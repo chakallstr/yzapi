@@ -1,0 +1,6 @@
+{
+  "name": "YZ Lab: Akıllı Yönlendirme Laboratuvarı",
+  "description": "YZ Ajanları ve üst düzey LLM'ler için akıllı yönlendirme, bilimsel dosya yönetimi ve AI performans yönetim laboratuvarı paneli.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
