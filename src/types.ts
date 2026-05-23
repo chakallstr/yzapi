@@ -1,13 +1,11 @@
-export interface ScientificData {
+export interface ModelEntry {
   id: string;
   name: string;
-  type: string;
-  size: string;
-  date: string;
-  status: 'loading' | 'success' | 'error';
-  rowsCount: number;
-  columns: string[];
-  data: Array<Record<string, string | number>>;
+  provider: string;
+  context: string;
+  type: "Metin" | "Görsel" | "Video";
+  inputUsd: number;
+  outputUsd: number;
 }
 
 export interface RoutingLog {
