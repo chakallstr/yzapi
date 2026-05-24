@@ -1,0 +1,4 @@
+{"at":"2026-05-24T15:37:51.158Z","agentId":"agent-backend-provider","type":"start","message":"agent started","mission":"OpenAI-compatible proxy, provider adapter, streaming billing, catalog sync, fallback router, image/video task flow."}
+{"at":"2026-05-24T15:37:51.158Z","agentId":"agent-billing-security","type":"start","message":"agent started","mission":"TL prepaid wallet, append-only ledger, API key lifecycle, webhook idempotency, rate limit, audit, customer/admin panel, deploy/observability."}
+{"at":"2026-05-24T15:37:51.158Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: litellm"}
+{"at":"2026-05-24T15:37:51.158Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: api key management"}

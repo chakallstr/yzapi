@@ -1,0 +1,525 @@
+[
+  {
+    "id": "anthropic/claude-haiku-4.5",
+    "name": "Claude Haiku 4.5",
+    "endpoints": [
+      "chat",
+      "messages"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "pricing": {
+      "prompt": "0.15000000",
+      "completion": "0.15000000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "anthropic/claude-opus-4.6",
+    "name": "Claude Opus 4.6",
+    "endpoints": [
+      "chat",
+      "messages"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "pricing": {
+      "prompt": "0.30000000",
+      "completion": "0.30000000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "anthropic/claude-opus-4.7",
+    "name": "Claude Opus 4.7",
+    "endpoints": [
+      "chat",
+      "messages"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "pricing": {
+      "prompt": "0.30000000",
+      "completion": "0.30000000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "anthropic/claude-sonnet-4.6",
+    "name": "Claude Sonnet 4.6",
+    "endpoints": [
+      "chat",
+      "messages"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "pricing": {
+      "prompt": "0.25500000",
+      "completion": "0.25500000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "bytedance/seedance-2.0",
+    "name": "Seedance 2.0",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "audio",
+      "image",
+      "text",
+      "video"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "pricing": {
+      "second": "0.00000000",
+      "second_by_resolution": {
+        "480p": "0.01681500",
+        "720p": "0.03780000",
+        "1080p": "0.08505000"
+      },
+      "unit": "usd_per_second"
+    }
+  },
+  {
+    "id": "bytedance/seedance-2.0-edit",
+    "name": "Seedance 2.0 Edit",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "audio",
+      "image",
+      "text",
+      "video"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "pricing": {
+      "second": "0.00000000",
+      "second_by_resolution": {
+        "480p": "0.01681500",
+        "720p": "0.03780000",
+        "1080p": "0.08505000"
+      },
+      "unit": "usd_per_second"
+    }
+  },
+  {
+    "id": "bytedance/seedance-2.0-extend",
+    "name": "Seedance 2.0 Extend",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "image",
+      "text",
+      "video"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "pricing": {
+      "second": "0.00000000",
+      "second_by_resolution": {
+        "480p": "0.01681500",
+        "720p": "0.03780000",
+        "1080p": "0.08505000"
+      },
+      "unit": "usd_per_second"
+    }
+  },
+  {
+    "id": "bytedance/seedance-2.0-i2v",
+    "name": "Seedance 2.0 i2v",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "pricing": {
+      "second": "0.00000000",
+      "second_by_resolution": {
+        "480p": "0.01681500",
+        "720p": "0.03780000",
+        "1080p": "0.08505000"
+      },
+      "unit": "usd_per_second"
+    }
+  },
+  {
+    "id": "google/gemini-2.5-pro",
+    "name": "Gemini 2.5 Pro",
+    "endpoints": [
+      "chat"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "pricing": {
+      "prompt": "0.11000000",
+      "completion": "0.11000000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "google/gemini-3.1-flash-lite-preview",
+    "name": "Gemini 3.1 Flash Lite Preview",
+    "endpoints": [
+      "chat"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "pricing": {
+      "prompt": "0.10000000",
+      "completion": "0.10000000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "google/gemini-3.1-pro-preview",
+    "name": "Gemini 3.1 Pro Preview",
+    "endpoints": [
+      "chat"
+    ],
+    "input_modalities": [
+      "audio",
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "pricing": {
+      "prompt": "0.13000000",
+      "completion": "0.13000000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "google/nano-banana-2",
+    "name": "Nano Banana 2",
+    "endpoints": [
+      "chat",
+      "images_generations"
+    ],
+    "input_modalities": [
+      "text"
+    ],
+    "output_modalities": [
+      "image"
+    ],
+    "pricing": {
+      "prompt": "0.10000000",
+      "completion": "0.30000000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "google/nano-banana-2-edit",
+    "name": "Nano Banana 2 Edit",
+    "endpoints": [
+      "chat",
+      "images_generations",
+      "images_edits"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "image"
+    ],
+    "pricing": {
+      "prompt": "0.10000000",
+      "completion": "0.30000000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "google/nano-banana-pro",
+    "name": "Nano Banana Pro",
+    "endpoints": [
+      "chat",
+      "images_generations"
+    ],
+    "input_modalities": [
+      "text"
+    ],
+    "output_modalities": [
+      "image"
+    ],
+    "pricing": {
+      "prompt": "0.20000000",
+      "completion": "1.20000000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "google/nano-banana-pro-edit",
+    "name": "Nano Banana Pro Edit",
+    "endpoints": [
+      "chat",
+      "images_generations",
+      "images_edits"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "image"
+    ],
+    "pricing": {
+      "prompt": "0.20000000",
+      "completion": "1.20000000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "google/veo-3.1-i2v",
+    "name": "Veo 3.1 i2v",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "pricing": {
+      "second": "0.03000000",
+      "unit": "usd_per_second"
+    }
+  },
+  {
+    "id": "kwaivgi/kling-v3.0-std-i2v",
+    "name": "Kling: 3.0 Standard Image-to-Video",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "pricing": {
+      "second": "0.03000000",
+      "unit": "usd_per_second"
+    }
+  },
+  {
+    "id": "kwaivgi/kling-v3.0-std-motion-control",
+    "name": "Kling: 3.0 Standard Motion Control",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "image",
+      "text",
+      "video"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "pricing": {
+      "second": "0.03000000",
+      "unit": "usd_per_second"
+    }
+  },
+  {
+    "id": "moonshotai/kimi-k2.5",
+    "name": "Kimi K2.5",
+    "endpoints": [
+      "chat"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "pricing": {
+      "prompt": "0.08000000",
+      "completion": "0.38000000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "openai/gpt-5.3-codex",
+    "name": "GPT 5.3 Codex",
+    "endpoints": [
+      "chat",
+      "responses"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "pricing": {
+      "prompt": "0.13000000",
+      "completion": "0.13000000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "openai/gpt-5.4",
+    "name": "GPT 5.4",
+    "endpoints": [
+      "chat",
+      "responses"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "pricing": {
+      "prompt": "0.15000000",
+      "completion": "0.15000000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "openai/gpt-5.4-mini",
+    "name": "GPT 5.4 Mini",
+    "endpoints": [
+      "chat",
+      "responses"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "pricing": {
+      "prompt": "0.10000000",
+      "completion": "0.10000000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "openai/gpt-5.5",
+    "name": "GPT 5.5",
+    "endpoints": [
+      "chat",
+      "responses"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "pricing": {
+      "prompt": "0.20000000",
+      "completion": "0.20000000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "openai/gpt-image-2",
+    "name": "GPT Image 2",
+    "endpoints": [
+      "chat",
+      "images_generations"
+    ],
+    "input_modalities": [
+      "text"
+    ],
+    "output_modalities": [
+      "image"
+    ],
+    "pricing": {
+      "prompt": "0.80000000",
+      "completion": "1.50000000",
+      "unit": "usd_per_million_tokens"
+    }
+  },
+  {
+    "id": "openai/gpt-image-2-edit",
+    "name": "GPT Image 2 Edit",
+    "endpoints": [
+      "chat",
+      "images_generations",
+      "images_edits"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "image"
+    ],
+    "pricing": {
+      "prompt": "0.80000000",
+      "completion": "1.50000000",
+      "unit": "usd_per_million_tokens"
+    }
+  }
+]

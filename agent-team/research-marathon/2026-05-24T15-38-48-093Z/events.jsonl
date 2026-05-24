@@ -1,0 +1,498 @@
+{"at":"2026-05-24T15:38:48.099Z","agentId":"agent-backend-provider","type":"start","message":"agent started","mission":"OpenAI-compatible proxy, provider adapter, streaming billing, catalog sync, fallback router, image/video task flow."}
+{"at":"2026-05-24T15:38:48.100Z","agentId":"agent-billing-security","type":"start","message":"agent started","mission":"TL prepaid wallet, append-only ledger, API key lifecycle, webhook idempotency, rate limit, audit, customer/admin panel, deploy/observability."}
+{"at":"2026-05-24T15:38:48.100Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: litellm"}
+{"at":"2026-05-24T15:38:48.100Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: api key management"}
+{"at":"2026-05-24T15:39:12.077Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: stripe webhook idempotency"}
+{"at":"2026-05-24T15:39:14.078Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: one-api openai"}
+{"at":"2026-05-24T15:39:14.585Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: one-api openai"}
+{"at":"2026-05-24T15:39:14.773Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key hash"}
+{"at":"2026-05-24T15:39:15.157Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: one-api openai"}
+{"at":"2026-05-24T15:39:15.161Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat.completions"}
+{"at":"2026-05-24T15:39:33.246Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: wallet ledger"}
+{"at":"2026-05-24T15:39:33.658Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: new-api openai"}
+{"at":"2026-05-24T15:39:34.206Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: new-api openai"}
+{"at":"2026-05-24T15:39:34.779Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: new-api openai"}
+{"at":"2026-05-24T15:39:52.782Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai proxy"}
+{"at":"2026-05-24T15:39:57.325Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: saas billing postgres"}
+{"at":"2026-05-24T15:39:57.872Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: saas billing"}
+{"at":"2026-05-24T15:39:58.447Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat/completions"}
+{"at":"2026-05-24T15:40:04.041Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key prefix"}
+{"at":"2026-05-24T15:40:16.929Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm gateway"}
+{"at":"2026-05-24T15:40:22.497Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: prepaid billing"}
+{"at":"2026-05-24T15:40:41.265Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: ai gateway"}
+{"at":"2026-05-24T15:40:46.601Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: rate limit redis express"}
+{"at":"2026-05-24T15:40:48.122Z","agentId":"agent-billing-security","type":"code-search","message":"code search: ledger_entries"}
+{"at":"2026-05-24T15:40:48.480Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: x-request-id"}
+{"at":"2026-05-24T15:41:06.619Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: audit log nodejs"}
+{"at":"2026-05-24T15:41:07.007Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai api gateway"}
+{"at":"2026-05-24T15:41:07.284Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: audit log"}
+{"at":"2026-05-24T15:41:30.934Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai compatible"}
+{"at":"2026-05-24T15:41:31.374Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: usage dashboard api"}
+{"at":"2026-05-24T15:41:32.532Z","agentId":"agent-billing-security","type":"code-search","message":"code search: idempotency_key"}
+{"at":"2026-05-24T15:41:37.240Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: images/generations"}
+{"at":"2026-05-24T15:41:51.040Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: payment webhook nodejs"}
+{"at":"2026-05-24T15:41:51.654Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: payment webhook"}
+{"at":"2026-05-24T15:41:55.751Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: provider adapter openai"}
+{"at":"2026-05-24T15:42:15.873Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openrouter"}
+{"at":"2026-05-24T15:42:15.950Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: crypto payment webhook"}
+{"at":"2026-05-24T15:42:16.556Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: crypto payment"}
+{"at":"2026-05-24T15:42:22.974Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: videos/tasks"}
+{"at":"2026-05-24T15:42:23.029Z","agentId":"agent-billing-security","type":"code-search","message":"code search: rate limit redis"}
+{"at":"2026-05-24T15:42:41.488Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: gemini openai proxy"}
+{"at":"2026-05-24T15:42:41.499Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: billing ledger"}
+{"at":"2026-05-24T15:43:05.826Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm router"}
+{"at":"2026-05-24T15:43:06.347Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: customer portal billing"}
+{"at":"2026-05-24T15:43:07.417Z","agentId":"agent-billing-security","type":"code-search","message":"code search: audit log"}
+{"at":"2026-05-24T15:43:12.340Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: provider adapter"}
+{"at":"2026-05-24T15:43:25.869Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: api key management"}
+{"at":"2026-05-24T15:43:30.841Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: litellm"}
+{"at":"2026-05-24T15:43:50.309Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: stripe webhook idempotency"}
+{"at":"2026-05-24T15:43:53.025Z","agentId":"agent-billing-security","type":"code-search","message":"code search: usage_records"}
+{"at":"2026-05-24T15:43:54.977Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: one-api openai"}
+{"at":"2026-05-24T15:43:55.752Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: one-api openai"}
+{"at":"2026-05-24T15:43:56.345Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: one-api openai"}
+{"at":"2026-05-24T15:43:56.347Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: model catalog pricing"}
+{"at":"2026-05-24T15:44:11.537Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: wallet ledger"}
+{"at":"2026-05-24T15:44:14.835Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: new-api openai"}
+{"at":"2026-05-24T15:44:15.530Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: new-api openai"}
+{"at":"2026-05-24T15:44:16.116Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: new-api openai"}
+{"at":"2026-05-24T15:44:34.123Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai proxy"}
+{"at":"2026-05-24T15:44:35.946Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: saas billing postgres"}
+{"at":"2026-05-24T15:44:36.460Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: saas billing"}
+{"at":"2026-05-24T15:44:39.722Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: stream_options include_usage"}
+{"at":"2026-05-24T15:44:42.084Z","agentId":"agent-billing-security","type":"code-search","message":"code search: webhook idempotency"}
+{"at":"2026-05-24T15:44:58.580Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm gateway"}
+{"at":"2026-05-24T15:45:00.618Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: prepaid billing"}
+{"at":"2026-05-24T15:45:22.712Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: ai gateway"}
+{"at":"2026-05-24T15:45:24.286Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: rate limit redis express"}
+{"at":"2026-05-24T15:45:25.396Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key hash"}
+{"at":"2026-05-24T15:45:29.126Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat.completions"}
+{"at":"2026-05-24T15:45:43.868Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: audit log nodejs"}
+{"at":"2026-05-24T15:45:44.585Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: audit log"}
+{"at":"2026-05-24T15:45:47.783Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai api gateway"}
+{"at":"2026-05-24T15:46:08.722Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: usage dashboard api"}
+{"at":"2026-05-24T15:46:09.940Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key prefix"}
+{"at":"2026-05-24T15:46:11.052Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai compatible"}
+{"at":"2026-05-24T15:46:17.383Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat/completions"}
+{"at":"2026-05-24T15:46:28.485Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: payment webhook nodejs"}
+{"at":"2026-05-24T15:46:29.227Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: payment webhook"}
+{"at":"2026-05-24T15:46:35.910Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: provider adapter openai"}
+{"at":"2026-05-24T15:46:53.491Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: crypto payment webhook"}
+{"at":"2026-05-24T15:46:54.165Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: crypto payment"}
+{"at":"2026-05-24T15:46:56.185Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openrouter"}
+{"at":"2026-05-24T15:47:00.590Z","agentId":"agent-billing-security","type":"code-search","message":"code search: ledger_entries"}
+{"at":"2026-05-24T15:47:04.646Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: x-request-id"}
+{"at":"2026-05-24T15:47:19.121Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: billing ledger"}
+{"at":"2026-05-24T15:47:23.166Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: gemini openai proxy"}
+{"at":"2026-05-24T15:47:43.445Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: customer portal billing"}
+{"at":"2026-05-24T15:47:44.661Z","agentId":"agent-billing-security","type":"code-search","message":"code search: idempotency_key"}
+{"at":"2026-05-24T15:47:47.674Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm router"}
+{"at":"2026-05-24T15:47:54.275Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: images/generations"}
+{"at":"2026-05-24T15:48:03.259Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: api key management"}
+{"at":"2026-05-24T15:48:13.406Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: litellm"}
+{"at":"2026-05-24T15:48:27.376Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: stripe webhook idempotency"}
+{"at":"2026-05-24T15:48:30.093Z","agentId":"agent-billing-security","type":"code-search","message":"code search: rate limit redis"}
+{"at":"2026-05-24T15:48:38.346Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: one-api openai"}
+{"at":"2026-05-24T15:48:39.083Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: one-api openai"}
+{"at":"2026-05-24T15:48:39.613Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: one-api openai"}
+{"at":"2026-05-24T15:48:39.615Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: videos/tasks"}
+{"at":"2026-05-24T15:48:48.622Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: wallet ledger"}
+{"at":"2026-05-24T15:48:58.090Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: new-api openai"}
+{"at":"2026-05-24T15:48:58.663Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: new-api openai"}
+{"at":"2026-05-24T15:48:59.220Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: new-api openai"}
+{"at":"2026-05-24T15:49:12.697Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: saas billing postgres"}
+{"at":"2026-05-24T15:49:13.409Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: saas billing"}
+{"at":"2026-05-24T15:49:17.224Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai proxy"}
+{"at":"2026-05-24T15:49:19.617Z","agentId":"agent-billing-security","type":"code-search","message":"code search: audit log"}
+{"at":"2026-05-24T15:49:23.226Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: provider adapter"}
+{"at":"2026-05-24T15:49:38.070Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: prepaid billing"}
+{"at":"2026-05-24T15:49:41.725Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm gateway"}
+{"at":"2026-05-24T15:50:01.726Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: rate limit redis express"}
+{"at":"2026-05-24T15:50:02.977Z","agentId":"agent-billing-security","type":"code-search","message":"code search: usage_records"}
+{"at":"2026-05-24T15:50:06.389Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: ai gateway"}
+{"at":"2026-05-24T15:50:13.280Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: model catalog pricing"}
+{"at":"2026-05-24T15:50:21.552Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: audit log nodejs"}
+{"at":"2026-05-24T15:50:22.117Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: audit log"}
+{"at":"2026-05-24T15:50:31.832Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai api gateway"}
+{"at":"2026-05-24T15:50:46.071Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: usage dashboard api"}
+{"at":"2026-05-24T15:50:47.182Z","agentId":"agent-billing-security","type":"code-search","message":"code search: webhook idempotency"}
+{"at":"2026-05-24T15:50:55.151Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai compatible"}
+{"at":"2026-05-24T15:51:01.078Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: stream_options include_usage"}
+{"at":"2026-05-24T15:51:05.672Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: payment webhook nodejs"}
+{"at":"2026-05-24T15:51:06.575Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: payment webhook"}
+{"at":"2026-05-24T15:51:19.568Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: provider adapter openai"}
+{"at":"2026-05-24T15:51:30.616Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: crypto payment webhook"}
+{"at":"2026-05-24T15:51:31.134Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: crypto payment"}
+{"at":"2026-05-24T15:51:37.066Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key hash"}
+{"at":"2026-05-24T15:51:39.830Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openrouter"}
+{"at":"2026-05-24T15:51:45.794Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat.completions"}
+{"at":"2026-05-24T15:51:55.543Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: billing ledger"}
+{"at":"2026-05-24T15:52:04.250Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: gemini openai proxy"}
+{"at":"2026-05-24T15:52:20.024Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: customer portal billing"}
+{"at":"2026-05-24T15:52:21.079Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key prefix"}
+{"at":"2026-05-24T15:52:28.110Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm router"}
+{"at":"2026-05-24T15:52:35.488Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat/completions"}
+{"at":"2026-05-24T15:52:39.616Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: api key management"}
+{"at":"2026-05-24T15:52:54.021Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: litellm"}
+{"at":"2026-05-24T15:53:04.752Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: stripe webhook idempotency"}
+{"at":"2026-05-24T15:53:07.402Z","agentId":"agent-billing-security","type":"code-search","message":"code search: ledger_entries"}
+{"at":"2026-05-24T15:53:18.363Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: one-api openai"}
+{"at":"2026-05-24T15:53:18.936Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: one-api openai"}
+{"at":"2026-05-24T15:53:19.453Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: one-api openai"}
+{"at":"2026-05-24T15:53:19.455Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: x-request-id"}
+{"at":"2026-05-24T15:53:25.935Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: wallet ledger"}
+{"at":"2026-05-24T15:53:37.991Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: new-api openai"}
+{"at":"2026-05-24T15:53:38.500Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: new-api openai"}
+{"at":"2026-05-24T15:53:39.062Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: new-api openai"}
+{"at":"2026-05-24T15:53:49.733Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: saas billing postgres"}
+{"at":"2026-05-24T15:53:50.324Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: saas billing"}
+{"at":"2026-05-24T15:53:55.958Z","agentId":"agent-billing-security","type":"code-search","message":"code search: idempotency_key"}
+{"at":"2026-05-24T15:53:57.065Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai proxy"}
+{"at":"2026-05-24T15:54:04.945Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: images/generations"}
+{"at":"2026-05-24T15:54:14.495Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: prepaid billing"}
+{"at":"2026-05-24T15:54:23.468Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm gateway"}
+{"at":"2026-05-24T15:54:38.328Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: rate limit redis express"}
+{"at":"2026-05-24T15:54:39.396Z","agentId":"agent-billing-security","type":"code-search","message":"code search: rate limit redis"}
+{"at":"2026-05-24T15:54:47.358Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: ai gateway"}
+{"at":"2026-05-24T15:54:53.978Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: videos/tasks"}
+{"at":"2026-05-24T15:54:57.890Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: audit log nodejs"}
+{"at":"2026-05-24T15:54:58.610Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: audit log"}
+{"at":"2026-05-24T15:55:12.522Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai api gateway"}
+{"at":"2026-05-24T15:55:22.935Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: usage dashboard api"}
+{"at":"2026-05-24T15:55:23.987Z","agentId":"agent-billing-security","type":"code-search","message":"code search: audit log"}
+{"at":"2026-05-24T15:55:35.574Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai compatible"}
+{"at":"2026-05-24T15:55:41.597Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: provider adapter"}
+{"at":"2026-05-24T15:55:43.148Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: payment webhook nodejs"}
+{"at":"2026-05-24T15:55:43.672Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: payment webhook"}
+{"at":"2026-05-24T15:56:00.084Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: provider adapter openai"}
+{"at":"2026-05-24T15:56:07.443Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: crypto payment webhook"}
+{"at":"2026-05-24T15:56:07.983Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: crypto payment"}
+{"at":"2026-05-24T15:56:14.195Z","agentId":"agent-billing-security","type":"code-search","message":"code search: usage_records"}
+{"at":"2026-05-24T15:56:20.983Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openrouter"}
+{"at":"2026-05-24T15:56:26.843Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: model catalog pricing"}
+{"at":"2026-05-24T15:56:32.677Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: billing ledger"}
+{"at":"2026-05-24T15:56:45.352Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: gemini openai proxy"}
+{"at":"2026-05-24T15:56:56.141Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: customer portal billing"}
+{"at":"2026-05-24T15:56:57.235Z","agentId":"agent-billing-security","type":"code-search","message":"code search: webhook idempotency"}
+{"at":"2026-05-24T15:57:09.146Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm router"}
+{"at":"2026-05-24T15:57:15.548Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: stream_options include_usage"}
+{"at":"2026-05-24T15:57:15.707Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: api key management"}
+{"at":"2026-05-24T15:57:34.104Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: litellm"}
+{"at":"2026-05-24T15:57:39.819Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: stripe webhook idempotency"}
+{"at":"2026-05-24T15:57:42.445Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key hash"}
+{"at":"2026-05-24T15:57:58.371Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: one-api openai"}
+{"at":"2026-05-24T15:57:59.085Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: one-api openai"}
+{"at":"2026-05-24T15:57:59.654Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: one-api openai"}
+{"at":"2026-05-24T15:57:59.655Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat.completions"}
+{"at":"2026-05-24T15:58:00.960Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: wallet ledger"}
+{"at":"2026-05-24T15:58:18.180Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: new-api openai"}
+{"at":"2026-05-24T15:58:18.754Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: new-api openai"}
+{"at":"2026-05-24T15:58:19.333Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: new-api openai"}
+{"at":"2026-05-24T15:58:24.955Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: saas billing postgres"}
+{"at":"2026-05-24T15:58:25.528Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: saas billing"}
+{"at":"2026-05-24T15:58:31.121Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key prefix"}
+{"at":"2026-05-24T15:58:37.339Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai proxy"}
+{"at":"2026-05-24T15:58:43.097Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat/completions"}
+{"at":"2026-05-24T15:58:49.558Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: prepaid billing"}
+{"at":"2026-05-24T15:59:01.582Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm gateway"}
+{"at":"2026-05-24T15:59:13.399Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: rate limit redis express"}
+{"at":"2026-05-24T15:59:14.545Z","agentId":"agent-billing-security","type":"code-search","message":"code search: ledger_entries"}
+{"at":"2026-05-24T15:59:25.711Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: ai gateway"}
+{"at":"2026-05-24T15:59:32.185Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: x-request-id"}
+{"at":"2026-05-24T15:59:33.075Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: audit log nodejs"}
+{"at":"2026-05-24T15:59:33.613Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: audit log"}
+{"at":"2026-05-24T15:59:50.669Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai api gateway"}
+{"at":"2026-05-24T15:59:57.375Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: usage dashboard api"}
+{"at":"2026-05-24T15:59:58.439Z","agentId":"agent-billing-security","type":"code-search","message":"code search: idempotency_key"}
+{"at":"2026-05-24T16:00:14.407Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai compatible"}
+{"at":"2026-05-24T16:00:16.892Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: payment webhook nodejs"}
+{"at":"2026-05-24T16:00:17.387Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: payment webhook"}
+{"at":"2026-05-24T16:00:20.503Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: images/generations"}
+{"at":"2026-05-24T16:00:39.243Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: provider adapter openai"}
+{"at":"2026-05-24T16:00:42.395Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: crypto payment webhook"}
+{"at":"2026-05-24T16:00:42.932Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: crypto payment"}
+{"at":"2026-05-24T16:00:49.248Z","agentId":"agent-billing-security","type":"code-search","message":"code search: rate limit redis"}
+{"at":"2026-05-24T16:01:07.782Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: billing ledger"}
+{"at":"2026-05-24T16:01:09.327Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openrouter"}
+{"at":"2026-05-24T16:01:15.449Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: videos/tasks"}
+{"at":"2026-05-24T16:01:31.495Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: customer portal billing"}
+{"at":"2026-05-24T16:01:33.002Z","agentId":"agent-billing-security","type":"code-search","message":"code search: audit log"}
+{"at":"2026-05-24T16:01:33.983Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: gemini openai proxy"}
+{"at":"2026-05-24T16:01:51.506Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: api key management"}
+{"at":"2026-05-24T16:01:57.605Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm router"}
+{"at":"2026-05-24T16:02:05.412Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: provider adapter"}
+{"at":"2026-05-24T16:02:15.793Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: stripe webhook idempotency"}
+{"at":"2026-05-24T16:02:18.454Z","agentId":"agent-billing-security","type":"code-search","message":"code search: usage_records"}
+{"at":"2026-05-24T16:02:23.891Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: litellm"}
+{"at":"2026-05-24T16:02:36.983Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: wallet ledger"}
+{"at":"2026-05-24T16:02:48.645Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: one-api openai"}
+{"at":"2026-05-24T16:02:49.222Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: one-api openai"}
+{"at":"2026-05-24T16:02:49.804Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: one-api openai"}
+{"at":"2026-05-24T16:02:49.805Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: model catalog pricing"}
+{"at":"2026-05-24T16:03:02.972Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: saas billing postgres"}
+{"at":"2026-05-24T16:03:03.817Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: saas billing"}
+{"at":"2026-05-24T16:03:08.320Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: new-api openai"}
+{"at":"2026-05-24T16:03:08.841Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: new-api openai"}
+{"at":"2026-05-24T16:03:09.421Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: new-api openai"}
+{"at":"2026-05-24T16:03:09.587Z","agentId":"agent-billing-security","type":"code-search","message":"code search: webhook idempotency"}
+{"at":"2026-05-24T16:03:27.426Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai proxy"}
+{"at":"2026-05-24T16:03:28.087Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: prepaid billing"}
+{"at":"2026-05-24T16:03:33.329Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: stream_options include_usage"}
+{"at":"2026-05-24T16:03:51.801Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: rate limit redis express"}
+{"at":"2026-05-24T16:03:52.011Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm gateway"}
+{"at":"2026-05-24T16:03:53.002Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key hash"}
+{"at":"2026-05-24T16:04:11.493Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: audit log nodejs"}
+{"at":"2026-05-24T16:04:12.271Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: audit log"}
+{"at":"2026-05-24T16:04:16.317Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: ai gateway"}
+{"at":"2026-05-24T16:04:22.606Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat.completions"}
+{"at":"2026-05-24T16:04:37.558Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: usage dashboard api"}
+{"at":"2026-05-24T16:04:38.699Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key prefix"}
+{"at":"2026-05-24T16:04:41.095Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai api gateway"}
+{"at":"2026-05-24T16:04:57.157Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: payment webhook nodejs"}
+{"at":"2026-05-24T16:04:57.794Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: payment webhook"}
+{"at":"2026-05-24T16:05:04.554Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai compatible"}
+{"at":"2026-05-24T16:05:11.784Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat/completions"}
+{"at":"2026-05-24T16:05:21.617Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: crypto payment webhook"}
+{"at":"2026-05-24T16:05:22.221Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: crypto payment"}
+{"at":"2026-05-24T16:05:28.332Z","agentId":"agent-billing-security","type":"code-search","message":"code search: ledger_entries"}
+{"at":"2026-05-24T16:05:30.372Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: provider adapter openai"}
+{"at":"2026-05-24T16:05:46.857Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: billing ledger"}
+{"at":"2026-05-24T16:05:50.437Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openrouter"}
+{"at":"2026-05-24T16:05:57.458Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: x-request-id"}
+{"at":"2026-05-24T16:06:11.505Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: customer portal billing"}
+{"at":"2026-05-24T16:06:12.644Z","agentId":"agent-billing-security","type":"code-search","message":"code search: idempotency_key"}
+{"at":"2026-05-24T16:06:15.933Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: gemini openai proxy"}
+{"at":"2026-05-24T16:06:31.103Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: api key management"}
+{"at":"2026-05-24T16:06:39.943Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm router"}
+{"at":"2026-05-24T16:06:47.404Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: images/generations"}
+{"at":"2026-05-24T16:06:55.102Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: stripe webhook idempotency"}
+{"at":"2026-05-24T16:06:57.857Z","agentId":"agent-billing-security","type":"code-search","message":"code search: rate limit redis"}
+{"at":"2026-05-24T16:07:05.870Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: litellm"}
+{"at":"2026-05-24T16:07:16.324Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: wallet ledger"}
+{"at":"2026-05-24T16:07:29.960Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: one-api openai"}
+{"at":"2026-05-24T16:07:30.566Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: one-api openai"}
+{"at":"2026-05-24T16:07:31.094Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: one-api openai"}
+{"at":"2026-05-24T16:07:31.095Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: videos/tasks"}
+{"at":"2026-05-24T16:07:40.232Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: saas billing postgres"}
+{"at":"2026-05-24T16:07:40.841Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: saas billing"}
+{"at":"2026-05-24T16:07:46.502Z","agentId":"agent-billing-security","type":"code-search","message":"code search: audit log"}
+{"at":"2026-05-24T16:07:49.558Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: new-api openai"}
+{"at":"2026-05-24T16:07:50.165Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: new-api openai"}
+{"at":"2026-05-24T16:07:50.723Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: new-api openai"}
+{"at":"2026-05-24T16:08:04.963Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: prepaid billing"}
+{"at":"2026-05-24T16:08:08.728Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai proxy"}
+{"at":"2026-05-24T16:08:14.562Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: provider adapter"}
+{"at":"2026-05-24T16:08:29.356Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: rate limit redis express"}
+{"at":"2026-05-24T16:08:30.431Z","agentId":"agent-billing-security","type":"code-search","message":"code search: usage_records"}
+{"at":"2026-05-24T16:08:33.084Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm gateway"}
+{"at":"2026-05-24T16:08:48.997Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: audit log nodejs"}
+{"at":"2026-05-24T16:08:49.566Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: audit log"}
+{"at":"2026-05-24T16:08:57.167Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: ai gateway"}
+{"at":"2026-05-24T16:09:03.757Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: model catalog pricing"}
+{"at":"2026-05-24T16:09:13.477Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: usage dashboard api"}
+{"at":"2026-05-24T16:09:14.642Z","agentId":"agent-billing-security","type":"code-search","message":"code search: webhook idempotency"}
+{"at":"2026-05-24T16:09:22.236Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai api gateway"}
+{"at":"2026-05-24T16:09:33.223Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: payment webhook nodejs"}
+{"at":"2026-05-24T16:09:33.863Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: payment webhook"}
+{"at":"2026-05-24T16:09:45.488Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai compatible"}
+{"at":"2026-05-24T16:09:51.964Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: stream_options include_usage"}
+{"at":"2026-05-24T16:09:57.845Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: crypto payment webhook"}
+{"at":"2026-05-24T16:09:58.429Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: crypto payment"}
+{"at":"2026-05-24T16:10:04.807Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key hash"}
+{"at":"2026-05-24T16:10:10.432Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: provider adapter openai"}
+{"at":"2026-05-24T16:10:23.316Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: billing ledger"}
+{"at":"2026-05-24T16:10:30.507Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openrouter"}
+{"at":"2026-05-24T16:10:36.793Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat.completions"}
+{"at":"2026-05-24T16:10:47.134Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: customer portal billing"}
+{"at":"2026-05-24T16:10:48.297Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key prefix"}
+{"at":"2026-05-24T16:10:55.255Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: gemini openai proxy"}
+{"at":"2026-05-24T16:11:06.774Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: api key management"}
+{"at":"2026-05-24T16:11:19.942Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm router"}
+{"at":"2026-05-24T16:11:26.617Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat/completions"}
+{"at":"2026-05-24T16:11:31.260Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: stripe webhook idempotency"}
+{"at":"2026-05-24T16:11:33.914Z","agentId":"agent-billing-security","type":"code-search","message":"code search: ledger_entries"}
+{"at":"2026-05-24T16:11:45.118Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: litellm"}
+{"at":"2026-05-24T16:11:52.437Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: wallet ledger"}
+{"at":"2026-05-24T16:12:09.461Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: one-api openai"}
+{"at":"2026-05-24T16:12:10.146Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: one-api openai"}
+{"at":"2026-05-24T16:12:10.678Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: one-api openai"}
+{"at":"2026-05-24T16:12:10.680Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: x-request-id"}
+{"at":"2026-05-24T16:12:16.900Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: saas billing postgres"}
+{"at":"2026-05-24T16:12:17.687Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: saas billing"}
+{"at":"2026-05-24T16:12:23.784Z","agentId":"agent-billing-security","type":"code-search","message":"code search: idempotency_key"}
+{"at":"2026-05-24T16:12:29.255Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: new-api openai"}
+{"at":"2026-05-24T16:12:29.853Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: new-api openai"}
+{"at":"2026-05-24T16:12:30.408Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: new-api openai"}
+{"at":"2026-05-24T16:12:43.017Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: prepaid billing"}
+{"at":"2026-05-24T16:12:48.414Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai proxy"}
+{"at":"2026-05-24T16:12:54.527Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: images/generations"}
+{"at":"2026-05-24T16:13:06.954Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: rate limit redis express"}
+{"at":"2026-05-24T16:13:08.145Z","agentId":"agent-billing-security","type":"code-search","message":"code search: rate limit redis"}
+{"at":"2026-05-24T16:13:13.023Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm gateway"}
+{"at":"2026-05-24T16:13:26.686Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: audit log nodejs"}
+{"at":"2026-05-24T16:13:27.274Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: audit log"}
+{"at":"2026-05-24T16:13:37.847Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: ai gateway"}
+{"at":"2026-05-24T16:13:44.616Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: videos/tasks"}
+{"at":"2026-05-24T16:13:54.525Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: usage dashboard api"}
+{"at":"2026-05-24T16:13:55.737Z","agentId":"agent-billing-security","type":"code-search","message":"code search: audit log"}
+{"at":"2026-05-24T16:14:03.150Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai api gateway"}
+{"at":"2026-05-24T16:14:14.454Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: payment webhook nodejs"}
+{"at":"2026-05-24T16:14:15.142Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: payment webhook"}
+{"at":"2026-05-24T16:14:27.673Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai compatible"}
+{"at":"2026-05-24T16:14:34.222Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: provider adapter"}
+{"at":"2026-05-24T16:14:39.226Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: crypto payment webhook"}
+{"at":"2026-05-24T16:14:39.718Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: crypto payment"}
+{"at":"2026-05-24T16:14:45.697Z","agentId":"agent-billing-security","type":"code-search","message":"code search: usage_records"}
+{"at":"2026-05-24T16:14:52.755Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: provider adapter openai"}
+{"at":"2026-05-24T16:15:04.273Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: billing ledger"}
+{"at":"2026-05-24T16:15:12.878Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openrouter"}
+{"at":"2026-05-24T16:15:19.202Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: model catalog pricing"}
+{"at":"2026-05-24T16:15:28.142Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: customer portal billing"}
+{"at":"2026-05-24T16:15:29.275Z","agentId":"agent-billing-security","type":"code-search","message":"code search: webhook idempotency"}
+{"at":"2026-05-24T16:15:37.774Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: gemini openai proxy"}
+{"at":"2026-05-24T16:15:47.964Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: api key management"}
+{"at":"2026-05-24T16:16:01.685Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm router"}
+{"at":"2026-05-24T16:16:09.732Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: stream_options include_usage"}
+{"at":"2026-05-24T16:16:12.133Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: stripe webhook idempotency"}
+{"at":"2026-05-24T16:16:14.656Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key hash"}
+{"at":"2026-05-24T16:16:28.262Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: litellm"}
+{"at":"2026-05-24T16:16:33.277Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: wallet ledger"}
+{"at":"2026-05-24T16:16:52.712Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: one-api openai"}
+{"at":"2026-05-24T16:16:53.365Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: one-api openai"}
+{"at":"2026-05-24T16:16:53.965Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: one-api openai"}
+{"at":"2026-05-24T16:16:53.966Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat.completions"}
+{"at":"2026-05-24T16:16:57.304Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: saas billing postgres"}
+{"at":"2026-05-24T16:16:57.888Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: saas billing"}
+{"at":"2026-05-24T16:17:03.902Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key prefix"}
+{"at":"2026-05-24T16:17:12.486Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: new-api openai"}
+{"at":"2026-05-24T16:17:13.031Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: new-api openai"}
+{"at":"2026-05-24T16:17:13.524Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: new-api openai"}
+{"at":"2026-05-24T16:17:22.402Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: prepaid billing"}
+{"at":"2026-05-24T16:17:31.531Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai proxy"}
+{"at":"2026-05-24T16:17:37.968Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat/completions"}
+{"at":"2026-05-24T16:17:46.220Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: rate limit redis express"}
+{"at":"2026-05-24T16:17:47.149Z","agentId":"agent-billing-security","type":"code-search","message":"code search: ledger_entries"}
+{"at":"2026-05-24T16:17:56.540Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm gateway"}
+{"at":"2026-05-24T16:18:05.687Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: audit log nodejs"}
+{"at":"2026-05-24T16:18:06.211Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: audit log"}
+{"at":"2026-05-24T16:18:20.883Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: ai gateway"}
+{"at":"2026-05-24T16:18:27.594Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: x-request-id"}
+{"at":"2026-05-24T16:18:30.576Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: usage dashboard api"}
+{"at":"2026-05-24T16:18:31.921Z","agentId":"agent-billing-security","type":"code-search","message":"code search: idempotency_key"}
+{"at":"2026-05-24T16:18:46.040Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai api gateway"}
+{"at":"2026-05-24T16:18:50.439Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: payment webhook nodejs"}
+{"at":"2026-05-24T16:18:50.993Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: payment webhook"}
+{"at":"2026-05-24T16:19:09.351Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai compatible"}
+{"at":"2026-05-24T16:19:15.141Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: crypto payment webhook"}
+{"at":"2026-05-24T16:19:15.649Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: crypto payment"}
+{"at":"2026-05-24T16:19:15.778Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: images/generations"}
+{"at":"2026-05-24T16:19:21.604Z","agentId":"agent-billing-security","type":"code-search","message":"code search: rate limit redis"}
+{"at":"2026-05-24T16:19:34.285Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: provider adapter openai"}
+{"at":"2026-05-24T16:19:40.102Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: billing ledger"}
+{"at":"2026-05-24T16:19:54.455Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openrouter"}
+{"at":"2026-05-24T16:20:00.359Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: videos/tasks"}
+{"at":"2026-05-24T16:20:03.782Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: customer portal billing"}
+{"at":"2026-05-24T16:20:04.843Z","agentId":"agent-billing-security","type":"code-search","message":"code search: audit log"}
+{"at":"2026-05-24T16:20:18.805Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: gemini openai proxy"}
+{"at":"2026-05-24T16:20:23.553Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: api key management"}
+{"at":"2026-05-24T16:20:42.827Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm router"}
+{"at":"2026-05-24T16:20:48.931Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: stripe webhook idempotency"}
+{"at":"2026-05-24T16:20:49.549Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: provider adapter"}
+{"at":"2026-05-24T16:20:51.411Z","agentId":"agent-billing-security","type":"code-search","message":"code search: usage_records"}
+{"at":"2026-05-24T16:21:08.044Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: litellm"}
+{"at":"2026-05-24T16:21:09.939Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: wallet ledger"}
+{"at":"2026-05-24T16:21:32.960Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: one-api openai"}
+{"at":"2026-05-24T16:21:33.655Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: one-api openai"}
+{"at":"2026-05-24T16:21:33.846Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: saas billing postgres"}
+{"at":"2026-05-24T16:21:34.256Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: one-api openai"}
+{"at":"2026-05-24T16:21:34.258Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: model catalog pricing"}
+{"at":"2026-05-24T16:21:34.377Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: saas billing"}
+{"at":"2026-05-24T16:21:40.296Z","agentId":"agent-billing-security","type":"code-search","message":"code search: webhook idempotency"}
+{"at":"2026-05-24T16:21:52.876Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: new-api openai"}
+{"at":"2026-05-24T16:21:53.569Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: new-api openai"}
+{"at":"2026-05-24T16:21:54.107Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: new-api openai"}
+{"at":"2026-05-24T16:21:58.855Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: prepaid billing"}
+{"at":"2026-05-24T16:22:12.109Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai proxy"}
+{"at":"2026-05-24T16:22:18.086Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: stream_options include_usage"}
+{"at":"2026-05-24T16:22:22.603Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: rate limit redis express"}
+{"at":"2026-05-24T16:22:23.825Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key hash"}
+{"at":"2026-05-24T16:22:36.558Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm gateway"}
+{"at":"2026-05-24T16:22:42.374Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: audit log nodejs"}
+{"at":"2026-05-24T16:22:42.916Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: audit log"}
+{"at":"2026-05-24T16:23:00.952Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: ai gateway"}
+{"at":"2026-05-24T16:23:07.186Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: usage dashboard api"}
+{"at":"2026-05-24T16:23:07.659Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat.completions"}
+{"at":"2026-05-24T16:23:08.248Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key prefix"}
+{"at":"2026-05-24T16:23:26.159Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai api gateway"}
+{"at":"2026-05-24T16:23:26.788Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: payment webhook nodejs"}
+{"at":"2026-05-24T16:23:27.368Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: payment webhook"}
+{"at":"2026-05-24T16:23:49.599Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai compatible"}
+{"at":"2026-05-24T16:23:51.186Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: crypto payment webhook"}
+{"at":"2026-05-24T16:23:51.701Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: crypto payment"}
+{"at":"2026-05-24T16:23:55.830Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat/completions"}
+{"at":"2026-05-24T16:23:57.846Z","agentId":"agent-billing-security","type":"code-search","message":"code search: ledger_entries"}
+{"at":"2026-05-24T16:24:14.303Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: provider adapter openai"}
+{"at":"2026-05-24T16:24:16.369Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: billing ledger"}
+{"at":"2026-05-24T16:24:34.607Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openrouter"}
+{"at":"2026-05-24T16:24:40.252Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: customer portal billing"}
+{"at":"2026-05-24T16:24:40.828Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: x-request-id"}
+{"at":"2026-05-24T16:24:41.304Z","agentId":"agent-billing-security","type":"code-search","message":"code search: idempotency_key"}
+{"at":"2026-05-24T16:24:59.286Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: gemini openai proxy"}
+{"at":"2026-05-24T16:24:59.815Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: api key management"}
+{"at":"2026-05-24T16:25:23.231Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm router"}
+{"at":"2026-05-24T16:25:23.951Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: stripe webhook idempotency"}
+{"at":"2026-05-24T16:25:26.473Z","agentId":"agent-billing-security","type":"code-search","message":"code search: rate limit redis"}
+{"at":"2026-05-24T16:25:29.481Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: images/generations"}
+{"at":"2026-05-24T16:25:45.187Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: wallet ledger"}
+{"at":"2026-05-24T16:25:47.941Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: litellm"}
+{"at":"2026-05-24T16:26:09.275Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: saas billing postgres"}
+{"at":"2026-05-24T16:26:09.910Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: saas billing"}
+{"at":"2026-05-24T16:26:12.159Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: one-api openai"}
+{"at":"2026-05-24T16:26:12.774Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: one-api openai"}
+{"at":"2026-05-24T16:26:13.352Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: one-api openai"}
+{"at":"2026-05-24T16:26:13.353Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: videos/tasks"}
+{"at":"2026-05-24T16:26:15.748Z","agentId":"agent-billing-security","type":"code-search","message":"code search: audit log"}
+{"at":"2026-05-24T16:26:31.845Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: new-api openai"}
+{"at":"2026-05-24T16:26:32.568Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: new-api openai"}
+{"at":"2026-05-24T16:26:33.118Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: new-api openai"}
+{"at":"2026-05-24T16:26:34.260Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: prepaid billing"}
+{"at":"2026-05-24T16:26:51.123Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai proxy"}
+{"at":"2026-05-24T16:26:57.130Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: provider adapter"}
+{"at":"2026-05-24T16:26:57.763Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: rate limit redis express"}
+{"at":"2026-05-24T16:26:58.988Z","agentId":"agent-billing-security","type":"code-search","message":"code search: usage_records"}
+{"at":"2026-05-24T16:27:15.617Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm gateway"}
+{"at":"2026-05-24T16:27:17.530Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: audit log nodejs"}
+{"at":"2026-05-24T16:27:18.084Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: audit log"}
+{"at":"2026-05-24T16:27:39.968Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: ai gateway"}
+{"at":"2026-05-24T16:27:42.114Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: usage dashboard api"}
+{"at":"2026-05-24T16:27:43.170Z","agentId":"agent-billing-security","type":"code-search","message":"code search: webhook idempotency"}
+{"at":"2026-05-24T16:27:46.259Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: model catalog pricing"}
+{"at":"2026-05-24T16:28:01.638Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: payment webhook nodejs"}
+{"at":"2026-05-24T16:28:02.332Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: payment webhook"}
+{"at":"2026-05-24T16:28:04.762Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai api gateway"}
+{"at":"2026-05-24T16:28:26.015Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: crypto payment webhook"}
+{"at":"2026-05-24T16:28:26.684Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: crypto payment"}
+{"at":"2026-05-24T16:28:27.962Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openai compatible"}
+{"at":"2026-05-24T16:28:33.164Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key hash"}
+{"at":"2026-05-24T16:28:34.016Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: stream_options include_usage"}
+{"at":"2026-05-24T16:28:51.613Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: billing ledger"}
+{"at":"2026-05-24T16:28:52.498Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: provider adapter openai"}
+{"at":"2026-05-24T16:29:12.649Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: openrouter"}
+{"at":"2026-05-24T16:29:15.310Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: customer portal billing"}
+{"at":"2026-05-24T16:29:16.390Z","agentId":"agent-billing-security","type":"code-search","message":"code search: api key prefix"}
+{"at":"2026-05-24T16:29:18.844Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat.completions"}
+{"at":"2026-05-24T16:29:34.873Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: api key management"}
+{"at":"2026-05-24T16:29:37.982Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: gemini openai proxy"}
+{"at":"2026-05-24T16:29:59.091Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: stripe webhook idempotency"}
+{"at":"2026-05-24T16:30:01.643Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: llm router"}
+{"at":"2026-05-24T16:30:01.717Z","agentId":"agent-billing-security","type":"code-search","message":"code search: ledger_entries"}
+{"at":"2026-05-24T16:30:07.843Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: chat/completions"}
+{"at":"2026-05-24T16:30:20.203Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: wallet ledger"}
+{"at":"2026-05-24T16:30:26.368Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: litellm"}
+{"at":"2026-05-24T16:30:44.148Z","agentId":"agent-billing-security","type":"repo-search","message":"repo search: saas billing postgres"}
+{"at":"2026-05-24T16:30:44.822Z","agentId":"agent-billing-security","type":"repo-search-empty","message":"no repo results; fallback: saas billing"}
+{"at":"2026-05-24T16:30:50.724Z","agentId":"agent-backend-provider","type":"repo-search","message":"repo search: one-api openai"}
+{"at":"2026-05-24T16:30:51.055Z","agentId":"agent-billing-security","type":"code-search","message":"code search: idempotency_key"}
+{"at":"2026-05-24T16:30:51.283Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results; fallback: one-api openai"}
+{"at":"2026-05-24T16:30:51.817Z","agentId":"agent-backend-provider","type":"repo-search-empty","message":"no repo results: one-api openai"}
+{"at":"2026-05-24T16:30:51.818Z","agentId":"agent-backend-provider","type":"code-search","message":"code search: x-request-id"}

@@ -1,0 +1,805 @@
+[
+  {
+    "id": "anthropic/claude-haiku-4.5",
+    "name": "Claude Haiku 4.5",
+    "context_length": 200000,
+    "max_output_tokens": 64000,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat",
+      "messages"
+    ],
+    "pricing": {
+      "prompt": "0.15000000",
+      "completion": "0.15000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 16,
+    "aliases_count": 5
+  },
+  {
+    "id": "anthropic/claude-opus-4.6",
+    "name": "Claude Opus 4.6",
+    "context_length": 1000000,
+    "max_output_tokens": 128000,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat",
+      "messages"
+    ],
+    "pricing": {
+      "prompt": "0.30000000",
+      "completion": "0.30000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 13,
+    "aliases_count": 2
+  },
+  {
+    "id": "anthropic/claude-opus-4.7",
+    "name": "Claude Opus 4.7",
+    "context_length": 1000000,
+    "max_output_tokens": 128000,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat",
+      "messages"
+    ],
+    "pricing": {
+      "prompt": "0.30000000",
+      "completion": "0.30000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 16,
+    "aliases_count": 2
+  },
+  {
+    "id": "anthropic/claude-sonnet-4.6",
+    "name": "Claude Sonnet 4.6",
+    "context_length": 1000000,
+    "max_output_tokens": 128000,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat",
+      "messages"
+    ],
+    "pricing": {
+      "prompt": "0.25500000",
+      "completion": "0.25500000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 16,
+    "aliases_count": 2
+  },
+  {
+    "id": "bytedance/seedance-2.0",
+    "name": "Seedance 2.0",
+    "context_length": null,
+    "max_output_tokens": null,
+    "input_modalities": [
+      "audio",
+      "image",
+      "text",
+      "video"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "pricing": {
+      "second": "0.00000000",
+      "second_by_resolution": {
+        "480p": "0.01681500",
+        "720p": "0.03780000",
+        "1080p": "0.08505000"
+      },
+      "unit": "usd_per_second"
+    },
+    "supported_parameters_count": 14,
+    "aliases_count": 0
+  },
+  {
+    "id": "bytedance/seedance-2.0-edit",
+    "name": "Seedance 2.0 Edit",
+    "context_length": null,
+    "max_output_tokens": null,
+    "input_modalities": [
+      "audio",
+      "image",
+      "text",
+      "video"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "pricing": {
+      "second": "0.00000000",
+      "second_by_resolution": {
+        "480p": "0.01681500",
+        "720p": "0.03780000",
+        "1080p": "0.08505000"
+      },
+      "unit": "usd_per_second"
+    },
+    "supported_parameters_count": 11,
+    "aliases_count": 0
+  },
+  {
+    "id": "bytedance/seedance-2.0-extend",
+    "name": "Seedance 2.0 Extend",
+    "context_length": null,
+    "max_output_tokens": null,
+    "input_modalities": [
+      "image",
+      "text",
+      "video"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "pricing": {
+      "second": "0.00000000",
+      "second_by_resolution": {
+        "480p": "0.01681500",
+        "720p": "0.03780000",
+        "1080p": "0.08505000"
+      },
+      "unit": "usd_per_second"
+    },
+    "supported_parameters_count": 12,
+    "aliases_count": 0
+  },
+  {
+    "id": "bytedance/seedance-2.0-i2v",
+    "name": "Seedance 2.0 i2v",
+    "context_length": null,
+    "max_output_tokens": null,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "pricing": {
+      "second": "0.00000000",
+      "second_by_resolution": {
+        "480p": "0.01681500",
+        "720p": "0.03780000",
+        "1080p": "0.08505000"
+      },
+      "unit": "usd_per_second"
+    },
+    "supported_parameters_count": 15,
+    "aliases_count": 0
+  },
+  {
+    "id": "deepseek/deepseek-v4-pro",
+    "name": "Deepseek V4 Pro",
+    "context_length": 1048576,
+    "max_output_tokens": 384000,
+    "input_modalities": [
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat"
+    ],
+    "pricing": {
+      "prompt": "0.10000000",
+      "completion": "0.10000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 13,
+    "aliases_count": 0
+  },
+  {
+    "id": "google/gemini-2.5-pro",
+    "name": "Gemini 2.5 Pro",
+    "context_length": 1048576,
+    "max_output_tokens": 65536,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat"
+    ],
+    "pricing": {
+      "prompt": "0.11000000",
+      "completion": "0.11000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 11,
+    "aliases_count": 0
+  },
+  {
+    "id": "google/gemini-3.1-flash-lite-preview",
+    "name": "Gemini 3.1 Flash Lite Preview",
+    "context_length": 1048576,
+    "max_output_tokens": 65536,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat"
+    ],
+    "pricing": {
+      "prompt": "0.10000000",
+      "completion": "0.10000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 11,
+    "aliases_count": 1
+  },
+  {
+    "id": "google/gemini-3.1-pro-preview",
+    "name": "Gemini 3.1 Pro Preview",
+    "context_length": 1048576,
+    "max_output_tokens": 65536,
+    "input_modalities": [
+      "audio",
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat"
+    ],
+    "pricing": {
+      "prompt": "0.13000000",
+      "completion": "0.13000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 11,
+    "aliases_count": 1
+  },
+  {
+    "id": "google/nano-banana-2",
+    "name": "Nano Banana 2",
+    "context_length": null,
+    "max_output_tokens": null,
+    "input_modalities": [
+      "text"
+    ],
+    "output_modalities": [
+      "image"
+    ],
+    "endpoints": [
+      "chat",
+      "images_generations"
+    ],
+    "pricing": {
+      "prompt": "0.10000000",
+      "completion": "0.30000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 7,
+    "aliases_count": 0
+  },
+  {
+    "id": "google/nano-banana-2-edit",
+    "name": "Nano Banana 2 Edit",
+    "context_length": null,
+    "max_output_tokens": null,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "image"
+    ],
+    "endpoints": [
+      "chat",
+      "images_generations",
+      "images_edits"
+    ],
+    "pricing": {
+      "prompt": "0.10000000",
+      "completion": "0.30000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 9,
+    "aliases_count": 0
+  },
+  {
+    "id": "google/nano-banana-pro",
+    "name": "Nano Banana Pro",
+    "context_length": null,
+    "max_output_tokens": null,
+    "input_modalities": [
+      "text"
+    ],
+    "output_modalities": [
+      "image"
+    ],
+    "endpoints": [
+      "chat",
+      "images_generations"
+    ],
+    "pricing": {
+      "prompt": "0.20000000",
+      "completion": "1.20000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 7,
+    "aliases_count": 0
+  },
+  {
+    "id": "google/nano-banana-pro-edit",
+    "name": "Nano Banana Pro Edit",
+    "context_length": null,
+    "max_output_tokens": null,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "image"
+    ],
+    "endpoints": [
+      "chat",
+      "images_generations",
+      "images_edits"
+    ],
+    "pricing": {
+      "prompt": "0.20000000",
+      "completion": "1.20000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 9,
+    "aliases_count": 0
+  },
+  {
+    "id": "google/veo-3.1",
+    "name": "Veo 3.1",
+    "context_length": null,
+    "max_output_tokens": null,
+    "input_modalities": [
+      "text"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "pricing": {
+      "second": "0.03000000",
+      "unit": "usd_per_second"
+    },
+    "supported_parameters_count": 10,
+    "aliases_count": 0
+  },
+  {
+    "id": "google/veo-3.1-extend",
+    "name": "Veo 3.1 Extend",
+    "context_length": null,
+    "max_output_tokens": null,
+    "input_modalities": [
+      "text",
+      "video"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "pricing": {
+      "second": "0.03000000",
+      "unit": "usd_per_second"
+    },
+    "supported_parameters_count": 8,
+    "aliases_count": 0
+  },
+  {
+    "id": "google/veo-3.1-i2v",
+    "name": "Veo 3.1 i2v",
+    "context_length": null,
+    "max_output_tokens": null,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "pricing": {
+      "second": "0.03000000",
+      "unit": "usd_per_second"
+    },
+    "supported_parameters_count": 14,
+    "aliases_count": 0
+  },
+  {
+    "id": "kwaivgi/kling-v3.0-std",
+    "name": "Kling v3.0 Standard",
+    "context_length": null,
+    "max_output_tokens": null,
+    "input_modalities": [
+      "text"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "pricing": {
+      "second": "0.03000000",
+      "unit": "usd_per_second"
+    },
+    "supported_parameters_count": 9,
+    "aliases_count": 0
+  },
+  {
+    "id": "kwaivgi/kling-v3.0-std-i2v",
+    "name": "Kling: 3.0 Standard Image-to-Video",
+    "context_length": null,
+    "max_output_tokens": null,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "pricing": {
+      "second": "0.03000000",
+      "unit": "usd_per_second"
+    },
+    "supported_parameters_count": 11,
+    "aliases_count": 0
+  },
+  {
+    "id": "kwaivgi/kling-v3.0-std-motion-control",
+    "name": "Kling: 3.0 Standard Motion Control",
+    "context_length": null,
+    "max_output_tokens": null,
+    "input_modalities": [
+      "image",
+      "text",
+      "video"
+    ],
+    "output_modalities": [
+      "video"
+    ],
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "pricing": {
+      "second": "0.03000000",
+      "unit": "usd_per_second"
+    },
+    "supported_parameters_count": 8,
+    "aliases_count": 0
+  },
+  {
+    "id": "mimo/mimo-v2-pro",
+    "name": "MiMo V2 Pro",
+    "context_length": 1048576,
+    "max_output_tokens": 131072,
+    "input_modalities": [
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat"
+    ],
+    "pricing": {
+      "prompt": "0.10000000",
+      "completion": "0.10000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 11,
+    "aliases_count": 0
+  },
+  {
+    "id": "minimax/minimax-m2.7",
+    "name": "MiniMax M2.7",
+    "context_length": 204800,
+    "max_output_tokens": 131072,
+    "input_modalities": [
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat"
+    ],
+    "pricing": {
+      "prompt": "0.10000000",
+      "completion": "0.10000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 18,
+    "aliases_count": 0
+  },
+  {
+    "id": "moonshotai/kimi-k2.5",
+    "name": "Kimi K2.5",
+    "context_length": 262144,
+    "max_output_tokens": 65535,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat"
+    ],
+    "pricing": {
+      "prompt": "0.08000000",
+      "completion": "0.38000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 20,
+    "aliases_count": 0
+  },
+  {
+    "id": "openai/gpt-5.3-codex",
+    "name": "GPT 5.3 Codex",
+    "context_length": 400000,
+    "max_output_tokens": 128000,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat",
+      "responses"
+    ],
+    "pricing": {
+      "prompt": "0.13000000",
+      "completion": "0.13000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 9,
+    "aliases_count": 0
+  },
+  {
+    "id": "openai/gpt-5.4",
+    "name": "GPT 5.4",
+    "context_length": 1050000,
+    "max_output_tokens": 128000,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat",
+      "responses"
+    ],
+    "pricing": {
+      "prompt": "0.15000000",
+      "completion": "0.15000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 19,
+    "aliases_count": 4
+  },
+  {
+    "id": "openai/gpt-5.4-mini",
+    "name": "GPT 5.4 Mini",
+    "context_length": 400000,
+    "max_output_tokens": 128000,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat",
+      "responses"
+    ],
+    "pricing": {
+      "prompt": "0.10000000",
+      "completion": "0.10000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 15,
+    "aliases_count": 4
+  },
+  {
+    "id": "openai/gpt-5.5",
+    "name": "GPT 5.5",
+    "context_length": 1050000,
+    "max_output_tokens": 128000,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat",
+      "responses"
+    ],
+    "pricing": {
+      "prompt": "0.20000000",
+      "completion": "0.20000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 9,
+    "aliases_count": 8
+  },
+  {
+    "id": "openai/gpt-image-2",
+    "name": "GPT Image 2",
+    "context_length": 272000,
+    "max_output_tokens": null,
+    "input_modalities": [
+      "text"
+    ],
+    "output_modalities": [
+      "image"
+    ],
+    "endpoints": [
+      "chat",
+      "images_generations"
+    ],
+    "pricing": {
+      "prompt": "0.80000000",
+      "completion": "1.50000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 6,
+    "aliases_count": 0
+  },
+  {
+    "id": "openai/gpt-image-2-edit",
+    "name": "GPT Image 2 Edit",
+    "context_length": null,
+    "max_output_tokens": null,
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "output_modalities": [
+      "image"
+    ],
+    "endpoints": [
+      "chat",
+      "images_generations",
+      "images_edits"
+    ],
+    "pricing": {
+      "prompt": "0.80000000",
+      "completion": "1.50000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 9,
+    "aliases_count": 0
+  },
+  {
+    "id": "qwen/qwen3.6-plus",
+    "name": "Qwen 3.6 Plus",
+    "context_length": 1000000,
+    "max_output_tokens": 65536,
+    "input_modalities": [
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat"
+    ],
+    "pricing": {
+      "prompt": "0.10000000",
+      "completion": "0.10000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 11,
+    "aliases_count": 0
+  },
+  {
+    "id": "z-ai/glm-5.1",
+    "name": "GLM 5.1",
+    "context_length": 202752,
+    "max_output_tokens": 65536,
+    "input_modalities": [
+      "text"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "endpoints": [
+      "chat"
+    ],
+    "pricing": {
+      "prompt": "0.10000000",
+      "completion": "0.10000000",
+      "unit": "usd_per_million_tokens"
+    },
+    "supported_parameters_count": 21,
+    "aliases_count": 0
+  }
+]

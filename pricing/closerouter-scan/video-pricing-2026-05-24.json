@@ -1,0 +1,196 @@
+[
+  {
+    "id": "bytedance/seedance-2.0",
+    "name": "Seedance 2.0",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "audio",
+      "image",
+      "text",
+      "video"
+    ],
+    "pricing": {
+      "second": "0.00000000",
+      "second_by_resolution": {
+        "480p": "0.01681500",
+        "720p": "0.03780000",
+        "1080p": "0.08505000"
+      },
+      "unit": "usd_per_second"
+    }
+  },
+  {
+    "id": "bytedance/seedance-2.0-edit",
+    "name": "Seedance 2.0 Edit",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "audio",
+      "image",
+      "text",
+      "video"
+    ],
+    "pricing": {
+      "second": "0.00000000",
+      "second_by_resolution": {
+        "480p": "0.01681500",
+        "720p": "0.03780000",
+        "1080p": "0.08505000"
+      },
+      "unit": "usd_per_second"
+    }
+  },
+  {
+    "id": "bytedance/seedance-2.0-extend",
+    "name": "Seedance 2.0 Extend",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "image",
+      "text",
+      "video"
+    ],
+    "pricing": {
+      "second": "0.00000000",
+      "second_by_resolution": {
+        "480p": "0.01681500",
+        "720p": "0.03780000",
+        "1080p": "0.08505000"
+      },
+      "unit": "usd_per_second"
+    }
+  },
+  {
+    "id": "bytedance/seedance-2.0-i2v",
+    "name": "Seedance 2.0 i2v",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "pricing": {
+      "second": "0.00000000",
+      "second_by_resolution": {
+        "480p": "0.01681500",
+        "720p": "0.03780000",
+        "1080p": "0.08505000"
+      },
+      "unit": "usd_per_second"
+    }
+  },
+  {
+    "id": "google/veo-3.1",
+    "name": "Veo 3.1",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "text"
+    ],
+    "pricing": {
+      "second": "0.03000000",
+      "unit": "usd_per_second"
+    }
+  },
+  {
+    "id": "google/veo-3.1-extend",
+    "name": "Veo 3.1 Extend",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "text",
+      "video"
+    ],
+    "pricing": {
+      "second": "0.03000000",
+      "unit": "usd_per_second"
+    }
+  },
+  {
+    "id": "google/veo-3.1-i2v",
+    "name": "Veo 3.1 i2v",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "pricing": {
+      "second": "0.03000000",
+      "unit": "usd_per_second"
+    }
+  },
+  {
+    "id": "kwaivgi/kling-v3.0-std",
+    "name": "Kling v3.0 Standard",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "text"
+    ],
+    "pricing": {
+      "second": "0.03000000",
+      "unit": "usd_per_second"
+    }
+  },
+  {
+    "id": "kwaivgi/kling-v3.0-std-i2v",
+    "name": "Kling: 3.0 Standard Image-to-Video",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "image",
+      "text"
+    ],
+    "pricing": {
+      "second": "0.03000000",
+      "unit": "usd_per_second"
+    }
+  },
+  {
+    "id": "kwaivgi/kling-v3.0-std-motion-control",
+    "name": "Kling: 3.0 Standard Motion Control",
+    "endpoints": [
+      "chat",
+      "videos_submit",
+      "videos_task"
+    ],
+    "input_modalities": [
+      "image",
+      "text",
+      "video"
+    ],
+    "pricing": {
+      "second": "0.03000000",
+      "unit": "usd_per_second"
+    }
+  }
+]
