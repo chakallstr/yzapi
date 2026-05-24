@@ -1,0 +1,25 @@
+[Unit]
+Description=YapayZekaLab API and panel
+After=network.target
+
+[Service]
+Type=simple
+User=yapayzekalab
+Group=yapayzekalab
+WorkingDirectory=/opt/yapayzekalab
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/yapayzekalab/.env.production
+ExecStart=/usr/bin/node /opt/yapayzekalab/dist/server.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

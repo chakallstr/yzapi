@@ -1,0 +1,69 @@
+# ────────────────────────────────────────────────────────────────────────────────
+# YapayZekaLab — cPanel .htaccess
+#
+# SCENARIO A — Passenger (recommended):
+#   If cPanel "Setup Node.js App" is configured with Application URL "/"
+#   and App Startup File "server.js", Passenger handles ALL traffic including
+#   /v1/* and /api/*. In this case the entire file below may be left as-is.
+#   Passenger does NOT need mod_proxy — it intercepts before Apache routing.
+#
+# SCENARIO B — mod_proxy (if Passenger is not available or not routing /api):
+#   Un-comment the ProxyPass lines in the PROXY section below and ensure
+#   "allow_url_fopen" + "AllowOverride All" in host config.
+# ────────────────────────────────────────────────────────────────────────────────
+
+Options -Indexes
+ServerSignature Off
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # ── Allow existing files/dirs to be served directly ──────────────────────────
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # ── SCENARIO B: Proxy /api/* and /v1/* to Node.js app ───────────────────────
+  # (Un-comment these lines if NOT using Passenger or if Passenger misses paths)
+  # RewriteRule ^(api|v1)/(.*) http://127.0.0.1:4567/$1/$2 [P,L]
+
+  # ── SCENARIO B: Proxy /health ────────────────────────────────────────────────
+  # RewriteRule ^health$ http://127.0.0.1:4567/health [P,L]
+
+  # ── SPA fallback: route everything else to index.html ────────────────────────
+  RewriteCond %{REQUEST_URI} !^/(api|v1|health)
+  RewriteRule ^ /index.html [L]
+</IfModule>
+
+# ── mod_proxy section (Scenario B) ────────────────────────────────────────────
+# <IfModule mod_proxy.c>
+#   ProxyRequests Off
+#   ProxyPreserveHost On
+#   ProxyPass /api/ http://127.0.0.1:4567/api/
+#   ProxyPassReverse /api/ http://127.0.0.1:4567/api/
+#   ProxyPass /v1/ http://127.0.0.1:4567/v1/
+#   ProxyPassReverse /v1/ http://127.0.0.1:4567/v1/
+#   ProxyPass /health http://127.0.0.1:4567/health
+#   ProxyPassReverse /health http://127.0.0.1:4567/health
+# </IfModule>
+
+# ── Security headers ───────────────────────────────────────────────────────────
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# ── Gzip ──────────────────────────────────────────────────────────────────────
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json
+</IfModule>
+
+# ── Cache static assets ───────────────────────────────────────────────────────
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType image/png "access plus 1 month"
+  ExpiresByType image/svg+xml "access plus 1 month"
+</IfModule>
