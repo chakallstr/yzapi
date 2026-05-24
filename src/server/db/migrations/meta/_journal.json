@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1779607031462,
+      "tag": "0000_amusing_echo",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1779608907428,
+      "tag": "0001_secret_talkback",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779619500000,
+      "tag": "0002_add_last_low_balance_alert",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779639600000,
+      "tag": "0003_usage_record_evidence",
+      "breakpoints": true
+    }
+  ]
+}

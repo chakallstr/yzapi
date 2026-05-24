@@ -1,0 +1,378 @@
+import { Router, Request, Response, NextFunction } from "express";
+import { env } from "../lib/env.js";
+import { logger } from "../lib/logger.js";
+import { BadRequestError, InsufficientBalanceError, ModelDisabledError, ModelNotFoundError, RateLimitError } from "../lib/errors.js";
+import { MASTER_MODELS, type MasterModel } from "../../master-models.js";
+import { checkRateLimit } from "../services/rate-limit-service.js";
+import { chargeUsage } from "../services/billing-service.js";
+import { activeProviderAdapter } from "../services/provider-adapter.js";
+import { db } from "../db/client.js";
+import { modelOverrides, users } from "../db/schema.js";
+import { eq } from "drizzle-orm";
+
+const router = Router();
+
+// Guard: requires CLOSEROUTER_API_KEY
+function requireProxy(req: Request, res: Response, next: NextFunction): void {
+  if (!env.CLOSEROUTER_API_KEY) {
+    res.status(503).json({ error: "proxy not configured" });
+    return;
+  }
+  next();
+}
+
+// Forward CloseRouter error bodies back to the client, preserving status code
+function forwardUpstreamError(err: unknown, res: Response): boolean {
+  const e = err as Error & { status?: number; body?: unknown };
+  if (e.status) {
+    if (e.status === 402) {
+      res.status(402).json({
+        error: "Platform balance exhausted (CloseRouter upstream)",
+        code: "upstream_insufficient_balance",
+        upstream: e.body,
+      });
+    } else {
+      res.status(e.status).json(e.body ?? { error: e.message });
+    }
+    return true;
+  }
+  return false;
+}
+
+async function resolveEnabledModel(modelId: string | undefined, endpoint: string): Promise<MasterModel> {
+  const masterModel = MASTER_MODELS.find((m) => m.id === modelId);
+  if (!masterModel) {
+    throw new ModelNotFoundError(modelId ?? "(none)");
+  }
+  if (!masterModel.endpoints.includes(endpoint)) {
+    throw new BadRequestError(`Model ${masterModel.id} does not support ${endpoint}`);
+  }
+
+  const overrideRows = await db
+    .select({ enabled: modelOverrides.enabled })
+    .from(modelOverrides)
+    .where(eq(modelOverrides.modelId, masterModel.id))
+    .limit(1);
+
+  if (overrideRows[0]?.enabled === false) {
+    throw new ModelDisabledError(masterModel.id);
+  }
+
+  return masterModel;
+}
+
+async function enforceRequestGuards(opts: {
+  userId: string;
+  apiKeyId: string;
+  modelId: string | undefined;
+  endpoint: string;
+}): Promise<MasterModel> {
+  const masterModel = await resolveEnabledModel(opts.modelId, opts.endpoint);
+
+  const rl = await checkRateLimit(opts.apiKeyId, opts.userId);
+  if (!rl.allowed) {
+    throw new RateLimitError("Rate limit exceeded", rl.retryAfter);
+  }
+
+  const balRows = await db
+    .select({ bakiye: users.bakiyeTL })
+    .from(users)
+    .where(eq(users.id, opts.userId))
+    .limit(1);
+  const balance = Number(balRows[0]?.bakiye ?? 0);
+  if (balance <= 0) {
+    throw new InsufficientBalanceError("Insufficient balance to process request");
+  }
+
+  return masterModel;
+}
+
+function setBillingHeaders(res: Response, costTL: number, remainingTL: number, requestId: string): void {
+  res.setHeader("X-YZ-Cost-TL", costTL.toFixed(4));
+  res.setHeader("X-YZ-Remaining-TL", remainingTL.toFixed(2));
+  res.setHeader("X-YZ-Request-Id", requestId);
+}
+
+function upstreamErrorCode(err: unknown): string {
+  const e = err as Error & { status?: number };
+  return e.status ? `upstream_${e.status}` : "upstream_error";
+}
+
+async function handleTextJsonEndpoint(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+  endpoint: "responses" | "messages"
+): Promise<void> {
+  const { model } = req.body as { model?: string };
+  const userId = req.user!.id;
+  const apiKeyId = req.apiKey!.id;
+  const requestId = (req as any).id as string;
+  const start = Date.now();
+  let masterModel: MasterModel | undefined;
+
+  try {
+    masterModel = await enforceRequestGuards({ userId, apiKeyId, modelId: model, endpoint });
+    const forwarder = endpoint === "responses"
+      ? activeProviderAdapter.forwardResponses.bind(activeProviderAdapter)
+      : activeProviderAdapter.forwardMessages.bind(activeProviderAdapter);
+
+    const { raw, usage } = await forwarder(req.body);
+    const responseMs = Date.now() - start;
+
+    const { costTL, remainingTL } = await chargeUsage({
+      userId,
+      apiKeyId,
+      model: masterModel,
+      usage: { promptTokens: usage.promptTokens, completionTokens: usage.completionTokens },
+      requestId,
+      rawUsageJson: usage,
+      responseMs,
+      status: "success",
+    });
+
+    setBillingHeaders(res, costTL, remainingTL, requestId);
+    res.json(raw);
+  } catch (err) {
+    if (err instanceof InsufficientBalanceError || err instanceof RateLimitError || err instanceof ModelNotFoundError || err instanceof ModelDisabledError || err instanceof BadRequestError) {
+      return next(err);
+    }
+    if (masterModel) {
+      const responseMs = Date.now() - start;
+      chargeUsage({
+        userId,
+        apiKeyId,
+        model: masterModel,
+        usage: {},
+        requestId,
+        rawUsageJson: {},
+        errorCode: upstreamErrorCode(err),
+        responseMs,
+        status: "error",
+      })
+        .catch((e2) => logger.error({ err: e2 }, "error usage record failed"));
+    }
+    if (forwardUpstreamError(err, res)) return;
+    return next(err);
+  }
+}
+
+// POST /v1/chat/completions
+router.post("/chat/completions", requireProxy, async (req: Request, res: Response, next: NextFunction) => {
+  const { model, stream } = req.body as { model?: string; stream?: boolean };
+  const userId = req.user!.id;
+  const apiKeyId = req.apiKey!.id;
+  const requestId = (req as any).id as string;
+
+  const start = Date.now();
+  const isStream = stream === true;
+  let masterModel: MasterModel | undefined;
+
+  try {
+    masterModel = await enforceRequestGuards({ userId, apiKeyId, modelId: model, endpoint: "chat" });
+
+    if (isStream) {
+      // Set billing headers before streaming — we'll add them via trailers or log them
+      // We cannot set headers after stream starts, so set placeholders
+      res.setHeader("X-YZ-Request-Id", requestId);
+
+      const usage = await activeProviderAdapter.forwardChatStream(req.body, res);
+      const responseMs = Date.now() - start;
+
+      // Billing out-of-band after stream completes
+      const streamStatus = usage.promptTokens > 0 || usage.completionTokens > 0 ? "success" : "stream_missing_usage";
+      chargeUsage({
+        userId,
+        apiKeyId,
+        model: masterModel,
+        usage: { promptTokens: usage.promptTokens, completionTokens: usage.completionTokens },
+        requestId,
+        rawUsageJson: usage,
+        errorCode: streamStatus === "stream_missing_usage" ? "stream_missing_usage" : undefined,
+        responseMs,
+        status: streamStatus,
+      })
+        .then(({ costTL, remainingTL }) => {
+          logger.info({ userId, costTL, remainingTL, requestId }, "stream billed");
+        })
+        .catch((err) => {
+          logger.error({ err, requestId }, "stream billing failed (out-of-band)");
+        });
+    } else {
+      const { raw, usage } = await activeProviderAdapter.forwardChat(req.body);
+      const responseMs = Date.now() - start;
+
+      const { costTL, remainingTL } = await chargeUsage({
+        userId,
+        apiKeyId,
+        model: masterModel,
+        usage: { promptTokens: usage.promptTokens, completionTokens: usage.completionTokens },
+        requestId,
+        rawUsageJson: usage,
+        responseMs,
+        status: "success",
+      });
+
+      setBillingHeaders(res, costTL, remainingTL, requestId);
+      res.json(raw);
+    }
+  } catch (err) {
+    const e = err as Error & { status?: number; body?: unknown };
+
+    if (err instanceof InsufficientBalanceError) {
+      return next(err);
+    }
+    if (err instanceof RateLimitError) {
+      return next(err);
+    }
+    if (err instanceof ModelNotFoundError || err instanceof ModelDisabledError || err instanceof BadRequestError) {
+      return next(err);
+    }
+
+    // Log usage record for upstream errors
+    if (masterModel) {
+      const responseMs = Date.now() - start;
+      chargeUsage({
+        userId,
+        apiKeyId,
+        model: masterModel,
+        usage: {},
+        requestId,
+        rawUsageJson: {},
+        errorCode: upstreamErrorCode(err),
+        responseMs,
+        status: "error",
+      })
+        .catch((e2) => logger.error({ err: e2 }, "error usage record failed"));
+    }
+
+    if (forwardUpstreamError(err, res)) return;
+    return next(err);
+  }
+});
+
+// POST /v1/responses
+router.post("/responses", requireProxy, (req: Request, res: Response, next: NextFunction) => {
+  void handleTextJsonEndpoint(req, res, next, "responses");
+});
+
+// POST /v1/messages
+router.post("/messages", requireProxy, (req: Request, res: Response, next: NextFunction) => {
+  void handleTextJsonEndpoint(req, res, next, "messages");
+});
+
+// POST /v1/images/generations
+router.post("/images/generations", requireProxy, async (req: Request, res: Response, next: NextFunction) => {
+  const body = req.body as Record<string, unknown>;
+  const modelId = body.model as string | undefined;
+  const userId = req.user!.id;
+  const apiKeyId = req.apiKey!.id;
+  const requestId = (req as any).id as string;
+
+  const start = Date.now();
+  let masterModel: MasterModel | undefined;
+  try {
+    masterModel = await enforceRequestGuards({ userId, apiKeyId, modelId, endpoint: "images_generations" });
+    const { raw, imageCount } = await activeProviderAdapter.forwardImage("generations", body);
+    const responseMs = Date.now() - start;
+
+    const { costTL, remainingTL } = await chargeUsage({
+      userId,
+      apiKeyId,
+      model: masterModel,
+      usage: { imageCount },
+      requestId,
+      rawUsageJson: { imageCount },
+      responseMs,
+      status: "success",
+    });
+
+    setBillingHeaders(res, costTL, remainingTL, requestId);
+    res.json(raw);
+  } catch (err) {
+    if (err instanceof InsufficientBalanceError || err instanceof RateLimitError || err instanceof ModelNotFoundError || err instanceof ModelDisabledError || err instanceof BadRequestError) {
+      return next(err);
+    }
+    if (masterModel) {
+      const responseMs = Date.now() - start;
+      chargeUsage({
+        userId,
+        apiKeyId,
+        model: masterModel,
+        usage: {},
+        requestId,
+        rawUsageJson: {},
+        errorCode: upstreamErrorCode(err),
+        responseMs,
+        status: "error",
+      })
+        .catch((e2) => logger.error({ err: e2 }, "error usage record failed"));
+    }
+    if (forwardUpstreamError(err, res)) return;
+    return next(err);
+  }
+});
+
+// POST /v1/images/edits
+router.post("/images/edits", requireProxy, async (req: Request, res: Response, next: NextFunction) => {
+  const body = req.body as Record<string, unknown>;
+  const modelId = body.model as string | undefined;
+  const userId = req.user!.id;
+  const apiKeyId = req.apiKey!.id;
+  const requestId = (req as any).id as string;
+
+  const start = Date.now();
+  let masterModel: MasterModel | undefined;
+  try {
+    masterModel = await enforceRequestGuards({ userId, apiKeyId, modelId, endpoint: "images_edits" });
+    const { raw, imageCount } = await activeProviderAdapter.forwardImage("edits", body);
+    const responseMs = Date.now() - start;
+
+    const { costTL, remainingTL } = await chargeUsage({
+      userId,
+      apiKeyId,
+      model: masterModel,
+      usage: { imageCount },
+      requestId,
+      rawUsageJson: { imageCount },
+      responseMs,
+      status: "success",
+    });
+
+    setBillingHeaders(res, costTL, remainingTL, requestId);
+    res.json(raw);
+  } catch (err) {
+    if (err instanceof InsufficientBalanceError || err instanceof RateLimitError || err instanceof ModelNotFoundError || err instanceof ModelDisabledError || err instanceof BadRequestError) {
+      return next(err);
+    }
+    if (masterModel) {
+      const responseMs = Date.now() - start;
+      chargeUsage({
+        userId,
+        apiKeyId,
+        model: masterModel,
+        usage: {},
+        requestId,
+        rawUsageJson: {},
+        errorCode: upstreamErrorCode(err),
+        responseMs,
+        status: "error",
+      })
+        .catch((e2) => logger.error({ err: e2 }, "error usage record failed"));
+    }
+    if (forwardUpstreamError(err, res)) return;
+    return next(err);
+  }
+});
+
+// POST /v1/videos/submit — stub (501)
+router.post("/videos/submit", requireProxy, (_req: Request, res: Response) => {
+  res.status(501).json({ error: "Video endpoints not yet implemented (Phase D)" });
+});
+
+// GET /v1/videos/tasks/:taskId — stub (501)
+router.get("/videos/tasks/:taskId", requireProxy, (_req: Request, res: Response) => {
+  res.status(501).json({ error: "Video endpoints not yet implemented (Phase D)" });
+});
+
+export default router;
