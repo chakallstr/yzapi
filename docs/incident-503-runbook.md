@@ -19,4 +19,12 @@ Tek komut özet:
 APP_DIR=/opt/yapayzekalab SERVICE=yapayzekalab npm run ops:vps-status
 ```
 
+Localden read-only canlı kapı kontrolü:
+
+```bash
+VPS_ALIAS=vps DOMAIN=yapayzekalab.org npm run preflight:live
+```
+
+Bu komut domain HTTP durumunu, `/api/models` sayısını, SSH ile VPS'teki app dizini/env/service/Nginx varlığını kontrol eder; secret değerlerini yazdırmaz.
+
 Incident kapanmadan önce `agent-team/WORKLOG.md` içine kök neden, işlem ve son smoke sonucu yazılır.

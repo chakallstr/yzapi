@@ -548,3 +548,42 @@
 
 - Faz 1 release snapshot uygulandı ve commit grupları oluşturuldu.
 - Faz 2 canlı VPS deploy için kalan blocker değişmedi: VPS erişimi, `.env.production`, DNS ve test API key gerekli.
+
+## 2026-05-24 — Faz 2 canlı VPS preflight ve blocker kanıtı
+
+### Agent/rol kaydı
+
+- Yeni native agent spawn tekrar denendi; sonuç: `agent thread limit reached`.
+- Bu nedenle 6 rol için sahte agent onayı üretilmedi; Deploy/Ops ve QA/Release kontrolü koordinatör tarafından read-only komutlarla yürütüldü.
+
+### Yapılan
+
+- `scripts/vps-live-preflight.sh` eklendi.
+- `npm run preflight:live` scripti eklendi.
+- 503 runbook içine localden read-only canlı/VPS preflight komutu eklendi.
+- Canlı domain ve hazır VPS alias'ı kontrol edildi; hiçbir secret değeri yazdırılmadı.
+
+### Kanıt
+
+- Branch: `phase/release-vps-beta`, rev: `77b1e95`.
+- DNS: `yapayzekalab.org -> 77.92.151.228`.
+- Canlı HTTP:
+  - `/health = 503`
+  - `/status = 503`
+  - `/api/models = not-json`
+- VPS read-only SSH:
+  - host: `seslab`
+  - `/opt/yapayzekalab` repo: missing
+  - `.env.production`: missing
+  - `yapayzekalab` service: inactive
+  - Nginx config: ok
+
+### Doğrulama
+
+- `bash -n scripts/vps-live-preflight.sh` geçti.
+- `npm run preflight:live` çalıştı ve doğru şekilde `preflight=BLOCKER failures=4` döndürdü.
+
+### Sonuç
+
+- Faz 2 canlı deploy tamam değildir.
+- Gerçek canlı deploy için sıradaki zorunlu adımlar: domain DNS'in VPS'e alınması, `/opt/yapayzekalab` repo/env kurulumu, `.env.production` izninin `600` yapılması, `yapayzekalab` servisinin active hale getirilmesi ve gerçek `SMOKE_API_KEY` + `SMOKE_LOW_BALANCE_API_KEY` ile smoke kapısının geçirilmesi.

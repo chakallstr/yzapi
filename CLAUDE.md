@@ -119,6 +119,22 @@ Express + TypeScript API. Kullanıcı bakiye yükler, API key alır, model bazl�
 - Admin panelde Sistem & Audit içine `Mutabakat` sekmesi eklendi; reconciliation JSON ve CSV export artık UI'dan erişilebilir.
 - Canlı deploy hâlâ blocker: VPS erişimi, `.env.production`, DNS ve test API key olmadan canlı başarı/402 smoke tamam sayılamaz.
 
+## Son Codex Aktivitesi (2026-05-24 ~22:58)
+
+| Alan | Durum |
+|---|---|
+| Yeni script | `scripts/vps-live-preflight.sh` |
+| Yeni npm komutu | `npm run preflight:live` |
+| Canlı DNS | `yapayzekalab.org -> 77.92.151.228` |
+| Canlı HTTP | `/health=503`, `/status=503`, `/api/models=not-json` |
+| VPS read-only | `vps` alias erişildi; `/opt/yapayzekalab` missing, `.env.production` missing, `yapayzekalab` service inactive, Nginx config ok |
+
+### 22:58 Sonuç
+
+- Faz 2 canlı VPS deploy hâlâ BLOCKER.
+- Preflight kanıtı artık tek komutla alınır: `VPS_ALIAS=vps DOMAIN=yapayzekalab.org npm run preflight:live`.
+- Tamam saymak için domain VPS IP'sine alınmalı, app `/opt/yapayzekalab` altına kurulmalı, `.env.production` `600` izinle oluşturulmalı, servis active olmalı, sonra gerçek `SMOKE_API_KEY` ve `SMOKE_LOW_BALANCE_API_KEY` ile smoke geçmeli.
+
 ## Son Codex Aktivitesi (2026-05-24 ~22:32)
 
 | Dosya | Saat | Ne Yapıldı |
