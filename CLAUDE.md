@@ -206,6 +206,30 @@ Express + TypeScript API. Kullanıcı bakiye yükler, API key alır, model bazl�
 - Faz 2C: `.env.production` güvenli oluşturma ve smoke key hazırlığı.
 - Canlı deploy hâlâ yapılmadı; DNS/certbot/public smoke sonraki fazlarda.
 
+## Son Codex Aktivitesi (2026-05-24 ~23:42)
+
+| Alan | Durum |
+|---|---|
+| Faz | Faz 2C production env scaffold |
+| VPS env file | `/opt/yapayzekalab/.env.production` present |
+| Env permission | `600` |
+| Non-secret prod ayarları | `NODE_ENV`, `PORT`, `APP_BASE_URL`, `FRONTEND_AUTH_RETURN`, `CLOSEROUTER_BASE_URL`, rate limit set |
+| Missing secrets | `DATABASE_URL`, `ADMIN_PASSWORD`, `JWT_SECRET`, `CLOSEROUTER_API_KEY` |
+| Smoke keys | `SMOKE_API_KEY` missing, `SMOKE_LOW_BALANCE_API_KEY` missing |
+| Service | `yapayzekalab` inactive |
+
+### 23:42 Doğrulama Kanıtı
+
+- Required env kontrolü secret basmadan çalıştı.
+- DB check: `db=BLOCKER_missing_DATABASE_URL`.
+- CloseRouter check: `closerouter=BLOCKER_missing_CLOSEROUTER_API_KEY`.
+- `npm run preflight:live` artık env dosyasını ve `600` iznini görüyor; kalan blocker secretlar ve inactive service.
+
+### 23:42 Sıradaki Faz
+
+- Gerçek production secretları girilmeden Faz 2D başlatılmayacak.
+- Gerekli değerler: `DATABASE_URL`, `ADMIN_PASSWORD`, `JWT_SECRET`, `CLOSEROUTER_API_KEY`, funded smoke key ve düşük bakiye smoke key.
+
 ## Son Codex Aktivitesi (2026-05-24 ~22:32)
 
 | Dosya | Saat | Ne Yapıldı |

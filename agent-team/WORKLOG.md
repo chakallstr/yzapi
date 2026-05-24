@@ -716,3 +716,57 @@
 - Faz 2B app bootstrap tamamlandı.
 - Sıradaki faz `Faz 2C - Production env ve smoke key hazırlığı`.
 - Canlı deploy hâlâ tamam değildir; env, service start, DNS, certbot ve gerçek API key smoke kapıları sonraki fazlarda geçilecek.
+
+## 2026-05-24 — Faz 2C production env scaffold ve secret blocker
+
+### Yapılan
+
+- VPS üzerinde `/opt/yapayzekalab/.env.production` oluşturuldu.
+- Dosya izni `600` yapıldı ve sahipliği `root:root` olarak bırakıldı.
+- Açık production ayarları yazıldı:
+  - `NODE_ENV=production`
+  - `PORT=4567`
+  - `APP_BASE_URL=https://yapayzekalab.org`
+  - `FRONTEND_AUTH_RETURN=/`
+  - `CLOSEROUTER_BASE_URL=https://api.closerouter.dev/v1`
+  - `RATE_LIMIT_PER_KEY_PER_MIN=60`
+- Boşluk içeren IBAN görünür değerleri shell uyumluluğu için quote edildi.
+- Gerçek secret değerleri yazılmadı ve terminale basılmadı.
+
+### Neden
+
+- Faz 2D deploy/smoke öncesi `.env.production` dosyasının varlığı, izinleri ve hangi secretların eksik olduğu açıkça görünmeli.
+- Gerçek production secretları olmadan DB ve CloseRouter doğrulamasını başarı gibi göstermek güvenli değil.
+
+### Kanıt
+
+- `.env.production`: present.
+- Permission: `600`.
+- Required key durumu:
+  - `NODE_ENV=set`
+  - `PORT=set`
+  - `APP_BASE_URL=set`
+  - `FRONTEND_AUTH_RETURN=set`
+  - `DATABASE_URL=missing`
+  - `ADMIN_PASSWORD=missing`
+  - `JWT_SECRET=missing`
+  - `CLOSEROUTER_API_KEY=missing`
+- DB check: `db=BLOCKER_missing_DATABASE_URL`.
+- CloseRouter check: `closerouter=BLOCKER_missing_CLOSEROUTER_API_KEY`.
+- Smoke key durumu:
+  - `SMOKE_API_KEY=missing`
+  - `SMOKE_LOW_BALANCE_API_KEY=missing`
+- `npm run preflight:live` artık `env_file=present`, `env_perms=600` görüyor.
+
+### Doğrulama
+
+- Preflight sonucu beklenen şekilde BLOCKER:
+  - canlı HTTP hâlâ 503/not-json
+  - `DATABASE_URL`, `ADMIN_PASSWORD`, `JWT_SECRET`, `CLOSEROUTER_API_KEY` missing
+  - `yapayzekalab` service inactive
+
+### Sonuç
+
+- Faz 2C env scaffold kısmı hazırdır; production readiness tamam değildir.
+- Sıradaki zorunlu bilgi: gerçek `DATABASE_URL`, `ADMIN_PASSWORD`, `JWT_SECRET`, `CLOSEROUTER_API_KEY`, `SMOKE_API_KEY`, `SMOKE_LOW_BALANCE_API_KEY`.
+- Bu değerler girilmeden Faz 2D deploy/smoke başlatılmayacak.
