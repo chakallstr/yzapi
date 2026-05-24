@@ -554,6 +554,7 @@
 ### Agent/rol kaydı
 
 - Yeni native agent spawn tekrar denendi; sonuç: `agent thread limit reached`.
+- Ruflo `swarm_health` tekrar kontrol edildi; sonuç: `no_swarm`.
 - Bu nedenle 6 rol için sahte agent onayı üretilmedi; Deploy/Ops ve QA/Release kontrolü koordinatör tarafından read-only komutlarla yürütüldü.
 
 ### Yapılan

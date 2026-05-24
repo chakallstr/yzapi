@@ -28,6 +28,7 @@ Plan kaynagi: son 24 saat API/site calismalari, `/Users/ufuk/yzapi` ve `/Users/u
 
 - Hedef branch: `phase/release-vps-beta`
 - Yeni native agent spawn denemesi: `agent thread limit reached`
+- 2026-05-24 23:00 Ruflo `swarm_health`: `no_swarm`; eski swarm kayıtları tarihsel kanıt olarak duruyor, aktif yürütme yok.
 - Eski 6 agent id'si sorgulandi:
   - Product/Growth: OK, text-only beta ve aktivasyon onerileri verdi.
   - Backend/Ledger: OK, reconciliation/outbox/idempotency onerileri verdi.
