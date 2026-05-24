@@ -110,6 +110,8 @@ Express + TypeScript API. Kullanıcı bakiye yükler, API key alır, model bazl�
 | Frontend commit | `57a85a3 feat: add customer activation panel` |
 | Yeni kayıt | `agent-team/RELEASE_VPS_BETA_AGENT_TEAM_2026-05-24.md` |
 | Yeni checklist | `docs/release-vps-beta-checklist.md` |
+| Remote branch | `origin/phase/release-vps-beta` |
+| PR link | `https://github.com/chakallstr/yzapi/pull/new/phase/release-vps-beta` |
 
 ### 22:46 Ek Kararlar
 

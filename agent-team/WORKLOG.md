@@ -541,6 +541,8 @@
   - `/api/__smoke_missing_route__: json_404`
   - `/v1/__smoke_missing_route__: json_404`
   - `SMOKE_API_KEY` ve `SMOKE_LOW_BALANCE_API_KEY` olmadığı için başarılı chat ve düşük bakiye smoke maddeleri `manual-live-required` kaldı.
+- Branch push edildi: `origin/phase/release-vps-beta`.
+- GitHub PR linki: `https://github.com/chakallstr/yzapi/pull/new/phase/release-vps-beta`
 
 ### Sonuç
 
