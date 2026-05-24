@@ -135,6 +135,22 @@ Express + TypeScript API. Kullanıcı bakiye yükler, API key alır, model bazl�
 - Preflight kanıtı artık tek komutla alınır: `VPS_ALIAS=vps DOMAIN=yapayzekalab.org npm run preflight:live`.
 - Tamam saymak için domain VPS IP'sine alınmalı, app `/opt/yapayzekalab` altına kurulmalı, `.env.production` `600` izinle oluşturulmalı, servis active olmalı, sonra gerçek `SMOKE_API_KEY` ve `SMOKE_LOW_BALANCE_API_KEY` ile smoke geçmeli.
 
+## Son Codex Aktivitesi (2026-05-24 ~23:04)
+
+| Alan | Durum |
+|---|---|
+| Yeni plan | `docs/superpowers/plans/2026-05-24-yapayzekalab-next-phases.md` |
+| Ruflo plan swarm | `swarm-1779653015913-xntzke`, healthy, `agentCount=0` |
+| Worker spawn | `Hive-mind not initialized` |
+| Native agent spawn | `agent thread limit reached` |
+| VPS OS | `CentOS Stream 8` |
+| Sıradaki gerçek faz | Phase 2A: `scripts/vps-setup.sh` CentOS/RHEL uyumu |
+
+### 23:04 Karar
+
+- Mevcut `vps` Ubuntu değil; Nginx `/etc/nginx/conf.d` kullanıyor. Bu yüzden canlı deploydan önce setup scripti `apt-get/sites-enabled` varsayımından çıkarılmalı.
+- Faz 2 sırası: CentOS setup patch → app bootstrap → production env/smoke key → localhost deploy smoke → DNS/certbot/public smoke → rollback drill.
+
 ## Son Codex Aktivitesi (2026-05-24 ~22:32)
 
 | Dosya | Saat | Ne Yapıldı |

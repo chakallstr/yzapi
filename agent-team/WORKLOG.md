@@ -588,3 +588,37 @@
 
 - Faz 2 canlı deploy tamam değildir.
 - Gerçek canlı deploy için sıradaki zorunlu adımlar: domain DNS'in VPS'e alınması, `/opt/yapayzekalab` repo/env kurulumu, `.env.production` izninin `600` yapılması, `yapayzekalab` servisinin active hale getirilmesi ve gerçek `SMOKE_API_KEY` + `SMOKE_LOW_BALANCE_API_KEY` ile smoke kapısının geçirilmesi.
+
+## 2026-05-24 — Sıradaki faz planı ve 6 rol kontrolü
+
+### Agent/rol kaydı
+
+- Ruflo mesh plan swarm kuruldu: `swarm-1779653015913-xntzke`.
+- `swarm_health`: healthy, `agentCount: 0`.
+- Ruflo worker spawn denemesi: `Hive-mind not initialized`.
+- Native agent spawn denemesi: `agent thread limit reached`.
+- Bu nedenle 6 rol gerçek çalışan agent çıktısı olarak değil, koordinatör tarafından kontrol edilen lane olarak kaydedildi.
+
+### Yapılan
+
+- Sıradaki faz planı yazıldı: `docs/superpowers/plans/2026-05-24-yapayzekalab-next-phases.md`.
+- Canlı deploy öncesi yeni kritik bulgu plana işlendi: hedef `vps` CentOS Stream 8, mevcut setup akışı Ubuntu varsayımlı.
+- Faz sırası netleşti:
+  1. Phase 2A: CentOS uyumlu VPS setup gate.
+  2. Phase 2B: `/opt/yapayzekalab` app bootstrap.
+  3. Phase 2C: production env ve smoke key hazırlığı.
+  4. Phase 2D: DNS öncesi localhost deploy smoke.
+  5. Phase 2E: DNS, certbot, public smoke ve rollback drill.
+  6. Phase 3+: customer panel, billing hardening, security, image/video, 9Router POC.
+
+### Kanıt
+
+- Branch: `phase/release-vps-beta`, rev: `d426bf9`.
+- VPS OS: `CentOS Stream 8`.
+- VPS portları: Nginx `80/443`, mevcut Node `127.0.0.1:3002`; app port `4567` henüz yok.
+- Live preflight tekrar çalıştı ve `preflight=BLOCKER failures=4` döndürdü.
+
+### Sonuç
+
+- Sıradaki gerçek iş `scripts/vps-setup.sh` dosyasını CentOS/RHEL uyumlu hale getirmek.
+- Canlı release hâlâ tamam değildir; DNS/env/service/smoke key kapısı geçmeden müşteri aktivasyonu production-ready sayılmayacak.
