@@ -177,6 +177,35 @@ Express + TypeScript API. Kullanıcı bakiye yükler, API key alır, model bazl�
 - Faz 2B: `/opt/yapayzekalab` altında release branch repo bootstrap.
 - Bu yapılmadan canlı release veya müşteri aktivasyonu production-ready sayılmayacak.
 
+## Son Codex Aktivitesi (2026-05-24 ~23:28)
+
+| Alan | Durum |
+|---|---|
+| Faz | Faz 2B VPS app bootstrap |
+| VPS git | `git version 2.43.0` kuruldu |
+| VPS app path | `/opt/yapayzekalab` |
+| VPS branch | `phase/release-vps-beta` |
+| VPS commit | `ec8eb28` |
+| Nginx config | `/etc/nginx/conf.d/yapayzekalab.conf` present |
+| systemd | `yapayzekalab` enabled, inactive |
+| SesLab | `seslab-com` active |
+
+### 23:28 Doğrulama Kanıtı
+
+- GitHub branch erişimi tokensız doğrulandı: `phase/release-vps-beta` -> `ec8eb2855db23f9327a6280ec5a324662f08ba3b`.
+- VPS read-only gate:
+  - `/opt/yapayzekalab/.git` present
+  - branch `phase/release-vps-beta`
+  - rev `ec8eb28`
+  - Nginx syntax ok
+  - `systemctl is-enabled yapayzekalab` -> `enabled`
+- `npm run preflight:live` artık app repo/branch/rev görüyor; beklenen blocker `.env.production` missing ve service inactive.
+
+### 23:28 Sıradaki Faz
+
+- Faz 2C: `.env.production` güvenli oluşturma ve smoke key hazırlığı.
+- Canlı deploy hâlâ yapılmadı; DNS/certbot/public smoke sonraki fazlarda.
+
 ## Son Codex Aktivitesi (2026-05-24 ~22:32)
 
 | Dosya | Saat | Ne Yapıldı |

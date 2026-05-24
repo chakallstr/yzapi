@@ -669,3 +669,50 @@
 
 - Faz 2A, deploy scripti açısından CentOS blocker'ını çözer.
 - Canlı deploy hâlâ tamam değildir; sıradaki faz `Faz 2B - VPS App Bootstrap`: `/opt/yapayzekalab` repo kurulumu, `.env.production`, servis start, DNS ve gerçek smoke key kapıları.
+
+## 2026-05-24 — Faz 2B VPS app bootstrap
+
+### Yapılan
+
+- VPS ön kontrolü yapıldı: CentOS Stream 8, Node `v22.22.2`, npm `10.9.7`, Nginx syntax ok.
+- VPS'e `git` kuruldu: `git version 2.43.0`.
+- GitHub branch erişimi tokensız doğrulandı: `phase/release-vps-beta` -> `ec8eb2855db23f9327a6280ec5a324662f08ba3b`.
+- `/opt/yapayzekalab` oluşturuldu ve `phase/release-vps-beta` branch'i klonlandı.
+- VPS üzerinde `scripts/vps-setup.sh` çalıştırıldı; systemd servis ve Nginx config bootstrap edildi.
+- Root read-only preflight için `/opt/yapayzekalab` Git safe.directory olarak kaydedildi.
+
+### Neden
+
+- Faz 2C/2D öncesinde app kodunun ve servis/Nginx configlerinin VPS üzerinde hazır olması gerekiyor.
+- Bu faz production deploy değildir; `.env.production` oluşturulmadı, service active hale getirilmedi, DNS değiştirilmedi.
+
+### Kanıt
+
+- `/opt/yapayzekalab/.git`: present.
+- VPS app branch: `phase/release-vps-beta`.
+- VPS app rev: `ec8eb28`.
+- Nginx config: `/etc/nginx/conf.d/yapayzekalab.conf` present.
+- Nginx syntax: ok.
+- systemd `yapayzekalab`: enabled, inactive.
+- Mevcut SesLab service: active.
+- `npm run preflight:live` artık `app_repo=present`, `app_branch=phase/release-vps-beta`, `app_rev=ec8eb28` döndürüyor.
+
+### Doğrulama
+
+- VPS read-only gate:
+  - `git --version` -> `2.43.0`
+  - `git -C /opt/yapayzekalab rev-parse --abbrev-ref HEAD` -> `phase/release-vps-beta`
+  - `git -C /opt/yapayzekalab rev-parse --short HEAD` -> `ec8eb28`
+  - `nginx -t` geçti
+  - `systemctl is-enabled yapayzekalab` -> `enabled`
+  - `systemctl is-active seslab-com` -> `active`
+- `npm run preflight:live` beklenen şekilde BLOCKER kaldı:
+  - canlı HTTP hâlâ 503/not-json
+  - `.env.production` missing
+  - `yapayzekalab` service inactive
+
+### Sonuç
+
+- Faz 2B app bootstrap tamamlandı.
+- Sıradaki faz `Faz 2C - Production env ve smoke key hazırlığı`.
+- Canlı deploy hâlâ tamam değildir; env, service start, DNS, certbot ve gerçek API key smoke kapıları sonraki fazlarda geçilecek.
