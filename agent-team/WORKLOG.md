@@ -622,3 +622,50 @@
 
 - Sıradaki gerçek iş `scripts/vps-setup.sh` dosyasını CentOS/RHEL uyumlu hale getirmek.
 - Canlı release hâlâ tamam değildir; DNS/env/service/smoke key kapısı geçmeden müşteri aktivasyonu production-ready sayılmayacak.
+
+## 2026-05-24 — Faz 2A CentOS uyumlu VPS setup
+
+### Yapılan
+
+- `scripts/vps-setup.sh` dağıtım algılayacak hale getirildi.
+- Debian/Ubuntu yolu mevcut `apt-get`, `ufw`, `sites-available/sites-enabled` davranışını koruyor.
+- CentOS/RHEL yolu `dnf`, `/etc/nginx/conf.d/yapayzekalab.conf`, opsiyonel `firewalld` ve SELinux `httpd_can_network_connect` desteğiyle eklendi.
+- Node.js 22 kontrolü platform bağımsız hale getirildi; Node 22 zaten varsa tekrar kurulum yapılmaz.
+- `docs/vps-deploy.md` ve `docs/incident-503-runbook.md` CentOS/Nginx `conf.d` gerçeğiyle güncellendi.
+
+### Neden
+
+- Hedef `vps` sunucusu CentOS Stream 8 ve mevcut Nginx yapısı `/etc/nginx/conf.d/`.
+- Eski setup scripti Ubuntu varsayımlıydı; canlı VPS'te `apt-get` veya `sites-enabled` kullanmaya çalışmak deploy öncesi riskti.
+- Mevcut SesLab Nginx configleri canlı çalıştığı için CentOS yolunda bu dosyalara dokunulmaması gerekiyor.
+
+### Kanıt
+
+- Read-only VPS kontrolü:
+  - OS: `CentOS Stream 8`
+  - Nginx: config syntax ok
+- Script arama kontrolü:
+  - CentOS/RHEL path `dnf` ve `/etc/nginx/conf.d/yapayzekalab.conf` içeriyor.
+  - Ubuntu path `apt-get` ve `sites-enabled` içinde kalıyor.
+- Canlı preflight:
+  - `/health=503`
+  - `/status=503`
+  - `/api/models=not-json`
+  - `/opt/yapayzekalab` repo missing
+  - `.env.production` missing
+  - `yapayzekalab` service inactive
+  - Sonuç: `preflight=BLOCKER failures=4`
+
+### Doğrulama
+
+- `bash -n scripts/vps-setup.sh scripts/vps-deploy.sh scripts/vps-ops-status.sh scripts/vps-live-preflight.sh` geçti.
+- `git diff --check` temiz.
+- `npm run lint` geçti.
+- `npm test` geçti: 12 test dosyası, 61 test.
+- `npm run build` geçti.
+- `npm run scan:public` geçti: 3 dosya tarandı, hit yok.
+
+### Sonuç
+
+- Faz 2A, deploy scripti açısından CentOS blocker'ını çözer.
+- Canlı deploy hâlâ tamam değildir; sıradaki faz `Faz 2B - VPS App Bootstrap`: `/opt/yapayzekalab` repo kurulumu, `.env.production`, servis start, DNS ve gerçek smoke key kapıları.

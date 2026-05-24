@@ -6,7 +6,7 @@ Tek VPS üzerinde `yapayzekalab.org` panel ve API aynı Express app olarak çal�
 
 ## Sunucu
 
-- Ubuntu 24.04 LTS
+- Ubuntu 24.04 LTS veya mevcut `vps` hedefindeki CentOS Stream 8
 - Node.js 22
 - Nginx
 - PostgreSQL client (`pg_dump` backup için)
@@ -19,6 +19,13 @@ Tek VPS üzerinde `yapayzekalab.org` panel ve API aynı Express app olarak çal�
 ```bash
 sudo bash scripts/vps-setup.sh
 ```
+
+Setup scripti dağıtımı otomatik algılar:
+
+- Debian/Ubuntu: `apt-get`, `ufw`, `/etc/nginx/sites-available` + `/etc/nginx/sites-enabled`
+- CentOS/RHEL: `dnf`, mevcutsa `firewalld`, `/etc/nginx/conf.d/yapayzekalab.conf`
+
+CentOS/RHEL yolunda mevcut `/etc/nginx/conf.d/seslab.com.tr.conf` gibi canlı config dosyaları silinmez veya devre dışı bırakılmaz.
 
 Repo VPS'e klonlandıktan sonra:
 

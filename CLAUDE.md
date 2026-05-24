@@ -151,6 +151,32 @@ Express + TypeScript API. Kullanıcı bakiye yükler, API key alır, model bazl�
 - Mevcut `vps` Ubuntu değil; Nginx `/etc/nginx/conf.d` kullanıyor. Bu yüzden canlı deploydan önce setup scripti `apt-get/sites-enabled` varsayımından çıkarılmalı.
 - Faz 2 sırası: CentOS setup patch → app bootstrap → production env/smoke key → localhost deploy smoke → DNS/certbot/public smoke → rollback drill.
 
+## Son Codex Aktivitesi (2026-05-24 ~23:15)
+
+| Alan | Durum |
+|---|---|
+| Faz | Faz 2A CentOS uyumlu VPS setup |
+| Ana dosya | `scripts/vps-setup.sh` |
+| Ubuntu yolu | `apt-get`, `ufw`, `sites-available/sites-enabled` korunuyor |
+| CentOS yolu | `dnf`, `/etc/nginx/conf.d/yapayzekalab.conf`, opsiyonel `firewalld`, SELinux network connect |
+| Canlı deploy | Yapılmadı; bu faz sadece setup yolunu güvenli hale getirir |
+
+### 23:15 Doğrulama Kanıtı
+
+- `bash -n scripts/vps-setup.sh scripts/vps-deploy.sh scripts/vps-ops-status.sh scripts/vps-live-preflight.sh` geçti.
+- `git diff --check` temiz.
+- `ssh vps 'cat /etc/os-release; nginx -t'` read-only kontrolü: CentOS Stream 8 ve Nginx syntax ok.
+- `npm run lint` geçti.
+- `npm test` geçti: 12 test dosyası, 61 test.
+- `npm run build` geçti.
+- `npm run scan:public` geçti.
+- `npm run preflight:live` beklenen şekilde BLOCKER kaldı: repo/env/service hâlâ kurulmadı.
+
+### 23:15 Sıradaki Faz
+
+- Faz 2B: `/opt/yapayzekalab` altında release branch repo bootstrap.
+- Bu yapılmadan canlı release veya müşteri aktivasyonu production-ready sayılmayacak.
+
 ## Son Codex Aktivitesi (2026-05-24 ~22:32)
 
 | Dosya | Saat | Ne Yapıldı |
