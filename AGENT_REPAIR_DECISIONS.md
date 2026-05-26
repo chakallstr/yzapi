@@ -34,6 +34,30 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-ADMIN-LIVE-STALE-001
+Decision title: Fix live admin password screen by deploying current single-owner Google admin build
+Decision type: Live repair/deploy gate
+Related bug IDs: R-BUG-008, ADMIN-GOOGLE-001
+Evidence from reports: Chrome UAT on 2026-05-27 completed Google OAuth with `cix.crazy666@gmail.com`; Admin nav became visible, but live Admin tab still showed a separate admin password form. Local `src/App.tsx` already gates Admin on `isAdminUser`, `src/admin-single-owner-contract.test.ts` asserts no frontend `/api/admin/login`, and backend `/api/admin/login` returns 410.
+Files likely affected: No source code change required; deploy uses current branch artifact. Reports may be updated with live evidence.
+Risk level: Medium
+Design/template impact: None expected; no CSS/classes/layout/template changes authorized.
+Security impact: Positive; removes stale live password gate and keeps admin restricted to the allowlisted Google user token.
+Backend/API/billing impact: Low; deploy must preserve existing backend auth and payment/billing behavior. No migrations expected for this specific repair.
+Proposed action: Run local verification gates, confirm git backup exists, deploy current branch to the live target, then retest Admin in standard Chrome without requesting an admin password.
+Agent 1 vote: APPROVE
+Agent 1 reason: User cannot access Admin because live UI is stale; Chrome evidence reproduces the problem.
+Agent 2 vote: APPROVE
+Agent 2 reason: Local backend/frontend contracts already match the desired single-owner Google admin flow; deploy is the needed repair.
+Agent 3 vote: APPROVE
+Agent 3 reason: Safe only if visual design remains unchanged, secrets are not printed, and rollbackable git backup/deploy gate is preserved.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Run local gates and live deploy preflight; deploy only after gates pass.
+Status: APPROVED
+
+---
+
 Decision ID: DEC-AGENT-TEAM-001
 Decision title: Continue with role-locked three-agent governance after external agent spawn limit
 Decision type: Agent coordination / risk-control fallback
