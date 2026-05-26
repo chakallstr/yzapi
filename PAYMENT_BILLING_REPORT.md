@@ -66,3 +66,14 @@ Billing code-path safety for failure and low-balance paths is acceptable, but la
 ## Payment Provider Status
 
 Shopier/Cryptomus sandbox E2E is still not accepted. Unit/signature/idempotency contracts exist, but provider-dashboard valid, invalid, duplicate callback/webhook evidence is still required with rotated sandbox credentials.
+
+## Standard Chrome Shopier Panel Check — 2026-05-27
+
+- Standard Chrome was used; no new debug port was opened.
+- Shopier login page opened and Chrome had saved credentials available.
+- Login reached the seller panel/orders area.
+- The panel showed real production account/order data, not a safe sandbox/test environment.
+- No order close, refund, collection, payout, product, callback, or real payment operation was clicked.
+- Result: `PANEL_ACCESS_CONFIRMED_PRODUCTION_DATA_VISIBLE`, but `SANDBOX_E2E_STILL_BLOCKED`.
+
+Security decision: Do not use this real Shopier panel for destructive E2E payment testing. Payment launch acceptance still requires rotated sandbox/test credentials or a provider-approved test flow.
