@@ -58,6 +58,30 @@ Status: APPROVED
 
 ---
 
+Decision ID: DEC-CHROME-UAT-001
+Decision title: Chrome provider/OAuth/admin UAT blocked by missing native host
+Decision type: Test execution decision
+Related bug IDs: R-BUG-003, R-BUG-006, R-BUG-007, R-BUG-008, R-BUG-009
+Evidence from reports: Chrome running and extension installed/enabled, but Codex Chrome native host manifest is missing; Chrome extension cannot connect.
+Files likely affected: `CHROME_PROVIDER_UAT_EXECUTION_REPORT.md`
+Risk level: High for launch evidence
+Design/template impact: None.
+Security impact: Avoids unsafe credential/cookie inspection and avoids self-installing native host.
+Backend/API/billing impact: Authenticated UI/provider flows remain unverified; local unit/contract tests can still run.
+Proposed action: Mark Chrome UAT blocked, run safe non-Chrome payment/auth/catalog tests, and require Chrome plugin/native host reinstall before authenticated browser UAT.
+Agent 1 vote: NEEDS_MORE_EVIDENCE
+Agent 1 reason: User-facing OAuth/admin/payment flows cannot be proven without a working Chrome connection.
+Agent 2 vote: NEEDS_MORE_EVIDENCE
+Agent 2 reason: Backend contracts can be tested, but real billing/payment DB effects require valid session/credentials.
+Agent 3 vote: APPROVE
+Agent 3 reason: Blocking Chrome UAT is safer than bypassing extension security or handling credentials unsafely.
+Approval count: 1/3 for release, 3/3 for blocking Chrome UAT until fixed
+Final decision: CHROME_UAT_BLOCKED
+Allowed next action: Continue safe local/API tests; ask for Chrome plugin/native host reinstall before Chrome UAT.
+Status: COMPLETED
+
+---
+
 Decision ID: DEC-GITHUB-BACKUP-PLAN-001
 Decision title: Backup provider/OAuth/admin UAT plan
 Decision type: Backup approval
