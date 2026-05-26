@@ -58,6 +58,30 @@ Status: APPROVED
 
 ---
 
+Decision ID: DEC-GITHUB-BACKUP-PLAN-001
+Decision title: Backup provider/OAuth/admin UAT plan
+Decision type: Backup approval
+Related bug IDs: R-BUG-003, R-BUG-006, R-BUG-007, R-BUG-008, R-BUG-009
+Evidence from reports: New plan documents the remaining Chrome/provider/OAuth/admin execution path and should be preserved before later live testing.
+Files likely affected: Git index/commit history only.
+Risk level: Low
+Design/template impact: None.
+Security impact: Backup allowed only after secret scan passes; plan contains no credentials.
+Backend/API/billing impact: None; plan-only commit, no runtime mutation.
+Proposed action: Run secret scan, stage `PROVIDER_OAUTH_ADMIN_UAT_PLAN.md` and updated decision log, commit, push current branch.
+Agent 1 vote: APPROVE
+Agent 1 reason: The remaining UAT plan should be checkpointed before execution.
+Agent 2 vote: APPROVE
+Agent 2 reason: Plan-only backup does not affect billing/runtime.
+Agent 3 vote: APPROVE
+Agent 3 reason: Safe if secret scan is clean and no deploy occurs.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Secret scan, commit and push plan checkpoint.
+Status: APPROVED
+
+---
+
 Decision ID: DEC-CMD-FINAL-VERIFY-001
 Decision title: Run final whitespace and secret checks before backup
 Decision type: Command approval / final verification
@@ -103,6 +127,30 @@ Approval count: 3/3
 Final decision: APPROVED
 Allowed next action: Commit/push backup after final verification passes.
 Status: APPROVED_PENDING_VERIFICATION
+
+---
+
+Decision ID: DEC-PLAN-PROVIDER-OAUTH-ADMIN-UAT-001
+Decision title: Plan Chrome-based Shopier/Cryptomus/OAuth/Admin UAT execution
+Decision type: Test planning approval
+Related bug IDs: R-BUG-003, R-BUG-006, R-BUG-007, R-BUG-008, R-BUG-009
+Evidence from reports: Remaining blockers are credential/session-dependent: funded API billing, low-balance behavior, Shopier/Cryptomus E2E, Google OAuth callback, admin browser UAT, and live deploy drift.
+Files likely affected: `PROVIDER_OAUTH_ADMIN_UAT_PLAN.md`
+Risk level: Medium
+Design/template impact: None; plan-only, no UI/style source changes.
+Security impact: Plan requires Chrome/manual login handling, no credential storage, no secret printing, rotated provider credentials only.
+Backend/API/billing impact: Plan covers payment/billing/admin tests but does not mutate runtime by itself.
+Proposed action: Create a concrete Chrome-based execution plan with three-agent checkpoints and evidence requirements.
+Agent 1 vote: APPROVE
+Agent 1 reason: The plan closes the exact UAT gaps: OAuth, admin browser, payment UI/history, and user-visible recovery.
+Agent 2 vote: APPROVE
+Agent 2 reason: The plan ties every UI/provider action to backend evidence in `payments`, `transactions`, `usage_records`, and balance.
+Agent 3 vote: APPROVE
+Agent 3 reason: The plan preserves visual lock, blocks real-money tests, and requires secret rotation/no logging.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Write `PROVIDER_OAUTH_ADMIN_UAT_PLAN.md`.
+Status: APPROVED
 
 ---
 
