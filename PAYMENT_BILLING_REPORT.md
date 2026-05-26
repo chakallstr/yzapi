@@ -77,3 +77,13 @@ Shopier/Cryptomus sandbox E2E is still not accepted. Unit/signature/idempotency 
 - Result: `PANEL_ACCESS_CONFIRMED_PRODUCTION_DATA_VISIBLE`, but `SANDBOX_E2E_STILL_BLOCKED`.
 
 Security decision: Do not use this real Shopier panel for destructive E2E payment testing. Payment launch acceptance still requires rotated sandbox/test credentials or a provider-approved test flow.
+
+## Standard Chrome Cryptomus Panel Check — 2026-05-27
+
+- Standard Chrome was used; no new debug port was opened.
+- `app.cryptomus.com` opened an authenticated account overview.
+- The panel showed real wallet/balance/history areas, not a safe sandbox/test environment.
+- No send, transfer, exchange, merchant, API-key, webhook, or real crypto operation was clicked.
+- Result: `PANEL_ACCESS_CONFIRMED_PRODUCTION_WALLET_VISIBLE`, but `SANDBOX_E2E_STILL_BLOCKED`.
+
+Security decision: Do not use this real Cryptomus wallet/account for destructive E2E payment testing. Crypto launch acceptance still requires a sandbox/test merchant flow or provider-approved test invoice/webhook evidence.

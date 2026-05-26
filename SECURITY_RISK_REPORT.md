@@ -34,5 +34,6 @@ Durum: 60 dakikalık site testi sonrası doldurulacak.
 - Provider panel/API keys daha önce kullanıcı tarafından chat içinde paylaşıldığı için rotate edilmeli; raporlara gerçek secret yazılmadı.
 - Shopier/Cryptomus sandbox valid/invalid/duplicate webhook E2E tamamlanmadı; payment security launch gate kapalı.
 - Shopier standard Chrome panel access reached real production order data; destructive payment/order tests were intentionally not executed there.
+- Cryptomus standard Chrome panel access reached real wallet/history areas; destructive crypto/payment tests were intentionally not executed there.
 - CloseRouter inference direct `502` verdiği için success billing ve cost headers kanıtlanamadı; failure path safe olsa da launch onayı için yeterli değil.
 - Admin destructive actions/audit kapsamı hâlâ sınırlı tutuldu; gerçek müşteri verisi mutasyonu yapılmadı.
