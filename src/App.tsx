@@ -32,6 +32,7 @@ import {
   Key,
   ListChecks,
 } from "lucide-react";
+import { getInitialAppTab, type AppTab } from "./navigation";
 import { RoutingLog, RouterSettings, AdminConfig, ModelOverride, UserEntry, BakiyeHareketi, SystemAnnouncement, ProviderDurumu, AuditLog } from "./types";
 
 interface ComputedModel {
@@ -105,7 +106,9 @@ interface ReconciliationReport {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"homepage" | "models" | "sss" | "api" | "admin">("homepage");
+  const [activeTab, setActiveTab] = useState<AppTab>(() =>
+    getInitialAppTab(window.location.pathname, window.location.search, window.location.hash)
+  );
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [modelSearch, setModelSearch] = useState<string>("");
   const [selectedModel, setSelectedModel] = useState<ComputedModel | null>(null);
@@ -1612,7 +1615,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                       </div>
                       <div className="flex items-center space-x-3 flex-wrap gap-2">
                         <button onClick={async () => {
-                          await fetch("/api/admin/refresh-kur", { method: "POST" });
+                          await adminFetch("/api/admin/refresh-kur", { method: "POST" });
                           await refreshData();
                           await loadAdminData();
                         }} className="flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all">
@@ -1623,7 +1626,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                             onChange={async (e) => {
                               const val = e.target.checked;
                               setAdminConfigDraft(p => ({ ...p, autoKurRefresh: val }));
-                              await fetch("/api/admin/config", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ autoKurRefresh: val }) });
+                              await adminFetch("/api/admin/config", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ autoKurRefresh: val }) });
                             }} className="rounded" />
                           <span>Otomatik Yenile</span>
                         </label>
@@ -1633,7 +1636,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                             onChange={async (e) => {
                               const val = parseInt(e.target.value) || 60;
                               setAdminConfigDraft(p => ({ ...p, kurRefreshIntervalDk: val }));
-                              await fetch("/api/admin/config", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kurRefreshIntervalDk: val }) });
+                              await adminFetch("/api/admin/config", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kurRefreshIntervalDk: val }) });
                             }}
                             className="w-14 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs text-white focus:outline-none" />
                           <span>dk</span>
@@ -1669,7 +1672,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                           minBakiyeTL: adminConfigDraft.minBakiyeTL,
                           anomaliEsikTL: adminConfigDraft.anomaliEsikTL,
                         };
-                        await fetch("/api/admin/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(visibleConfig) });
+                        await adminFetch("/api/admin/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(visibleConfig) });
                         setAdminConfig(adminConfigDraft);
                         await refreshData();
                         await loadAdminData();
@@ -1800,7 +1803,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                                       <input type="number" step="0.001" value={ovr?.inputUsdOverride ?? m.providerInputUsd ?? ""}
                                         onBlur={async (e) => {
                                           const val = e.target.value === "" ? null : parseFloat(e.target.value);
-                                          await fetch("/api/admin/model-overrides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ modelId: m.id, enabled, inputUsdOverride: val, outputUsdOverride: ovr?.outputUsdOverride ?? null, notlar: ovr?.notlar ?? "" }) });
+                                          await adminFetch("/api/admin/model-overrides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ modelId: m.id, enabled, inputUsdOverride: val, outputUsdOverride: ovr?.outputUsdOverride ?? null, notlar: ovr?.notlar ?? "" }) });
                                           await loadAdminData();
                                         }}
                                         onChange={() => {}}
@@ -1810,7 +1813,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                                       <input type="number" step="0.001" value={ovr?.outputUsdOverride ?? m.providerOutputUsd ?? ""}
                                         onBlur={async (e) => {
                                           const val = e.target.value === "" ? null : parseFloat(e.target.value);
-                                          await fetch("/api/admin/model-overrides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ modelId: m.id, enabled, inputUsdOverride: ovr?.inputUsdOverride ?? null, outputUsdOverride: val, notlar: ovr?.notlar ?? "" }) });
+                                          await adminFetch("/api/admin/model-overrides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ modelId: m.id, enabled, inputUsdOverride: ovr?.inputUsdOverride ?? null, outputUsdOverride: val, notlar: ovr?.notlar ?? "" }) });
                                           await loadAdminData();
                                         }}
                                         onChange={() => {}}
@@ -1825,7 +1828,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                                       <input type="number" step="0.0001" value={ovr?.inputUsdOverride ?? m.providerImageInputUsd ?? ""}
                                         onBlur={async (e) => {
                                           const val = e.target.value === "" ? null : parseFloat(e.target.value);
-                                          await fetch("/api/admin/model-overrides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ modelId: m.id, enabled, inputUsdOverride: val, outputUsdOverride: ovr?.outputUsdOverride ?? null, notlar: ovr?.notlar ?? "" }) });
+                                          await adminFetch("/api/admin/model-overrides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ modelId: m.id, enabled, inputUsdOverride: val, outputUsdOverride: ovr?.outputUsdOverride ?? null, notlar: ovr?.notlar ?? "" }) });
                                           await loadAdminData();
                                         }}
                                         onChange={() => {}}
@@ -1835,7 +1838,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                                       <input type="number" step="0.0001" value={ovr?.outputUsdOverride ?? m.providerImageOutputUsd ?? ""}
                                         onBlur={async (e) => {
                                           const val = e.target.value === "" ? null : parseFloat(e.target.value);
-                                          await fetch("/api/admin/model-overrides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ modelId: m.id, enabled, inputUsdOverride: ovr?.inputUsdOverride ?? null, outputUsdOverride: val, notlar: ovr?.notlar ?? "" }) });
+                                          await adminFetch("/api/admin/model-overrides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ modelId: m.id, enabled, inputUsdOverride: ovr?.inputUsdOverride ?? null, outputUsdOverride: val, notlar: ovr?.notlar ?? "" }) });
                                           await loadAdminData();
                                         }}
                                         onChange={() => {}}
@@ -1853,7 +1856,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                                 <td className="p-3 text-center">
                                   <button onClick={async (e) => {
                                     e.stopPropagation();
-                                    await fetch("/api/admin/model-overrides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ modelId: m.id, enabled: !enabled, inputUsdOverride: ovr?.inputUsdOverride ?? null, outputUsdOverride: ovr?.outputUsdOverride ?? null, notlar: ovr?.notlar ?? "" }) });
+                                    await adminFetch("/api/admin/model-overrides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ modelId: m.id, enabled: !enabled, inputUsdOverride: ovr?.inputUsdOverride ?? null, outputUsdOverride: ovr?.outputUsdOverride ?? null, notlar: ovr?.notlar ?? "" }) });
                                     await loadAdminData();
                                     await refreshData();
                                   }} className={`text-[10px] font-semibold px-2 py-0.5 rounded transition-all ${enabled ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "bg-red-50 text-red-700 hover:bg-red-100"}`}>
@@ -1883,7 +1886,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                                     defaultValue={ovr.inputUsdOverride ?? ""}
                                     onBlur={async (e) => {
                                       const val = e.target.value === "" ? null : parseFloat(e.target.value);
-                                      await fetch("/api/admin/model-overrides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...ovr, inputUsdOverride: val }) });
+                                      await adminFetch("/api/admin/model-overrides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...ovr, inputUsdOverride: val }) });
                                       await loadAdminData();
                                     }}
                                     className="w-full bg-slate-50 border border-slate-200 rounded py-1.5 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
@@ -1894,7 +1897,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                                     defaultValue={ovr.outputUsdOverride ?? ""}
                                     onBlur={async (e) => {
                                       const val = e.target.value === "" ? null : parseFloat(e.target.value);
-                                      await fetch("/api/admin/model-overrides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...ovr, outputUsdOverride: val }) });
+                                      await adminFetch("/api/admin/model-overrides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...ovr, outputUsdOverride: val }) });
                                       await loadAdminData();
                                     }}
                                     className="w-full bg-slate-50 border border-slate-200 rounded py-1.5 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
@@ -1903,13 +1906,13 @@ print(response.json()["choices"][0]["message"]["content"])`;
                                   <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block mb-1">Notlar</label>
                                   <textarea rows={2} defaultValue={ovr.notlar}
                                     onBlur={async (e) => {
-                                      await fetch("/api/admin/model-overrides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...ovr, notlar: e.target.value }) });
+                                      await adminFetch("/api/admin/model-overrides", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...ovr, notlar: e.target.value }) });
                                       await loadAdminData();
                                     }}
                                     className="w-full bg-slate-50 border border-slate-200 rounded py-1.5 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
                                 </div>
                                 <button onClick={async () => {
-                                  await fetch(`/api/admin/model-overrides/${encodeURIComponent(selectedAdminModel.id)}`, { method: "DELETE" });
+                                  await adminFetch(`/api/admin/model-overrides/${encodeURIComponent(selectedAdminModel.id)}`, { method: "DELETE" });
                                   await loadAdminData();
                                 }} className="text-xs text-red-600 hover:text-red-800 flex items-center space-x-1">
                                   <Trash2 className="w-3 h-3" /><span>Override Sil</span>
@@ -1987,7 +1990,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                             <select value={selectedAdminUser.durum}
                               onChange={async (e) => {
                                 const updated = { ...selectedAdminUser, durum: e.target.value as UserEntry["durum"] };
-                                await fetch(`/api/admin/users/${selectedAdminUser.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ durum: e.target.value }) });
+                                await adminFetch(`/api/admin/users/${selectedAdminUser.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ durum: e.target.value }) });
                                 setSelectedAdminUser(updated);
                                 await loadAdminData();
                               }}
@@ -2002,7 +2005,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                             <select value={selectedAdminUser.plan}
                               onChange={async (e) => {
                                 const updated = { ...selectedAdminUser, plan: e.target.value as UserEntry["plan"] };
-                                await fetch(`/api/admin/users/${selectedAdminUser.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan: e.target.value }) });
+                                await adminFetch(`/api/admin/users/${selectedAdminUser.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan: e.target.value }) });
                                 setSelectedAdminUser(updated);
                                 await loadAdminData();
                               }}
@@ -2018,7 +2021,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                             <textarea rows={2} value={selectedAdminUser.not}
                               onChange={(e) => setSelectedAdminUser({ ...selectedAdminUser, not: e.target.value })}
                               onBlur={async () => {
-                                await fetch(`/api/admin/users/${selectedAdminUser.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ not: selectedAdminUser.not }) });
+                                await adminFetch(`/api/admin/users/${selectedAdminUser.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ not: selectedAdminUser.not }) });
                               }}
                               className="w-full bg-slate-50 border border-slate-200 rounded py-1.5 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
                           </div>
@@ -2035,7 +2038,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                             <button onClick={async () => {
                               const miktar = parseFloat(bakiyeForm.miktar);
                               if (!miktar) return;
-                              const res = await fetch(`/api/admin/users/${selectedAdminUser.id}/bakiye`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ miktar, aciklama: bakiyeForm.aciklama }) });
+                              const res = await adminFetch(`/api/admin/users/${selectedAdminUser.id}/bakiye`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ miktar, aciklama: bakiyeForm.aciklama }) });
                               const data = await res.json();
                               setSelectedAdminUser(data.user);
                               setBakiyeForm({ miktar: "", aciklama: "" });
@@ -2139,7 +2142,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                     </div>
                     <button onClick={async () => {
                       if (!newAnnouncement.mesaj || !newAnnouncement.bitis) return;
-                      await fetch("/api/admin/announcements", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...newAnnouncement, aktif: true, baslangic: new Date(newAnnouncement.baslangic).toISOString(), bitis: new Date(newAnnouncement.bitis).toISOString() }) });
+                      await adminFetch("/api/admin/announcements", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...newAnnouncement, aktif: true, baslangic: new Date(newAnnouncement.baslangic).toISOString(), bitis: new Date(newAnnouncement.bitis).toISOString() }) });
                       setNewAnnouncement({ mesaj: "", tip: "bilgi", baslangic: new Date().toISOString().split("T")[0], bitis: "" });
                       await loadAdminData();
                       await refreshData();
@@ -2165,14 +2168,14 @@ print(response.json()["choices"][0]["message"]["content"])`;
                             <td className="p-3"><span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${a.tip === "uyari" ? "bg-amber-50 text-amber-700" : a.tip === "bakim" ? "bg-red-50 text-red-700" : a.tip === "yenilik" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}>{a.tip}</span></td>
                             <td className="p-3">
                               <button onClick={async () => {
-                                await fetch(`/api/admin/announcements/${a.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aktif: !a.aktif }) });
+                                await adminFetch(`/api/admin/announcements/${a.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aktif: !a.aktif }) });
                                 await loadAdminData(); await refreshData();
                               }} className={`font-mono text-[10px] px-1.5 py-0.5 rounded transition-all ${a.aktif ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>{a.aktif ? "Aktif" : "Pasif"}</button>
                             </td>
                             <td className="p-3 font-mono text-slate-400 text-[10px]">{new Date(a.bitis).toLocaleDateString("tr-TR")}</td>
                             <td className="p-3 text-center">
                               <button onClick={async () => {
-                                await fetch(`/api/admin/announcements/${a.id}`, { method: "DELETE" });
+                                await adminFetch(`/api/admin/announcements/${a.id}`, { method: "DELETE" });
                                 await loadAdminData(); await refreshData();
                               }} className="text-red-400 hover:text-red-600 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                             </td>
@@ -2233,7 +2236,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                               </td>
                               <td className="p-3 text-center">
                                 <button onClick={async () => {
-                                  await fetch(`/api/admin/provider-durumu/${encodeURIComponent(p.provider)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ durum: p.durum, not: p.not }) });
+                                  await adminFetch(`/api/admin/provider-durumu/${encodeURIComponent(p.provider)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ durum: p.durum, not: p.not }) });
                                   await loadAdminData();
                                 }} className="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-1 rounded transition-all font-semibold">Kaydet</button>
                               </td>
@@ -2439,7 +2442,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                         className="bg-slate-50 border border-slate-200 rounded py-1.5 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 flex-1" />
                       <button onClick={async () => {
                         if (!newApiKeyForm.userId || !newApiKeyForm.ad) return;
-                        await fetch(`/api/admin/api-keys/${newApiKeyForm.userId}/create`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ad: newApiKeyForm.ad }) });
+                        await adminFetch(`/api/admin/api-keys/${newApiKeyForm.userId}/create`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ad: newApiKeyForm.ad }) });
                         setNewApiKeyForm({ userId: "", ad: "" });
                         await loadAdminData();
                       }} className="flex items-center space-x-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all whitespace-nowrap">
@@ -2481,7 +2484,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                                 <td className="p-3 text-center">
                                   {k.aktif && (
                                     <button onClick={async () => {
-                                      await fetch(`/api/admin/api-keys/revoke/${k.id}`, { method: "POST" });
+                                      await adminFetch(`/api/admin/api-keys/revoke/${k.id}`, { method: "POST" });
                                       await loadAdminData();
                                     }} className="text-xs text-red-600 hover:text-red-800 font-semibold">İptal</button>
                                   )}
@@ -2620,7 +2623,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                               <input type="number" defaultValue={plan.gunlukLimitTL ?? ""}
                                 onBlur={async (e) => {
                                   const val = e.target.value === "" ? null : parseFloat(e.target.value);
-                                  await fetch(`/api/admin/plans/${plan.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ gunlukLimitTL: val }) });
+                                  await adminFetch(`/api/admin/plans/${plan.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ gunlukLimitTL: val }) });
                                   await loadAdminData();
                                 }}
                                 placeholder="Sınırsız"
@@ -2631,7 +2634,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                               <input type="number" defaultValue={plan.aylikLimitTL ?? ""}
                                 onBlur={async (e) => {
                                   const val = e.target.value === "" ? null : parseFloat(e.target.value);
-                                  await fetch(`/api/admin/plans/${plan.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aylikLimitTL: val }) });
+                                  await adminFetch(`/api/admin/plans/${plan.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aylikLimitTL: val }) });
                                   await loadAdminData();
                                 }}
                                 placeholder="Sınırsız"
@@ -2642,7 +2645,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                             <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block mb-1">Açıklama</label>
                             <textarea rows={2} defaultValue={plan.aciklama ?? ""}
                               onBlur={async (e) => {
-                                await fetch(`/api/admin/plans/${plan.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aciklama: e.target.value }) });
+                                await adminFetch(`/api/admin/plans/${plan.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aciklama: e.target.value }) });
                                 await loadAdminData();
                               }}
                               className="w-full bg-slate-50 border border-slate-200 rounded py-1.5 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
@@ -2651,7 +2654,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                             <div className="flex items-center justify-between mb-1">
                               <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">İzinli Modeller</label>
                               <button onClick={async () => {
-                                await fetch(`/api/admin/plans/${plan.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ izinliModeller: [] }) });
+                                await adminFetch(`/api/admin/plans/${plan.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ izinliModeller: [] }) });
                                 await loadAdminData();
                               }} className={`text-[10px] font-mono px-2 py-0.5 rounded transition-all ${isAll ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600 hover:bg-blue-50"}`}>
                                 {isAll ? "Tümü (aktif)" : "Tümünü Seç"}
@@ -2672,7 +2675,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                                       } else {
                                         newIzinli = [...izinli, mid];
                                       }
-                                      await fetch(`/api/admin/plans/${plan.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ izinliModeller: newIzinli }) });
+                                      await adminFetch(`/api/admin/plans/${plan.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ izinliModeller: newIzinli }) });
                                       await loadAdminData();
                                     }}
                                     className={`text-[9px] font-mono px-1.5 py-0.5 rounded transition-all ${active ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-400"}`}>

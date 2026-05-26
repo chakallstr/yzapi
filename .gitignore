@@ -15,6 +15,7 @@ coverage/
 ruvector.db
 agentdb.rvf*
 screenshots/
+qa-artifacts/
 /2026*-*.png
 /cpanel_login.png
 /filemanager*.png
