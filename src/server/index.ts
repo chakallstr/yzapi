@@ -22,6 +22,7 @@ import filesRouter from "./routes/files.js";
 import legacyRouter from "./routes/legacy.js";
 import proxyRouter from "./routes/proxy.js";
 import paymentsRouter from "./routes/payments.js";
+import v1CatalogRouter from "./routes/v1-catalog.js";
 import { apiKeyAuth } from "./middleware/api-key-auth.js";
 import { getStatusSnapshot } from "./services/status-service.js";
 
@@ -136,6 +137,7 @@ app.use("/api", legacyRouter);
 app.use("/api/payments", paymentsRouter);
 
 // Proxy routes — require yzk_* API key, mounted at /v1 before Vite catch-all
+app.use("/v1", v1CatalogRouter);
 app.use("/v1", (req, res, next) => {
   const knownRoutes = [
     /^\/chat\/completions$/,

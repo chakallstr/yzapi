@@ -70,3 +70,13 @@ Operasyon tarihi: 2026-05-26
 - Test: `src/server/services/payment-guards.test.ts`; local payment methods smoke.
 - Retest: Payment methods 200, current env IBAN disabled, scanner/lint/test/build PASS.
 - Sonuç: FIXED LOCAL.
+
+## R-BUG-001
+
+- Problem: `/v1/models`, `/v1/providers`, `/v1/models/count` public katalog endpointleri 404 dönüyordu.
+- Kök neden: `/v1` route chain sadece authenticated proxy endpointlerini allowlist ediyor, public catalog router mount edilmiyordu.
+- Karar: DEC-FIX-001 ve DEC-FIX-001A, 3/3 APPROVED.
+- Yapılan değişiklik: Public read-only `/v1` catalog router eklendi; payload müşteri-facing computed fiyat/availability üzerinden üretilecek şekilde düzeltildi. Authenticated `/v1` proxy, billing, images/videos ve unknown JSON 404 davranışı değiştirilmedi.
+- Test: `src/server/routes/v1-catalog.test.ts`
+- Retest: Targeted test PASS; lint/test/build PASS; public scan pending.
+- Sonuç: FIXED LOCAL / FULL LIVE ROUTE SMOKE PENDING.

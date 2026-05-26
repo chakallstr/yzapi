@@ -1,0 +1,201 @@
+import { Router } from "express";
+import { MASTER_MODELS, type MasterModel } from "../../master-models.js";
+import { computePrice, type ComputedPrice } from "../../pricing.js";
+import { db } from "../db/client.js";
+import { modelOverrides } from "../db/schema.js";
+import { buildPricingConfig } from "../services/pricing-service.js";
+
+type V1ModelPricing = {
+  unit: ComputedPrice["unit"];
+  input?: {
+    usd: string;
+    tl: string;
+  };
+  output?: {
+    usd: string;
+    tl: string;
+  };
+  per_resolution?: Record<string, {
+    usd: string;
+    tl: string;
+  }>;
+};
+
+export interface V1CatalogEntry {
+  model: MasterModel;
+  computed?: ComputedPrice;
+  enabled: boolean;
+}
+
+function providerSlug(model: MasterModel): string {
+  return model.providerSlug ?? model.provider.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function stringPrice(value: number | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  return value.toFixed(8);
+}
+
+function serializePricePoint(point: { usd: number; tl: number } | undefined) {
+  if (!point) return undefined;
+  return {
+    usd: stringPrice(point.usd)!,
+    tl: stringPrice(point.tl)!,
+  };
+}
+
+function buildPricing(computed: ComputedPrice | undefined): V1ModelPricing | null {
+  if (!computed) return null;
+  const perResolution = computed.perResolution
+    ? Object.fromEntries(
+        Object.entries(computed.perResolution).flatMap(([resolution, point]) => {
+          const serialized = serializePricePoint(point);
+          return serialized ? [[resolution, serialized]] : [];
+        })
+      )
+    : undefined;
+
+  return {
+    unit: computed.unit,
+    input: serializePricePoint(computed.input),
+    output: serializePricePoint(computed.output),
+    per_resolution: perResolution && Object.keys(perResolution).length > 0 ? perResolution : undefined,
+  };
+}
+
+async function buildCatalogEntries(): Promise<V1CatalogEntry[]> {
+  const cfg = await buildPricingConfig();
+  const overrides = await db.select().from(modelOverrides);
+  const overrideMap = new Map(overrides.map((override) => [override.modelId, override]));
+
+  return MASTER_MODELS.map((model) => {
+    const override = overrideMap.get(model.id);
+    const patched = { ...model };
+    if (override) {
+      if (model.type === "Metin") {
+        if (override.inputUsdOverride !== null) patched.providerInputUsd = Number(override.inputUsdOverride);
+        if (override.outputUsdOverride !== null) patched.providerOutputUsd = Number(override.outputUsdOverride);
+      } else if (model.type === "Görsel") {
+        if (override.inputUsdOverride !== null) patched.providerImageInputUsd = Number(override.inputUsdOverride);
+        if (override.outputUsdOverride !== null) patched.providerImageOutputUsd = Number(override.outputUsdOverride);
+      }
+    }
+    return {
+      model: patched,
+      computed: computePrice(patched, cfg),
+      enabled: override ? override.enabled : true,
+    };
+  });
+}
+
+function defaultCatalogEntries(): V1CatalogEntry[] {
+  return MASTER_MODELS.map((model) => ({
+    model,
+    enabled: true,
+  }));
+}
+
+export function buildV1ModelsResponse(entries: V1CatalogEntry[] = defaultCatalogEntries()) {
+  const enabledEntries = entries.filter((entry) => entry.enabled);
+
+  return {
+    object: "list" as const,
+    data: enabledEntries.map(({ model, computed }) => ({
+      id: model.id,
+      object: "model" as const,
+      name: model.name,
+      owned_by: providerSlug(model),
+      provider: {
+        name: model.provider,
+        slug: providerSlug(model),
+      },
+      enabled: true,
+      context_length: model.contextTokens ?? null,
+      max_output_tokens: model.maxOutputTokens ?? null,
+      pricing: buildPricing(computed),
+      endpoints: model.endpoints,
+      endpoint_details: (model.endpointDetails ?? []).map((endpoint) => ({
+        type: endpoint.type,
+        supports_streaming: endpoint.supportsStreaming,
+        supported_parameters: endpoint.supportedParameters,
+      })),
+      supported_parameters: model.supportedParameters ?? [],
+      architecture: {
+        input_modalities: model.inputModalities ?? [],
+        output_modalities: model.outputModalities ?? [],
+      },
+    })),
+  };
+}
+
+export function buildV1ModelCountResponse(entries: V1CatalogEntry[] = defaultCatalogEntries()) {
+  return {
+    count: entries.filter((entry) => entry.enabled).length,
+  };
+}
+
+export function buildV1ProvidersResponse(entries: V1CatalogEntry[] = defaultCatalogEntries()) {
+  const bySlug = new Map<string, { id: string; name: string; model_count: number; endpoints: Set<string> }>();
+
+  for (const { model, enabled } of entries) {
+    if (!enabled) continue;
+    const slug = providerSlug(model);
+    const entry = bySlug.get(slug) ?? {
+      id: slug,
+      name: model.provider,
+      model_count: 0,
+      endpoints: new Set<string>(),
+    };
+    entry.model_count += 1;
+    for (const endpoint of model.endpoints) {
+      entry.endpoints.add(endpoint);
+    }
+    bySlug.set(slug, entry);
+  }
+
+  return {
+    object: "list" as const,
+    data: [...bySlug.values()]
+      .map((provider) => ({
+        id: provider.id,
+        name: provider.name,
+        model_count: provider.model_count,
+        endpoints: [...provider.endpoints].sort(),
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+  };
+}
+
+export function createV1CatalogRouter(loadEntries: () => Promise<V1CatalogEntry[]> = buildCatalogEntries) {
+  const router = Router();
+
+  router.get("/models", async (_req, res, next) => {
+    try {
+      res.json(buildV1ModelsResponse(await loadEntries()));
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  router.get("/models/count", async (_req, res, next) => {
+    try {
+      res.json(buildV1ModelCountResponse(await loadEntries()));
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  router.get("/providers", async (_req, res, next) => {
+    try {
+      res.json(buildV1ProvidersResponse(await loadEntries()));
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  return router;
+}
+
+const router = createV1CatalogRouter();
+
+export default router;

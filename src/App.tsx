@@ -61,7 +61,7 @@ const SSS_DATA = [
   { q: "Neden günlük istek paketi yok?", a: "Çünkü her istek aynı maliyette değildir. Kısa bir istek çok ucuz olabilir, uzun context kullanan bir istek çok pahalı olabilir. İstek sayısı maliyet değildir." },
   { q: "Ucuz model kullanan daha az mı öder?", a: "Evet. Her model kendi fiyatından bakiyeden düşer. Claude Haiku kullanan, GPT-5.5 kullanandan çok daha az öder." },
   { q: "Input ve output ayrı mı hesaplanır?", a: "Evet. Input token ve output token ayrı fiyatlanır." },
-  { q: "Video ve görsel var mı?", a: "Görsel modeller (GPT Image 2) katalogda yer alır. Video modelleri de kapsama dahildir. Fiyatlar çözünürlük ve süreye göre değişir." },
+  { q: "Video ve görsel var mı?", a: "Görsel modeller (GPT Image 2) katalogda yer alır. Video modelleri beta/sınırlı durumdadır; video API endpointleri aktif değilse 501 dönebilir. Fiyatlar çözünürlük ve süreye göre değişir." },
   { q: "Kalan bakiye görünür mü?", a: "Evet. Her istekten sonra kalan bakiye panelde görünür." },
   { q: "Admin panel olacak mı?", a: "Evet. Model aktifliği, kullanıcılar ve sistem ayarları ayrı yönetim ekranında takip edilecek." },
 ];
@@ -574,14 +574,14 @@ export default function App() {
     return { label: "Haiku / Sonnet", desc: "Hız öncelikli — hızlı ve ekonomik modeller tercih edilir.", color: "blue" };
   };
 
-  const getCodeSnippet = (): string => {
+const getCodeSnippet = (): string => {
     switch (codeLanguage) {
       case "nodejs":
         return `// YapayZekaLab - OpenAI uyumlu tek endpoint
-const response = await fetch('https://api.yapayzekalab.com/v1/chat/completions', {
+const response = await fetch('https://yapayzekalab.org/v1/chat/completions', {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer YOUR_API_KEY',
+    'Authorization': 'Bearer yzk_live_YOUR_KEY',
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
@@ -596,21 +596,21 @@ console.log(result.choices[0].message.content);`;
         return `import requests
 
 # YapayZekaLab - OpenAI uyumlu
-url = "https://api.yapayzekalab.com/v1/chat/completions"
+url = "https://yapayzekalab.org/v1/chat/completions"
 payload = {
     "model": "anthropic/claude-haiku-4.5",
     "messages": [{"role": "user", "content": "Merhaba!"}]
 }
 headers = {
-    "Authorization": "Bearer YOUR_API_KEY",
+    "Authorization": "Bearer yzk_live_YOUR_KEY",
     "Content-Type": "application/json"
 }
 response = requests.post(url, json=payload, headers=headers)
 print(response.json()["choices"][0]["message"]["content"])`;
 
       case "curl":
-        return `curl -X POST https://api.yapayzekalab.com/v1/chat/completions \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
+        return `curl -X POST https://yapayzekalab.org/v1/chat/completions \\
+  -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
     "model": "anthropic/claude-haiku-4.5",
@@ -1496,7 +1496,7 @@ print(response.json()["choices"][0]["message"]["content"])`;
                   <Sparkles className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
                   <div className="text-blue-800 leading-normal text-[11px]">
                     <span className="font-semibold block mb-1">Örnek İstek</span>
-                    <code className="font-mono text-[10px] block bg-blue-100 rounded p-2 whitespace-pre-wrap">{"POST /v1/chat/completions\nAuthorization: Bearer YOUR_API_KEY\n{\"model\": \"anthropic/claude-haiku-4.5\"}"}</code>
+                    <code className="font-mono text-[10px] block bg-blue-100 rounded p-2 whitespace-pre-wrap">{"POST /v1/chat/completions\nAuthorization: Bearer yzk_live_YOUR_KEY\n{\"model\": \"anthropic/claude-haiku-4.5\"}"}</code>
                   </div>
                 </div>
 
