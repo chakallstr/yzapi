@@ -5,8 +5,8 @@ Operasyon tarihi: 2026-05-26
 ## Browser Kanıtı
 
 - Browser: Playwright `channel: chrome`, headless.
-- Lokal `qa:uat` raporu: `qa-artifacts/uat-smoke-2026-05-26T13-53-11-761Z/uat-smoke-report.md`, 10/10 PASS.
-- Canlı `qa:uat` raporu: `qa-artifacts/uat-smoke-2026-05-26T13-53-30-264Z/uat-smoke-report.md`, 6/10 FAIL.
+- Lokal `qa:uat` raporu: `qa-artifacts/uat-smoke-2026-05-26T14-05-53-517Z/uat-smoke-report.md`, 10/10 PASS.
+- Canlı `qa:uat` raporu: `qa-artifacts/uat-smoke-2026-05-26T14-06-12-720Z/uat-smoke-report.md`, 6/10 FAIL.
 - Screenshot artifactleri yerelde `qa-artifacts/` altında tutuldu; GitHub'a binary artifact olarak eklenmeyecek.
 
 ## Persona / Journey Sonuçları
@@ -17,9 +17,9 @@ Operasyon tarihi: 2026-05-26
 | UAT-002 Model keşfi | Developer | PASS | `/models` route ve Modeller tab | Modeller erişilebilir; DB açılınca API 500 yok |
 | UAT-003 SSS | Anonymous Visitor | PASS LOCAL / FAIL LIVE | `/sss` route | Lokal route fix sonrası doğru; canlı deploy edilmediği için beklenen içerik yok |
 | UAT-004 Login | New Developer | PARTIAL | Canlı `/api/auth/google` 302 | Google redirect doğru; gerçek Google callback tamamlanmadı |
-| UAT-005 API key | Developer | PASS LOCAL | Local test JWT | Tam key sadece create response; listede full key yok; DB hash var; revoke sonrası 401 |
+| UAT-005 API key | Developer | PASS LOCAL | Local test JWT + admin API | Tam key sadece create response; admin-created key artık hash’li; listede full key yok; revoke sonrası 401 |
 | UAT-006 İlk API call | Developer | BLOCKED | `SMOKE_API_KEY` yok | Valid local key ile upstream env yoksa 503; canlı funded key yok |
-| UAT-007 Bakiye/payment | Balance Buyer | PARTIAL PASS LOCAL | IBAN init/admin approve | IBAN local çalıştı; Shopier/Cryptomus env yok |
+| UAT-007 Bakiye/payment | Balance Buyer | PARTIAL PASS LOCAL | IBAN pre-guard + payment guard tests | IBAN approve/idempotency pre-guard doğrulandı; current env IBAN eksik olduğu için disabled/503; Shopier/Cryptomus env yok |
 | UAT-008 Low balance | Low-Balance User | BLOCKED | `SMOKE_LOW_BALANCE_API_KEY` yok | Otomatik smoke atlandı |
 | UAT-009 Usage/cost trust | Returning API User | BLOCKED | Gerçek başarılı `/v1` yok | Billing header ve usage DB gerçek provider çağrısıyla doğrulanamadı |
 | UAT-010 Mobile | Mobile User | PASS PUBLIC | 390x844 Chrome | Homepage/Modeller/SSS/API görünür |
@@ -31,7 +31,7 @@ Operasyon tarihi: 2026-05-26
 - DB kapalı ilk koşuda `/api/models` ve `/api/announcements/active` 500 verdi; Docker/Postgres açılınca kayboldu.
 - Lokal `/admin` route’unda tek console 404 görüldü; büyük olasılıkla favicon/static kaynak. API bad response listesinde kritik 4xx/5xx yok.
 - Canlı desktop/mobile homepage testinde console/network hata yok.
-- Canlı `qa:uat` 4 route içerik hatası verdi: desktop/mobile `/sss` ve desktop/mobile `/admin`. HTTP 200 var ama SPA başlangıç tabı canlıda doğru değil.
+- Canlı `qa:uat` son koşuda 4 route içerik hatası verdi: desktop/mobile `/sss` ve desktop/mobile `/admin`. HTTP 200 var ama SPA başlangıç tabı canlıda doğru değil.
 
 ## UX Notları
 

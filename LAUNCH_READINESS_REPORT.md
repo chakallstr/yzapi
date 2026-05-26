@@ -14,6 +14,7 @@ NOT READY — PAYMENT/BILLING/AUTH BLOCKERS
 - Google OAuth callback gerçek kullanıcı ile tamamlanmadı.
 - Shopier/Cryptomus sandbox/gerçek webhook uçtan uca doğrulanmadı.
 - Bu turdaki local frontend/QA fixleri canlıya deploy edilmedi; canlı `qa:uat` 6/10 kaldı, `/sss` ve `/admin` doğru içerik göstermiyor.
+- Admin API key, ledger dışı bakiye patch ve payment guard fixleri lokal doğrulandı ama canlıya deploy edilmedi.
 
 ## Must-Fix Before Launch
 
@@ -23,6 +24,7 @@ NOT READY — PAYMENT/BILLING/AUTH BLOCKERS
 - Admin email/allowlist kararını netleştir.
 - Live deploy sonrası `/admin`, `/docs`, admin mutasyonları ve mobile UI tekrar test edilsin.
 - `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` canlıda 10/10 PASS olana kadar release onayı verme.
+- Deploy sonrası admin-created API key, direct balance patch 400, payment methods enabled flags ve payment init min/max guard canlıda tekrar doğrulansın.
 
 ## Should-Fix Soon
 
@@ -52,9 +54,9 @@ Options considered:
 - NOT READY — BUILD/ENVIRONMENT BLOCKERS
 Evidence collected:
 - Local/live public smoke PASS.
-- Lint/test/build/public scan/secret scan PASS.
+- Lint/test/build/public scan/secret scan PASS; 18 test dosyası / 80 test PASS.
 - Local `qa:uat` PASS 10/10; live `qa:uat` FAIL 6/10.
-- API key and IBAN local flows PASS.
+- API key, admin-created key, direct balance patch guard ve payment guard local PASS.
 - Real Google callback, real funded `/v1`, billing headers, low balance, Shopier/Cryptomus E2E not tested.
 Agent 1 — QA Automation & End-User UAT: REJECT
 Reason: Public UI iyi ama login sonrası gerçek müşteri journey tamamlanmadı.

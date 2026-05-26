@@ -292,7 +292,7 @@ Options considered:
 Evidence collected:
 - İlk scanner run fazla false-positive verdi; kural daraltıldı.
 - `src/secret-scan-script.test.ts` PASS.
-- `node scripts/scan-secrets.mjs` PASS, 175 dosya tarandı, hit yok.
+- `node scripts/scan-secrets.mjs` PASS, 179 dosya tarandı, hit yok.
 - `qa-artifacts/` `.gitignore` içine alındı.
 Agent 1 vote: APPROVE
 Agent 1 reason: Kullanıcı test listesindeki eksik komut artık tekrarlanabilir şekilde çalışıyor.
@@ -315,7 +315,7 @@ Options considered:
 - B) Kısmen yeterli; release öncesi ek E2E gerekir.
 - C) Yetersiz.
 Evidence collected:
-- `npm test`: 16 dosya / 75 test PASS.
+- `npm test`: 18 dosya / 80 test PASS.
 - `npm run qa:uat`: lokal 10/10 PASS.
 - `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`: canlı 6/10 FAIL.
 - Gerçek Google callback, funded `/v1` billing headers, low-balance, Shopier/Cryptomus E2E otomasyonu yok.
@@ -343,7 +343,7 @@ Options considered:
 - NOT READY — SECURITY BLOCKERS
 - NOT READY — BUILD/ENVIRONMENT BLOCKERS
 Evidence collected:
-- Local kalite kapısı PASS: lint, 16/75 tests, build, public scan, source secret scan.
+- Local kalite kapısı PASS: lint, 18/80 tests, build, public scan, source secret scan.
 - Local `qa:uat` PASS 10/10.
 - Live `qa:uat` FAIL 6/10; `/sss` ve `/admin` canlıda doğru içerik göstermiyor.
 - Real Google callback, live funded `/v1`, billing headers, low-balance, Shopier/Cryptomus E2E doğrulanmadı.
@@ -381,3 +381,132 @@ Approval count: 3/3
 Final decision: APPROVED
 Status: PASS
 Follow-up action: Wrapper dosyasını ekle, syntax check ve canlı smoke komutuyla doğrula.
+
+---
+
+Decision ID: DEC-FIX-006
+Decision title: Backend billing/admin güvenlik guard'ları eklensin mi?
+Area: Backend / Billing / Admin / Payment Safety
+Options considered:
+- A) Admin-created API key'i gerçek hash ile üret, user PATCH üzerinden doğrudan `bakiyeTL` değişimini reddet, payment init miktarını sistem min/max limitleriyle doğrula ve IBAN env eksikse yöntemi kapat.
+- B) Sadece raporla, kodu değiştirme.
+- C) Büyük admin/payment refactor yap.
+Evidence collected:
+- `POST /api/admin/api-keys/:userId/create` `keyHash: null` yazıyor; bu key `validateApiKey` içinde kullanılamaz.
+- `PATCH /api/admin/users/:id` `bakiyeTL` alanını transaction ledger yazmadan değiştirebiliyor.
+- `system_config` içinde `minBakiyeTL` ve `maxBakiyeTL` var, ancak payment init endpointleri sadece `> 0` kontrol ediyor.
+- `GET /api/payments/methods` IBAN bilgisinin tamamı boş olsa bile `iban.enabled: true` döndürüyor.
+Agent 1 vote: APPROVE
+Agent 1 reason: Bu fixler müşteri yolculuğunu ve admin UAT doğruluğunu artırır; UI tema/düzen değişmez.
+Agent 2 vote: APPROVE
+Agent 2 reason: API key, ledger ve payment limit riskleri doğrulandı; minimal backend guard gerekir.
+Agent 3 vote: APPROVE
+Agent 3 reason: Hash'siz key, ledger bypass ve sahte aktif ödeme yöntemi release/security riskidir; küçük koruma uygundur.
+Approval count: 3/3
+Final decision: APPROVED
+Status: PASS
+Follow-up action: Önce regression testlerini yaz, sonra minimal backend guard değişikliklerini uygula ve ilgili testleri çalıştır.
+
+---
+
+Decision ID: DEC-RETEST-005
+Decision title: `turkapi-smoke` alias fix kabul edilsin mi?
+Area: Retest / Live Smoke Compatibility
+Options considered:
+- A) Kabul edilsin.
+- B) Ayrı smoke script istenir.
+Evidence collected:
+- `node --check scripts/turkapi-smoke.mjs` PASS.
+- `SMOKE_BASE_URL=https://yapayzekalab.org node scripts/turkapi-smoke.mjs` PASS public checks.
+- `SMOKE_API_KEY` ve `SMOKE_LOW_BALANCE_API_KEY` olmadığı için başarılı chat ve low-balance testleri manuel gereksinim olarak kaldı.
+Agent 1 vote: APPROVE
+Agent 1 reason: Kullanıcının istediği komut çalışıyor ve mevcut live smoke sözleşmesini bozmadı.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend davranışı değişmedi; mevcut vps smoke runner aynen kullanıldı.
+Agent 3 vote: APPROVE
+Agent 3 reason: Secret basmıyor, gerçek para kullanmıyor.
+Approval count: 3/3
+Final decision: APPROVED
+Status: ACCEPTED
+Follow-up action: Live keyler sağlanınca aynı komut tam smoke için tekrar çalıştırılmalı.
+
+---
+
+Decision ID: DEC-RETEST-006
+Decision title: Backend billing/admin guard fixleri kabul edilsin mi?
+Area: Retest / Backend / Billing / Admin
+Options considered:
+- A) Lokal fixler kabul edilsin, canlı deploy sonrası tekrar test şartı kalsın.
+- B) Ek refactor yapılmadan kabul edilmesin.
+Evidence collected:
+- `src/admin-billing-guard.test.ts` PASS.
+- `src/server/services/payment-guards.test.ts` PASS.
+- Local admin API smoke: admin login 200, direct balance patch 400, admin key create 201, full key varlığı doğrulandı, key revoke 200.
+- Local gateway admin-created key ile 503 döndü; bu 401 değil, auth geçip lokal upstream env eksikliğine takıldığını gösterir.
+- Payment methods 200, current env IBAN disabled; `payment-guards` min/max unit testleri PASS.
+- `npm run lint`, `npm test`, `npm run build`, `npm run scan:public`, `node scripts/scan-secrets.mjs` PASS.
+Agent 1 vote: APPROVE
+Agent 1 reason: Admin UI full key tek seferlik görünür hale geldi; route ve UAT smoke lokal bozulmadı.
+Agent 2 vote: APPROVE
+Agent 2 reason: Hash'siz key, ledger bypass ve payment guard eksikleri kapandı; provider/live kanıtı hâlâ manuel gereksinim.
+Agent 3 vote: APPROVE
+Agent 3 reason: Security riskleri azaltıldı; secret sızıntısı olmadı.
+Approval count: 3/3
+Final decision: APPROVED
+Status: ACCEPTED_LOCAL
+Follow-up action: Canlı deploy sonrası admin key, balance patch, payment methods ve init guard tekrar doğrulanmalı.
+
+---
+
+Decision ID: DEC-AUTOMATION-002
+Decision title: Güncel otomasyon launch için yeterli mi?
+Area: Automated Tests
+Options considered:
+- A) Launch için yeterli.
+- B) Regression için yeterli, launch için eksik.
+- C) Yetersiz.
+Evidence collected:
+- `npm test`: 18 dosya / 80 test PASS.
+- `npm run qa:uat`: lokal 10/10 PASS.
+- `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`: canlı 6/10 FAIL.
+- `SMOKE_BASE_URL=https://yapayzekalab.org node scripts/turkapi-smoke.mjs`: public checks PASS, live funded/low-balance key testleri atlandı.
+- Gerçek Google callback, funded `/v1` billing headers, low-balance, Shopier/Cryptomus E2E otomasyonu yok.
+Agent 1 vote: NEEDS_MORE_EVIDENCE
+Agent 1 reason: Browser smoke var, fakat login sonrası ödeme/API key/customer journey tam otomasyon değil.
+Agent 2 vote: NEEDS_MORE_EVIDENCE
+Agent 2 reason: Live funded usage ve provider payment E2E key/env olmadan doğrulanmadı.
+Agent 3 vote: NEEDS_MORE_EVIDENCE
+Agent 3 reason: Payment webhook ve admin allowlist launch riski hâlâ açık.
+Approval count: 0/3
+Final decision: REJECTED_FOR_LAUNCH
+Status: PARTIAL_PASS_FOR_REGRESSION
+Follow-up action: Live test keyler ve provider sandbox credentiallarıyla E2E suite tamamlanmalı.
+
+---
+
+Decision ID: DEC-FINAL-RELEASE-002
+Decision title: Güncel durumda YapayZekaLab gerçek kullanıcılar için hazır mı?
+Area: Release Readiness
+Options considered:
+- READY FOR PRODUCTION
+- READY AFTER MINOR FIXES
+- NOT READY — MAJOR UX/FLOW ISSUES
+- NOT READY — PAYMENT/BILLING/AUTH BLOCKERS
+- NOT READY — SECURITY BLOCKERS
+- NOT READY — BUILD/ENVIRONMENT BLOCKERS
+Evidence collected:
+- Local kalite kapısı PASS: lint, 18/80 tests, build, public scan, source secret scan.
+- Local `qa:uat` PASS 10/10.
+- Live `qa:uat` FAIL 6/10; `/sss` ve `/admin` canlıda doğru içerik göstermiyor.
+- Admin API key, ledger dışı balance patch ve payment guard fixleri lokal PASS ama canlıya deploy edilmedi.
+- Real Google callback, live funded `/v1`, billing headers, low-balance, Shopier/Cryptomus E2E doğrulanmadı.
+Agent 1 vote: REJECT
+Agent 1 reason: Canlı route smoke geçmiyor ve login sonrası gerçek müşteri journey tamamlanmadı.
+Agent 2 vote: REJECT
+Agent 2 reason: Başarılı canlı API usage, billing headers, balance deduction ve payment provider E2E eksik.
+Agent 3 vote: REJECT
+Agent 3 reason: Payment webhook/provider, live deploy ve admin allowlist riskleri launch öncesi açık.
+Approval count: 0/3
+Final decision: NOT READY — PAYMENT/BILLING/AUTH BLOCKERS
+Status: REJECTED_FOR_PRODUCTION
+Follow-up action: GitHub checkpoint sonrası canlı deploy/test credential hazırlığı ve full live UAT yapılmalı.

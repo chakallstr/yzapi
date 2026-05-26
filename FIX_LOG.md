@@ -29,5 +29,44 @@ Operasyon tarihi: 2026-05-26
 - Karar: DEC-FIX-004, 3/3 APPROVED.
 - Yapılan değişiklik: `scripts/scan-secrets.mjs` eklendi; gerçek secret değerlerini basmadan Git kapsamındaki dosyaları tarıyor. `qa-artifacts/` `.gitignore` kapsamına alındı.
 - Test: `src/secret-scan-script.test.ts`
-- Retest: `node scripts/scan-secrets.mjs` PASS, 175 dosya tarandı, hit yok.
+- Retest: `node scripts/scan-secrets.mjs` PASS, 179 dosya tarandı, hit yok.
 - Sonuç: FIXED.
+
+## BUG-QA-002
+
+- Problem: Kullanıcının canlı smoke listesinde yer alan `scripts/turkapi-smoke.mjs` yoktu.
+- Kök neden: Repo içinde aynı kontrolü yapan `scripts/vps-smoke.mjs` vardı, fakat beklenen komut adı yoktu.
+- Karar: DEC-FIX-005, 3/3 APPROVED.
+- Yapılan değişiklik: `scripts/turkapi-smoke.mjs` mevcut `vps-smoke` scriptini çağıran ince wrapper olarak eklendi.
+- Retest: `SMOKE_BASE_URL=https://yapayzekalab.org node scripts/turkapi-smoke.mjs` PASS; funded/low-balance key testleri credential olmadığı için manuel gereksinim.
+- Sonuç: FIXED.
+
+## BUG-ADMIN-002
+
+- Problem: Admin panelinden oluşturulan API key `keyHash: null` ile kaydedildiği için `/v1` auth tarafından kullanılamıyordu.
+- Kök neden: Admin route gerçek `generateApiKey()` / `hashApiKey()` servisini kullanmıyordu.
+- Karar: DEC-FIX-006, 3/3 APPROVED.
+- Yapılan değişiklik: Admin create endpoint hash’li key üretir; full key sadece create response içinde döner. Admin UI full key’i tek seferlik uyarı kutusunda gösterir.
+- Test: `src/admin-billing-guard.test.ts`; local admin API smoke.
+- Retest: Admin key create 201, full key varlığı doğrulandı, revoke 200.
+- Sonuç: FIXED LOCAL.
+
+## BUG-ADMIN-003
+
+- Problem: `PATCH /api/admin/users/:id` body içindeki `bakiyeTL` alanı transaction ledger yazmadan kullanıcı bakiyesi değiştirebiliyordu.
+- Kök neden: Generic user update route’u finansal alanı da kabul ediyordu.
+- Karar: DEC-FIX-006, 3/3 APPROVED.
+- Yapılan değişiklik: `bakiyeTL` generic patch içinde 400 ile reddedildi; ledger yazan `/api/admin/users/:id/bakiye` endpointi zorunlu bırakıldı.
+- Test: `src/admin-billing-guard.test.ts`; local admin API smoke.
+- Retest: Direct balance patch 400.
+- Sonuç: FIXED LOCAL.
+
+## BUG-PAY-001
+
+- Problem: Payment init endpointleri sistem min/max bakiye limitlerini uygulamıyordu; IBAN env boşken yöntem aktif görünebiliyordu.
+- Kök neden: `system_config.minBakiyeTL/maxBakiyeTL` payment init içinde kullanılmıyordu ve IBAN enabled sabitti.
+- Karar: DEC-FIX-006, 3/3 APPROVED.
+- Yapılan değişiklik: `payment-guards` helperları eklendi; Shopier/IBAN/Cryptomus init miktarı min/max ile doğrulanıyor, IBAN env eksikse disabled/503 dönüyor.
+- Test: `src/server/services/payment-guards.test.ts`; local payment methods smoke.
+- Retest: Payment methods 200, current env IBAN disabled, scanner/lint/test/build PASS.
+- Sonuç: FIXED LOCAL.

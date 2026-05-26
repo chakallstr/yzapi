@@ -11,6 +11,8 @@ Operasyon tarihi: 2026-05-26
 | Admin UI route | FIXED | `/admin` artık admin login ekranını gösteriyor |
 | Admin data load | PASS STATIC/API | `adminFetch` kullanıyor |
 | Admin mutasyonları | FIXED | Protected `/api/admin/*` raw fetch çağrıları `adminFetch` oldu |
+| Admin API key create | FIXED LOCAL | Admin-created key artık hash’li, full key sadece create response/UI uyarısında görünüyor |
+| Direct user balance patch | FIXED LOCAL | Generic user PATCH `bakiyeTL` alanını 400 ile reddediyor; ledger endpoint zorunlu |
 | Kur/config/model/user/balance/announcement/provider/plans/API key UI calls | PASS STATIC | Token guard testi eklendi |
 | IBAN pending approve | PASS LOCAL | Admin JWT ile approve/reject güvenliği test edildi |
 | Audit | PARTIAL | Audit write kodu var; her admin mutasyonunun audit kapsamı tek tek doğrulanmadı |
@@ -21,6 +23,12 @@ Operasyon tarihi: 2026-05-26
 - Fix: `src/App.tsx` içinde protected admin endpointler `adminFetch` ile çağrılıyor.
 - Test: `src/admin-fetch-guard.test.ts`
 - Retest: `npm test`, `npm run lint`, `npm run build`, `npm run scan:public` geçti.
+- `BUG-ADMIN-002`: Admin-created API key `keyHash: null` ile oluşuyordu ve kullanılamazdı.
+- Fix: Admin create endpoint `generateApiKey()` + `hashApiKey(fullKey)` kullanıyor; full key yalnız create response içinde dönüyor.
+- Test: `src/admin-billing-guard.test.ts`, local admin API smoke.
+- `BUG-ADMIN-003`: Generic user patch route’u `bakiyeTL` alanını transaction ledger yazmadan değiştirebiliyordu.
+- Fix: Bu alan 400 ile reddedildi; `/api/admin/users/:id/bakiye` ledger yazan endpoint olarak bırakıldı.
+- Test: `src/admin-billing-guard.test.ts`, local admin API smoke.
 
 ## Açık Riskler
 

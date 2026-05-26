@@ -1,7 +1,7 @@
 import { Router } from "express";
 import express from "express";
 import { db } from "../db/client.js";
-import { payments, pendingIbanPayments, users, transactions } from "../db/schema.js";
+import { payments, pendingIbanPayments, systemConfig, users, transactions } from "../db/schema.js";
 import { eq, desc, and } from "drizzle-orm";
 import { env } from "../lib/env.js";
 import { userAuth } from "../middleware/user-auth.js";
@@ -11,6 +11,7 @@ import { buildCheckoutForm, verifyCallback } from "../services/shopier-service.j
 import { createInvoice, verifyWebhook } from "../services/cryptomus-service.js";
 import { writeAudit } from "../services/audit-service.js";
 import { logger } from "../lib/logger.js";
+import { isIbanConfigured, validatePaymentAmount } from "../services/payment-guards.js";
 
 const router = Router();
 
@@ -22,6 +23,16 @@ function generateReferansKodu(): string {
     code += chars[Math.floor(Math.random() * chars.length)];
   }
   return code;
+}
+
+async function getPaymentLimits() {
+  const rows = await db
+    .select({ minBakiyeTL: systemConfig.minBakiyeTL, maxBakiyeTL: systemConfig.maxBakiyeTL })
+    .from(systemConfig)
+    .where(eq(systemConfig.id, 1))
+    .limit(1);
+
+  return rows[0] ?? { minBakiyeTL: "10", maxBakiyeTL: "50000" };
 }
 
 function serializePayment(p: typeof payments.$inferSelect) {
@@ -57,10 +68,11 @@ function serializeIban(p: typeof pendingIbanPayments.$inferSelect) {
 
 // ── GET /api/payments/methods ─────────────────────────────────────────────────
 router.get("/methods", userAuth, (_req, res) => {
+  const ibanEnabled = isIbanConfigured(env);
   res.json({
     shopier: { enabled: !!(env.SHOPIER_API_KEY && env.SHOPIER_API_SECRET) },
     iban: {
-      enabled: true,
+      enabled: ibanEnabled,
       bankName: env.IBAN_BANK_NAME,
       ibanNumber: env.IBAN_NUMBER,
       owner: env.IBAN_OWNER,
@@ -79,12 +91,13 @@ router.post("/shopier/init", userAuth, async (req, res, next) => {
     }
 
     const { miktarTL } = req.body as { miktarTL: number };
-    if (!miktarTL || miktarTL <= 0) {
-      res.status(400).json({ error: "Geçerli bir miktar girin." });
+    const amountValidation = validatePaymentAmount(miktarTL, await getPaymentLimits());
+    if (!amountValidation.ok) {
+      res.status(amountValidation.status).json({ error: amountValidation.error });
       return;
     }
 
-    const kdv = calcKdv(miktarTL);
+    const kdv = calcKdv(amountValidation.amount);
 
     // Load user info for form fields
     const userRows = await db.select({ email: users.email, adSoyad: users.adSoyad })
@@ -177,13 +190,19 @@ router.post(
 // ── POST /api/payments/iban/init ─────────────────────────────────────────────
 router.post("/iban/init", userAuth, async (req, res, next) => {
   try {
-    const { miktarTL } = req.body as { miktarTL: number };
-    if (!miktarTL || miktarTL <= 0) {
-      res.status(400).json({ error: "Geçerli bir miktar girin." });
+    if (!isIbanConfigured(env)) {
+      res.status(503).json({ error: "IBAN ödeme yöntemi şu an kullanılamıyor." });
       return;
     }
 
-    const kdv = calcKdv(miktarTL);
+    const { miktarTL } = req.body as { miktarTL: number };
+    const amountValidation = validatePaymentAmount(miktarTL, await getPaymentLimits());
+    if (!amountValidation.ok) {
+      res.status(amountValidation.status).json({ error: amountValidation.error });
+      return;
+    }
+
+    const kdv = calcKdv(amountValidation.amount);
     const referansKodu = generateReferansKodu();
 
     // Create payment row
@@ -230,12 +249,13 @@ router.post("/crypto/init", userAuth, async (req, res, next) => {
     }
 
     const { miktarTL } = req.body as { miktarTL: number };
-    if (!miktarTL || miktarTL <= 0) {
-      res.status(400).json({ error: "Geçerli bir miktar girin." });
+    const amountValidation = validatePaymentAmount(miktarTL, await getPaymentLimits());
+    if (!amountValidation.ok) {
+      res.status(amountValidation.status).json({ error: amountValidation.error });
       return;
     }
 
-    const kdv = calcKdv(miktarTL);
+    const kdv = calcKdv(amountValidation.amount);
 
     // Create payment row first
     const inserted = await db.insert(payments).values({

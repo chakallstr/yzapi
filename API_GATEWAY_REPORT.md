@@ -7,7 +7,7 @@ Operasyon tarihi: 2026-05-26
 | Endpoint | Test | Sonuç | Not |
 |---|---|---|---|
 | `POST /v1/chat/completions` | Auth yok | PASS | 401 JSON |
-| `POST /v1/chat/completions` | Local valid key, upstream env yok | PASS/PARTIAL | 503 `proxy not configured`; auth doğrulandı, provider çağrısı yok |
+| `POST /v1/chat/completions` | Local valid user/admin-created key, upstream env yok | PASS/PARTIAL | 503 `proxy not configured`; auth doğrulandı, provider çağrısı yok |
 | `POST /v1/chat/completions` | Revoked key | PASS | 401 `Invalid API key` |
 | `GET /v1/__missing__` | Unknown route | PASS | JSON 404 |
 | `POST /v1/responses` | Static/test coverage | PARTIAL | Service tests var; canlı gerçek key ile denenmedi |
@@ -29,6 +29,7 @@ Operasyon tarihi: 2026-05-26
 - `SMOKE_LOW_BALANCE_API_KEY` yok.
 - Lokal `CLOSEROUTER_API_KEY` yok.
 - Canlı funded user API key sağlanmadı.
+- Canlı `SMOKE_API_KEY` / `SMOKE_LOW_BALANCE_API_KEY` sağlanmadığı için billing header ve 402 low-balance testleri atlandı.
 
 ## Sonuç
 

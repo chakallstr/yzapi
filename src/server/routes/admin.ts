@@ -16,6 +16,7 @@ import {
 import { writeAudit } from "../services/audit-service.js";
 import { refreshKur } from "../services/kur-service.js";
 import { getReconciliationReport } from "../services/reconciliation-service.js";
+import { generateApiKey, hashApiKey } from "../services/api-key-service.js";
 
 const router = Router();
 
@@ -238,7 +239,10 @@ router.patch("/users/:id", async (req, res, next) => {
     if (body.plan !== undefined) updates.plan = body.plan;
     if (body.not !== undefined) updates.not = body.not;
     if (body.gunlukLimitTL !== undefined) updates.gunlukLimitTL = body.gunlukLimitTL !== null ? String(body.gunlukLimitTL) : null;
-    if (body.bakiyeTL !== undefined) updates.bakiyeTL = String(body.bakiyeTL);
+    if (body.bakiyeTL !== undefined) {
+      res.status(400).json({ error: "Bakiye degisikligi icin /api/admin/users/:id/bakiye endpointini kullanin." });
+      return;
+    }
     updates.updatedAt = new Date();
 
     const updated = await db.update(users).set(updates).where(eq(users.id, id)).returning();
@@ -537,21 +541,26 @@ router.post("/api-keys/:userId/create", async (req, res, next) => {
   try {
     const { userId } = req.params;
     const { ad } = req.body as { ad: string };
-    const randHex4 = Math.floor(Math.random() * 0xffff).toString(16).padStart(4, "0");
-    const maskedKey = `yzk_live_••••${randHex4}`;
+    const { fullKey, prefix, maskedKey } = generateApiKey();
+    const keyHash = await hashApiKey(fullKey);
 
     const userRows = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!userRows.length) return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+
     const inserted = await db.insert(apiKeys).values({
       userId,
       ad: ad || "yeni-key",
       maskedKey,
-      keyHash: null,
-      prefix: "yzk_live_",
+      keyHash,
+      prefix,
       aktif: true,
     }).returning();
 
     await writeAudit("apikey_create", userId, `Yeni key: ${maskedKey}`);
-    res.status(201).json(serializeApiKey(inserted[0], userRows[0]?.email));
+    res.status(201).json({
+      ...serializeApiKey(inserted[0], userRows[0].email),
+      key: fullKey,
+    });
   } catch (e) { next(e); }
 });
 

@@ -9,6 +9,9 @@ Operasyon tarihi: 2026-05-26
 | SEC-ADMIN-001 | High | Admin UI mutasyonlarında Authorization header eksikti. | Static grep + failing test | FIXED |
 | SEC-ROUTE-001 | Medium | `/admin` route login ekranına ulaşmıyordu; admin UI test edilemiyordu. | Lokal/canlı path testi | FIXED LOCAL |
 | SEC-AUTH-001 | Medium | Admin sadece parola/JWT rol bazlı; email allowlist yok. | `admin-auth.ts` | OPEN |
+| SEC-ADMIN-002 | High | Admin-created API key hash’siz oluşuyordu. | Agent 2 review + regression test | FIXED LOCAL |
+| SEC-BILLING-001 | High | Generic user patch route’u ledger dışı bakiye değiştirebiliyordu. | Agent 2 review + local API smoke | FIXED LOCAL |
+| SEC-PAY-002 | Medium | Boş IBAN config aktif yöntem gibi dönebiliyor, payment min/max guard eksikti. | Agent 2 review + unit/local test | FIXED LOCAL |
 | SEC-OAUTH-001 | Medium | Lokal Google OAuth env yok. | `/api/auth/google` lokal 503 | OPEN/ENV |
 | SEC-PAY-001 | Medium | Shopier/Cryptomus gerçek/sandbox provider testleri yapılmadı. | Env yok / gerçek para yok | OPEN |
 | SEC-API-001 | Medium | Başarılı canlı `/v1` billing header testi yapılamadı. | `SMOKE_API_KEY` yok | OPEN |
@@ -22,8 +25,11 @@ Operasyon tarihi: 2026-05-26
 - Revoked API key `/v1`: 401.
 - Unknown `/api/*` ve `/v1/*`: JSON 404, HTML/stack trace yok.
 - Public bundle secret scan: PASS.
-- Git kapsamlı source secret scan: PASS, 175 dosya, hit yok.
+- Git kapsamlı source secret scan: PASS, 179 dosya, hit yok.
 - API key DB storage: full key DB’de plaintext değil, hash var; full key listede dönmüyor.
+- Admin-created API key: hash’li, full key sadece create response/UI uyarısında tek seferlik.
+- Direct admin user patch ile bakiye değiştirme: 400.
+- Boş IBAN env: methods disabled, init 503.
 - IBAN duplicate approve: 409; çift credit yok.
 
 ## Secret Notu

@@ -183,6 +183,7 @@ export default function App() {
   const [apiKeysData, setApiKeysData] = useState<any[]>([]);
   const [konsolMode, setKonsolMode] = useState<"Metin" | "Görsel" | "Video">("Metin");
   const [newApiKeyForm, setNewApiKeyForm] = useState({ userId: "", ad: "" });
+  const [newAdminApiKeyResult, setNewAdminApiKeyResult] = useState<{ key: string; maskedKey?: string; userEmail?: string } | null>(null);
 
   // Auth state
   const [adminToken, setAdminToken] = useState<string | null>(() => localStorage.getItem("adminToken"));
@@ -2442,13 +2443,23 @@ print(response.json()["choices"][0]["message"]["content"])`;
                         className="bg-slate-50 border border-slate-200 rounded py-1.5 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 flex-1" />
                       <button onClick={async () => {
                         if (!newApiKeyForm.userId || !newApiKeyForm.ad) return;
-                        await adminFetch(`/api/admin/api-keys/${newApiKeyForm.userId}/create`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ad: newApiKeyForm.ad }) });
+                        const res = await adminFetch(`/api/admin/api-keys/${newApiKeyForm.userId}/create`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ad: newApiKeyForm.ad }) });
+                        const data = await res.json();
+                        if (!res.ok) return;
+                        if (data.key) setNewAdminApiKeyResult({ key: data.key, maskedKey: data.maskedKey, userEmail: data.userEmail });
                         setNewApiKeyForm({ userId: "", ad: "" });
                         await loadAdminData();
                       }} className="flex items-center space-x-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all whitespace-nowrap">
                         <Plus className="w-3.5 h-3.5" /><span>Oluştur</span>
                       </button>
                     </div>
+                    {newAdminApiKeyResult && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                        <div className="font-semibold">Yeni anahtar sadece bir kez görünür.</div>
+                        <div className="mt-1 font-mono break-all">{newAdminApiKeyResult.key}</div>
+                        <div className="mt-1 text-amber-700">{newAdminApiKeyResult.userEmail || newAdminApiKeyResult.maskedKey || "Kullanıcıya güvenli şekilde iletin."}</div>
+                      </div>
+                    )}
                   </div>
                   {(() => {
                     const grouped: Record<string, any[]> = {};
