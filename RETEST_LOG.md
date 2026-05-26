@@ -61,3 +61,19 @@ Agent 2 retest vote: APPROVE
 Agent 3 retest vote: APPROVE
 Approval count: 3/3
 Final retest status: LIVE_ADMIN_GOOGLE_PASS_FULL_RELEASE_BLOCKED_BY_BILLING_PAYMENT
+
+## LIVE-BILLING-001 Live Billing / Provider Diagnostic Retest
+
+Bug ID: R-BUG-006
+Fix decision ID: DEC-LIVE-BILLING-TEST-001
+Retest decision ID: DEC-RETEST-LIVE-BILLING-001
+Command or manual flow: Live service environment with isolated `qa-live-billing-*` users/keys, tiny text calls only, raw keys kept out of reports/logs, test keys revoked after use. Direct CloseRouter `/credits`, `/models/count`, `/models?output_modalities=text`, model endpoint metadata, and chat/responses inference diagnostics.
+Expected: Funded key should receive a successful text response with billing headers, balance decrement, transaction, and success `usage_records`; low-balance should return safe `402`; invalid/revoked keys should return `401`; direct provider should support at least one tiny text inference route.
+Actual: Low-balance returned `402`, invalid key returned `401`, upstream failure usage records were zero-cost and funded balance did not decrement. Direct CloseRouter account/catalog/balance checks passed, but OpenAI/Anthropic/Deepseek/Google chat and OpenAI responses inference returned `502 upstream_connection_refused` or `502 upstream_connect_timeout`.
+Passed/Failed: Partial. Security/failure-path billing passed; success billing failed due upstream inference.
+Evidence: CloseRouter `/credits` 200 with approximately `$1.99998845`; `/models/count` 200 with `34`; text catalog 18 models; direct inference 502 across tested providers; follow-up read-only DB check found no remaining `qa-live-billing-*` test rows.
+Agent 1 retest vote: REJECT_FULL_RELEASE
+Agent 2 retest vote: REJECT_FULL_RELEASE
+Agent 3 retest vote: REJECT_FULL_RELEASE
+Approval count: 0/3
+Final retest status: FAILURE_PATH_PASS_SUCCESS_BILLING_BLOCKED_BY_UPSTREAM_502

@@ -114,8 +114,25 @@ Whitespace diff check:
 - Admin full browser UAT: `PASS_STANDARD_CHROME` for dashboard entry; destructive admin mutations not run.
 - Shopier dashboard/callback E2E: `BLOCKED_BY_CHROME_NATIVE_HOST` plus rotated sandbox credential required.
 - Cryptomus dashboard/webhook E2E: `BLOCKED_BY_CHROME_NATIVE_HOST` plus rotated sandbox credential required.
-- Funded `yzk_live_*` real billing: safe funded test key required.
-- Low-balance `yzk_live_*`: safe low-balance test key required.
+- Funded `yzk_live_*` real billing: test key was created and revoked safely, but success billing is `BLOCKED_BY_CLOSEROUTER_UPSTREAM_502`.
+- Low-balance `yzk_live_*`: `PASS`, zero-balance test key returned `402`.
+
+## Live Billing / Provider Diagnostic Update
+
+Tarih: 2026-05-27 02:50 TRT
+
+- Direct CloseRouter `/credits`: `200`, approximately `$1.99998845` remaining.
+- Direct CloseRouter `/models/count`: `200`, `34`.
+- Direct CloseRouter text catalog: `200`, `18` text models.
+- Direct CloseRouter metadata for `openai/gpt-5.4-mini`, `anthropic/claude-haiku-4.5`, `deepseek/deepseek-v4-pro`, and `moonshotai/kimi-k2.5`: `200`.
+- Direct CloseRouter inference failed before YapayZekaLab billing could record a successful paid call:
+  - `openai/gpt-5.4-mini` chat: `502 upstream_connection_refused`.
+  - `anthropic/claude-haiku-4.5` chat: `502 upstream_connection_refused`.
+  - `deepseek/deepseek-v4-pro` chat: `502 upstream_connection_refused`.
+  - `google/gemini-3.1-flash-lite-preview` chat: `502 upstream_connection_refused`.
+  - `openai/gpt-5.4-mini` responses: `502 upstream_connect_timeout`.
+- YapayZekaLab failure-path billing remained safe: upstream failure records zero-cost error usage and does not decrement the funded test balance.
+- Raw provider keys and raw `yzk_live_*` test keys were not printed or committed.
 
 ## Current 3-Agent Vote
 

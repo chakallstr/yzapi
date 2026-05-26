@@ -25,3 +25,45 @@ Durum: 60 dakikalık site testi sonrası doldurulacak.
 - `GET /v1/models/count`: `404`.
 - Valid kullanıcı API anahtarı yok.
 - Upstream CloseRouter health local ortamda `unknown`.
+
+---
+
+# Live API/Billing Retest Update — 2026-05-27 02:50 TRT
+
+## Sonuç
+
+- Genel API sonucu: `PARTIAL / BLOCKED_BY_UPSTREAM_INFERENCE`.
+- Canlı public katalog deploy sonrası düzeldi: `/v1/models`, `/v1/providers`, `/v1/models/count` artık live smoke kapsamından geçti.
+- Canlı auth/security negatif yollar çalıştı: authsuz `/v1/chat/completions` JSON `401` döndü.
+- İzole canlı test kullanıcıları ve test API keyleri oluşturuldu, raw key değerleri rapora/loga yazılmadı, test sonrası salt-okuma DB kontrolünde `qa-live-billing-*` test satırı kalmadı.
+- Zero-balance test key ile küçük text çağrısı `402` döndü; provider harcaması yapılmadı.
+- Invalid key testi `401` döndü.
+- Funded key ile başarılı ücretli text inference hâlâ doğrulanamadı; gateway çağrıları ve doğrudan CloseRouter inference çağrıları `502 upstream_error` verdi.
+
+## Direct CloseRouter Provider Evidence
+
+Masrafsız/güvenli kontroller:
+
+- `GET /credits`: `200`, `total_credits ~= 1.99998845`, `total_usage ~= 0.00001155`.
+- `GET /models/count`: `200`, `count = 34`.
+- `GET /models?output_modalities=text`: `200`, `18` text model döndü.
+- Model endpoint metadata: `anthropic/claude-haiku-4.5`, `deepseek/deepseek-v4-pro`, `openai/gpt-5.4-mini`, `moonshotai/kimi-k2.5` için `200`.
+
+Inference kontrolleri:
+
+- Direct `POST /chat/completions` `openai/gpt-5.4-mini`: `502`, `upstream_connection_refused`.
+- Direct `POST /chat/completions` `anthropic/claude-haiku-4.5`: `502`, `upstream_connection_refused`.
+- Direct `POST /chat/completions` `deepseek/deepseek-v4-pro`: `502`, `upstream_connection_refused`.
+- Direct `POST /chat/completions` `google/gemini-3.1-flash-lite-preview`: `502`, `upstream_connection_refused`.
+- Direct `POST /responses` `openai/gpt-5.4-mini`: `502`, `upstream_connect_timeout`.
+- `qwen/qwen3-235b` and `z-ai/glm-4.32b` direct calls returned `400 model unavailable`; these were not valid success candidates.
+
+## Billing Acceptance Status
+
+- PASS: API key auth rejection for invalid/no-auth.
+- PASS: Low-balance rejection path returns safe `402`.
+- PASS: Upstream failure path records zero-cost error usage and does not decrement test balance.
+- PASS: Direct provider diagnostics show account/key/catalog/balance are present.
+- BLOCKED: Successful text response, `X-YZ-Cost-TL`, `X-YZ-Remaining-TL`, `X-YZ-Request-Id`, positive cost deduction, `transactions`, and success `usage_records` cannot be accepted until CloseRouter inference returns a successful response.
+
+Final API verdict remains: `NOT READY — API/BILLING/BALANCE BLOCKERS`.

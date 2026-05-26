@@ -34,6 +34,30 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-LIVE-BILLING-TEST-001
+Decision title: Create isolated live test API keys to verify billing headers, balance decrement, and low-balance behavior
+Decision type: Live test data approval
+Related bug IDs: R-BUG-006
+Evidence from reports: Final QA and billing reports mark funded `yzk_live_*`, low-balance, cost headers, balance decrement, and `usage_records` as unverified launch blockers.
+Files likely affected: Live database test rows only; no source file edit. Test keys must not be printed or committed.
+Risk level: Medium
+Design/template impact: None.
+Security impact: Full raw test keys must remain in remote temp files only and be revoked/cleaned after testing. No real user data should be mutated.
+Backend/API/billing impact: Creates isolated `qa-live-billing-*` users/API keys with small test balances, performs tiny text API calls, verifies ledger/usage, then revokes test keys.
+Proposed action: Use the live service environment to create test-only funded and zero-balance users/keys, run bounded text API tests, record only masked evidence, and revoke keys after retest.
+Agent 1 vote: APPROVE
+Agent 1 reason: This is the missing real developer flow evidence and uses no UI/design changes.
+Agent 2 vote: APPROVE
+Agent 2 reason: Isolated test rows allow real billing verification without touching production customers or payments.
+Agent 3 vote: APPROVE
+Agent 3 reason: Acceptable only with secret redaction, no image/video spend, no real payment, and cleanup/revoke after use.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Run live billing test setup and bounded text API checks.
+Status: APPROVED
+
+---
+
 Decision ID: DEC-ADMIN-LIVE-STALE-001
 Decision title: Fix live admin password screen by deploying current single-owner Google admin build
 Decision type: Live repair/deploy gate
@@ -439,6 +463,30 @@ Approval count: 3/3
 Final decision: APPROVED
 Allowed next action: Run `npm run lint`.
 Status: APPROVED
+
+---
+
+Decision ID: DEC-RETEST-LIVE-BILLING-001
+Decision title: Is live billing accepted after isolated funded/low-balance/provider diagnostics?
+Decision type: Retest acceptance
+Related bug IDs: R-BUG-006
+Evidence from reports: Isolated live test users/API keys were used without printing raw keys and then revoked. Low-balance returned `402`; invalid key returned `401`; upstream failure records were zero-cost and did not decrement the funded test balance. Direct CloseRouter `/credits` and `/models` passed, but direct text inference across OpenAI/Anthropic/Deepseek/Google returned `502`.
+Files likely affected: `API_TEST_REPORT.md`, `API_COST_PLAN.md`, `PAYMENT_BILLING_REPORT.md`, `BACKEND_TEST_REPORT.md`, `RETEST_LOG.md`, `FIX_LOG.md`, `LAUNCH_READINESS_AFTER_REPAIR.md`
+Risk level: High for release, Low for documentation update.
+Design/template impact: None; no frontend source/style/template change.
+Security impact: Raw provider keys and raw `yzk_live_*` test keys must remain excluded; test keys were revoked.
+Backend/API/billing impact: Failure and low-balance paths are safer, but success billing cannot be approved without a successful provider response.
+Proposed action: Record partial pass and keep launch blocked until CloseRouter inference route is restored and a successful funded text call proves headers, transaction, usage record, and balance decrement.
+Agent 1 vote: REJECT
+Agent 1 reason: A normal developer still cannot complete the first successful API call.
+Agent 2 vote: REJECT
+Agent 2 reason: Billing success path, positive charge, transaction and success usage record are not proven.
+Agent 3 vote: REJECT
+Agent 3 reason: Release guard must stay closed; no design issue, but billing/payment proof is a launch gate.
+Approval count: 0/3
+Final decision: NOT ACCEPTED FOR FULL RELEASE
+Allowed next action: Fix/restore provider upstream inference outside this source change, then rerun tiny funded billing acceptance.
+Status: COMPLETED
 
 ---
 

@@ -33,3 +33,36 @@ Operasyon tarihi: 2026-05-26
 ## Sonuç
 
 PARTIAL PASS. Ledger dışı bakiye patch’i kapatıldı, ödeme miktar/IBAN guard eklendi. Shopier/Cryptomus gerçek/sandbox provider doğrulaması ve başarılı API usage deduction tamamlanmadan launch onayı verilmez.
+
+---
+
+# Live Billing Retest Update — 2026-05-27 02:50 TRT
+
+## Usage Deduction / API Billing
+
+| Kontrol | Sonuç | Kanıt |
+|---|---|---|
+| Live funded test key setup | PASS TEST-ONLY | İzole `qa-live-billing-*` kullanıcı/key oluşturuldu; raw key yazılmadı |
+| Live funded gateway call | BLOCKED_BY_UPSTREAM | Gateway text calls upstream `502` aldığı için success billing doğrulanamadı |
+| Failed upstream charge safety | PASS | Funded test balance unchanged; error usage records `cost_tl=0` |
+| Low-balance key | PASS | Zero-balance key small text call `402` |
+| Invalid key | PASS | Invalid/fake key `401` |
+| Test data cleanup | PASS | Follow-up read-only DB check found no remaining `qa-live-billing-*` test rows |
+| Direct CloseRouter credits | PASS | `/credits` 200, yaklaşık `$1.99998845` credit |
+| Direct CloseRouter catalog | PASS | `/models/count` 200, 34 model |
+| Direct CloseRouter inference | FAIL UPSTREAM | OpenAI/Anthropic/Deepseek/Google chat and OpenAI responses `502` |
+
+## Current Billing Risk
+
+Billing code-path safety for failure and low-balance paths is acceptable, but launch billing acceptance is still blocked because a successful provider response is required to prove:
+
+- `X-YZ-Cost-TL`
+- `X-YZ-Remaining-TL`
+- `X-YZ-Request-Id`
+- positive `transactions` ledger write
+- success `usage_records`
+- user balance decrement
+
+## Payment Provider Status
+
+Shopier/Cryptomus sandbox E2E is still not accepted. Unit/signature/idempotency contracts exist, but provider-dashboard valid, invalid, duplicate callback/webhook evidence is still required with rotated sandbox credentials.

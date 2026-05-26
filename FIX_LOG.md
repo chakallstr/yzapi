@@ -91,3 +91,13 @@ Operasyon tarihi: 2026-05-26
 - Test: `npm run lint`, `npm test`, `npm run build`, `npm run scan:public`, `node scripts/scan-secrets.mjs`, live health/auth smoke, live Chrome OAuth/Admin UAT.
 - Retest: Admin Google OAuth PASS; Admin panel parola istemeden açıldı; live `qa:uat` 10/10 PASS.
 - Sonuç: FIXED LIVE. Full release hâlâ funded billing/payment E2E kanıtına bağlı.
+
+## LIVE-BILLING-001
+
+- Problem: Launch için gerekli successful funded `yzk_live_*` text API billing kabulü kanıtlanamıyordu.
+- Kök neden bulgusu: YapayZekaLab gateway öncesinde direct CloseRouter inference rotaları `502 upstream_connection_refused` veya `502 upstream_connect_timeout` veriyor. CloseRouter key/account/catalog/balance mevcut; sorun key yokluğu veya bakiye yokluğu değil.
+- Karar: DEC-LIVE-BILLING-TEST-001, 3/3 APPROVED for isolated live test execution only.
+- Yapılan değişiklik: Kod değişmedi. İzole canlı test kullanıcı/keyleri oluşturuldu, tiny text çağrıları denendi, raw keyler raporlanmadı, test keyleri revoke edildi.
+- Test: Low-balance `402`, invalid key `401`, upstream failure zero-cost/no-decrement PASS. Direct `/credits` and `/models` PASS.
+- Retest: Successful billing FAIL/BLOCKED because OpenAI/Anthropic/Deepseek/Google direct inference returned `502`.
+- Sonuç: NOT FIXED. Provider/upstream inference düzelmeden launch billing acceptance verilemez.

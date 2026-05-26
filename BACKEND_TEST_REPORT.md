@@ -19,3 +19,25 @@ Durum: 60 dakikalık site testi sonrası doldurulacak.
 - `GET /v1/models`, `/v1/providers`, `/v1/models/count` yok.
 - Admin login credential yok; admin mutation testleri yapılmadı.
 - User JWT yok; user profile, API key create/revoke, payment init, usage records gerçek kullanıcı akışı bloklu.
+
+---
+
+# Backend Live Update — 2026-05-27
+
+## Düzelen / Doğrulanan
+
+- Live target gerçek servis olarak `/opt/turkapiprojesi`, `turkapiprojesi.service`, port `4568` doğrulandı.
+- Canlı deploy sonrası `/health` 200; DB/kur/CloseRouter health checks `ok`.
+- Canlı `qa:uat` 10/10 geçti.
+- Public `/v1` katalog endpointleri canlı smoke kapsamından geçti.
+- Authsuz `/v1/chat/completions` canlıda JSON `401` dönüyor.
+- Admin Google OAuth canlıda tamamlandı; allowlisted `cix.crazy666@gmail.com` admin dashboard'a ayrı admin şifresi olmadan girebildi.
+- Admin anonymous state'te görünmüyor.
+
+## Kalan Backend/Billing Blokajı
+
+- Successful `/v1` text inference billing kabulü hâlâ bloklu.
+- İzole canlı funded/zero-balance API key testleri çalıştırıldı ve keyler revoke edildi.
+- Low-balance path `402`, invalid key path `401`, upstream failure path zero-cost/no-decrement güvenli.
+- Direct CloseRouter `/credits` ve `/models` çalışıyor, ancak direct inference OpenAI/Anthropic/Deepseek/Google tarafında `502 upstream_connection_refused` veya `502 upstream_connect_timeout` veriyor.
+- Bu upstream 502 düzelmeden success `usage_records`, `transactions`, cost headers ve balance decrement acceptance yapılamaz.
