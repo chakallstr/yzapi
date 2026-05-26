@@ -130,12 +130,13 @@ export async function paymentReceiptEmail(
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px">
   <h2 style="color:#15803d;margin-bottom:8px">Ödeme Alındı</h2>
   <p style="color:#374151">Merhaba <strong>${user.adSoyad}</strong>,</p>
-  <p style="color:#374151">Ödemeniz başarıyla işlendi. Bakiyenize <strong>₺${payment.netTL.toFixed(2)}</strong> eklendi.</p>
+  <p style="color:#374151">Ödemeniz başarıyla işlendi. Bakiyenize <strong>₺${payment.miktarTL.toFixed(2)}</strong> eklendi.</p>
   <table style="width:100%;border-collapse:collapse;margin:16px 0">
     <tr><td style="color:#6b7280;padding:4px 0">Ödeme Yöntemi</td><td style="text-align:right;color:#374151">${payment.metod}</td></tr>
     <tr><td style="color:#6b7280;padding:4px 0">Brüt Tutar</td><td style="text-align:right;color:#374151">₺${payment.miktarTL.toFixed(2)}</td></tr>
     ${kdvRow}
-    <tr style="border-top:1px solid #bbf7d0"><td style="color:#15803d;font-weight:bold;padding:8px 0">Yüklenen Bakiye</td><td style="text-align:right;color:#15803d;font-weight:bold">₺${payment.netTL.toFixed(2)}</td></tr>
+    <tr><td style="color:#6b7280;padding:4px 0">Net Tutar</td><td style="text-align:right;color:#374151">₺${payment.netTL.toFixed(2)}</td></tr>
+    <tr style="border-top:1px solid #bbf7d0"><td style="color:#15803d;font-weight:bold;padding:8px 0">Kullanılabilir Bakiye</td><td style="text-align:right;color:#15803d;font-weight:bold">₺${payment.miktarTL.toFixed(2)}</td></tr>
   </table>
   <p style="color:#6b7280;font-size:12px">Referans Kodu: <code>${payment.refKod}</code>${payment.transactionId ? ` &nbsp;|&nbsp; İşlem ID: <code>${payment.transactionId}</code>` : ""}</p>
 </div>`;

@@ -105,6 +105,23 @@ interface ReconciliationReport {
   }>;
 }
 
+type PaymentMethodKey = "shopier" | "iban" | "crypto";
+
+interface PaymentMethodInfo {
+  enabled: boolean;
+  reason?: string | null;
+}
+
+interface PaymentMethodsResponse {
+  shopier: PaymentMethodInfo;
+  iban: PaymentMethodInfo & { bankName?: string; ibanNumber?: string; owner?: string };
+  cryptomus: PaymentMethodInfo;
+  limits?: { minBakiyeTL: number; maxBakiyeTL: number };
+  kdvRate?: number;
+}
+
+const ADMIN_EMAIL = "cix.crazy666@gmail.com";
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>(() =>
     getInitialAppTab(window.location.pathname, window.location.search, window.location.hash)
@@ -186,20 +203,19 @@ export default function App() {
   const [newAdminApiKeyResult, setNewAdminApiKeyResult] = useState<{ key: string; maskedKey?: string; userEmail?: string } | null>(null);
 
   // Auth state
-  const [adminToken, setAdminToken] = useState<string | null>(() => localStorage.getItem("adminToken"));
-  const [adminLoginPw, setAdminLoginPw] = useState("");
-  const [adminLoginError, setAdminLoginError] = useState("");
-  const [adminLoginLoading, setAdminLoginLoading] = useState(false);
   const [userInfo, setUserInfo] = useState<{ email: string; bakiyeTL: string } | null>(null);
+  const [userAuthChecked, setUserAuthChecked] = useState(false);
+  const isAdminUser = userInfo?.email.trim().toLowerCase() === ADMIN_EMAIL;
 
   // BakiyeYukle modal state
   const [showBakiyeModal, setShowBakiyeModal] = useState(false);
-  const [bakiyeModalMiktar, setBakiyeModalMiktar] = useState("100");
+  const [bakiyeModalMiktar, setBakiyeModalMiktar] = useState("250");
   const [bakiyeModalStep, setBakiyeModalStep] = useState<"select" | "shopier" | "iban" | "crypto">("select");
   const [bakiyeModalLoading, setBakiyeModalLoading] = useState(false);
   const [bakiyeModalError, setBakiyeModalError] = useState("");
   const [bakiyeIbanResult, setBakiyeIbanResult] = useState<{ referansKodu: string; iban: { bankName: string; ibanNumber: string; owner: string }; paymentId: string } | null>(null);
   const [bakiyeShopierForm, setBakiyeShopierForm] = useState<{ actionUrl: string; fields: Record<string, string> } | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodsResponse | null>(null);
   const [userPayments, setUserPayments] = useState<Array<{ id: string; metod: string; miktarTL: number; kdvTL: number; durum: string; olusturma: string }>>([]);
   const [copiedRef, setCopiedRef] = useState(false);
 
@@ -224,53 +240,30 @@ export default function App() {
   // Load user info if user token present
   useEffect(() => {
     const token = localStorage.getItem("userAccessToken");
-    if (!token) return;
+    if (!token) {
+      setUserAuthChecked(true);
+      return;
+    }
     fetch("/api/user/me", { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setUserInfo({ email: data.email, bakiyeTL: data.bakiyeTL }); })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setUserAuthChecked(true));
   }, []);
 
-  // adminFetch: injects admin JWT, on 401 clears token and shows gate
+  // adminFetch: admin is the allowlisted signed-in Google user.
   const adminFetch = async (path: string, opts: RequestInit = {}): Promise<Response> => {
-    const token = localStorage.getItem("adminToken");
+    const token = localStorage.getItem("userAccessToken");
     const headers = { ...(opts.headers as Record<string, string> || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) };
     const res = await fetch(path, { ...opts, headers });
-    if (res.status === 401) {
-      localStorage.removeItem("adminToken");
-      setAdminToken(null);
+    if (res.status === 401 || res.status === 403) {
+      setActiveTab("homepage");
     }
     return res;
   };
 
-  const handleAdminLogin = async () => {
-    setAdminLoginLoading(true);
-    setAdminLoginError("");
-    try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: adminLoginPw }),
-      });
-      if (!res.ok) {
-        setAdminLoginError("Hatalı şifre. Tekrar deneyin.");
-        return;
-      }
-      const { token } = await res.json();
-      localStorage.setItem("adminToken", token);
-      setAdminToken(token);
-      setAdminLoginPw("");
-      loadAdminData();
-    } catch {
-      setAdminLoginError("Bağlantı hatası.");
-    } finally {
-      setAdminLoginLoading(false);
-    }
-  };
-
-  const handleAdminLogout = () => {
-    localStorage.removeItem("adminToken");
-    setAdminToken(null);
+  const handleAdminExit = () => {
+    setActiveTab("homepage");
   };
 
   // Live activity feed
@@ -290,7 +283,6 @@ export default function App() {
 
   const refreshData = async () => {
     try {
-      const token = localStorage.getItem("adminToken");
       const [settingsRes, logsRes, annRes, modelsRes] = await Promise.all([
         fetch("/api/settings"),
         fetch("/api/logs"),
@@ -301,18 +293,6 @@ export default function App() {
       if (logsRes.ok) setLogs(await logsRes.json());
       if (annRes.ok) setActiveAnnouncements(await annRes.json());
       if (modelsRes.ok) setModels(await modelsRes.json());
-      if (token) {
-        const [configRes, kurHistRes] = await Promise.all([
-          adminFetch("/api/admin/config"),
-          adminFetch("/api/admin/kur-history"),
-        ]);
-        if (configRes.ok) {
-          const cfg: AdminConfig = await configRes.json();
-          setAdminConfig(cfg);
-          setAdminConfigDraft(cfg);
-        }
-        if (kurHistRes.ok) setKurHistoryData(await kurHistRes.json());
-      }
     } catch (error) {
       console.error("Veri yüklenirken hata:", error);
     }
@@ -320,7 +300,9 @@ export default function App() {
 
   const loadAdminData = async () => {
     try {
-      const [usersRes, overridesRes, hareketRes, annRes, provRes, auditRes, dashRes, plansRes, keysRes, reconciliationRes] = await Promise.all([
+      const [configRes, kurHistRes, usersRes, overridesRes, hareketRes, annRes, provRes, auditRes, dashRes, plansRes, keysRes, reconciliationRes] = await Promise.all([
+        adminFetch("/api/admin/config"),
+        adminFetch("/api/admin/kur-history"),
         adminFetch("/api/admin/users"),
         adminFetch("/api/admin/model-overrides"),
         adminFetch("/api/admin/bakiye-hareketleri"),
@@ -332,6 +314,12 @@ export default function App() {
         adminFetch("/api/admin/api-keys"),
         adminFetch("/api/admin/reconciliation"),
       ]);
+      if (configRes.ok) {
+        const cfg: AdminConfig = await configRes.json();
+        setAdminConfig(cfg);
+        setAdminConfigDraft(cfg);
+      }
+      if (kurHistRes.ok) setKurHistoryData(await kurHistRes.json());
       if (usersRes.ok) setAdminUsers(await usersRes.json());
       if (overridesRes.ok) setModelOverrides(await overridesRes.json());
       if (hareketRes.ok) setAdminBakiyeHareketleri(await hareketRes.json());
@@ -363,6 +351,14 @@ export default function App() {
 
   useEffect(() => { refreshData(); }, []);
 
+  useEffect(() => {
+    if (isAdminUser) {
+      loadAdminData();
+    } else if (userAuthChecked && activeTab === "admin") {
+      setActiveTab("homepage");
+    }
+  }, [isAdminUser, activeTab, userAuthChecked]);
+
   // Load user's own payment history
   const loadUserPayments = async () => {
     const token = localStorage.getItem("userAccessToken");
@@ -384,10 +380,30 @@ export default function App() {
 
   // KDV calculation helper (mirrors server)
   const calcKdvPreview = (gross: number) => {
-    const kdvRate = 0.20;
+    const kdvRate = paymentMethods?.kdvRate ?? 0.20;
     const netTL = gross / (1 + kdvRate);
     const kdvTL = gross - netTL;
     return { gross, netTL: Math.round(netTL * 100) / 100, kdvTL: Math.round(kdvTL * 100) / 100 };
+  };
+
+  const loadPaymentMethods = async () => {
+    const token = localStorage.getItem("userAccessToken");
+    if (!token) return;
+    try {
+      const res = await fetch("/api/payments/methods", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setPaymentMethods(await res.json());
+    } catch {}
+  };
+
+  const paymentMethodKey = (metod: PaymentMethodKey): "shopier" | "iban" | "cryptomus" =>
+    metod === "crypto" ? "cryptomus" : metod;
+
+  const isPaymentMethodEnabled = (metod: PaymentMethodKey) =>
+    Boolean(paymentMethods?.[paymentMethodKey(metod)]?.enabled);
+
+  const getPaymentMethodReason = (metod: PaymentMethodKey) => {
+    const method = paymentMethods?.[paymentMethodKey(metod)];
+    return method?.enabled ? null : (method?.reason ?? "Ödeme yöntemi şu an kapalı");
   };
 
   const handleOpenBakiyeModal = () => {
@@ -395,12 +411,17 @@ export default function App() {
     setBakiyeModalError("");
     setBakiyeIbanResult(null);
     setBakiyeShopierForm(null);
-    setBakiyeModalMiktar("100");
+    setBakiyeModalMiktar("250");
     setShowBakiyeModal(true);
     loadUserPayments();
+    loadPaymentMethods();
   };
 
   const handleBakiyeMethodSelect = async (metod: "shopier" | "iban" | "crypto") => {
+    if (!isPaymentMethodEnabled(metod)) {
+      setBakiyeModalError(getPaymentMethodReason(metod) ?? "Ödeme yöntemi şu an kapalı");
+      return;
+    }
     const miktar = parseFloat(bakiyeModalMiktar);
     if (!miktar || miktar <= 0) { setBakiyeModalError("Geçerli bir miktar girin."); return; }
     setBakiyeModalLoading(true);
@@ -672,8 +693,24 @@ print(response.json()["choices"][0]["message"]["content"])`;
                 <span className="text-xs font-medium text-slate-800 truncate max-w-[120px]">{userInfo.email}</span>
                 <span className="text-[10px] text-emerald-600 font-mono">₺{parseFloat(userInfo.bakiyeTL).toFixed(2)}</span>
               </div>
+              {isAdminUser && (
+                <button
+                  onClick={() => setActiveTab("admin")}
+                  className={`hidden sm:flex items-center space-x-1 text-[10px] font-medium rounded-md px-2.5 py-1.5 border transition-all ${
+                    activeTab === "admin" ? "bg-blue-50 text-blue-700 border-blue-100" : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>Admin</span>
+                </button>
+              )}
               <button
-                onClick={() => { localStorage.removeItem("userAccessToken"); localStorage.removeItem("userRefreshToken"); setUserInfo(null); }}
+                onClick={() => {
+                  localStorage.removeItem("userAccessToken");
+                  localStorage.removeItem("userRefreshToken");
+                  setUserInfo(null);
+                  if (activeTab === "admin") setActiveTab("homepage");
+                }}
                 className="text-[10px] text-slate-400 hover:text-slate-700 ml-1"
                 title="Çıkış"
               >
@@ -1466,43 +1503,14 @@ print(response.json()["choices"][0]["message"]["content"])`;
         )}
 
         {/* ── ADMIN TAB ── */}
-        {activeTab === "admin" && !adminToken && (
-          <div className="flex items-center justify-center" style={{ minHeight: "calc(100vh - 220px)" }}>
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 w-full max-w-sm space-y-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <div className="bg-slate-800 rounded p-1.5 text-white"><Settings className="w-4 h-4" /></div>
-                <span className="font-display font-bold text-slate-900">Admin Girişi</span>
-              </div>
-              <p className="text-xs text-slate-500">Devam etmek için admin şifresini girin.</p>
-              <input
-                type="password"
-                value={adminLoginPw}
-                onChange={e => setAdminLoginPw(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleAdminLogin()}
-                placeholder="Şifre"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
-                autoFocus
-              />
-              {adminLoginError && <p className="text-xs text-red-600">{adminLoginError}</p>}
-              <button
-                onClick={handleAdminLogin}
-                disabled={adminLoginLoading}
-                className="w-full bg-slate-900 text-white text-sm font-semibold py-2 rounded-lg hover:bg-slate-700 transition-all disabled:opacity-50"
-              >
-                {adminLoginLoading ? "Giriş yapılıyor..." : "Giriş Yap"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "admin" && adminToken && (
+        {activeTab === "admin" && isAdminUser && (
           <div className="flex gap-4" style={{ minHeight: "calc(100vh - 180px)" }}>
 
             {/* Sidebar */}
             <div className="w-44 flex-shrink-0 bg-slate-900 rounded-xl p-2 self-start sticky top-20">
               <div className="px-2 py-2 mb-1 flex items-center justify-between">
                 <span className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest">YZ Admin</span>
-                <button onClick={handleAdminLogout} title="Çıkış" className="text-slate-500 hover:text-white transition-colors">
+                <button onClick={handleAdminExit} title="Kapat" className="text-slate-500 hover:text-white transition-colors">
                   <X className="w-3 h-3" />
                 </button>
               </div>
@@ -2735,13 +2743,17 @@ print(response.json()["choices"][0]["message"]["content"])`;
                     <label className="text-[10px] font-mono font-semibold text-slate-400 uppercase tracking-wider block">Miktar (₺)</label>
                     <input
                       type="number"
-                      min="1"
+                      min={paymentMethods?.limits?.minBakiyeTL ?? 250}
                       value={bakiyeModalMiktar}
                       onChange={e => { setBakiyeModalMiktar(e.target.value); setBakiyeModalError(""); }}
-                      placeholder="100"
+                      placeholder={String(paymentMethods?.limits?.minBakiyeTL ?? 250)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       autoFocus
                     />
+                    <div className="text-[10px] text-slate-400 font-mono">
+                      Minimum ₺{paymentMethods?.limits?.minBakiyeTL ?? 250}
+                      {paymentMethods?.limits?.maxBakiyeTL ? ` · Maksimum ₺${paymentMethods.limits.maxBakiyeTL}` : ""}
+                    </div>
                     {parseFloat(bakiyeModalMiktar) > 0 && (() => {
                       const { gross, netTL, kdvTL } = calcKdvPreview(parseFloat(bakiyeModalMiktar));
                       return (
@@ -2760,13 +2772,14 @@ print(response.json()["choices"][0]["message"]["content"])`;
                     {/* Kart — Shopier */}
                     <button
                       onClick={() => handleBakiyeMethodSelect("shopier")}
-                      disabled={bakiyeModalLoading}
+                      disabled={bakiyeModalLoading || !isPaymentMethodEnabled("shopier")}
                       className="w-full flex items-center space-x-3 bg-white border border-slate-200 hover:border-blue-400 hover:bg-blue-50/30 rounded-xl p-4 transition-all text-left disabled:opacity-50"
                     >
                       <div className="p-2 rounded-lg bg-blue-50 text-blue-600 flex-shrink-0"><DollarSign className="w-4 h-4" /></div>
                       <div>
                         <div className="text-sm font-semibold text-slate-800">Kredi / Banka Kartı</div>
                         <div className="text-[11px] text-slate-500 mt-0.5">Shopier ile güvenli kart ödemesi</div>
+                        {getPaymentMethodReason("shopier") && <div className="text-[10px] text-slate-400 mt-1">{getPaymentMethodReason("shopier")}</div>}
                       </div>
                       <ArrowRight className="w-3.5 h-3.5 text-slate-300 ml-auto flex-shrink-0" />
                     </button>
@@ -2774,13 +2787,14 @@ print(response.json()["choices"][0]["message"]["content"])`;
                     {/* IBAN */}
                     <button
                       onClick={() => handleBakiyeMethodSelect("iban")}
-                      disabled={bakiyeModalLoading}
+                      disabled={bakiyeModalLoading || !isPaymentMethodEnabled("iban")}
                       className="w-full flex items-center space-x-3 bg-white border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/30 rounded-xl p-4 transition-all text-left disabled:opacity-50"
                     >
                       <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 flex-shrink-0"><Database className="w-4 h-4" /></div>
                       <div>
                         <div className="text-sm font-semibold text-slate-800">Banka Havalesi (IBAN)</div>
                         <div className="text-[11px] text-slate-500 mt-0.5">Manuel onaylı — 1-24 saat işlem süresi</div>
+                        {getPaymentMethodReason("iban") && <div className="text-[10px] text-slate-400 mt-1">{getPaymentMethodReason("iban")}</div>}
                       </div>
                       <ArrowRight className="w-3.5 h-3.5 text-slate-300 ml-auto flex-shrink-0" />
                     </button>
@@ -2788,13 +2802,14 @@ print(response.json()["choices"][0]["message"]["content"])`;
                     {/* Kripto */}
                     <button
                       onClick={() => handleBakiyeMethodSelect("crypto")}
-                      disabled={bakiyeModalLoading}
+                      disabled={bakiyeModalLoading || !isPaymentMethodEnabled("crypto")}
                       className="w-full flex items-center space-x-3 bg-white border border-slate-200 hover:border-purple-400 hover:bg-purple-50/30 rounded-xl p-4 transition-all text-left disabled:opacity-50"
                     >
                       <div className="p-2 rounded-lg bg-purple-50 text-purple-600 flex-shrink-0"><Zap className="w-4 h-4" /></div>
                       <div>
                         <div className="text-sm font-semibold text-slate-800">Kripto Para (USDT TRC20)</div>
                         <div className="text-[11px] text-slate-500 mt-0.5">Cryptomus — blockchain onayı gerekir</div>
+                        {getPaymentMethodReason("crypto") && <div className="text-[10px] text-slate-400 mt-1">{getPaymentMethodReason("crypto")}</div>}
                       </div>
                       <ArrowRight className="w-3.5 h-3.5 text-slate-300 ml-auto flex-shrink-0" />
                     </button>

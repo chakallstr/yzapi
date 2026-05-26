@@ -6,15 +6,15 @@
 - **Health**: https://yapayzekalab.org/health → 503
 - **Models**: https://yapayzekalab.org/api/models → 503
 - **Frontend**: https://yapayzekalab.org/ → 503
-- **Admin panel**: Admin tab'a girip "Giriş Yap"; parola sadece cPanel `.env` içindeki `ADMIN_PASSWORD` değerinden kontrol edilir.
+- **Admin panel**: Ayrı admin şifresi yok. Sadece `cix.crazy666@gmail.com` Google/user oturumu admin panelini ve admin API'lerini kullanabilir.
 - **DB**: Neon PostgreSQL (eu-central-1, free tier)
 - **Node**: 22.22.2, cPanel Phusion Passenger
 
 Local production build sağlıklı: `/health` 200, `db:"ok"`, `/api/models` 33 model. Canlı problem cPanel Passenger/deploy/env katmanında araştırılmalı.
 
-## 🔑 Üretim parolaları
+## 🔑 Üretim secretları
 
-Üretim parolaları dokümana yazılmaz. `ADMIN_PASSWORD` sadece cPanel `.env` içinde tutulmalı; değişiklik gerekiyorsa yeni parola üret, `.env`'i güncelle ve app restart et.
+Üretim secretları dokümana yazılmaz. Admin yetkisi ayrı parola ile değil `cix.crazy666@gmail.com` Google hesabıyla verilir.
 
 ## ⚠️ Yapman gereken 2 küçük iş
 
@@ -95,7 +95,7 @@ Eklemek için: `.env`'i düzenle (File Manager'da sağ tık → Edit), kaydet, N
 |---|---|
 | `/health` 502/503 | File Manager > `yapayzekalab/stderr.log` aç → son satırlara bak. Genelde `.env` eksik bir değişken |
 | `/health` "It works!" | Placeholder server.js döndü, deploy başarısız. `dist/server.js` boyutunu kontrol et — 130KB+ olmalı |
-| Admin login 401 | `.env`'deki ADMIN_PASSWORD tam parola olmalı, special char escape etme |
+| Admin 401/403 | Yetkili Google hesabıyla giriş yapıldığını ve token'ın `cix.crazy666@gmail.com` kullanıcısına ait olduğunu kontrol et |
 | `db:"fail"` | Neon DATABASE_URL yanlış veya Neon DB pause olmuş (free tier 5dk idle → suspend, ilk istek yeniden uyandırır, 2-3sn gecikme normal) |
 
 ## 📊 Domain ekosistemi

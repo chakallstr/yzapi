@@ -37,8 +37,8 @@ const routes = [
   },
   {
     path: "/admin",
-    title: "Admin giris",
-    requiredText: ["Admin Girişi"],
+    title: "Admin guard",
+    requiredText: ["YapayZekaLab"],
   },
 ];
 

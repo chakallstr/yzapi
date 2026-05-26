@@ -61,6 +61,11 @@ router.get("/google/callback", async (req, res, next) => {
     const { idToken } = await exchangeCode(code);
     const profile = await verifyIdToken(idToken);
 
+    if (!profile.email_verified) {
+      res.status(403).json({ error: "Google e-posta doğrulaması gerekli." });
+      return;
+    }
+
     // Upsert user
     const existing = await db.select().from(users).where(eq(users.email, profile.email)).limit(1);
 

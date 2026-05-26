@@ -11,7 +11,6 @@ const schema = z.object({
   GEMINI_API_KEY: z.string().optional(),
 
   // Auth
-  ADMIN_PASSWORD: z.string().min(1, "ADMIN_PASSWORD is required"),
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   JWT_ACCESS_TTL_SEC: z.coerce.number().default(900),
   JWT_REFRESH_TTL_SEC: z.coerce.number().default(60 * 60 * 24 * 30),

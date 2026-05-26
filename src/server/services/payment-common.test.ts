@@ -4,7 +4,9 @@ import { calcKdv } from "./payment-common.js";
 const mocks = vi.hoisted(() => ({
   limit: vi.fn(),
   transaction: vi.fn(),
+  txUpdateSet: vi.fn(),
   txUpdateWhere: vi.fn(),
+  txUpdateReturning: vi.fn(),
   txInsertValues: vi.fn(),
   txReturning: vi.fn(),
 }));
@@ -29,10 +31,19 @@ vi.mock("./email-service.js", () => ({ paymentReceiptEmail: vi.fn().mockResolved
 describe("calcKdv — KDV-inclusive math", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.limit.mockReset();
+    mocks.transaction.mockReset();
+    mocks.txUpdateSet.mockReset();
+    mocks.txUpdateWhere.mockReset();
+    mocks.txUpdateReturning.mockReset();
+    mocks.txInsertValues.mockReset();
+    mocks.txReturning.mockReset();
     mocks.transaction.mockImplementation(async (fn) => fn({
       update: vi.fn(() => ({
-        set: vi.fn(() => ({
-          where: mocks.txUpdateWhere.mockResolvedValue([]),
+        set: mocks.txUpdateSet.mockImplementation(() => ({
+          where: mocks.txUpdateWhere.mockReturnValue({
+            returning: mocks.txUpdateReturning.mockResolvedValue([{ email: "u@test.com", adSoyad: "Test User", bakiyeTL: "160.0000" }]),
+          }),
         })),
       })),
       insert: vi.fn(() => ({
@@ -91,10 +102,19 @@ describe("calcKdv — KDV-inclusive math", () => {
 describe("creditUserBalance — usable TL balance", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.limit.mockReset();
+    mocks.transaction.mockReset();
+    mocks.txUpdateSet.mockReset();
+    mocks.txUpdateWhere.mockReset();
+    mocks.txUpdateReturning.mockReset();
+    mocks.txInsertValues.mockReset();
+    mocks.txReturning.mockReset();
     mocks.transaction.mockImplementation(async (fn) => fn({
       update: vi.fn(() => ({
-        set: vi.fn(() => ({
-          where: mocks.txUpdateWhere.mockResolvedValue([]),
+        set: mocks.txUpdateSet.mockImplementation(() => ({
+          where: mocks.txUpdateWhere.mockReturnValue({
+            returning: mocks.txUpdateReturning.mockResolvedValue([{ email: "u@test.com", adSoyad: "Test User", bakiyeTL: "160.0000" }]),
+          }),
         })),
       })),
       insert: vi.fn(() => ({
@@ -122,6 +142,21 @@ describe("creditUserBalance — usable TL balance", () => {
       sonrakiBakiye: "160",
       idempotencyKey: "pay_YZ-ABC123",
     }));
+  });
+
+  it("increments balance atomically instead of setting a stale snapshot", async () => {
+    mocks.limit
+      .mockResolvedValueOnce([{ id: "pay-1", durum: "bekliyor", transactionId: null }])
+      .mockResolvedValueOnce([{ email: "u@test.com", adSoyad: "Test User", bakiyeTL: "40.0000" }]);
+
+    const { creditUserBalance } = await import("./payment-common.js");
+
+    await creditUserBalance("user-1", "pay-1", 120, "iban", "YZ-ABC123");
+
+    const balanceUpdate = mocks.txUpdateSet.mock.calls[0]?.[0];
+    expect(balanceUpdate).toBeDefined();
+    expect(balanceUpdate.bakiyeTL).not.toBe("160");
+    expect(typeof balanceUpdate.bakiyeTL).not.toBe("string");
   });
 
   it("does not credit the same successful payment twice", async () => {

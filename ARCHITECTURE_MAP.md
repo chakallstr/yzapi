@@ -56,7 +56,6 @@ Operasyon tarihi: 2026-05-26
 
 ### Admin
 
-- `POST /api/admin/login`
 - `POST /api/admin/logout`
 - `GET /api/admin/me`
 - `GET/POST /api/admin/config`
@@ -115,11 +114,11 @@ Operasyon tarihi: 2026-05-26
 
 ## Auth Flow
 
-- Admin auth: `POST /api/admin/login` yalnız parola ile admin JWT üretir.
+- Admin auth: Ayrı admin şifresi yoktur. Admin endpointleri normal user JWT ister; backend DB'den kullanıcı emailini okuyup sadece `cix.crazy666@gmail.com` için izin verir.
 - User auth: Google OAuth callback kullanıcıyı bulur/oluşturur, access/refresh token üretir.
 - User endpointleri `Authorization: Bearer <user JWT>` ister.
 - API gateway endpointleri `Authorization: Bearer yzk_live_*` ister.
-- Admin endpointleri `Authorization: Bearer <admin JWT>` ister.
+- Admin endpointleri `Authorization: Bearer <user JWT>` ister; email allowlist backend tarafında zorunludur.
 
 ## API Key Flow
 

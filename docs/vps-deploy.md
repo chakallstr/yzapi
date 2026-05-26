@@ -40,12 +40,13 @@ sudo chmod 600 /opt/yapayzekalab/.env.production
 - `NODE_ENV=production`
 - `PORT=4567`
 - `DATABASE_URL`
-- `ADMIN_PASSWORD`
 - `JWT_SECRET`
 - `APP_BASE_URL=https://yapayzekalab.org`
 - `FRONTEND_AUTH_RETURN=/`
 - `CLOSEROUTER_API_KEY`
 - ödeme ve email secretları
+
+Admin ayrı şifre kullanmaz; admin yetkisi `cix.crazy666@gmail.com` Google/user oturumuyla verilir.
 
 Deploy scripti required alanları boş bırakılmışsa durur. `.env.production` izni `600` olmalıdır.
 

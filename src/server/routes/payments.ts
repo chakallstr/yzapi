@@ -32,7 +32,12 @@ async function getPaymentLimits() {
     .where(eq(systemConfig.id, 1))
     .limit(1);
 
-  return rows[0] ?? { minBakiyeTL: "10", maxBakiyeTL: "50000" };
+  return rows[0] ?? { minBakiyeTL: "250", maxBakiyeTL: "50000" };
+}
+
+function safeCryptomusWebhookLog(body: Record<string, unknown>) {
+  const { uuid, order_id, status, amount, currency, to_currency } = body as Record<string, unknown>;
+  return { uuid, order_id, status, amount, currency, to_currency };
 }
 
 function serializePayment(p: typeof payments.$inferSelect) {
@@ -67,19 +72,35 @@ function serializeIban(p: typeof pendingIbanPayments.$inferSelect) {
 }
 
 // ── GET /api/payments/methods ─────────────────────────────────────────────────
-router.get("/methods", userAuth, (_req, res) => {
-  const ibanEnabled = isIbanConfigured(env);
-  res.json({
-    shopier: { enabled: !!(env.SHOPIER_API_KEY && env.SHOPIER_API_SECRET) },
-    iban: {
-      enabled: ibanEnabled,
-      bankName: env.IBAN_BANK_NAME,
-      ibanNumber: env.IBAN_NUMBER,
-      owner: env.IBAN_OWNER,
-    },
-    cryptomus: { enabled: !!(env.CRYPTOMUS_MERCHANT_ID && env.CRYPTOMUS_API_KEY) },
-    kdvRate: env.KDV_RATE,
-  });
+router.get("/methods", userAuth, async (_req, res, next) => {
+  try {
+    const ibanEnabled = isIbanConfigured(env);
+    const shopierEnabled = !!(env.SHOPIER_API_KEY && env.SHOPIER_API_SECRET);
+    const cryptomusEnabled = !!(env.CRYPTOMUS_MERCHANT_ID && env.CRYPTOMUS_API_KEY);
+    const limits = await getPaymentLimits();
+    res.json({
+      shopier: {
+        enabled: shopierEnabled,
+        reason: shopierEnabled ? null : "Shopier ödeme yöntemi şu an kapalı.",
+      },
+      iban: {
+        enabled: ibanEnabled,
+        reason: ibanEnabled ? null : "IBAN ödeme bilgileri henüz tanımlı değil.",
+        bankName: env.IBAN_BANK_NAME,
+        ibanNumber: env.IBAN_NUMBER,
+        owner: env.IBAN_OWNER,
+      },
+      cryptomus: {
+        enabled: cryptomusEnabled,
+        reason: cryptomusEnabled ? null : "Kripto ödeme yöntemi şu an kapalı.",
+      },
+      limits: {
+        minBakiyeTL: Number(limits.minBakiyeTL),
+        maxBakiyeTL: Number(limits.maxBakiyeTL),
+      },
+      kdvRate: env.KDV_RATE,
+    });
+  } catch (e) { next(e); }
 });
 
 // ── POST /api/payments/shopier/init ──────────────────────────────────────────
@@ -288,11 +309,11 @@ router.post(
   async (req, res, next) => {
     try {
       const body = req.body as Record<string, unknown>;
-      logger.info({ body }, "Cryptomus webhook received");
+      logger.info({ webhook: safeCryptomusWebhookLog(body) }, "Cryptomus webhook received");
 
       const result = verifyWebhook(body);
       if (!result.valid) {
-        logger.warn({ body }, "Cryptomus webhook signature invalid");
+        logger.warn({ webhook: safeCryptomusWebhookLog(body) }, "Cryptomus webhook signature invalid");
         res.status(401).json({ error: "Invalid signature" });
         return;
       }
@@ -322,7 +343,7 @@ router.post(
       }
 
       const payment = paymentRows[0];
-      await creditUserBalance(
+      const credit = await creditUserBalance(
         payment.userId,
         payment.id,
         Number(payment.miktarTL),
@@ -331,6 +352,11 @@ router.post(
         body,
       );
 
+      if (!credit.success && !credit.alreadyCredited) {
+        res.status(500).json({ error: "Bakiye yüklenirken hata oluştu." });
+        return;
+      }
+
       res.json({ ok: true });
     } catch (e) { next(e); }
   }
@@ -338,7 +364,7 @@ router.post(
 
 // ── GET /api/payments/crypto/callback (PUBLIC — browser redirect from Cryptomus) ─
 router.get("/crypto/callback", (_req, res) => {
-  res.redirect(`${env.APP_BASE_URL}/?payment=success`);
+  res.redirect(`${env.APP_BASE_URL}/?payment=pending`);
 });
 
 // ── GET /api/payments/me ─────────────────────────────────────────────────────

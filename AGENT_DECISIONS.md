@@ -360,6 +360,59 @@ Follow-up action: GitHub checkpoint sonrası canlı deploy/test credential hazı
 
 ---
 
+Decision ID: DEC-FIX-009
+Decision title: Admin paneli sadece `cix.crazy666@gmail.com` kullanıcı hesabına bağlansın mı?
+Area: Admin Auth / Frontend Visibility / Security
+Options considered:
+- A) Eski ayrı admin şifresi ve `adminToken` akışı kalsın.
+- B) Admin paneli sadece frontend'de gizlensin, backend aynı kalsın.
+- C) Ayrı admin şifresi kaldırılıp admin yetkisi normal user JWT + DB'de allowlisted email kontrolüne bağlansın.
+Evidence collected:
+- Kullanıcı açıkça “admin şifresini ayrı yapma, cix.crazy666@gmail.com admindir, başka admine gerek yok” dedi.
+- Mevcut sistem `/api/admin/login`, `ADMIN_PASSWORD`, `adminToken` ve `role: admin` token ile çalışıyor.
+- Mevcut frontend `/admin` deep-link ile ayrı admin giriş ekranı gösterebiliyor.
+- Security ajanı frontend gizlemenin tek başına güvenlik olmadığını, backend allowlist zorunlu olduğunu belirtti.
+- Backend ajanı `/api/admin/*` yanında `/api/payments/admin/*` gibi `adminAuth` kullanan tüm route'ların aynı kurala bağlanması gerektiğini belirtti.
+Agent 1 vote: APPROVE
+Agent 1 reason: QA/UAT açısından ayrı şifre ekranı kaldırılmalı; admin sekmesi sadece allowlisted kullanıcı giriş yaptıysa görünmeli.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend/Auth açısından admin yetkisi normal user JWT + DB email allowlist ile doğrulanmalı; eski admin token kabul edilmemeli.
+Agent 3 vote: APPROVE
+Agent 3 reason: Security açısından asıl koruma backend allowlist olmalı; frontend gizleme sadece UX katmanı olmalı.
+Approval count: 3/3
+Final decision: APPROVED
+Status: ACCEPTED_LOCAL
+Follow-up action: Admin auth/UI fixleri uygulandı. Kanıt: admin hedef testleri 5/5 PASS, lokal Chrome UAT 10/10 PASS, full test suite 21 dosya / 90 test PASS. Canlı deploy sonrası `cix.crazy666@gmail.com` Google oturumuyla admin panel smoke yapılmalı.
+
+---
+
+Decision ID: DEC-FIX-008
+Decision title: Ödeme/billing blockerları ödeme bildirimi ve USDT kur özelliğinden önce kapatılsın mı?
+Area: Payment / Billing / Currency / Release Safety
+Options considered:
+- A) Önce blocker fixleri: atomik bakiye kredi, Cryptomus webhook credit failure kontrolü, min yükleme 250 TL hizası, makbuz brüt/net metin tutarlılığı, ödeme yöntemleri disabled/limit bilgisinin API/UI uyumu.
+- B) Doğrudan IBAN ödeme bildirimi ve USDT kur özelliğini ekle.
+- C) Hiç kod yazma, sadece raporla.
+Evidence collected:
+- `creditUserBalance` mevcut bakiyeyi transaction öncesi okuyup son bakiyeyi sabit değerle yazıyor; eşzamanlı ödeme onayında bakiye kaybı riski var.
+- Cryptomus webhook `creditUserBalance` sonucunu kontrol etmeden `ok:true` dönebiliyor; provider retry mekanizması yanlış başarı görebilir.
+- `minBakiyeTL` schema ve seed default değeri 10 TL; ürün kararı ve ajan raporları 250 TL ile hizalanmasını istiyor.
+- Makbuz e-postası bakiyeye net tutarın eklendiğini söylüyor; kod kullanılabilir bakiyeye brüt tutarı ekliyor.
+- Frontend ödeme modalı ödeme yöntemlerinin disabled bilgisini doğrudan kullanmıyor; kullanıcı kapalı provider için aktif buton görebiliyor.
+- Agent 1, Agent 2 ve Agent 3 aynı sırayı önerdi: önce payment/billing safety, sonra ödeme bildirimi ve USDT fiyatı.
+Agent 1 vote: APPROVE
+Agent 1 reason: QA/UAT açısından ödeme deneyimi yanlış başarı ve yanıltıcı fiyat üretmeden önce temel blokajlar kapanmalı.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend/Billing açısından atomik kredi, webhook hata dönüşü, min limit ve makbuz tutarlılığı zorunlu ön koşul.
+Agent 3 vote: APPROVE
+Agent 3 reason: Security/Release açısından concurrency, webhook retry ve disabled provider riskleri kapatılmadan ödeme feature'ı güvenli değil.
+Approval count: 3/3
+Final decision: APPROVED
+Status: ACCEPTED_LOCAL
+Follow-up action: Payment blocker fixleri uygulandı. Kanıt: payment safety hedef testleri 14/14 PASS, full test suite 21 dosya / 90 test PASS. Ödeme bildirimi/USDT kur fazı canlı deploy/review sonrası ayrı devam etmeli.
+
+---
+
 Decision ID: DEC-FIX-005
 Decision title: `scripts/turkapi-smoke.mjs` komut alias'ı eklensin mi?
 Area: Automated Tests / Live Smoke Compatibility
@@ -455,6 +508,33 @@ Approval count: 3/3
 Final decision: APPROVED
 Status: ACCEPTED_LOCAL
 Follow-up action: Canlı deploy sonrası admin key, balance patch, payment methods ve init guard tekrar doğrulanmalı.
+
+---
+
+Decision ID: DEC-FIX-007
+Decision title: Ödeme bildirimi ve canlı USD/USDT kur bilgisi doğrudan eklensin mi?
+Area: Payment UX / Billing / Currency
+Options considered:
+- A) Dar kapsam: IBAN ödeme bildirimi notu, admin pending görünümü, payment methods içinde min/max ve yuvarlanmış USD/USDT kur bilgisi, Cryptomus USDT fiyatını canlı/cached kurla hesaplar.
+- B) Dekont dosya upload, otomatik kredi, provider canlı ödeme launch.
+- C) Önce ödeme güvenlik/billing blockerlarını kapat, sonra ödeme bildirimi ve USDT fiyatını ekle.
+Evidence collected:
+- Kullanıcı ödeme alma/bildirme ve güncel USD/USDT fiyatı istedi.
+- Mevcut IBAN akışı pending kayıt oluşturuyor, admin approve/reject var; kullanıcı "ödeme yaptım" bildirimi yok.
+- Mevcut Cryptomus TL -> USD dönüşümü `system_config.kur` ile yapılıyor; anlık USDT/TRY kaynağı yok.
+- Agent 1 dar IBAN/manual bildirim MVP'sine koşullu onay verdi; Shopier/Cryptomus production ödeme iddiasını reddetti.
+- Agent 2 gerçek onayı geldikten sonra P0/P1 blocker bildirdi: atomic credit yok, Cryptomus webhook credit fail durumunda 2xx dönüyor, receipt mail net/brüt tutarı çelişkili, min top-up 250 TL ile hizalı değil.
+- Agent 3 gerçek onayı geldikten sonra P0/P1 blocker bildirdi: concurrent credit drift riski, IBAN spam/dedupe eksikliği, callback/log yanıltıcı success riski.
+Agent 1 vote: APPROVE
+Agent 1 reason: Dar IBAN/manual bildirim MVP'si UI açısından uygun; otomatik kredi yoksa kabul.
+Agent 2 vote: REJECT
+Agent 2 reason: Atomic credit, webhook failure handling, min 250 TL ve receipt tutarı düzelmeden ödeme alma/bildirme güvenli değil.
+Agent 3 vote: REJECT
+Agent 3 reason: Concurrent credit drift, spam/dedupe ve callback/log riskleri kapatılmadan release riski yüksek.
+Approval count: 1/3
+Final decision: REJECTED
+Status: BLOCKED
+Follow-up action: Önce ödeme blocker fixleri için yeni karar ve test-first uygulama yapılmalı; ödeme bildirimi/USDT fiyatı ikinci adım.
 
 ---
 

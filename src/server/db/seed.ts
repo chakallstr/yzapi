@@ -44,7 +44,7 @@ async function main() {
       platformAdi: "YapayZekaLab",
       destekEmail: "destek@yapayzekalab.com",
       maxBakiyeTL: "50000",
-      minBakiyeTL: "10",
+      minBakiyeTL: "250",
       anomaliEsikTL: "500",
     });
     console.log("  system_config inserted");

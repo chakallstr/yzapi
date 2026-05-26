@@ -56,27 +56,29 @@ export async function creditUserBalance(
       return { success: true, alreadyCredited: true, txId: existing[0].transactionId ?? undefined };
     }
 
-    // Load user for balance snapshot
-    const userRows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-    if (!userRows.length) throw new Error(`User ${userId} not found`);
-    const user = userRows[0];
-
-    const oncekiBakiye = Number(user.bakiyeTL);
-    const sonrakiBakiye = oncekiBakiye + miktarTL;
-
     let txId: string | undefined;
+    let oncekiBakiye = 0;
+    let sonrakiBakiye = 0;
+    let receiptUser: { email: string; adSoyad: string } | null = null;
 
     await db.transaction(async (tx) => {
-      // Update user balance
-      await tx
+      // Atomic increment prevents stale balance overwrites under concurrent approvals.
+      const updatedUsers = await tx
         .update(users)
-        .set({ bakiyeTL: String(sonrakiBakiye), updatedAt: new Date() })
-        .where(eq(users.id, userId));
+        .set({ bakiyeTL: sql`${users.bakiyeTL} + ${miktarTL}`, updatedAt: new Date() })
+        .where(eq(users.id, userId))
+        .returning({ email: users.email, adSoyad: users.adSoyad, bakiyeTL: users.bakiyeTL });
+
+      if (!updatedUsers.length) throw new Error(`User ${userId} not found`);
+      const updatedUser = updatedUsers[0];
+      receiptUser = { email: updatedUser.email, adSoyad: updatedUser.adSoyad };
+      sonrakiBakiye = Number(updatedUser.bakiyeTL);
+      oncekiBakiye = sonrakiBakiye - miktarTL;
 
       // Insert transaction record (idempotency via payments.idempotencyKey unique constraint)
       const txInserted = await tx.insert(transactions).values({
         userId,
-        userEmail: user.email,
+        userEmail: updatedUser.email,
         tip: "yukleme",
         miktarTL: String(miktarTL),
         oncekiBakiye: String(oncekiBakiye),
@@ -106,9 +108,10 @@ export async function creditUserBalance(
     logger.info({ userId, paymentId, miktarTL, metod }, "Balance credited");
 
     // Fire-and-forget receipt email — must NOT block payment flow
+    if (!receiptUser) throw new Error(`User ${userId} not found after credit`);
     const kdv = calcKdv(miktarTL);
     paymentReceiptEmail(
-      { email: user.email, adSoyad: user.adSoyad },
+      receiptUser,
       {
         miktarTL,
         kdvTL: kdv.kdvTL,

@@ -29,7 +29,7 @@ export const systemConfig = pgTable("system_config", {
   platformAdi: text("platform_adi").notNull().default("YapayZekaLab"),
   destekEmail: text("destek_email").notNull().default("destek@yapayzekalab.com"),
   maxBakiyeTL: numeric("max_bakiye_tl", { precision: 14, scale: 4 }).notNull().default("50000"),
-  minBakiyeTL: numeric("min_bakiye_tl", { precision: 14, scale: 4 }).notNull().default("10"),
+  minBakiyeTL: numeric("min_bakiye_tl", { precision: 14, scale: 4 }).notNull().default("250"),
   anomaliEsikTL: numeric("anomali_esik_tl", { precision: 14, scale: 4 }).notNull().default("500"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });

@@ -22,7 +22,7 @@ Normal bir müşterinin siteyi açıp ürünü anlayabilmesi, giriş yapabilmesi
 - Normal kullanıcı: seed veya test DB kullanıcısı.
 - Funded kullanıcı: bakiyesi pozitif kullanıcı.
 - Low/zero balance kullanıcı: bakiyesi 0 veya düşük kullanıcı.
-- Admin kullanıcı: `ADMIN_PASSWORD` ile alınan admin JWT; parola loglanmayacak.
+- Admin kullanıcı: `cix.crazy666@gmail.com` ile normal Google/user JWT; ayrı admin şifresi yok.
 - Revoked API key: test içinde oluşturulup revoke edilecek.
 - Invalid API key: sahte `yzk_live_invalid`.
 - Pending IBAN: `/api/payments/iban/init` ile oluşturulacak.

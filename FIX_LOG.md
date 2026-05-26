@@ -19,7 +19,7 @@ Operasyon tarihi: 2026-05-26
 - Karar: DEC-FIX-002, 3/3 APPROVED.
 - Yapılan değişiklik: `src/navigation.ts` helper eklendi; `src/App.tsx` başlangıç tabını URL pathname/query/hash üzerinden belirliyor.
 - Test: `src/navigation.test.ts`
-- Retest: `/admin` Chrome smoke ile `Admin Girişi` göründü; `/docs` API tab içeriği göründü.
+- Retest: `/admin` Chrome smoke artık ayrı admin şifresi ekranı beklemiyor; admin paneli sadece allowlisted user oturumuyla açılacak şekilde güncellendi.
 - Sonuç: FIXED LOCAL.
 
 ## BUG-QA-001

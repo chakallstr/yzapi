@@ -99,8 +99,10 @@ DATABASE_URL=postgres://yzapi_user:PASSWORD@localhost:5432/ufukince1_yapayzekala
 LOG_LEVEL=info
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
-ADMIN_PASSWORD=CHANGE_THIS_STRONG_PASSWORD
 JWT_SECRET=CHANGE_THIS_TO_RANDOM_64_CHAR_STRING
+
+# Admin ayrı şifre kullanmaz; yetkili Google hesabı:
+# cix.crazy666@gmail.com
 
 # ── App URL ───────────────────────────────────────────────────────────────────
 APP_BASE_URL=https://yapayzekalab.org

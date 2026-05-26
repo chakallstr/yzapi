@@ -6,15 +6,15 @@ Operasyon tarihi: 2026-05-26
 
 | Alan | Sonuç | Not |
 |---|---|---|
-| Admin login API | PASS LOCAL | `ADMIN_PASSWORD` ile 200 ve token varlığı doğrulandı; token/parola loglanmadı |
+| Admin auth modeli | FIXED LOCAL | Ayrı admin şifresi kaldırıldı; sadece `cix.crazy666@gmail.com` user JWT admin kabul edilir |
 | Admin API anon erişim | PASS | `/api/admin/dashboard` authsuz 401 |
-| Admin UI route | FIXED | `/admin` artık admin login ekranını gösteriyor |
+| Admin UI route | FIXED | Admin sekmesi sadece allowlisted kullanıcı giriş yapmışsa görünür |
 | Admin data load | PASS STATIC/API | `adminFetch` kullanıyor |
 | Admin mutasyonları | FIXED | Protected `/api/admin/*` raw fetch çağrıları `adminFetch` oldu |
 | Admin API key create | FIXED LOCAL | Admin-created key artık hash’li, full key sadece create response/UI uyarısında görünüyor |
 | Direct user balance patch | FIXED LOCAL | Generic user PATCH `bakiyeTL` alanını 400 ile reddediyor; ledger endpoint zorunlu |
 | Kur/config/model/user/balance/announcement/provider/plans/API key UI calls | PASS STATIC | Token guard testi eklendi |
-| IBAN pending approve | PASS LOCAL | Admin JWT ile approve/reject güvenliği test edildi |
+| IBAN pending approve | PASS LOCAL | Allowlisted user JWT ile approve/reject güvenliği test edildi |
 | Audit | PARTIAL | Audit write kodu var; her admin mutasyonunun audit kapsamı tek tek doğrulanmadı |
 
 ## Bulunan ve Düzeltilen Hata

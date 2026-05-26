@@ -16,7 +16,7 @@ describe("qa:uat script contract", () => {
     expect(source).toContain("channel: process.env.PLAYWRIGHT_CHANNEL ?? \"chrome\"");
     expect(source).toContain("qa-artifacts");
     expect(source).toContain("YapayZekaLab UAT Smoke Raporu");
-    expect(source).toContain("Admin Girişi");
+    expect(source).toContain("Admin guard");
     expect(source).toContain("/docs");
   });
 });
