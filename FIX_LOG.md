@@ -80,3 +80,14 @@ Operasyon tarihi: 2026-05-26
 - Test: `src/server/routes/v1-catalog.test.ts`
 - Retest: Targeted test PASS; lint/test/build PASS; public scan pending.
 - Sonuç: FIXED LOCAL / FULL LIVE ROUTE SMOKE PENDING.
+
+## ADMIN-GOOGLE-001
+
+- Problem: Canlı sitede Google admin hesabıyla giriş yapıldıktan sonra Admin sekmesi hâlâ ayrı `admin parola` ekranı gösteriyordu.
+- Kök neden: Yerel kaynak kod ve backend tek Google admin modelindeydi; problem canlı hedefin eski/stale bundle servis etmesiydi. Gerçek canlı hedef `/opt/turkapiprojesi` ve servis `turkapiprojesi.service`; `/opt/yapayzekalab` yanlış/inactive hedefti.
+- Karar: DEC-ADMIN-LIVE-STALE-001, 3/3 APPROVED.
+- Yapılan değişiklik: Kod değişmedi. Güncel doğrulanmış `dist/` canlı `/opt/turkapiprojesi` hedefine yedekli olarak deploy edildi, `turkapiprojesi.service` restart edildi.
+- Rollback: `/opt/turkapiprojesi/.deploy/rollback-manual-20260526T233319Z-8a8f1bc.sh`
+- Test: `npm run lint`, `npm test`, `npm run build`, `npm run scan:public`, `node scripts/scan-secrets.mjs`, live health/auth smoke, live Chrome OAuth/Admin UAT.
+- Retest: Admin Google OAuth PASS; Admin panel parola istemeden açıldı; live `qa:uat` 10/10 PASS.
+- Sonuç: FIXED LIVE. Full release hâlâ funded billing/payment E2E kanıtına bağlı.

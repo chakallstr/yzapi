@@ -58,6 +58,30 @@ Status: APPROVED
 
 ---
 
+Decision ID: DEC-RETEST-ADMIN-GOOGLE-001
+Decision title: Is the live Google-admin/no-admin-password fix accepted?
+Decision type: Retest acceptance
+Related bug IDs: R-BUG-008, ADMIN-GOOGLE-001
+Evidence from reports: Standard Chrome retest after live deploy showed anonymous Admin hidden, Google OAuth with `cix.crazy666@gmail.com` completed, Admin button appeared after login, and clicking Admin opened `YZ Admin` / `Gösterge Paneli` directly without a separate admin password form. Live frontend bundle does not contain stale admin password strings. Live `qa:uat` passed 10/10.
+Files likely affected: `CHROME_PROVIDER_UAT_EXECUTION_REPORT.md`
+Risk level: Low for accepted fix; remaining payment/billing release risk remains High.
+Design/template impact: None observed; no CSS/layout/theme changes were made.
+Security impact: Positive; live admin access now follows allowlisted Google user token.
+Backend/API/billing impact: No billing/payment mutation was performed; live service health remained 200 with DB/kur/CloseRouter checks ok.
+Proposed action: Mark the admin Google-only live fix accepted, but keep full launch blocked until funded billing and payment E2E pass.
+Agent 1 vote: APPROVE
+Agent 1 reason: Browser evidence matches the user requirement: admin visible only after admin Google login and no admin password prompt.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend stayed healthy after deploy and admin auth remains email/token based.
+Agent 3 vote: APPROVE
+Agent 3 reason: Visual design was preserved and stale password strings are absent from live frontend bundle.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Continue remaining billing/payment/provider tests; do not mark release ready yet.
+Status: COMPLETED
+
+---
+
 Decision ID: DEC-AGENT-TEAM-001
 Decision title: Continue with role-locked three-agent governance after external agent spawn limit
 Decision type: Agent coordination / risk-control fallback

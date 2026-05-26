@@ -45,3 +45,19 @@ Agent 2 retest vote: APPROVE
 Agent 3 retest vote: APPROVE
 Approval count: 3/3
 Final retest status: LOCAL_REGRESSION_PASS_LIVE_SMOKE_PENDING
+
+## ADMIN-GOOGLE-001 Live Retest
+
+Bug ID: ADMIN-GOOGLE-001
+Fix decision ID: DEC-ADMIN-LIVE-STALE-001
+Retest decision ID: DEC-RETEST-ADMIN-GOOGLE-001
+Command or manual flow: Standard Chrome live flow: open `https://yapayzekalab.org`, verify Admin hidden while anonymous, click Google login, choose `cix.crazy666@gmail.com`, click Admin after `/dashboard`.
+Expected: Admin is visible only after allowlisted Google login and opens the dashboard without a separate admin password form.
+Actual: OAuth completed, Admin appeared, and clicking Admin opened `YZ Admin` / `Gösterge Paneli` directly. No admin password prompt appeared.
+Passed/Failed: Passed
+Evidence: Live deploy id `manual-20260526T233319Z-8a8f1bc`; `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` returned 10 pass / 0 fail; live bundle stale-string check found no `admin parola`, `Admin paneline gir`, `ADMİN GİRİŞİ`, or `adminToken`.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: LIVE_ADMIN_GOOGLE_PASS_FULL_RELEASE_BLOCKED_BY_BILLING_PAYMENT
