@@ -1,8 +1,6 @@
 import { createHash } from "crypto";
 import { env } from "../lib/env.js";
-import { db } from "../db/client.js";
-import { systemConfig } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { roundUpUsdAmount } from "./payment-pricing.js";
 
 const BASE_URL = "https://api.cryptomus.com/v1";
 
@@ -24,7 +22,7 @@ export interface CryptomusInvoice {
 
 export interface CreateInvoiceOpts {
   paymentId: string;   // our payments.id → used as order_id
-  miktarTL: number;    // TL amount to convert to USD
+  amountUsd: number;   // USD-denominated top-up amount
 }
 
 export async function createInvoice(opts: CreateInvoiceOpts): Promise<CryptomusInvoice> {
@@ -32,10 +30,7 @@ export async function createInvoice(opts: CreateInvoiceOpts): Promise<CryptomusI
   const apiKey = env.CRYPTOMUS_API_KEY!;
   const baseUrl = env.APP_BASE_URL;
 
-  // Load current sell rate to convert TL → USD
-  const rows = await db.select({ kur: systemConfig.kur }).from(systemConfig).where(eq(systemConfig.id, 1)).limit(1);
-  const kur = rows.length ? Number(rows[0].kur) : 47;
-  const amountUsd = (opts.miktarTL / kur).toFixed(2);
+  const amountUsd = roundUpUsdAmount(opts.amountUsd).toFixed(2);
 
   const callbackUrl = env.CRYPTOMUS_WEBHOOK_URL ?? `${baseUrl}/api/payments/crypto/webhook`;
   const returnUrl = env.CRYPTOMUS_RETURN_URL ?? `${baseUrl}/api/payments/crypto/callback`;

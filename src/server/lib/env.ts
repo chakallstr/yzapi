@@ -52,6 +52,7 @@ const schema = z.object({
   EMAIL_PROVIDER: z.enum(["resend", "smtp"]).optional(),
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
+  PAYMENT_NOTIFICATION_EMAIL: z.string().optional(),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().optional(),
   SMTP_USER: z.string().optional(),

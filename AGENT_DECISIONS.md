@@ -590,3 +590,35 @@ Approval count: 0/3
 Final decision: NOT READY — PAYMENT/BILLING/AUTH BLOCKERS
 Status: REJECTED_FOR_PRODUCTION
 Follow-up action: GitHub checkpoint sonrası canlı deploy/test credential hazırlığı ve full live UAT yapılmalı.
+# QA Run Decisions — 2026-05-26
+
+## DEC-SITE-60-001
+- Decision title: 60 dakikalık site testi geçti mi?
+- Evidence: 3601 sn koşu, 10 route/page, 831 tıklama, 41 form, 3981 endpoint kontrolü.
+- Agent 1 vote: REJECT
+- Agent 1 reason: Google login/docs/video ve runtime kesintileri UAT akışını bozdu.
+- Agent 4 vote: REJECT
+- Agent 4 reason: `/v1` katalog endpointleri 404, valid billing doğrulanmadı.
+- Agent 5 vote: REJECT
+- Agent 5 reason: OAuth/API key/payment gerçek akışları launch güvenliği için eksik.
+- Approval count: 0/3
+- Final decision: REJECT
+- Follow-up: BUG-001/002/003 öncelikli fix.
+
+## DEC-API-001
+- Decision title: API text endpointleri fonksiyonel, doğru billed ve güvenli mi?
+- Evidence: Authsuz `/v1/*` 401; valid `yzk_live_*` yok; `/v1/models/providers/count` 404.
+- Agent 1 vote: REJECT
+- Agent 4 vote: REJECT
+- Agent 5 vote: NEEDS_MORE_EVIDENCE
+- Approval count: 0/3
+- Final decision: REJECT
+
+## DEC-FINAL-RELEASE-001
+- Decision title: YapayZekaLab gerçek kullanıcıya hazır mı?
+- Evidence: PASS kalite komutları; FAIL runtime/API/OAuth/billing UAT.
+- Agent 1 vote: REJECT
+- Agent 4 vote: REJECT
+- Agent 5 vote: REJECT
+- Approval count: 0/3
+- Final decision: NOT READY — API/BILLING/BALANCE BLOCKERS

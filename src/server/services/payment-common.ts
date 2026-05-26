@@ -43,6 +43,12 @@ export async function creditUserBalance(
   metod: string,
   idempotencyKey: string,
   providerPayload?: unknown,
+  paymentMeta?: {
+    paidTL?: number;
+    amountUsd?: number;
+    kurAtPayment?: number;
+    roundingTL?: number;
+  },
 ): Promise<CreditResult> {
   try {
     // Check idempotency: is this payment already credited?
@@ -119,6 +125,10 @@ export async function creditUserBalance(
         metod,
         refKod: idempotencyKey,
         transactionId: txId,
+        paidTL: paymentMeta?.paidTL,
+        amountUsd: paymentMeta?.amountUsd,
+        kurAtPayment: paymentMeta?.kurAtPayment,
+        roundingTL: paymentMeta?.roundingTL,
       },
     ).catch((e: unknown) => logger.error({ err: e }, "[payment-common] receipt email failed"));
 

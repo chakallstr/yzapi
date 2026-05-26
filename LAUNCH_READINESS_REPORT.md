@@ -66,3 +66,28 @@ Agent 3 — Security, Abuse & Release Risk: REJECT
 Reason: Payment webhook/provider ve admin allowlist riskleri launch öncesi açık.
 Approval count: 0/3
 Final launch verdict: NOT READY — PAYMENT/BILLING/AUTH BLOCKERS
+# Launch Readiness Report — 2026-05-26
+
+## Final Verdict
+`NOT READY — API/BILLING/BALANCE BLOCKERS`
+
+## Gerekçe
+- 60 dakikalık gerçek browser koşusu tamamlandı (`3601` saniye), fakat runtime stabilite sorunları gözlendi.
+- `/v1/models`, `/v1/providers`, `/v1/models/count` eksik.
+- Google OAuth `503` verdi.
+- Valid `yzk_live_*` ve admin credential olmadığı için gerçek kullanıcı API key, billing, balance, usage_records, payment ve admin mutation akışları doğrulanamadı.
+- `closerouter` health local ortamda `unknown`; gerçek upstream/billing testi yapılmadı.
+
+## Geçen Kalite Komutları
+- `npm run lint`: PASS
+- `npm test`: PASS, 22 dosya / 94 test
+- `npm run build`: PASS
+- `npm run scan:public`: PASS, hit yok
+- `node scripts/scan-secrets.mjs`: PASS, hit yok
+
+## Final 3-Agent Release Vote
+- Agent 1 — End-User Frontend Agent: REJECT. Login/docs/video durumu ve runtime kesintileri kullanıcı akışını bozuyor.
+- Agent 4 — Backend/Billing/Database Agent: REJECT. `/v1` katalog eksik, valid billing/balance doğrulanmadı.
+- Agent 5 — Security/Risk Agent: REJECT. OAuth/API key/payment/admin gerçek akışları tam doğrulanmadı.
+- Approval count: 0/3.
+- Final decision: REJECT.

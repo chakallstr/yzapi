@@ -117,7 +117,16 @@ interface PaymentMethodsResponse {
   iban: PaymentMethodInfo & { bankName?: string; ibanNumber?: string; owner?: string };
   cryptomus: PaymentMethodInfo;
   limits?: { minBakiyeTL: number; maxBakiyeTL: number };
+  kur?: number;
   kdvRate?: number;
+}
+
+interface TopupQuote {
+  amountUsd: number;
+  kur: number;
+  payableTL: number;
+  creditTL: number;
+  roundingTL: number;
 }
 
 const ADMIN_EMAIL = "cix.crazy666@gmail.com";
@@ -209,14 +218,14 @@ export default function App() {
 
   // BakiyeYukle modal state
   const [showBakiyeModal, setShowBakiyeModal] = useState(false);
-  const [bakiyeModalMiktar, setBakiyeModalMiktar] = useState("250");
+  const [bakiyeModalMiktar, setBakiyeModalMiktar] = useState("10");
   const [bakiyeModalStep, setBakiyeModalStep] = useState<"select" | "shopier" | "iban" | "crypto">("select");
   const [bakiyeModalLoading, setBakiyeModalLoading] = useState(false);
   const [bakiyeModalError, setBakiyeModalError] = useState("");
-  const [bakiyeIbanResult, setBakiyeIbanResult] = useState<{ referansKodu: string; iban: { bankName: string; ibanNumber: string; owner: string }; paymentId: string } | null>(null);
+  const [bakiyeIbanResult, setBakiyeIbanResult] = useState<{ referansKodu: string; iban: { bankName: string; ibanNumber: string; owner: string }; paymentId: string; quote?: TopupQuote } | null>(null);
   const [bakiyeShopierForm, setBakiyeShopierForm] = useState<{ actionUrl: string; fields: Record<string, string> } | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodsResponse | null>(null);
-  const [userPayments, setUserPayments] = useState<Array<{ id: string; metod: string; miktarTL: number; kdvTL: number; durum: string; olusturma: string }>>([]);
+  const [userPayments, setUserPayments] = useState<Array<{ id: string; metod: string; miktarTL: number; kdvTL: number; durum: string; olusturma: string; amountUsd?: number | null; payableTL?: number | null; creditTL?: number | null; kurAtPayment?: number | null; roundingTL?: number | null; idempotencyKey?: string | null }>>([]);
   const [copiedRef, setCopiedRef] = useState(false);
 
   // Admin pending IBAN state
@@ -386,6 +395,19 @@ export default function App() {
     return { gross, netTL: Math.round(netTL * 100) / 100, kdvTL: Math.round(kdvTL * 100) / 100 };
   };
 
+  const buildTopupQuotePreview = (amountUsd: number): TopupQuote => {
+    const kur = paymentMethods?.kur ?? adminConfig.kur;
+    const creditTL = Math.round(amountUsd * kur * 10000) / 10000;
+    const payableTL = Math.ceil(amountUsd * kur);
+    return {
+      amountUsd,
+      kur,
+      payableTL,
+      creditTL,
+      roundingTL: Math.round((payableTL - creditTL) * 10000) / 10000,
+    };
+  };
+
   const loadPaymentMethods = async () => {
     const token = localStorage.getItem("userAccessToken");
     if (!token) return;
@@ -411,7 +433,7 @@ export default function App() {
     setBakiyeModalError("");
     setBakiyeIbanResult(null);
     setBakiyeShopierForm(null);
-    setBakiyeModalMiktar("250");
+    setBakiyeModalMiktar("10");
     setShowBakiyeModal(true);
     loadUserPayments();
     loadPaymentMethods();
@@ -422,8 +444,8 @@ export default function App() {
       setBakiyeModalError(getPaymentMethodReason(metod) ?? "Ödeme yöntemi şu an kapalı");
       return;
     }
-    const miktar = parseFloat(bakiyeModalMiktar);
-    if (!miktar || miktar <= 0) { setBakiyeModalError("Geçerli bir miktar girin."); return; }
+    const amountUsd = parseFloat(bakiyeModalMiktar);
+    if (!amountUsd || amountUsd <= 0) { setBakiyeModalError("Geçerli bir USD tutarı girin."); return; }
     setBakiyeModalLoading(true);
     setBakiyeModalError("");
     const token = localStorage.getItem("userAccessToken");
@@ -431,12 +453,12 @@ export default function App() {
       const res = await fetch(`/api/payments/${metod === "crypto" ? "crypto" : metod}/init`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ miktarTL: miktar }),
+        body: JSON.stringify({ amountUsd }),
       });
       const data = await res.json();
       if (!res.ok) { setBakiyeModalError(data.error ?? "Hata oluştu."); return; }
       if (metod === "iban") {
-        setBakiyeIbanResult({ referansKodu: data.referansKodu, iban: data.iban, paymentId: data.paymentId });
+        setBakiyeIbanResult({ referansKodu: data.referansKodu, iban: data.iban, paymentId: data.paymentId, quote: data.quote });
         setBakiyeModalStep("iban");
       } else if (metod === "shopier") {
         setBakiyeShopierForm({ actionUrl: data.actionUrl, fields: data.fields });
@@ -2557,7 +2579,8 @@ print(response.json()["choices"][0]["message"]["content"])`;
                                 <div className="text-[10px] text-slate-400 truncate max-w-[140px]">{entry.userEmail}</div>
                               </td>
                               <td className="p-3 text-right font-mono">
-                                <div className="font-bold text-slate-800">₺{Number(entry.miktarTL).toFixed(2)}</div>
+                                <div className="font-bold text-slate-800">₺{Number(entry.payableTL ?? entry.miktarTL).toFixed(2)}</div>
+                                {entry.amountUsd && <div className="text-[10px] text-blue-500">${Number(entry.amountUsd).toFixed(2)} bakiye</div>}
                                 <div className="text-[10px] text-slate-400">KDV ₺{Number(entry.kdvTL).toFixed(2)}</div>
                               </td>
                               <td className="p-3">
@@ -2740,26 +2763,34 @@ print(response.json()["choices"][0]["message"]["content"])`;
                 <>
                   {/* Amount input */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-mono font-semibold text-slate-400 uppercase tracking-wider block">Miktar (₺)</label>
+                    <label className="text-[10px] font-mono font-semibold text-slate-400 uppercase tracking-wider block">Yüklenecek Bakiye ($)</label>
                     <input
                       type="number"
-                      min={paymentMethods?.limits?.minBakiyeTL ?? 250}
+                      min={1}
+                      step="0.01"
                       value={bakiyeModalMiktar}
                       onChange={e => { setBakiyeModalMiktar(e.target.value); setBakiyeModalError(""); }}
-                      placeholder={String(paymentMethods?.limits?.minBakiyeTL ?? 250)}
+                      placeholder="10"
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       autoFocus
                     />
                     <div className="text-[10px] text-slate-400 font-mono">
-                      Minimum ₺{paymentMethods?.limits?.minBakiyeTL ?? 250}
-                      {paymentMethods?.limits?.maxBakiyeTL ? ` · Maksimum ₺${paymentMethods.limits.maxBakiyeTL}` : ""}
+                      Kur ₺{(paymentMethods?.kur ?? adminConfig.kur).toFixed(4)}
+                      {paymentMethods?.limits?.minBakiyeTL ? ` · Minimum tahsilat ₺${paymentMethods.limits.minBakiyeTL}` : ""}
+                      {paymentMethods?.limits?.maxBakiyeTL ? ` · Maksimum tahsilat ₺${paymentMethods.limits.maxBakiyeTL}` : ""}
                     </div>
                     {parseFloat(bakiyeModalMiktar) > 0 && (() => {
-                      const { gross, netTL, kdvTL } = calcKdvPreview(parseFloat(bakiyeModalMiktar));
+                      const quote = buildTopupQuotePreview(parseFloat(bakiyeModalMiktar));
+                      const { netTL, kdvTL } = calcKdvPreview(quote.payableTL);
                       return (
-                        <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs flex items-center justify-between">
-                          <span className="text-blue-700 font-semibold">₺{gross.toFixed(2)}</span>
-                          <span className="text-blue-500 text-[10px]">KDV ₺{kdvTL.toFixed(2)} dahil &nbsp;|&nbsp; Net ₺{netTL.toFixed(2)}</span>
+                        <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-blue-700 font-semibold">${quote.amountUsd.toFixed(2)} bakiye</span>
+                            <span className="text-blue-700 font-semibold">ödenecek ₺{quote.payableTL.toFixed(2)}</span>
+                          </div>
+                          <div className="text-blue-500 text-[10px]">
+                            Kullanılabilir karşılık ₺{quote.creditTL.toFixed(2)} · TL yuvarlama ₺{quote.roundingTL.toFixed(2)} · KDV ₺{kdvTL.toFixed(2)} dahil · Net ₺{netTL.toFixed(2)}
+                          </div>
                         </div>
                       );
                     })()}
@@ -2838,7 +2869,8 @@ print(response.json()["choices"][0]["message"]["content"])`;
                           <div key={p.id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 text-xs">
                             <div className="flex items-center space-x-2">
                               <span className="font-mono text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">{p.metod}</span>
-                              <span className="text-slate-700 font-semibold">₺{p.miktarTL}</span>
+                              <span className="text-slate-700 font-semibold">{p.amountUsd ? `$${p.amountUsd.toFixed(2)}` : `₺${p.miktarTL}`}</span>
+                              <span className="text-slate-400 font-mono text-[10px]">₺{Number(p.payableTL ?? p.miktarTL).toFixed(2)}</span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-semibold ${
@@ -2866,6 +2898,14 @@ print(response.json()["choices"][0]["message"]["content"])`;
                     </div>
                     <p className="text-xs text-emerald-700">Aşağıdaki bilgilere havale gönderin. Açıklama alanına referans kodunuzu yazmayı unutmayın.</p>
                   </div>
+
+                  {bakiyeIbanResult.quote && (
+                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-1 text-xs">
+                      <div className="flex justify-between"><span className="text-blue-500 font-mono uppercase tracking-wider text-[10px]">Alınacak bakiye</span><span className="text-blue-800 font-semibold">${bakiyeIbanResult.quote.amountUsd.toFixed(2)}</span></div>
+                      <div className="flex justify-between"><span className="text-blue-500 font-mono uppercase tracking-wider text-[10px]">Gönderilecek tutar</span><span className="text-blue-800 font-semibold">₺{bakiyeIbanResult.quote.payableTL.toFixed(2)}</span></div>
+                      <div className="flex justify-between"><span className="text-blue-500 font-mono uppercase tracking-wider text-[10px]">Kur</span><span className="text-blue-800 font-mono">₺{bakiyeIbanResult.quote.kur.toFixed(4)}</span></div>
+                    </div>
+                  )}
 
                   {bakiyeIbanResult.iban.bankName && (
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2 text-xs">

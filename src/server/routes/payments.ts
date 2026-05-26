@@ -12,6 +12,8 @@ import { createInvoice, verifyWebhook } from "../services/cryptomus-service.js";
 import { writeAudit } from "../services/audit-service.js";
 import { logger } from "../lib/logger.js";
 import { isIbanConfigured, validatePaymentAmount } from "../services/payment-guards.js";
+import { adminPaymentNotificationEmail } from "../services/email-service.js";
+import { buildUsdTopupQuote } from "../services/payment-pricing.js";
 
 const router = Router();
 
@@ -35,9 +37,40 @@ async function getPaymentLimits() {
   return rows[0] ?? { minBakiyeTL: "250", maxBakiyeTL: "50000" };
 }
 
+async function getPaymentKur(): Promise<number> {
+  const rows = await db
+    .select({ kur: systemConfig.kur })
+    .from(systemConfig)
+    .where(eq(systemConfig.id, 1))
+    .limit(1);
+
+  return Number(rows[0]?.kur ?? 47.084289);
+}
+
+async function buildQuoteFromRequest(body: Record<string, unknown>) {
+  const kur = await getPaymentKur();
+  const rawAmountUsd = body.amountUsd ?? (body.miktarTL !== undefined ? Number(body.miktarTL) / kur : undefined);
+  const amountUsd = Number(rawAmountUsd);
+  const quote = buildUsdTopupQuote(amountUsd, kur);
+  const amountValidation = validatePaymentAmount(quote.payableTL, await getPaymentLimits());
+  return { quote, amountValidation };
+}
+
 function safeCryptomusWebhookLog(body: Record<string, unknown>) {
   const { uuid, order_id, status, amount, currency, to_currency } = body as Record<string, unknown>;
   return { uuid, order_id, status, amount, currency, to_currency };
+}
+
+function safeShopierCallbackLog(body: Record<string, string>) {
+  const { platform_order_id, payment_id, status, installment, istest } = body;
+  return { platform_order_id, payment_id, status, installment, istest };
+}
+
+function safeProviderPayload(body: Record<string, unknown>) {
+  const blocked = new Set(["signature", "sign", "API_key", "api_key", "token", "authorization", "cookie"]);
+  return Object.fromEntries(
+    Object.entries(body).filter(([key]) => !blocked.has(key.toLowerCase())),
+  );
 }
 
 function serializePayment(p: typeof payments.$inferSelect) {
@@ -46,6 +79,11 @@ function serializePayment(p: typeof payments.$inferSelect) {
     userId: p.userId,
     metod: p.metod,
     miktarTL: Number(p.miktarTL),
+    amountUsd: p.amountUsd === null ? null : Number(p.amountUsd),
+    payableTL: p.payableTL === null ? null : Number(p.payableTL),
+    creditTL: p.creditTL === null ? null : Number(p.creditTL),
+    kurAtPayment: p.kurAtPayment === null ? null : Number(p.kurAtPayment),
+    roundingTL: p.roundingTL === null ? null : Number(p.roundingTL),
     kdvTL: Number(p.kdvTL),
     netTL: Number(p.netTL),
     durum: p.durum,
@@ -61,6 +99,11 @@ function serializeIban(p: typeof pendingIbanPayments.$inferSelect) {
     id: p.id,
     userId: p.userId,
     miktarTL: Number(p.miktarTL),
+    amountUsd: p.amountUsd === null ? null : Number(p.amountUsd),
+    payableTL: p.payableTL === null ? null : Number(p.payableTL),
+    creditTL: p.creditTL === null ? null : Number(p.creditTL),
+    kurAtPayment: p.kurAtPayment === null ? null : Number(p.kurAtPayment),
+    roundingTL: p.roundingTL === null ? null : Number(p.roundingTL),
     kdvTL: Number(p.kdvTL),
     referansKodu: p.referansKodu,
     durum: p.durum,
@@ -78,6 +121,7 @@ router.get("/methods", userAuth, async (_req, res, next) => {
     const shopierEnabled = !!(env.SHOPIER_API_KEY && env.SHOPIER_API_SECRET);
     const cryptomusEnabled = !!(env.CRYPTOMUS_MERCHANT_ID && env.CRYPTOMUS_API_KEY);
     const limits = await getPaymentLimits();
+    const kur = await getPaymentKur();
     res.json({
       shopier: {
         enabled: shopierEnabled,
@@ -98,6 +142,7 @@ router.get("/methods", userAuth, async (_req, res, next) => {
         minBakiyeTL: Number(limits.minBakiyeTL),
         maxBakiyeTL: Number(limits.maxBakiyeTL),
       },
+      kur,
       kdvRate: env.KDV_RATE,
     });
   } catch (e) { next(e); }
@@ -111,14 +156,13 @@ router.post("/shopier/init", userAuth, async (req, res, next) => {
       return;
     }
 
-    const { miktarTL } = req.body as { miktarTL: number };
-    const amountValidation = validatePaymentAmount(miktarTL, await getPaymentLimits());
+    const { quote, amountValidation } = await buildQuoteFromRequest(req.body as Record<string, unknown>);
     if (!amountValidation.ok) {
       res.status(amountValidation.status).json({ error: amountValidation.error });
       return;
     }
 
-    const kdv = calcKdv(amountValidation.amount);
+    const kdv = calcKdv(quote.payableTL);
 
     // Load user info for form fields
     const userRows = await db.select({ email: users.email, adSoyad: users.adSoyad })
@@ -130,9 +174,14 @@ router.post("/shopier/init", userAuth, async (req, res, next) => {
     const inserted = await db.insert(payments).values({
       userId: req.user!.id,
       metod: "shopier",
-      miktarTL: String(kdv.gross),
+      miktarTL: String(quote.payableTL),
       kdvTL: String(kdv.kdvTL),
       netTL: String(kdv.netTL),
+      amountUsd: String(quote.amountUsd),
+      payableTL: String(quote.payableTL),
+      creditTL: String(quote.creditTL),
+      kurAtPayment: String(quote.kur),
+      roundingTL: String(quote.roundingTL),
       durum: "bekliyor",
       // idempotencyKey will be set to the id itself after insert
     }).returning({ id: payments.id });
@@ -145,12 +194,12 @@ router.post("/shopier/init", userAuth, async (req, res, next) => {
     const checkout = buildCheckoutForm({
       userId: req.user!.id,
       paymentId,
-      miktarTL: kdv.gross,
+      miktarTL: quote.payableTL,
       email,
       adSoyad,
     });
 
-    res.json({ paymentId, kdv, ...checkout });
+    res.json({ paymentId, kdv, quote, ...checkout });
   } catch (e) { next(e); }
 });
 
@@ -161,11 +210,17 @@ router.post(
   async (req, res, next) => {
     try {
       const body = req.body as Record<string, string>;
-      logger.info({ body }, "Shopier callback received");
+      logger.info({ callback: safeShopierCallbackLog(body) }, "Shopier callback received");
 
       const result = verifyCallback(body);
       if (!result.valid) {
-        logger.warn({ body }, "Shopier callback signature invalid");
+        logger.warn({ callback: safeShopierCallbackLog(body) }, "Shopier callback signature invalid");
+        adminPaymentNotificationEmail({
+          title: "Shopier callback imza hatası",
+          method: "shopier",
+          reference: body.platform_order_id,
+          status: "invalid_signature",
+        }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
         res.redirect(`${env.APP_BASE_URL}/?payment=fail`);
         return;
       }
@@ -177,6 +232,12 @@ router.post(
             .set({ durum: "basarisiz", tamamlanma: new Date() })
             .where(eq(payments.id, result.platformOrderId));
         }
+        adminPaymentNotificationEmail({
+          title: "Shopier ödeme başarısız",
+          method: "shopier",
+          reference: result.platformOrderId,
+          status: result.status ?? "fail",
+        }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
         res.redirect(`${env.APP_BASE_URL}/?payment=fail`);
         return;
       }
@@ -190,13 +251,20 @@ router.post(
       }
 
       const payment = paymentRows[0];
+      const creditTL = Number(payment.creditTL ?? payment.miktarTL);
       const credit = await creditUserBalance(
         payment.userId,
         paymentId,
-        Number(payment.miktarTL),
+        creditTL,
         "shopier",
         paymentId,
-        body,
+        safeProviderPayload(body),
+        {
+          paidTL: Number(payment.payableTL ?? payment.miktarTL),
+          amountUsd: payment.amountUsd === null ? undefined : Number(payment.amountUsd),
+          kurAtPayment: payment.kurAtPayment === null ? undefined : Number(payment.kurAtPayment),
+          roundingTL: payment.roundingTL === null ? undefined : Number(payment.roundingTL),
+        },
       );
 
       if (credit.success) {
@@ -216,41 +284,65 @@ router.post("/iban/init", userAuth, async (req, res, next) => {
       return;
     }
 
-    const { miktarTL } = req.body as { miktarTL: number };
-    const amountValidation = validatePaymentAmount(miktarTL, await getPaymentLimits());
+    const { quote, amountValidation } = await buildQuoteFromRequest(req.body as Record<string, unknown>);
     if (!amountValidation.ok) {
       res.status(amountValidation.status).json({ error: amountValidation.error });
       return;
     }
 
-    const kdv = calcKdv(amountValidation.amount);
+    const kdv = calcKdv(quote.payableTL);
     const referansKodu = generateReferansKodu();
 
     // Create payment row
     const paymentInserted = await db.insert(payments).values({
       userId: req.user!.id,
       metod: "iban",
-      miktarTL: String(kdv.gross),
+      miktarTL: String(quote.payableTL),
       kdvTL: String(kdv.kdvTL),
       netTL: String(kdv.netTL),
+      amountUsd: String(quote.amountUsd),
+      payableTL: String(quote.payableTL),
+      creditTL: String(quote.creditTL),
+      kurAtPayment: String(quote.kur),
+      roundingTL: String(quote.roundingTL),
       durum: "bekliyor",
       idempotencyKey: referansKodu,
     }).returning({ id: payments.id });
 
     const paymentId = paymentInserted[0].id;
 
+    const userRows = await db.select({ email: users.email })
+      .from(users).where(eq(users.id, req.user!.id)).limit(1);
+
     // Create pending iban record
     await db.insert(pendingIbanPayments).values({
       userId: req.user!.id,
-      miktarTL: String(kdv.gross),
+      miktarTL: String(quote.payableTL),
       kdvTL: String(kdv.kdvTL),
+      amountUsd: String(quote.amountUsd),
+      payableTL: String(quote.payableTL),
+      creditTL: String(quote.creditTL),
+      kurAtPayment: String(quote.kur),
+      roundingTL: String(quote.roundingTL),
       referansKodu,
     });
+
+    adminPaymentNotificationEmail({
+      title: "Yeni IBAN ödeme bildirimi",
+      userEmail: userRows[0]?.email,
+      method: "iban",
+      amountUsd: quote.amountUsd,
+      payableTL: quote.payableTL,
+      creditTL: quote.creditTL,
+      reference: referansKodu,
+      status: "bekliyor",
+    }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
 
     res.json({
       paymentId,
       referansKodu,
       kdv,
+      quote,
       iban: {
         bankName: env.IBAN_BANK_NAME,
         ibanNumber: env.IBAN_NUMBER,
@@ -269,36 +361,40 @@ router.post("/crypto/init", userAuth, async (req, res, next) => {
       return;
     }
 
-    const { miktarTL } = req.body as { miktarTL: number };
-    const amountValidation = validatePaymentAmount(miktarTL, await getPaymentLimits());
+    const { quote, amountValidation } = await buildQuoteFromRequest(req.body as Record<string, unknown>);
     if (!amountValidation.ok) {
       res.status(amountValidation.status).json({ error: amountValidation.error });
       return;
     }
 
-    const kdv = calcKdv(amountValidation.amount);
+    const kdv = calcKdv(quote.payableTL);
 
     // Create payment row first
     const inserted = await db.insert(payments).values({
       userId: req.user!.id,
       metod: "cryptomus",
-      miktarTL: String(kdv.gross),
+      miktarTL: String(quote.payableTL),
       kdvTL: String(kdv.kdvTL),
       netTL: String(kdv.netTL),
+      amountUsd: String(quote.amountUsd),
+      payableTL: String(quote.payableTL),
+      creditTL: String(quote.creditTL),
+      kurAtPayment: String(quote.kur),
+      roundingTL: String(quote.roundingTL),
       durum: "bekliyor",
     }).returning({ id: payments.id });
 
     const paymentId = inserted[0].id;
 
     // Create Cryptomus invoice
-    const invoice = await createInvoice({ paymentId, miktarTL: kdv.gross });
+    const invoice = await createInvoice({ paymentId, amountUsd: quote.amountUsd });
 
     // Store invoice uuid as idempotency key
     await db.update(payments)
       .set({ idempotencyKey: invoice.uuid })
       .where(eq(payments.id, paymentId));
 
-    res.json({ paymentId, url: invoice.url, uuid: invoice.uuid, kdv });
+    res.json({ paymentId, url: invoice.url, uuid: invoice.uuid, kdv, quote });
   } catch (e) { next(e); }
 });
 
@@ -343,13 +439,20 @@ router.post(
       }
 
       const payment = paymentRows[0];
+      const creditTL = Number(payment.creditTL ?? payment.miktarTL);
       const credit = await creditUserBalance(
         payment.userId,
         payment.id,
-        Number(payment.miktarTL),
+        creditTL,
         "cryptomus",
         uuid,
-        body,
+        safeProviderPayload(body),
+        {
+          paidTL: Number(payment.payableTL ?? payment.miktarTL),
+          amountUsd: payment.amountUsd === null ? undefined : Number(payment.amountUsd),
+          kurAtPayment: payment.kurAtPayment === null ? undefined : Number(payment.kurAtPayment),
+          roundingTL: payment.roundingTL === null ? undefined : Number(payment.roundingTL),
+        },
       );
 
       if (!credit.success && !credit.alreadyCredited) {
@@ -423,12 +526,20 @@ router.post("/admin/pending-iban/:id/approve", adminAuth, async (req, res, next)
     }
 
     const payment = paymentRows[0];
+    const creditTL = Number(payment.creditTL ?? pending.miktarTL);
     const credit = await creditUserBalance(
       pending.userId,
       payment.id,
-      Number(pending.miktarTL),
+      creditTL,
       "iban",
       pending.referansKodu,
+      undefined,
+      {
+        paidTL: Number(payment.payableTL ?? pending.miktarTL),
+        amountUsd: payment.amountUsd === null ? undefined : Number(payment.amountUsd),
+        kurAtPayment: payment.kurAtPayment === null ? undefined : Number(payment.kurAtPayment),
+        roundingTL: payment.roundingTL === null ? undefined : Number(payment.roundingTL),
+      },
     );
 
     if (!credit.success && !credit.alreadyCredited) {

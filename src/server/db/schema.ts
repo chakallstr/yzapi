@@ -209,6 +209,11 @@ export const payments = pgTable("payments", {
   miktarTL: numeric("miktar_tl", { precision: 14, scale: 4 }).notNull(),
   kdvTL: numeric("kdv_tl", { precision: 14, scale: 4 }).notNull(),
   netTL: numeric("net_tl", { precision: 14, scale: 4 }).notNull(),
+  amountUsd: numeric("amount_usd", { precision: 14, scale: 4 }),
+  payableTL: numeric("payable_tl", { precision: 14, scale: 4 }),
+  creditTL: numeric("credit_tl", { precision: 14, scale: 4 }),
+  kurAtPayment: numeric("kur_at_payment", { precision: 14, scale: 6 }),
+  roundingTL: numeric("rounding_tl", { precision: 14, scale: 4 }),
   durum: text("durum").notNull().default("bekliyor"), // bekliyor | basarili | iptal | basarisiz
   idempotencyKey: text("idempotency_key").unique(), // provider-side unique
   providerPayload: jsonb("provider_payload"), // raw webhook body
@@ -223,6 +228,11 @@ export const pendingIbanPayments = pgTable("pending_iban_payments", {
   userId: uuid("user_id").notNull().references(() => users.id),
   miktarTL: numeric("miktar_tl", { precision: 14, scale: 4 }).notNull(),
   kdvTL: numeric("kdv_tl", { precision: 14, scale: 4 }).notNull(),
+  amountUsd: numeric("amount_usd", { precision: 14, scale: 4 }),
+  payableTL: numeric("payable_tl", { precision: 14, scale: 4 }),
+  creditTL: numeric("credit_tl", { precision: 14, scale: 4 }),
+  kurAtPayment: numeric("kur_at_payment", { precision: 14, scale: 6 }),
+  roundingTL: numeric("rounding_tl", { precision: 14, scale: 4 }),
   referansKodu: text("referans_kodu").notNull().unique(),
   durum: text("durum").notNull().default("bekliyor"), // bekliyor | onaylandi | reddedildi
   olusturma: timestamp("olusturma").notNull().default(sql`now()`),

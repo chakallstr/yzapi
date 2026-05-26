@@ -13,6 +13,10 @@ export interface EmailPayment {
   metod: string;
   refKod: string;
   transactionId?: string;
+  amountUsd?: number;
+  paidTL?: number;
+  kurAtPayment?: number;
+  roundingTL?: number;
 }
 
 type EmailProvider = "resend" | "smtp" | "none";
@@ -123,6 +127,13 @@ export async function paymentReceiptEmail(
   user: EmailUser,
   payment: EmailPayment,
 ): Promise<void> {
+  const paidTL = payment.paidTL ?? payment.miktarTL;
+  const usdRows = payment.amountUsd && payment.kurAtPayment
+    ? `
+    <tr><td style="color:#6b7280;padding:4px 0">Alınan USD bakiye</td><td style="text-align:right;color:#374151">$${payment.amountUsd.toFixed(2)}</td></tr>
+    <tr><td style="color:#6b7280;padding:4px 0">İşlem kuru</td><td style="text-align:right;color:#374151">₺${payment.kurAtPayment.toFixed(4)}</td></tr>
+    ${payment.roundingTL && payment.roundingTL > 0 ? `<tr><td style="color:#6b7280;padding:4px 0">TL yuvarlama</td><td style="text-align:right;color:#374151">₺${payment.roundingTL.toFixed(2)}</td></tr>` : ""}`
+    : "";
   const kdvRow = payment.kdvTL > 0
     ? `<tr><td style="color:#6b7280;padding:4px 0">KDV</td><td style="text-align:right;color:#374151">₺${payment.kdvTL.toFixed(2)}</td></tr>`
     : "";
@@ -130,10 +141,11 @@ export async function paymentReceiptEmail(
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px">
   <h2 style="color:#15803d;margin-bottom:8px">Ödeme Alındı</h2>
   <p style="color:#374151">Merhaba <strong>${user.adSoyad}</strong>,</p>
-  <p style="color:#374151">Ödemeniz başarıyla işlendi. Bakiyenize <strong>₺${payment.miktarTL.toFixed(2)}</strong> eklendi.</p>
+  <p style="color:#374151">Ödemeniz başarıyla işlendi. Kullanılabilir bakiyenize <strong>₺${payment.miktarTL.toFixed(2)}</strong> eklendi.</p>
   <table style="width:100%;border-collapse:collapse;margin:16px 0">
     <tr><td style="color:#6b7280;padding:4px 0">Ödeme Yöntemi</td><td style="text-align:right;color:#374151">${payment.metod}</td></tr>
-    <tr><td style="color:#6b7280;padding:4px 0">Brüt Tutar</td><td style="text-align:right;color:#374151">₺${payment.miktarTL.toFixed(2)}</td></tr>
+    <tr><td style="color:#6b7280;padding:4px 0">Ödenen Tutar</td><td style="text-align:right;color:#374151">₺${paidTL.toFixed(2)}</td></tr>
+    ${usdRows}
     ${kdvRow}
     <tr><td style="color:#6b7280;padding:4px 0">Net Tutar</td><td style="text-align:right;color:#374151">₺${payment.netTL.toFixed(2)}</td></tr>
     <tr style="border-top:1px solid #bbf7d0"><td style="color:#15803d;font-weight:bold;padding:8px 0">Kullanılabilir Bakiye</td><td style="text-align:right;color:#15803d;font-weight:bold">₺${payment.miktarTL.toFixed(2)}</td></tr>
@@ -141,6 +153,41 @@ export async function paymentReceiptEmail(
   <p style="color:#6b7280;font-size:12px">Referans Kodu: <code>${payment.refKod}</code>${payment.transactionId ? ` &nbsp;|&nbsp; İşlem ID: <code>${payment.transactionId}</code>` : ""}</p>
 </div>`;
   await sendEmail(user.email, "YapayZekaLab — Ödeme Makbuzu", html);
+}
+
+export async function adminPaymentNotificationEmail(event: {
+  title: string;
+  userEmail?: string;
+  method?: string;
+  amountUsd?: number;
+  payableTL?: number;
+  creditTL?: number;
+  reference?: string;
+  status?: string;
+  reason?: string;
+}): Promise<void> {
+  const to = env.PAYMENT_NOTIFICATION_EMAIL;
+  if (!to) {
+    logger.warn({ title: event.title }, "[email] PAYMENT_NOTIFICATION_EMAIL not configured");
+    return;
+  }
+
+  const html = `
+<div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px">
+  <h2 style="color:#0f172a;margin-bottom:8px">${event.title}</h2>
+  <table style="width:100%;border-collapse:collapse;margin:16px 0">
+    ${event.userEmail ? `<tr><td style="color:#64748b;padding:4px 0">Kullanıcı</td><td style="text-align:right;color:#0f172a">${event.userEmail}</td></tr>` : ""}
+    ${event.method ? `<tr><td style="color:#64748b;padding:4px 0">Yöntem</td><td style="text-align:right;color:#0f172a">${event.method}</td></tr>` : ""}
+    ${event.amountUsd ? `<tr><td style="color:#64748b;padding:4px 0">USD</td><td style="text-align:right;color:#0f172a">$${event.amountUsd.toFixed(2)}</td></tr>` : ""}
+    ${event.payableTL ? `<tr><td style="color:#64748b;padding:4px 0">Ödenecek TL</td><td style="text-align:right;color:#0f172a">₺${event.payableTL.toFixed(2)}</td></tr>` : ""}
+    ${event.creditTL ? `<tr><td style="color:#64748b;padding:4px 0">Kredi TL</td><td style="text-align:right;color:#0f172a">₺${event.creditTL.toFixed(2)}</td></tr>` : ""}
+    ${event.reference ? `<tr><td style="color:#64748b;padding:4px 0">Referans</td><td style="text-align:right;color:#0f172a"><code>${event.reference}</code></td></tr>` : ""}
+    ${event.status ? `<tr><td style="color:#64748b;padding:4px 0">Durum</td><td style="text-align:right;color:#0f172a">${event.status}</td></tr>` : ""}
+    ${event.reason ? `<tr><td style="color:#64748b;padding:4px 0">Not</td><td style="text-align:right;color:#0f172a">${event.reason}</td></tr>` : ""}
+  </table>
+</div>`;
+
+  await sendEmail(to, `YapayZekaLab — ${event.title}`, html);
 }
 
 export async function sendDailyReport(adminEmail: string, html: string): Promise<void> {

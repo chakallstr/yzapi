@@ -10,8 +10,8 @@ describe("payment safety contract", () => {
     expect(source("./server/db/schema.ts")).toMatch(/minBakiyeTL:.*default\("250"\)/);
     expect(source("./server/db/seed.ts")).toContain('minBakiyeTL: "250"');
     expect(source("./server/routes/payments.ts")).toContain('minBakiyeTL: "250"');
-    expect(source("./App.tsx")).toContain('useState("250")');
-    expect(source("./App.tsx")).toContain('setBakiyeModalMiktar("250")');
+    expect(source("./App.tsx")).toContain("Minimum tahsilat");
+    expect(source("./App.tsx")).toContain('setBakiyeModalMiktar("10")');
   });
 
   it("does not acknowledge a paid Cryptomus webhook when balance credit fails", () => {
@@ -27,7 +27,8 @@ describe("payment safety contract", () => {
   it("describes gross usable balance consistently in payment receipt emails", () => {
     const emailService = source("./server/services/email-service.ts");
 
-    expect(emailService).toContain("Bakiyenize <strong>₺${payment.miktarTL.toFixed(2)}</strong> eklendi.");
+    expect(emailService).toContain("Kullanılabilir bakiyenize <strong>₺${payment.miktarTL.toFixed(2)}</strong> eklendi.");
+    expect(emailService).toContain("Ödenen Tutar");
     expect(emailService).toContain("Kullanılabilir Bakiye");
     expect(emailService).toContain("payment.miktarTL.toFixed(2)");
   });
@@ -39,5 +40,24 @@ describe("payment safety contract", () => {
     expect(app).toContain("loadPaymentMethods");
     expect(app).toContain("isPaymentMethodEnabled");
     expect(app).toContain("Ödeme yöntemi şu an kapalı");
+  });
+
+  it("keeps payment callbacks and metadata safe for USD top-ups", () => {
+    const paymentsRoute = source("./server/routes/payments.ts");
+    const schema = source("./server/db/schema.ts");
+
+    expect(schema).toContain("amountUsd");
+    expect(schema).toContain("payableTL");
+    expect(schema).toContain("creditTL");
+    expect(schema).toContain("kurAtPayment");
+    expect(schema).toContain("roundingTL");
+
+    expect(paymentsRoute).toContain("amountUsd");
+    expect(paymentsRoute).toContain("buildUsdTopupQuote");
+    expect(paymentsRoute).toContain("safeShopierCallbackLog");
+    expect(paymentsRoute).toContain("safeProviderPayload");
+    expect(paymentsRoute).toContain("adminPaymentNotificationEmail");
+    expect(paymentsRoute).not.toContain('logger.info({ body }, "Shopier callback received")');
+    expect(paymentsRoute).not.toContain('logger.warn({ body }, "Shopier callback signature invalid")');
   });
 });
