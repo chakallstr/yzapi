@@ -41,3 +41,14 @@ Durum: 60 dakikalık site testi sonrası doldurulacak.
 - Low-balance path `402`, invalid key path `401`, upstream failure path zero-cost/no-decrement güvenli.
 - Direct CloseRouter `/credits` ve `/models` çalışıyor, ancak direct inference OpenAI/Anthropic/Deepseek/Google tarafında `502 upstream_connection_refused` veya `502 upstream_connect_timeout` veriyor.
 - Bu upstream 502 düzelmeden success `usage_records`, `transactions`, cost headers ve balance decrement acceptance yapılamaz.
+
+## Live Payment Schema / IBAN Update — 2026-05-27
+
+- Canlı DB’de eksik ödeme quote kolonları yedek sonrası idempotent olarak eklendi.
+- `payments` ve `pending_iban_payments` içinde `amount_usd`, `payable_tl`, `credit_tl`, `kur_at_payment`, `rounding_tl` doğrulandı.
+- Canlı IBAN init/admin approve/reject E2E geçici test verisiyle geçti.
+- Duplicate approve `409`, normal user admin payment access `403`, reject without reason `400`.
+- Shopier/Cryptomus env yoksa 503 ile güvenli disabled kalıyor.
+- Test kayıtları canlı DB’den temizlendi.
+
+Sonuç: Backend payment schema ve IBAN ledger/idempotency live PASS. Successful AI usage deduction ve Shopier/Cryptomus provider E2E hâlâ launch blocker.

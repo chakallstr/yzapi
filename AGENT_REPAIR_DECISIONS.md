@@ -34,6 +34,78 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-FIX-LIVE-PAYMENT-MIGRATION-001
+Decision title: Apply missing live payment USD quote columns
+Decision type: Production DB migration approval
+Related bug IDs: R-BUG-007, PAYMENT-LIVE-001
+Evidence from reports: Live payment provider E2E was still blocked. Live IBAN init test failed because production DB lacks `payments.amount_usd` and related quote columns while the deployed code reads/writes those fields. Local migration `0005_payment_usd_quote_fields.sql` is idempotent and uses `ADD COLUMN IF NOT EXISTS`.
+Files likely affected: Production PostgreSQL schema only; no source file edit.
+Risk level: High
+Design/template impact: None.
+Security impact: No secrets printed; DB backup required before schema change.
+Backend/API/billing impact: Enables live payment quote fields used by Shopier/IBAN/Cryptomus init/callback flows. No data deletion; additive columns only.
+Proposed action: Take a PostgreSQL 14 backup, apply `0005_payment_usd_quote_fields.sql` equivalent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` statements on live DB, verify both `payments` and `pending_iban_payments` contain the new columns, then rerun safe IBAN init/admin approve/reject E2E with temporary data and cleanup.
+Agent 1 vote: APPROVE
+Agent 1 reason: Payment UI/API cannot be accepted while live init crashes on missing columns.
+Agent 2 vote: APPROVE
+Agent 2 reason: Additive idempotent migration matches current schema and is necessary for billing/payment correctness.
+Agent 3 vote: APPROVE
+Agent 3 reason: No visual impact; backup and no-secret constraints reduce release risk.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Backup live DB, apply missing payment columns, retest payment E2E.
+Status: APPROVED
+
+---
+
+Decision ID: DEC-FIX-PAYMENT-UI-ROUNDING-001
+Decision title: Align account top-up UI with backend USD-to-TL rounded payment quote
+Decision type: Code/edit approval
+Related bug IDs: R-BUG-007, PAYMENT-UI-001
+Evidence from reports: User required USD balance top-up with Shopier/IBAN TL collection rounded upward to whole TL. Live IBAN E2E showed backend quote `$10`, `kur=47.279606`, `payableTL=473`, `creditTL=472.7961`, `roundingTL=0.2039`. Source inspection found `src/yapayzekalab/tab-account.jsx` still displaying decimal approximate TL and frontend-only `%5 komisyon`, while backend init receives only `amountUsd` and does not apply this commission.
+Files likely affected: `src/api-docs-content.test.ts`, `src/yapayzekalab/tab-account.jsx`, reports.
+Risk level: Medium
+Design/template impact: None allowed; no CSS/class/layout/spacing/color/button/card/modal changes. Only existing text and calculated values inside the current layout may change.
+Security impact: Reduces payment confusion and prevents frontend/backend amount mismatch.
+Backend/API/billing impact: None to backend behavior; frontend display will mirror existing backend quote rules.
+Proposed action: Add a failing source contract test proving the account top-up UI uses rounded whole-TL payment display and does not advertise unimplemented frontend commission. Then update `tab-account.jsx` calculation/copy only: no fee, `payableTL = Math.ceil(effectiveAmount * tlRate)`, `creditTL = effectiveAmount * tlRate`, and rounded TL text.
+Agent 1 vote: APPROVE
+Agent 1 reason: User-facing payment amount must match the server-side payment quote before launch.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend already stores payable/credit/rounding fields; frontend must stop showing a different amount.
+Agent 3 vote: APPROVE
+Agent 3 reason: Approved only because visual template/style is locked and the change is calculation/copy-only.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Write RED test, patch calculation/copy only, run targeted test.
+Status: APPROVED
+
+---
+
+Decision ID: DEC-CMD-PAYMENT-UI-ROUNDING-001
+Decision title: Run regression after payment UI quote alignment
+Decision type: Command/test approval
+Related bug IDs: PAYMENT-UI-001, R-BUG-007
+Evidence from reports: Frontend account payment display was changed in copy/calculation only. Because payment amounts are user-facing billing information, targeted and full regression plus scans/build are required before accepting or deploying.
+Files likely affected: Build/QA artifacts only.
+Risk level: Medium
+Design/template impact: No source style changes expected; build/UAT/browser checks must confirm rejected template stays absent.
+Security impact: Secret scan must remain clean; no provider/payment spending commands are allowed by this decision.
+Backend/API/billing impact: No DB/provider calls; verifies source contracts and production bundle only.
+Proposed action: Run `npm test -- src/api-docs-content.test.ts`, `npm run lint`, `npm test`, `npm run build`, `npm run scan:public`, `node scripts/scan-secrets.mjs`, and `npm run qa:uat`.
+Agent 1 vote: APPROVE
+Agent 1 reason: UAT/payment display cannot be accepted without regression and smoke evidence.
+Agent 2 vote: APPROVE
+Agent 2 reason: The commands do not spend money and verify billing-facing contract expectations.
+Agent 3 vote: APPROVE
+Agent 3 reason: Public and secret scans protect release and visual guard requirements.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Run the listed local verification commands and record exact results.
+Status: APPROVED
+
+---
+
 Decision ID: DEC-LIVE-DEPLOY-RESTORED-THEME-001
 Decision title: Deploy restored approved theme to the real live service with corrected rollback
 Decision type: Deploy approval

@@ -58,3 +58,17 @@ PARTIAL PASS. Kritik token gönderme hatası düzeltildi; tam admin UAT için ca
 ## Güncel Sonuç
 
 Admin password/user complaint fixed live. Admin launch acceptance is improved, but full admin mutation/audit UAT remains partial by design because destructive actions on real customer data were not executed.
+
+## Live Payment Admin Queue Update — 2026-05-27
+
+| Alan | Sonuç | Not |
+|---|---|---|
+| Pending IBAN list | PASS LIVE | Geçici test ödeme bildirimi admin queue içinde göründü |
+| IBAN approve | PASS LIVE | Tek transaction, `iban_approve` audit, user balance credit |
+| Duplicate approve | PASS LIVE | 409; çift credit yok |
+| Reject without reason | PASS LIVE | 400; red sebebi zorunlu |
+| Reject with reason | PASS LIVE | `iban_reject` audit, payment/pending rejected |
+| Normal user admin queue access | PASS LIVE | 403 `Admin email required` |
+| Cleanup | PASS LIVE | Geçici canlı test kayıtları temizlendi |
+
+Sonuç: IBAN ödeme admin queue canlı E2E geçti. Tam admin launch kabulü için diğer destructive admin tab/action audit coverage hâlâ gerçek müşteri verisi kullanılmadan ayrıca tamamlanmalı.

@@ -236,3 +236,71 @@ Agent 2 retest vote: APPROVE_WITH_BILLING_GAP
 Agent 3 retest vote: APPROVE_WITH_RELEASE_BLOCKER
 Approval count: 3/3
 Final retest status: LIVE_DEPLOY_PASS_RELEASE_BLOCKED_BY_BILLING_PAYMENT_E2E
+
+## PAYMENT-LIVE-001 Live Payment Schema / IBAN E2E Retest
+
+Bug ID: PAYMENT-LIVE-001, R-BUG-007
+Fix decision ID: DEC-FIX-LIVE-PAYMENT-MIGRATION-001
+Retest decision ID: DEC-RETEST-PAYMENT-LIVE-001
+Command or manual flow:
+- Took live PostgreSQL 14 backup before schema change.
+- Applied additive `ADD COLUMN IF NOT EXISTS` quote fields to `payments` and `pending_iban_payments`.
+- Verified both live tables expose `amount_usd`, `payable_tl`, `credit_tl`, `kur_at_payment`, and `rounding_tl`.
+- Created isolated temporary user/session; no real money; no real provider payment.
+- Called `/api/payments/methods`, `/api/payments/shopier/init`, `/api/payments/crypto/init`, `/api/payments/iban/init`, admin pending list, approve, duplicate approve, second pending reject without reason, reject with reason, DB/audit reads, cleanup.
+Expected:
+- Missing columns no longer crash live payment init.
+- IBAN init creates pending/payment records with rounded TL quote.
+- Normal user cannot access admin payment queue.
+- Admin approve credits exactly once and writes ledger/audit.
+- Duplicate approve cannot double-credit.
+- Reject requires reason and does not credit.
+- Shopier/Cryptomus remain disabled with 503 when env credentials are absent.
+Actual:
+- Payment methods: `shopier.enabled=false`, `iban.enabled=true`, `cryptomus.enabled=false`.
+- `shopier/init`: `503`; `crypto/init`: `503`.
+- `iban/init` for `$10`: `200`, `kur=47.279606`, `payableTL=473`, `creditTL=472.7961`, `roundingTL=0.2039`.
+- Normal user admin pending endpoint: `403`.
+- Admin pending before approve: `200`, count `1`.
+- Approve: `200`, `durum=onaylandi`, transaction id present.
+- Duplicate approve: `409`.
+- Reject without reason: `400`; reject with reason: `200`, `durum=reddedildi`.
+- DB after approve: user balance `472.7961`, one `yukleme` transaction, one approved pending, one rejected pending, matching `payments`, audit actions `iban_approve` and `iban_reject`.
+- Cleanup removed temporary users/payments/pending/transactions/audit rows.
+Passed/Failed: Passed for IBAN/payment schema; provider E2E still blocked.
+Evidence: Live backup `/opt/turkapiprojesi/.deploy/db-backups/payment-quote-cols-20260527T070013Z.dump`; command output retained in current repair session; raw tokens/API keys were not printed.
+Agent 1 retest vote: APPROVE_WITH_PROVIDER_GAP
+Agent 2 retest vote: APPROVE_WITH_PROVIDER_GAP
+Agent 3 retest vote: APPROVE_WITH_PROVIDER_GAP
+Approval count: 3/3
+Final retest status: IBAN_LIVE_PASS_SHOPIER_CRYPTOMUS_PROVIDER_E2E_BLOCKED
+
+## PAYMENT-UI-001 Payment UI Rounded Quote Retest
+
+Bug ID: PAYMENT-UI-001, R-BUG-007
+Fix decision ID: DEC-FIX-PAYMENT-UI-ROUNDING-001
+Retest decision ID: DEC-RETEST-PAYMENT-UI-ROUNDING-001
+Command or manual flow:
+- Wrote RED source contract test for rounded TL payment display and unimplemented commission copy.
+- Patched `src/yapayzekalab/tab-account.jsx` text/calculation only.
+- Ran targeted and full local regression.
+Expected:
+- Account top-up UI mirrors backend: Shopier/IBAN collect `Math.ceil(amountUsd * tlRate)` TL, credit selected USD equivalent, show rounding difference.
+- Cryptomus display uses USD/USDT invoice amount rounded upward to 2 decimals.
+- Payment history shows method/status/USD credit/TL collection/rounding/date fields.
+- No style/theme/template/class/layout changes.
+Actual:
+- RED test failed before fix, then `npm test -- src/api-docs-content.test.ts` passed 7/7.
+- `npm run lint`: PASS.
+- `npm test`: PASS, 27 files / 116 tests.
+- `npm run build`: PASS, existing chunk-size warning only.
+- `npm run scan:public`: PASS, hits `[]`.
+- `node scripts/scan-secrets.mjs`: PASS, hits `[]`.
+- `npm run qa:uat`: PASS, 10/10, report `qa-artifacts/uat-smoke-2026-05-27T07-10-10-016Z/uat-smoke-report.md`.
+Passed/Failed: Passed locally
+Evidence: Source contract tests and UAT screenshots under `qa-artifacts/uat-smoke-2026-05-27T07-10-10-016Z/`.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: LOCAL_PASS_LIVE_DEPLOY_PENDING

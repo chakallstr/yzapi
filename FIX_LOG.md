@@ -153,3 +153,23 @@ Operasyon tarihi: 2026-05-26
 - Test: `npm run lint`; `npm test`; `npm run build`; `npm run scan:public`; `node scripts/scan-secrets.mjs`; `npm audit --omit=dev --json`; `npm run qa:uat`; live `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`; live `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`; live bundle fingerprint scan; browser visual/admin anonymous smoke.
 - Retest: Local verification PASS; production audit 0; live smoke PASS; live UAT 10/10 PASS; live `/v1` catalog PASS; live rejected-template bundle hits `[]`; browser: eski tema görünüyor, anonim Admin gizli, admin parola/rejected template/fake live claim yok.
 - Sonuç: FIXED LIVE. Full release hâlâ successful funded billing ve payment provider E2E kanıtına bağlı.
+
+## PAYMENT-LIVE-001
+
+- Problem: Canlı IBAN/payment init akışı, deploy edilmiş kodun beklediği USD quote kolonları (`amount_usd`, `payable_tl`, `credit_tl`, `kur_at_payment`, `rounding_tl`) production DB’de olmadığı için canlı E2E doğrulanamıyordu.
+- Kök neden: `0005_payment_usd_quote_fields.sql` source/migration içinde vardı, fakat aktif VPS DB şemasına uygulanmamıştı.
+- Karar: DEC-FIX-LIVE-PAYMENT-MIGRATION-001, 3/3 APPROVED.
+- Yapılan değişiklik: Canlı PostgreSQL 14 yedeği alındı; `payments` ve `pending_iban_payments` tablolarına idempotent/additive USD quote kolonları eklendi.
+- Rollback/backup: `/opt/turkapiprojesi/.deploy/db-backups/payment-quote-cols-20260527T070013Z.dump`.
+- Retest: Canlı IBAN init `$10` için `payableTL=473`, `creditTL=472.7961`, `roundingTL=0.2039` döndürdü; admin approve tek transaction ile bakiye ekledi; duplicate approve `409`; reject without reason `400`; reject with reason `200`; normal user admin pending endpoint `403`; test kayıtları temizlendi.
+- Sonuç: FIXED LIVE FOR IBAN. Shopier/Cryptomus sandbox E2E hâlâ provider env/test credential olmadığı için bloklu.
+
+## PAYMENT-UI-001
+
+- Problem: Hesap ekranı top-up kutusu backend’in USD→TL yukarı yuvarlama kuralı yerine ondalıklı yaklaşık TL ve frontend-only `%5 komisyon` gösteriyordu. Bu, kullanıcıya backend tahsilatından farklı tutar gösterebilirdi.
+- Kök neden: Frontend hesaplama eski görsel shell içinde simülasyon mantığıyla kalmıştı; backend init endpointleri yalnız `amountUsd` alıp `Math.ceil(amountUsd * kur)` ile `payableTL` hesaplıyor.
+- Karar: DEC-FIX-PAYMENT-UI-ROUNDING-001, 3/3 APPROVED.
+- Yapılan değişiklik: `src/yapayzekalab/tab-account.jsx` içinde yalnız hesap/metin mapping’i değiştirildi. Shopier/IBAN ödeme ekranı tam TL `payableTL`, USD bakiye ve `roundingTL` gösteriyor; Cryptomus USD/USDT invoice 2 ondalığa yukarı yuvarlanıyor; ödeme geçmişi `Bakiye USD`, `Tahsilat TL`, `Yuvarlama` alanlarını gösteriyor. CSS, class, layout, renk, spacing, card/button/modal yapısı değiştirilmedi.
+- Test: `src/api-docs-content.test.ts` payment contract testleri önce RED, sonra PASS.
+- Retest: `npm test -- src/api-docs-content.test.ts` PASS 7/7; `npm run lint` PASS; `npm test` PASS 27 files / 116 tests; `npm run build` PASS; `npm run scan:public` PASS 0 hit; `node scripts/scan-secrets.mjs` PASS 0 hit; `npm run qa:uat` PASS 10/10.
+- Sonuç: FIXED LOCAL. Live deploy pending.

@@ -33,3 +33,25 @@ Agent 3 vote: APPROVE
 Agent 3 reason: Visual lock is preserved at source level.
 Approval count: 3/3
 Final decision: DESIGN PRESERVED FOR CURRENT PHASE
+
+---
+
+## 2026-05-27 Payment UI Quote Alignment Check
+
+Result: PASS locally.
+
+- Homepage screenshot after change still shows the restored old YapayZekaLab theme.
+- Payment UI source change is calculation/copy/data mapping only in `src/yapayzekalab/tab-account.jsx`.
+- No CSS, class names, layout structure, colors, card/button/modal styles, typography, spacing, or responsive rules changed.
+- `npm run qa:uat` passed 10/10 after the change: `qa-artifacts/uat-smoke-2026-05-27T07-10-10-016Z/uat-smoke-report.md`.
+- Public bundle scan found no rejected-template fingerprints.
+
+DEC-DESIGN-PAYMENT-UI-001:
+Agent 1 vote: APPROVE
+Agent 1 reason: UAT smoke and source diff show payment information changed without visible template restructuring.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend behavior was not changed; frontend now matches backend quote fields.
+Agent 3 vote: APPROVE
+Agent 3 reason: Visual lock remains preserved; no style/theme edits.
+Approval count: 3/3
+Final decision: DESIGN PRESERVED FOR PAYMENT UI PHASE

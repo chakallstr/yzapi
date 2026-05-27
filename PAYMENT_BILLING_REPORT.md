@@ -87,3 +87,48 @@ Security decision: Do not use this real Shopier panel for destructive E2E paymen
 - Result: `PANEL_ACCESS_CONFIRMED_PRODUCTION_WALLET_VISIBLE`, but `SANDBOX_E2E_STILL_BLOCKED`.
 
 Security decision: Do not use this real Cryptomus wallet/account for destructive E2E payment testing. Crypto launch acceptance still requires a sandbox/test merchant flow or provider-approved test invoice/webhook evidence.
+
+---
+
+# Live Payment Migration / IBAN E2E Update — 2026-05-27 10:12 TRT
+
+## Canlı Provider/Method Durumu
+
+| Alan | Sonuç | Kanıt |
+|---|---|---|
+| Live payment quote columns | PASS LIVE | `payments` ve `pending_iban_payments` içinde `amount_usd`, `payable_tl`, `credit_tl`, `kur_at_payment`, `rounding_tl` doğrulandı |
+| DB backup | PASS LIVE | `/opt/turkapiprojesi/.deploy/db-backups/payment-quote-cols-20260527T070013Z.dump` |
+| `/api/payments/methods` | PASS LIVE | User token ile 200; IBAN enabled, Shopier/Cryptomus env olmadığı için disabled |
+| Shopier init | EXPECTED DISABLED | Env yok; 503. Gerçek/sandbox Shopier E2E hâlâ yapılmadı |
+| Cryptomus init | EXPECTED DISABLED | Env yok; 503. Gerçek/sandbox Cryptomus E2E hâlâ yapılmadı |
+| IBAN init | PASS LIVE | `$10`, kur `47.279606`, tahsilat `₺473`, kredi `₺472.7961`, yuvarlama `₺0.2039` |
+| Normal user admin payment access | PASS LIVE | Pending IBAN admin endpoint normal user ile 403 |
+| Admin pending list | PASS LIVE | Admin token ile pending kayıt listede göründü |
+| Admin approve | PASS LIVE | Tek transaction ile bakiye `472.7961` arttı, payment `basarili`, pending `onaylandi` |
+| Duplicate approve | PASS LIVE | 409; ikinci kredi yok |
+| Admin reject without reason | PASS LIVE | 400; sebep zorunlu |
+| Admin reject with reason | PASS LIVE | 200; payment `iptal`, pending `reddedildi` |
+| Audit logs | PASS LIVE | `iban_approve` ve `iban_reject` audit kayıtları görüldü |
+| Cleanup | PASS LIVE | Geçici test user/payment/pending/transaction/audit kayıtları temizlendi |
+
+## Frontend Payment Display Update
+
+- Hesap ekranındaki top-up kutusu backend quote ile hizalandı: Shopier/IBAN için `Math.ceil(amountUsd * kur)` tam TL tahsilat gösteriliyor.
+- Frontend-only `%5 komisyon` simülasyonu kaldırıldı; backend böyle bir ücret uygulamadığı için kullanıcıya farklı tutar gösterilmeyecek.
+- Cryptomus için ödeme etiketi USD/USDT invoice; TL tutarı bilgi olarak gösteriliyor.
+- Ödeme geçmişi artık `Bakiye USD`, `Tahsilat TL`, `Yuvarlama`, durum ve tarih alanlarını gösteriyor.
+- Tasarım/stil değişmedi; sadece mevcut alanların metin/veri mapping’i değişti.
+
+## Retest
+
+- `npm test -- src/api-docs-content.test.ts`: PASS, 7/7.
+- `npm run lint`: PASS.
+- `npm test`: PASS, 27 files / 116 tests.
+- `npm run build`: PASS.
+- `npm run scan:public`: PASS, 0 hit.
+- `node scripts/scan-secrets.mjs`: PASS, 0 hit.
+- `npm run qa:uat`: PASS, 10/10.
+
+## Güncel Billing/Payment Verdict
+
+IBAN akışı canlıda güvenli ve idempotent çalıştı. Ancak Shopier/Cryptomus provider valid/invalid/duplicate webhook E2E hâlâ rotated sandbox/test credential olmadan kabul edilemez. Successful funded `/v1` usage deduction da CloseRouter upstream inference `502` nedeniyle bloklu kaldığı için genel launch verdict değişmedi.

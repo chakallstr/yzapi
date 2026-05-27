@@ -17,6 +17,8 @@ Post-QA repair intake, triage and phase planning files were created. The old app
 - Full local regression passed after the latest text/data-only change.
 - Restored-theme build was deployed live to the real active service `/opt/turkapiprojesi` with deploy ID `manual-20260527T064341Z-6021b8e` and a corrected rollback script.
 - Live smoke, live UAT, live `/v1` catalog checks, live bundle fingerprint scan and browser visual/admin anonymous checks passed after deploy.
+- Live payment quote schema was aligned with deployed code and IBAN init/approve/reject E2E passed with temporary data.
+- Account payment UI now shows backend-aligned rounded TL collection, USD credit and rounding fields without changing layout/style.
 
 ## Files Read
 
@@ -37,13 +39,15 @@ Key QA inputs included `QA_FINAL_REPORT.md`, `QA_REPORT.md`, `60_MINUTE_SITE_TES
 - `STATIC-FAVICON-001`: `/favicon.ico` 404 removed via inline SVG link.
 - `DESIGN-CSS-001`: Tailwind/Inter/Space Grotesk template global CSS and dependency/config wiring removed from active app.
 - `SECURITY-DEPS-001`: Production audit high advisory removed; `npm audit --omit=dev` now has 0 vulnerabilities.
+- `PAYMENT-LIVE-001`: Production DB quote columns added safely; live IBAN queue approve/reject and duplicate protection passed.
+- `PAYMENT-UI-001`: Account top-up/payment history display now matches backend USD→TL quote fields and removes unimplemented commission copy.
 
 ## Bugs Not Fixed
 
 - `R-BUG-002`: Runtime stability/process model needs prod-like validation.
 - `R-BUG-003`: Google OAuth callback requires real env/session verification.
 - `R-BUG-006`: Successful funded API billing flow blocked by missing safe test key/upstream env.
-- `R-BUG-007`: Shopier/Cryptomus E2E blocked by missing rotated sandbox credentials.
+- `R-BUG-007`: IBAN live E2E passed; Shopier/Cryptomus E2E remains blocked by missing rotated sandbox credentials.
 - `R-BUG-008`: Admin full browser click-through/audit coverage still partial.
 - `R-BUG-009`: Live deploy drift fixed for the restored-theme bundle; live smoke/UAT passed after deploy.
 - `R-BUG-010`: Favicon/static cleanup and screenshot baseline remain low-priority pending.
@@ -70,6 +74,8 @@ Key QA inputs included `QA_FINAL_REPORT.md`, `QA_REPORT.md`, `60_MINUTE_SITE_TES
 - Live `/v1/models`, `/v1/providers`, `/v1/models/count`: 200 JSON; unknown `/v1/*`: JSON 404; authless `/v1/chat/completions`: 401 JSON.
 - Live bundle forbidden-fingerprint scan: 0 hits.
 - Live browser visual smoke: restored old hero visible, anonymous Admin hidden, rejected template and fake-live claim absent.
+- Live payment migration/IBAN E2E: quote columns present; `$10` IBAN init returned `payableTL=473`, `creditTL=472.7961`, duplicate approve `409`, reject reason guard `400`, audit entries present, cleanup completed.
+- Payment UI regression: `npm test -- src/api-docs-content.test.ts` PASS 7/7; `npm run lint` PASS; `npm test` PASS 27 files / 116 tests; `npm run build` PASS; `npm run scan:public` PASS; `node scripts/scan-secrets.mjs` PASS; `npm run qa:uat` PASS 10/10.
 
 ## Files Changed
 
@@ -101,15 +107,15 @@ No final local command failed after the latest fixes. Earlier targeted tests fai
 
 ## Retest Results
 
-`R-BUG-001`, `R-BUG-004`, `R-BUG-005`, `R-BUG-009`, `DESIGN-REGRESSION-001`, `UX-FAKE-LIVE-001`, `PUBLIC-CONFIG-001`, `STATIC-FAVICON-001`, `DESIGN-CSS-001`, `SECURITY-DEPS-001`, and `LIVE-DEPLOY-RESTORED-THEME-001` are fixed and retested locally/live where applicable.
+`R-BUG-001`, `R-BUG-004`, `R-BUG-005`, `R-BUG-009`, `DESIGN-REGRESSION-001`, `UX-FAKE-LIVE-001`, `PUBLIC-CONFIG-001`, `STATIC-FAVICON-001`, `DESIGN-CSS-001`, `SECURITY-DEPS-001`, `LIVE-DEPLOY-RESTORED-THEME-001`, `PAYMENT-LIVE-001` and `PAYMENT-UI-001` are fixed and retested locally/live where applicable.
 
 ## Design Preservation Result
 
-PASS locally and live: old visual shell restored; latest changes were text/data/backend/guard only. No CSS/class/layout/theme/button/card/modal styling was changed. Live browser and bundle scans show the rejected template is absent.
+PASS locally and live: old visual shell restored; latest changes were text/data/backend/guard only. No CSS/class/layout/theme/button/card/modal styling was changed. Live browser and bundle scans show the rejected template is absent. Payment UI alignment changed only existing labels/calculated values inside the existing account card/table.
 
 ## Remaining Risks
 
-The product is still not launch-ready because successful funded API billing and payment provider E2E remain unproven. Standard Chrome automation was unavailable in this Codex session, so post-deploy admin/OAuth was not re-run in the user's existing Chrome profile during this pass; anonymous admin exposure was verified live.
+The product is still not launch-ready because successful funded API billing and Shopier/Cryptomus provider E2E remain unproven. IBAN is now live-proven. Standard Chrome automation was unavailable in this Codex session, so post-deploy admin/OAuth was not re-run in the user's existing Chrome profile during this pass; anonymous admin exposure was verified live.
 
 General `npm audit` still reports 4 moderate dev-only advisories under `drizzle-kit`/nested esbuild. Production runtime audit is clean, so this is not the current launch-blocking high advisory, but it should stay tracked.
 

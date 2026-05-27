@@ -10,6 +10,7 @@ const appSource = [
 ].map((file) => readFileSync(file, "utf8")).join("\n");
 
 const modelsSource = readFileSync("src/yapayzekalab/tab-models.jsx", "utf8");
+const accountSource = readFileSync("src/yapayzekalab/tab-account.jsx", "utf8");
 
 describe("API docs content contract", () => {
   it("uses the production YapayZekaLab v1 base URL and live key prefix in examples", () => {
@@ -46,5 +47,22 @@ describe("API docs content contract", () => {
     expect(appSource).not.toMatch(/ilk başarılı yanıtın/i);
     expect(appSource).toMatch(/Playground · örnek akış/i);
     expect(appSource).toContain("yzk_live_YOUR_KEY");
+  });
+
+  it("keeps the account top-up payment display aligned with backend rounded TL quotes", () => {
+    expect(accountSource).toContain("Math.ceil(effectiveAmount * tlRate)");
+    expect(accountSource).toContain("roundingTL");
+    expect(accountSource).toMatch(/paymentTotalLabel[\s\S]{0,160}payableTL/);
+    expect(accountSource).toMatch(/Ödenecek[\s\S]{0,360}paymentTotalLabel/);
+    expect(accountSource).not.toContain("tweaks.feePct ?? 5");
+    expect(accountSource).not.toMatch(/%5 komisyon|Komisyon %/);
+  });
+
+  it("shows payment history with USD credit and rounded TL collection fields", () => {
+    expect(accountSource).toContain("Bakiye USD");
+    expect(accountSource).toContain("Tahsilat TL");
+    expect(accountSource).toContain("Yuvarlama");
+    expect(accountSource).toMatch(/creditTL[\s\S]{0,180}amountUsd/);
+    expect(accountSource).toMatch(/payableTL[\s\S]{0,180}miktarTL/);
   });
 });

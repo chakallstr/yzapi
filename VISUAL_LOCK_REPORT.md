@@ -76,3 +76,29 @@ Visual diff notes:
 - Live deploy performed to the real active service `/opt/turkapiprojesi` as deploy ID `manual-20260527T064341Z-6021b8e`.
 - Live visual/browser smoke after deploy: old YapayZekaLab hero visible, anonymous Admin hidden, rejected template absent, fake-live claim absent, Tailwind/Inter template CSS absent.
 - Live public bundle scan after deploy found no forbidden template/admin-password/fake-live fingerprints.
+
+---
+
+## 2026-05-27 Payment UI Quote Alignment
+
+Files checked for visual/template risk:
+
+- `src/yapayzekalab/tab-account.jsx`: payment amount calculation/copy/data mapping only.
+- `src/api-docs-content.test.ts`: source contract tests only.
+- CSS/theme/token/layout files: not touched.
+
+Verification:
+
+- `npm test -- src/api-docs-content.test.ts`: PASS, 7/7.
+- `npm run lint`: PASS.
+- `npm test`: PASS, 27 files / 116 tests.
+- `npm run build`: PASS.
+- `npm run scan:public`: PASS, 0 hits.
+- `node scripts/scan-secrets.mjs`: PASS, 0 hits.
+- `npm run qa:uat`: PASS, 10/10.
+- Screenshot evidence: `qa-artifacts/uat-smoke-2026-05-27T07-10-10-016Z/desktop-home.png`.
+
+Visual diff notes:
+
+- No class names, inline style objects, CSS variables, spacing, colors, card/button/modal structure, or responsive breakpoints were changed.
+- Only existing payment text and displayed values changed to match backend rounded TL quote behavior.

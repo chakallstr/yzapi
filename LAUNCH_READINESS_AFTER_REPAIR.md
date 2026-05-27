@@ -24,6 +24,8 @@ NOT READY — API/BILLING/BALANCE BLOCKERS
 - Local remaining-test run passed lint, full tests, build, public scan, secret scan, production audit, backend smoke, catalog smoke and local `qa:uat`.
 - Live restored-theme deploy completed to real service `turkapiprojesi.service` under `/opt/turkapiprojesi`; deploy ID `manual-20260527T064341Z-6021b8e`.
 - Live smoke and live `qa:uat` passed after deploy; live bundle rejected-template scan found no forbidden fingerprints.
+- Live IBAN payment schema/init/admin approve/reject/idempotency/audit E2E passed with temporary test data and cleanup.
+- Account payment UI now shows backend-aligned rounded TL collection and USD credit fields; unimplemented frontend commission copy removed without visual style changes.
 
 ## Must-Fix Before Launch
 
@@ -48,21 +50,23 @@ NOT READY — API/BILLING/BALANCE BLOCKERS
 - Latest live UAT: `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T06-44-24-709Z/uat-smoke-report.md`.
 - Latest live `/v1` catalog: `/v1/models`, `/v1/providers`, `/v1/models/count` 200 JSON; unknown `/v1/*` JSON 404; authless `/v1/chat/completions` 401 JSON.
 - Latest browser smoke: live old hero present, rejected template absent, anonymous Admin hidden, fake live playground claim absent, Tailwind/Inter template CSS absent.
+- Latest live IBAN E2E: `$10` init produced `payableTL=473`, `creditTL=472.7961`, `roundingTL=0.2039`; admin approve credited once, duplicate approve `409`, reject reason guard `400`, audit entries present, cleanup complete.
+- Latest payment UI local regression: `npm test -- src/api-docs-content.test.ts` PASS 7/7; `npm run lint` PASS; `npm test` PASS 27 files / 116 tests; `npm run build` PASS; scans PASS; `npm run qa:uat` PASS 10/10.
 - Standard Chrome automation was unavailable to this Codex session, so post-deploy logged-in Google admin click-through was not rerun in the user's existing Chrome profile.
-- Previous billing failure-path evidence exists; successful funded text billing and payment provider E2E are still not approved.
+- Previous billing failure-path evidence exists; successful funded text billing and Shopier/Cryptomus provider E2E are still not approved. IBAN payment E2E is approved.
 
 ## Final 3-Agent Vote
 
 DEC-FINAL-REPAIR-RELEASE-001:
 
 Agent 1 — QA / UAT / Regression: REJECT
-Reason: User-facing admin/OAuth and live smoke improved, but successful first API call and payment E2E are still not proven.
+Reason: User-facing admin/OAuth, live smoke, restored theme and IBAN payment improved, but successful first API call and Shopier/Cryptomus E2E are still not proven.
 
 Agent 2 — Backend / API / Billing: REJECT
-Reason: Failure paths are safe, but success billing is blocked by CloseRouter upstream inference 502 and payment provider E2E remains unverified.
+Reason: Failure paths and IBAN ledger are safe, but success billing is blocked by CloseRouter upstream inference 502 and Shopier/Cryptomus provider E2E remains unverified.
 
 Agent 3 — Visual Integrity / Security / Release Guard: REJECT
-Reason: Design was preserved and admin password issue is fixed, but release cannot be approved while billing/payment success evidence is missing.
+Reason: Design was preserved and admin password issue is fixed, but release cannot be approved while successful API billing and non-IBAN provider payment evidence are missing.
 
 Approval count: 0/3
 

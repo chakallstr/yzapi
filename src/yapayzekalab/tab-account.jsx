@@ -12,9 +12,9 @@ import {
    ============================================ */
 
 const PAY_METHODS = [
-  { id: 'iban',    label: 'IBAN Havalesi',      sub: 'Banka transferi · 0% komisyon',           Ico: I.Database, time: '15 dk' },
-  { id: 'shopier', label: 'Shopier Kart',        sub: 'Kredi / banka kartı · %5 komisyon',       Ico: I.Wallet,   time: 'anlık' },
-  { id: 'crypto',  label: 'Cryptomus USDT',     sub: 'TRC20 ağı · %5 komisyon',                 Ico: I.Coin,     time: '5 dk' },
+  { id: 'iban',    label: 'IBAN Havalesi',      sub: 'Banka transferi · TL tahsilat',            Ico: I.Database, time: '15 dk' },
+  { id: 'shopier', label: 'Shopier Kart',        sub: 'Kredi / banka kartı · TL tahsilat',        Ico: I.Wallet,   time: 'anlık' },
+  { id: 'crypto',  label: 'Cryptomus USDT',     sub: 'TRC20 ağı · USD/USDT invoice',             Ico: I.Coin,     time: '5 dk' },
 ];
 
 const mockKeys = [
@@ -134,7 +134,7 @@ const AutoRechargeCard = ({ tweaks, setTweak }) => {
           <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>yükle</span>
         </div>
         <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', fontSize: 11.5, color: 'var(--accent-ink)' }}>
-          <strong>Shopier</strong> ile kayıtlı kartından çekilecek — komisyon %{tweaks?.feePct ?? 5}.
+          <strong>Shopier</strong> ile kayıtlı kartından çekilecek — TL ödeme tutarı backend kurundan yukarı yuvarlanır.
           Aylık üst limit: <strong>$200</strong>.
         </div>
       </div>
@@ -575,8 +575,13 @@ const AccountTab = ({ ctx }) => {
   const rawAmount = customAmount ? Number(customAmount) : topUp;
   const effectiveAmount = Math.max(MIN_USD, isFinite(rawAmount) ? rawAmount : 0);
   const belowMin = (customAmount && Number(customAmount) > 0 && Number(customAmount) < MIN_USD);
-  const fee = payMethod === 'iban' ? 0 : effectiveAmount * (tweaks.feePct ?? 5) / 100;
-  const total = effectiveAmount + fee;
+  const creditTL = effectiveAmount * tlRate;
+  const payableTL = Math.ceil(effectiveAmount * tlRate);
+  const roundingTL = Math.max(0, payableTL - creditTL);
+  const cryptoInvoiceUsd = Math.ceil(effectiveAmount * 100) / 100;
+  const paymentTotalLabel = payMethod === 'crypto'
+    ? `$${cryptoInvoiceUsd.toFixed(2)} USDT`
+    : `₺${payableTL.toFixed(0)}`;
   const backendPaymentMethod = payMethod === 'crypto' ? 'cryptomus' : payMethod;
   const selectedPaymentMethod = paymentMethods?.[backendPaymentMethod];
   const paymentMethodEnabled = selectedPaymentMethod?.enabled !== false;
@@ -767,17 +772,19 @@ const AccountTab = ({ ctx }) => {
               <span style={{ color: 'var(--ink-2)' }}>Yüklenecek bakiye</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }} className="tnum">${effectiveAmount.toFixed(2)}</span>
             </div>
-            {fee > 0 && (
+            {roundingTL > 0 && payMethod !== 'crypto' && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0' }}>
-                <span style={{ color: 'var(--ink-2)' }}>Komisyon %{tweaks.feePct ?? 5}</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }} className="tnum">${fee.toFixed(2)}</span>
+                <span style={{ color: 'var(--ink-2)' }}>TL yuvarlama</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }} className="tnum">₺{roundingTL.toFixed(2)}</span>
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '8px 0 0', marginTop: 6, borderTop: '1px solid var(--border)' }}>
               <span style={{ fontWeight: 600 }}>Ödenecek</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-ink)' }} className="tnum">
-                ${total.toFixed(2)}
-                <span style={{ fontWeight: 500, marginLeft: 8, color: 'var(--ink-3)' }}>≈ ₺{(total * tlRate).toFixed(2)}</span>
+                {paymentTotalLabel}
+                <span style={{ fontWeight: 500, marginLeft: 8, color: 'var(--ink-3)' }}>
+                  {payMethod === 'crypto' ? `bilgi: ₺${payableTL.toFixed(0)}` : `bakiyeye $${effectiveAmount.toFixed(2)}`}
+                </span>
               </span>
             </div>
           </div>
@@ -790,11 +797,11 @@ const AccountTab = ({ ctx }) => {
             opacity: belowMin || !paymentMethodEnabled ? 0.55 : 1, cursor: belowMin || !paymentMethodEnabled ? 'not-allowed' : 'pointer',
           }}>
             <I.Wallet size={14} stroke="#fff" />
-            <span>${total.toFixed(2)} öde · bakiyeye USD ekle</span>
+            <span>{paymentTotalLabel} öde · bakiyeye ${effectiveAmount.toFixed(2)} ekle</span>
           </button>
 
           <div style={{ fontSize: 10.5, color: 'var(--ink-3)', textAlign: 'center', marginTop: 10, fontFamily: 'var(--font-mono)', lineHeight: 1.55 }}>
-            Ücretlendirme USD bazında — TL tutarı yalnızca <strong style={{ color: 'var(--ink-2)' }}>bilgi</strong> amaçlıdır.
+            Ücretlendirme USD bazında — Shopier/IBAN TL tahsilatı <strong style={{ color: 'var(--ink-2)' }}>yukarı tam liraya</strong> yuvarlanır.
             Minimum yükleme <strong style={{ color: 'var(--ink-2)' }}>${MIN_USD}</strong>.
           </div>
         </Card>
@@ -982,7 +989,7 @@ const AccountTab = ({ ctx }) => {
           display: 'grid', gridTemplateColumns: '110px 110px 100px 90px 100px 110px 110px',
           gap: 10, padding: '12px 20px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)',
         }}>
-          {['Ödeme ID','Yöntem','Brüt','Komisyon','Net (USD)','Durum','Tamamlanma'].map(h => (
+          {['Ödeme ID','Yöntem','Bakiye USD','Tahsilat TL','Yuvarlama','Durum','Tarih'].map(h => (
             <Caption key={h} style={{ fontSize: 9 }}>{h}</Caption>
           ))}
         </div>
@@ -995,13 +1002,10 @@ const AccountTab = ({ ctx }) => {
             iptal:      { bg: '#fef2f2',      fg: '#b91c1c', label: 'iptal'       },
             basarisiz:  { bg: '#fef2f2',      fg: '#b91c1c', label: 'başarısız'   },
           }[p.durum || p.status] || { bg: 'var(--surface-2)', fg: 'var(--ink-2)', label: p.durum || p.status || '—' };
-          // Convert TL fields to USD for display
-          const grossTl = asNumber(p.miktarTL ?? p.gross, 0);
-          const feeTl = asNumber(p.kdvTL ?? p.fee, 0);
-          const netTl = asNumber(p.netTL, Math.max(0, grossTl - feeTl));
-          const grossUsd = grossTl / tlRate;
-          const feeUsd = feeTl / tlRate;
-          const netUsd = netTl / tlRate;
+          const collectedTL = asNumber(p.payableTL ?? p.miktarTL ?? p.gross, 0);
+          const creditedTL = asNumber(p.creditTL ?? p.netTL ?? p.miktarTL ?? p.gross, collectedTL);
+          const creditedUsd = asNumber(p.amountUsd, creditedTL / tlRate);
+          const roundedTL = asNumber(p.roundingTL, Math.max(0, collectedTL - creditedTL));
           return (
             <div key={p.id} style={{
               display: 'grid', gridTemplateColumns: '110px 110px 100px 90px 100px 110px 110px',
@@ -1012,11 +1016,11 @@ const AccountTab = ({ ctx }) => {
               <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 10.5 }}>{p.id}</span>
               <span style={{ fontWeight: 500 }}>{methodLabel}</span>
               <div>
-                <div style={{ fontFamily: 'var(--font-mono)' }} className="tnum">${grossUsd.toFixed(2)}</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-4)' }} className="tnum">₺{grossTl.toFixed(2)}</div>
+                <div style={{ fontFamily: 'var(--font-mono)' }} className="tnum">${creditedUsd.toFixed(2)}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-4)' }} className="tnum">₺{creditedTL.toFixed(2)}</div>
               </div>
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }} className="tnum">${feeUsd.toFixed(2)}</span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }} className="tnum">${netUsd.toFixed(2)}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }} className="tnum">₺{collectedTL.toFixed(0)}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }} className="tnum">₺{roundedTL.toFixed(2)}</span>
               <Chip tone="neutral" style={{ background: statusTone.bg, color: statusTone.fg, fontSize: 9.5, justifySelf: 'start' }}>{statusTone.label}</Chip>
               <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 10.5 }}>{shortDate(p.tamamlanma || p.completedAt)}</span>
             </div>

@@ -39,3 +39,25 @@ Gerçek `.env` değerleri raporlanmadı. Komut çıktılarında token, parola ve
 ## Sonuç
 
 Security açısından temel kontroller iyi; fakat admin allowlist, gerçek OAuth callback, gerçek provider webhookları ve canlı funded API kullanım testi tamamlanmadan production-ready denemez.
+
+---
+
+# Live Payment/Admin Security Update — 2026-05-27
+
+## Ek Geçen Kontroller
+
+- Live IBAN payment schema migration additive yapıldı; DB backup alındı, veri silinmedi.
+- Normal user, admin payment queue endpointinde `403` aldı.
+- Admin IBAN approve tek transaction ile credit etti.
+- Duplicate approve `409` verdi; double-credit yok.
+- Reject without reason `400` verdi; sebep zorunlu.
+- Reject with reason `200` ve `iban_reject` audit üretti.
+- Shopier/Cryptomus env yokken init endpointleri `503` disabled kaldı; frontend tek başına provider credit yaratmadı.
+- Payment UI artık backend yuvarlama kuralını gösteriyor; fake/uygulanmayan komisyon metni kaldırıldı.
+
+## Kalan Security/Release Riskleri
+
+- Shopier/Cryptomus valid/invalid/duplicate callback/webhook E2E sandbox/test credential olmadan hâlâ açık launch gate.
+- Successful funded `/v1` text response ve pozitif billing headers hâlâ CloseRouter upstream `502` nedeniyle kanıtlanmadı.
+
+Güncel security verdict: IBAN admin/payment güvenliği güçlendi; genel release hâlâ billing/provider kanıtına bağlı.

@@ -37,3 +37,11 @@ Durum: 60 dakikalık site testi sonrası doldurulacak.
 - Cryptomus standard Chrome panel access reached real wallet/history areas; destructive crypto/payment tests were intentionally not executed there.
 - CloseRouter inference direct `502` verdiği için success billing ve cost headers kanıtlanamadı; failure path safe olsa da launch onayı için yeterli değil.
 - Admin destructive actions/audit kapsamı hâlâ sınırlı tutuldu; gerçek müşteri verisi mutasyonu yapılmadı.
+
+## Live Payment/Admin Risk Update — 2026-05-27 10:12 TRT
+
+- IBAN admin queue canlıda geçici test verisiyle approve/reject edildi; double-credit engeli ve audit kayıtları doğrulandı.
+- Normal user admin payment endpointine erişemedi (`403`).
+- Payment quote schema migration yedekli ve additive uygulandı.
+- Payment UI backend tahsilatından farklı frontend komisyon/ondalıklı TL göstermeyecek şekilde düzeltildi.
+- Kalan risk: Shopier/Cryptomus gerçek/sandbox provider webhook E2E ve successful funded `/v1` billing hâlâ kanıtlanmadı.
