@@ -303,4 +303,36 @@ Agent 1 retest vote: APPROVE
 Agent 2 retest vote: APPROVE
 Agent 3 retest vote: APPROVE
 Approval count: 3/3
-Final retest status: LOCAL_PASS_LIVE_DEPLOY_PENDING
+Live deploy:
+- Deploy ID: `manual-20260527T071659Z-ddee303`.
+- Backup: `/opt/turkapiprojesi/.deploy/dist-backups/manual-20260527T071659Z-ddee303`.
+- Rollback: `/opt/turkapiprojesi/.deploy/rollback-manual-20260527T071659Z-ddee303.sh`.
+- Service: `turkapiprojesi.service` active.
+- Live smoke: `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` PASS for health/status/models/authless/JSON-404 checks; funded/low-balance keys skipped.
+- Live UAT: `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T07-17-37-093Z/uat-smoke-report.md`.
+- Live bundle check: required payment labels present; old `%5 komisyon`/`Komisyon %`, rejected template, admin-password and fake-live fingerprints absent.
+Final retest status: LIVE_PASS
+
+## LIVE-BILLING-001 Direct CloseRouter Recheck
+
+Bug ID: R-BUG-006, LIVE-BILLING-001
+Fix decision ID: DEC-CMD-LIVE-BILLING-RECHECK-001
+Retest decision ID: DEC-RETEST-LIVE-BILLING-RECHECK-001
+Command or manual flow: Read provider key from live env without printing it; tiny direct CloseRouter `/chat/completions` attempts with `max_tokens <= 4`; no image/video/payment calls.
+Expected: At least one cheap text model should return 200 with choices before attempting funded gateway billing.
+Actual:
+- `/credits`: `200`, `total_credits=1.99998845`, `total_usage=0.00001155`.
+- `/models/count`: `200`, `count=34`.
+- `anthropic/claude-haiku-4.5`: timeout.
+- `openai/gpt-5.4-mini`: timeout.
+- `deepseek/deepseek-v4-pro`: timeout.
+- `google/gemini-3.5-flash`: timeout.
+- `moonshotai/kimi-k2.5`: timeout.
+- `qwen/qwen3.6-plus`: timeout.
+Passed/Failed: Failed for success inference readiness.
+Evidence: Current repair session command output; no secrets printed.
+Agent 1 retest vote: REJECT
+Agent 2 retest vote: REJECT
+Agent 3 retest vote: REJECT
+Approval count: 0/3
+Final retest status: SUCCESS_BILLING_STILL_BLOCKED_BY_UPSTREAM_TIMEOUT

@@ -67,3 +67,25 @@ Inference kontrolleri:
 - BLOCKED: Successful text response, `X-YZ-Cost-TL`, `X-YZ-Remaining-TL`, `X-YZ-Request-Id`, positive cost deduction, `transactions`, and success `usage_records` cannot be accepted until CloseRouter inference returns a successful response.
 
 Final API verdict remains: `NOT READY — API/BILLING/BALANCE BLOCKERS`.
+
+---
+
+# Live API/Billing Recheck — 2026-05-27 10:20 TRT
+
+## Direct Provider Status
+
+- `/credits`: `200`, `total_credits=1.99998845`, `total_usage=0.00001155`.
+- `/models/count`: `200`, `count=34`.
+- Tiny `/chat/completions` calls with `max_tokens <= 4` timed out for:
+  - `anthropic/claude-haiku-4.5`
+  - `openai/gpt-5.4-mini`
+  - `deepseek/deepseek-v4-pro`
+  - `google/gemini-3.5-flash`
+  - `moonshotai/kimi-k2.5`
+  - `qwen/qwen3.6-plus`
+
+No image/video calls were made. No provider key was printed.
+
+## Updated API Verdict
+
+The account/catalog/balance side of CloseRouter is reachable, but inference remains unavailable from the live VPS. Do not run larger token tests or claim successful YapayZekaLab billing until at least one tiny direct provider call succeeds, then a funded `yzk_live_*` gateway call proves cost headers, transaction, usage record and balance decrement.

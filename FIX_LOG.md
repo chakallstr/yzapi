@@ -172,4 +172,6 @@ Operasyon tarihi: 2026-05-26
 - Yapılan değişiklik: `src/yapayzekalab/tab-account.jsx` içinde yalnız hesap/metin mapping’i değiştirildi. Shopier/IBAN ödeme ekranı tam TL `payableTL`, USD bakiye ve `roundingTL` gösteriyor; Cryptomus USD/USDT invoice 2 ondalığa yukarı yuvarlanıyor; ödeme geçmişi `Bakiye USD`, `Tahsilat TL`, `Yuvarlama` alanlarını gösteriyor. CSS, class, layout, renk, spacing, card/button/modal yapısı değiştirilmedi.
 - Test: `src/api-docs-content.test.ts` payment contract testleri önce RED, sonra PASS.
 - Retest: `npm test -- src/api-docs-content.test.ts` PASS 7/7; `npm run lint` PASS; `npm test` PASS 27 files / 116 tests; `npm run build` PASS; `npm run scan:public` PASS 0 hit; `node scripts/scan-secrets.mjs` PASS 0 hit; `npm run qa:uat` PASS 10/10.
-- Sonuç: FIXED LOCAL. Live deploy pending.
+- Live deploy: `manual-20260527T071659Z-ddee303` deployed to `/opt/turkapiprojesi`, service `turkapiprojesi.service`.
+- Live retest: `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` PASS; `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` PASS 10/10; live bundle contains `Bakiye USD`, `Tahsilat TL`, `Yuvarlama`, `yukarı tam liraya`; forbidden `%5 komisyon`, `Komisyon %`, rejected template/admin password/fake-live strings absent.
+- Sonuç: FIXED LIVE.

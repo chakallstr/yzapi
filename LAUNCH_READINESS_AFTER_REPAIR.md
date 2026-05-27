@@ -52,6 +52,8 @@ NOT READY — API/BILLING/BALANCE BLOCKERS
 - Latest browser smoke: live old hero present, rejected template absent, anonymous Admin hidden, fake live playground claim absent, Tailwind/Inter template CSS absent.
 - Latest live IBAN E2E: `$10` init produced `payableTL=473`, `creditTL=472.7961`, `roundingTL=0.2039`; admin approve credited once, duplicate approve `409`, reject reason guard `400`, audit entries present, cleanup complete.
 - Latest payment UI local regression: `npm test -- src/api-docs-content.test.ts` PASS 7/7; `npm run lint` PASS; `npm test` PASS 27 files / 116 tests; `npm run build` PASS; scans PASS; `npm run qa:uat` PASS 10/10.
+- Latest payment UI live deploy: `manual-20260527T071659Z-ddee303`; live smoke PASS; live UAT PASS 10/10; live bundle includes rounded quote labels and excludes stale commission/rejected-template fingerprints.
+- Latest direct CloseRouter recheck: `/credits` and `/models/count` still 200, but tiny inference timed out across tested Anthropic/OpenAI/DeepSeek/Google/Moonshot/Qwen models.
 - Standard Chrome automation was unavailable to this Codex session, so post-deploy logged-in Google admin click-through was not rerun in the user's existing Chrome profile.
 - Previous billing failure-path evidence exists; successful funded text billing and Shopier/Cryptomus provider E2E are still not approved. IBAN payment E2E is approved.
 

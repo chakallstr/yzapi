@@ -46,3 +46,12 @@
 2. Run exactly one tiny success call first (`max_tokens <= 8`).
 3. Verify cost headers, balance decrement, transaction, and `usage_records`.
 4. Only then consider a small batch; keep total planned spend under `$0.10` unless separately approved.
+
+---
+
+# Cost Recheck — 2026-05-27 10:20 TRT
+
+- `/credits` still reports approximately `$1.99998845` remaining.
+- Tiny direct inference recheck timed out before a successful billable response.
+- No image/video generation was attempted.
+- Keep current rule: do not attempt 100k-token plan until one tiny success call proves the provider route and YapayZekaLab billing headers.

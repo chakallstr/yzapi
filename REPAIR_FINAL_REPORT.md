@@ -76,6 +76,8 @@ Key QA inputs included `QA_FINAL_REPORT.md`, `QA_REPORT.md`, `60_MINUTE_SITE_TES
 - Live browser visual smoke: restored old hero visible, anonymous Admin hidden, rejected template and fake-live claim absent.
 - Live payment migration/IBAN E2E: quote columns present; `$10` IBAN init returned `payableTL=473`, `creditTL=472.7961`, duplicate approve `409`, reject reason guard `400`, audit entries present, cleanup completed.
 - Payment UI regression: `npm test -- src/api-docs-content.test.ts` PASS 7/7; `npm run lint` PASS; `npm test` PASS 27 files / 116 tests; `npm run build` PASS; `npm run scan:public` PASS; `node scripts/scan-secrets.mjs` PASS; `npm run qa:uat` PASS 10/10.
+- Payment UI live deploy: `manual-20260527T071659Z-ddee303`, live smoke PASS, live UAT PASS 10/10, live bundle payment labels present and old commission/rejected-template fingerprints absent.
+- Direct CloseRouter recheck: `/credits` and `/models/count` 200; tiny inference timed out across tested text models.
 
 ## Files Changed
 

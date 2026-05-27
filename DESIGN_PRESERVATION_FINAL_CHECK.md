@@ -45,6 +45,7 @@ Result: PASS locally.
 - No CSS, class names, layout structure, colors, card/button/modal styles, typography, spacing, or responsive rules changed.
 - `npm run qa:uat` passed 10/10 after the change: `qa-artifacts/uat-smoke-2026-05-27T07-10-10-016Z/uat-smoke-report.md`.
 - Public bundle scan found no rejected-template fingerprints.
+- Live deploy `manual-20260527T071659Z-ddee303` also passed live smoke/UAT and live bundle rejected-template/payment stale-string scan.
 
 DEC-DESIGN-PAYMENT-UI-001:
 Agent 1 vote: APPROVE

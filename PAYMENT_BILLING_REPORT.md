@@ -132,3 +132,19 @@ Security decision: Do not use this real Cryptomus wallet/account for destructive
 ## Güncel Billing/Payment Verdict
 
 IBAN akışı canlıda güvenli ve idempotent çalıştı. Ancak Shopier/Cryptomus provider valid/invalid/duplicate webhook E2E hâlâ rotated sandbox/test credential olmadan kabul edilemez. Successful funded `/v1` usage deduction da CloseRouter upstream inference `502` nedeniyle bloklu kaldığı için genel launch verdict değişmedi.
+
+## Live Payment UI Deploy — 2026-05-27 10:18 TRT
+
+- Deploy ID: `manual-20260527T071659Z-ddee303`.
+- Live smoke PASS; live UAT PASS 10/10.
+- Live bundle required labels present: `Bakiye USD`, `Tahsilat TL`, `Yuvarlama`, `yukarı tam liraya`.
+- Live bundle removed stale payment mismatch strings: `%5 komisyon`, `Komisyon %`.
+- Rejected template/admin password/fake-live fingerprints remained absent.
+
+## Direct Provider Recheck — 2026-05-27 10:20 TRT
+
+- CloseRouter `/credits`: `200`, `total_credits=1.99998845`, `total_usage=0.00001155`.
+- CloseRouter `/models/count`: `200`, `count=34`.
+- Tiny text inference with `max_tokens <= 4` timed out for Anthropic, OpenAI, DeepSeek, Google, Moonshot and Qwen tested models.
+
+Updated payment/billing verdict: IBAN and payment UI are live-pass. Overall billing launch remains blocked by successful text inference/billing and Shopier/Cryptomus provider E2E.

@@ -102,3 +102,4 @@ Visual diff notes:
 
 - No class names, inline style objects, CSS variables, spacing, colors, card/button/modal structure, or responsive breakpoints were changed.
 - Only existing payment text and displayed values changed to match backend rounded TL quote behavior.
+- Live deploy `manual-20260527T071659Z-ddee303` preserved the restored old theme. Live UAT `qa-artifacts/uat-smoke-2026-05-27T07-17-37-093Z/desktop-home.png` shows the old YapayZekaLab hero and no rejected template.

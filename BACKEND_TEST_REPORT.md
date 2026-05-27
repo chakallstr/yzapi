@@ -52,3 +52,9 @@ Durum: 60 dakikalık site testi sonrası doldurulacak.
 - Test kayıtları canlı DB’den temizlendi.
 
 Sonuç: Backend payment schema ve IBAN ledger/idempotency live PASS. Successful AI usage deduction ve Shopier/Cryptomus provider E2E hâlâ launch blocker.
+
+## Direct Provider Recheck — 2026-05-27
+
+- VPS env üzerinden `/credits` ve `/models/count` hâlâ 200.
+- Tiny text inference recheck, tested Anthropic/OpenAI/DeepSeek/Google/Moonshot/Qwen modellerinde timeout verdi.
+- Bu nedenle gateway successful billing testini büyütmek veya 100k token planını başlatmak güvenli değil.

@@ -106,6 +106,102 @@ Status: APPROVED
 
 ---
 
+Decision ID: DEC-LIVE-DEPLOY-PAYMENT-UI-001
+Decision title: Deploy payment UI quote alignment to real live service
+Decision type: Deploy approval
+Related bug IDs: PAYMENT-UI-001, R-BUG-007
+Evidence from reports: Commit `ddee303` is pushed to GitHub. Local regression after payment UI quote alignment passed: targeted test 7/7, lint PASS, full tests 27 files / 116 tests, build PASS, public scan 0 hits, secret scan 0 hits, local UAT 10/10. Live active service target is `/opt/turkapiprojesi` / `turkapiprojesi.service`; generic deploy script default target is not safe for this service.
+Files likely affected: Live `/opt/turkapiprojesi/dist`, live `package.json`, live `package-lock.json`, deploy backup metadata.
+Risk level: Medium
+Design/template impact: Source style unchanged; deploy must preserve restored old theme and reject template fingerprints.
+Security impact: No secrets printed; no payment/provider calls in deploy. Rollback backup required.
+Backend/API/billing impact: Frontend display only; no DB migration in this deploy.
+Proposed action: Create live dist backup and rollback script, rsync current `dist/`, `package.json`, and `package-lock.json` to `/opt/turkapiprojesi`, run `npm ci --omit=dev`, restart `turkapiprojesi.service`, then run live smoke/UAT/bundle checks.
+Agent 1 vote: APPROVE
+Agent 1 reason: User-facing payment quote display must reach live site after passing local UAT.
+Agent 2 vote: APPROVE
+Agent 2 reason: No billing backend behavior changes; deploy is frontend bundle only with rollback.
+Agent 3 vote: APPROVE
+Agent 3 reason: Approved only with backup, rollback and rejected-template scan after deploy.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Perform rollbackable live deploy to `/opt/turkapiprojesi` and retest.
+Status: APPROVED
+
+---
+
+Decision ID: DEC-CMD-LIVE-BILLING-RECHECK-001
+Decision title: Recheck CloseRouter tiny text inference after live payment UI deploy
+Decision type: Command/test approval
+Related bug IDs: R-BUG-006, LIVE-BILLING-001
+Evidence from reports: Successful funded billing remains the primary launch blocker. Previous direct CloseRouter account/catalog/balance checks passed but tiny inference returned upstream `502`. User authorized continued testing with cost cap and no image/video spend.
+Files likely affected: None.
+Risk level: Medium
+Design/template impact: None.
+Security impact: Provider key must be read only from live env and never printed. Response body must not contain secrets.
+Backend/API/billing impact: Tiny direct provider call may spend negligible text tokens only if upstream succeeds. No DB mutation unless a later gateway funded-key acceptance is separately run.
+Proposed action: From VPS env, call direct CloseRouter `/chat/completions` with max_tokens <= 4 on a small set of text models, stop on first success, print only status/error code/model and no authorization values.
+Agent 1 vote: APPROVE
+Agent 1 reason: A successful first API path cannot be accepted until upstream inference is rechecked.
+Agent 2 vote: APPROVE
+Agent 2 reason: Tiny direct provider check is safe within budget and tells whether gateway success billing can be attempted.
+Agent 3 vote: APPROVE
+Agent 3 reason: No secrets printed and no image/video/real payment spend.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Run bounded direct CloseRouter text inference recheck.
+Status: APPROVED
+
+---
+
+Decision ID: DEC-RETEST-PAYMENT-UI-ROUNDING-001
+Decision title: Accept payment UI rounded quote retest
+Decision type: Retest acceptance
+Related bug IDs: PAYMENT-UI-001, R-BUG-007
+Evidence from reports: `npm test -- src/api-docs-content.test.ts` PASS 7/7; `npm run lint` PASS; `npm test` PASS 27 files / 116 tests; `npm run build` PASS; `npm run scan:public` PASS 0 hits; `node scripts/scan-secrets.mjs` PASS 0 hits; `npm run qa:uat` PASS 10/10. Live deploy `manual-20260527T071659Z-ddee303` completed and live bundle contains `Bakiye USD`, `Tahsilat TL`, `Yuvarlama`, `yukarı tam liraya` while old `%5 komisyon`/`Komisyon %` strings are absent.
+Files likely affected: `src/yapayzekalab/tab-account.jsx`, `src/api-docs-content.test.ts`, reports.
+Risk level: Low after verification
+Design/template impact: None; source diff did not touch style/layout/class/theme files and live old theme screenshot remains intact.
+Security impact: Positive; frontend now avoids misleading payment amount copy.
+Backend/API/billing impact: Backend behavior unchanged; frontend display matches backend quote fields.
+Proposed action: Mark payment UI quote alignment accepted locally and live.
+Agent 1 vote: APPROVE
+Agent 1 reason: User-facing payment amount display now matches server quote and UAT stayed green.
+Agent 2 vote: APPROVE
+Agent 2 reason: Billing backend was not changed and display now reflects existing payable/credit/rounding fields.
+Agent 3 vote: APPROVE
+Agent 3 reason: Visual lock and bundle scans stayed clean.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Keep release blocked only by successful inference billing and non-IBAN provider E2E.
+Status: COMPLETED
+
+---
+
+Decision ID: DEC-RETEST-LIVE-BILLING-RECHECK-001
+Decision title: Is successful live API billing unblocked after direct CloseRouter recheck?
+Decision type: Retest acceptance
+Related bug IDs: R-BUG-006, LIVE-BILLING-001
+Evidence from reports: Direct CloseRouter `/credits` 200 and `/models/count` 200 still pass from VPS env. Tiny `chat/completions` recheck with max_tokens <= 4 timed out for `anthropic/claude-haiku-4.5`, `openai/gpt-5.4-mini`, `deepseek/deepseek-v4-pro`, `google/gemini-3.5-flash`, `moonshotai/kimi-k2.5`, and `qwen/qwen3.6-plus`.
+Files likely affected: API/report files only.
+Risk level: High for release
+Design/template impact: None.
+Security impact: No secrets printed; no image/video/payment spend.
+Backend/API/billing impact: Successful gateway billing cannot be re-attempted while upstream inference times out.
+Proposed action: Keep launch verdict blocked; require provider/upstream recovery before tiny funded gateway success test.
+Agent 1 vote: REJECT
+Agent 1 reason: Developer first successful API call remains unproven.
+Agent 2 vote: REJECT
+Agent 2 reason: Success `usage_records`, transaction, cost headers and balance decrement are still blocked.
+Agent 3 vote: REJECT
+Agent 3 reason: Release guard remains closed due external provider/inference failure.
+Approval count: 0/3
+Final decision: NOT ACCEPTED FOR RELEASE
+Allowed next action: Fix provider/upstream inference outside this UI deploy, then rerun tiny funded gateway acceptance.
+Status: COMPLETED
+
+---
+
 Decision ID: DEC-LIVE-DEPLOY-RESTORED-THEME-001
 Decision title: Deploy restored approved theme to the real live service with corrected rollback
 Decision type: Deploy approval
