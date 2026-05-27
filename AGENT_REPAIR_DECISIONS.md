@@ -34,6 +34,198 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-FIX-SEC-DEPS-001
+Decision title: Upgrade vulnerable production/dev dependencies without force fixing
+Decision type: Dependency/security fix approval
+Related bug IDs: SECURITY-DEPS-001
+Evidence from reports: `npm audit --json` returned 1 high (`drizzle-orm <0.45.2`, SQL injection via escaped SQL identifiers) and 5 moderate advisories (`uuid <11.1.1`, old `drizzle-kit`/nested `esbuild`). `npm audit fix --force` would apply breaking changes blindly, so controlled explicit upgrades are safer.
+Files likely affected: `package.json`, `package-lock.json`, maybe TypeScript compile fixes if APIs changed.
+Risk level: Medium
+Design/template impact: None.
+Security impact: Positive; removes known dependency advisories if compatible.
+Backend/API/billing impact: Medium; Drizzle ORM/kit affect DB query and migration tooling, so full test/build/migrate smoke must pass.
+Proposed action: Explicitly upgrade `drizzle-orm` to `^0.45.2`, `drizzle-kit` to `^0.31.10`, and `uuid` to `^14.0.0`; remove obsolete `@types/uuid` if no longer needed; do not run `npm audit fix --force`. Then run lint, tests, build, audit, secret/public scans, and local UAT.
+Agent 1 vote: APPROVE
+Agent 1 reason: Launch readiness cannot ignore a high dependency advisory.
+Agent 2 vote: APPROVE
+Agent 2 reason: Controlled explicit upgrades plus full backend regression are safer than force fixing.
+Agent 3 vote: APPROVE
+Agent 3 reason: Security release guard requires zero known high advisories before launch approval.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Run controlled npm dependency updates and full verification.
+Status: APPROVED
+
+---
+
+Decision ID: DEC-RETEST-SEC-DEPS-001
+Decision title: Accept production dependency security retest
+Decision type: Retest acceptance
+Related bug IDs: SECURITY-DEPS-001
+Evidence from reports: Initial `npm audit --json` returned 1 high and 5 moderate. After controlled upgrades, `npm audit --omit=dev --json` returned 0 vulnerabilities. `npm run lint`, `npm test` (27 files / 114 tests), `npm run build`, `npm run scan:public`, `node scripts/scan-secrets.mjs`, and `npm run qa:uat` all passed.
+Files likely affected: `package.json`, `package-lock.json`, reports.
+Risk level: Low after retest
+Design/template impact: None.
+Security impact: Positive; production high advisory removed.
+Backend/API/billing impact: Drizzle runtime upgraded; regression tests/build passed.
+Proposed action: Mark production dependency security retest accepted; keep dev-only moderate `drizzle-kit` advisories as follow-up, not release approval.
+Agent 1 vote: APPROVE
+Agent 1 reason: UAT and full tests stayed green after dependency upgrade.
+Agent 2 vote: APPROVE
+Agent 2 reason: Drizzle upgrade did not break backend tests/build and production audit is clean.
+Agent 3 vote: APPROVE_WITH_DEV_FOLLOWUP
+Agent 3 reason: High production advisory is fixed; remaining moderate advisories are dev-only and should be tracked.
+Approval count: 3/3
+Final decision: APPROVED FOR PRODUCTION RUNTIME
+Allowed next action: Continue live billing/payment/OAuth/deploy gating.
+Status: COMPLETED
+
+---
+
+Decision ID: DEC-FIX-DESIGN-CSS-001
+Decision title: Remove leftover rejected template global CSS import
+Decision type: Code/edit approval
+Related bug IDs: DESIGN-REGRESSION-001
+Evidence from reports: User ordered the rejected template code removed everywhere. Source inspection found `src/main.tsx` still imports `src/index.css`, and that file contains Tailwind/Inter/Space Grotesk template globals that are separate from the approved old theme `src/yapayzekalab/tokens.css`.
+Files likely affected: `src/rejected-template-guard.test.ts`, `src/main.tsx`, `src/index.css`, reports.
+Risk level: Medium
+Design/template impact: Intended preservation of old theme by removing conflicting leftover template CSS. No new colors/layout/classes are introduced.
+Security impact: None.
+Backend/API/billing impact: None.
+Proposed action: Add a failing guard for leftover global template CSS/import, then remove the `./index.css` import and delete the unused template CSS file. The approved theme keeps using `src/yapayzekalab/tokens.css`.
+Agent 1 vote: APPROVE
+Agent 1 reason: Conflicting global CSS can cause the rejected template look to reappear or visually drift.
+Agent 2 vote: APPROVE
+Agent 2 reason: Frontend CSS cleanup has no backend/API/billing impact and is covered by build/UAT.
+Agent 3 vote: APPROVE
+Agent 3 reason: This directly enforces the visual lock and removes leftover template code.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Write failing guard, verify RED, remove import/file, rerun target and full regression.
+Status: IN_PROGRESS
+
+---
+
+Decision ID: DEC-RETEST-DESIGN-CSS-001
+Decision title: Accept leftover template CSS removal retest
+Decision type: Retest acceptance
+Related bug IDs: DESIGN-REGRESSION-001, DESIGN-CSS-001
+Evidence from reports: Guard test first failed on `./index.css`, `tailwindcss`, Space Grotesk/JetBrains template globals, then failed on Tailwind dependency/config wiring. After removing the import, deleting `src/index.css`, and uninstalling Tailwind wiring, `npm test -- src/rejected-template-guard.test.ts` passed 7/7; full `npm test` passed 27 files / 114 tests; lint/build/public scan/secret scan/UAT passed; Playwright smoke confirmed template CSS fingerprints absent.
+Files likely affected: `src/rejected-template-guard.test.ts`, `src/main.tsx`, `src/index.css`, `vite.config.ts`, `package.json`, `package-lock.json`, reports.
+Risk level: Low after retest
+Design/template impact: Positive; removes conflicting template CSS/dependency wiring and leaves old `tokens.css` active.
+Security impact: None.
+Backend/API/billing impact: None.
+Proposed action: Mark local CSS/template cleanup accepted and keep live deploy gated behind Git backup plus live smoke.
+Agent 1 vote: APPROVE
+Agent 1 reason: UI smoke and UAT stayed green after the CSS cleanup.
+Agent 2 vote: APPROVE
+Agent 2 reason: No backend/API/billing behavior changed.
+Agent 3 vote: APPROVE
+Agent 3 reason: Rejected template CSS is now blocked by source guard and absent in browser CSS.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Prepare Git backup and live deploy plan only after confirming no secrets and no unrelated destructive changes.
+Status: COMPLETED
+
+---
+
+Decision ID: DEC-FIX-DESIGN-001
+Decision title: Remove rejected frontend template fingerprints and add a no-return guard
+Decision type: Code edit approval
+Related bug IDs: DESIGN-REGRESSION-001
+Evidence from reports: User explicitly rejected the current template-like landing. `DESIGN_REGRESSION_ACCOUNTABILITY.md` identifies `src/App.tsx` as carrying the rejected visual/copy state; grep confirmed active app strings and starter package identity.
+Files likely affected: `src/App.tsx`, `src/rejected-template-guard.test.ts`, `scripts/scan-public-bundle.mjs`, `package.json`, `package-lock.json`
+Risk level: Medium
+Design/template impact: Intended removal of rejected template copy only; no CSS, Tailwind classes, layout structure, colors, spacing, cards, modals, or responsive breakpoints changed.
+Security impact: None; no auth/payment/provider secrets touched.
+Backend/API/billing impact: None; API examples, admin owner gate, and payment/backend calls remain unchanged.
+Proposed action: Replace rejected landing copy with direct product copy, remove `react-example` starter identity, add a Vitest guard and public-bundle scan needles so rejected template fingerprints cannot return.
+Agent 1 vote: APPROVE
+Agent 1 reason: The user-facing rejected slogans must be removed and guarded by tests; replacing the entire app without a verified approved source would risk breaking UAT.
+Agent 2 vote: APPROVE
+Agent 2 reason: Text-only source changes preserve admin, API key, payment, and billing logic while preventing frontend regression.
+Agent 3 vote: APPROVE
+Agent 3 reason: This avoids importing the unrelated `/Users/ufuk/Desktop/yapayzekalab` scientific template and protects against future template reintroduction.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Edit the approved files and run targeted verification.
+Status: IMPLEMENTED
+
+---
+
+Decision ID: DEC-CMD-DESIGN-001
+Decision title: Run template guard, typecheck, build, and public scan
+Decision type: Command approval
+Related bug IDs: DESIGN-REGRESSION-001
+Evidence from reports: The rejected template reached live because no visual/source guard stopped it before deploy.
+Files likely affected: Build command may update `dist/`; tests should not alter source.
+Risk level: Low
+Design/template impact: Build output only; source visual classes/layout already checked.
+Security impact: Public scan checks for banned secrets/pricing internals and rejected template text.
+Backend/API/billing impact: No provider/payment/API spend; no DB migration.
+Proposed action: Run `npm test -- src/rejected-template-guard.test.ts src/admin-single-owner-contract.test.ts src/api-docs-content.test.ts`, `npm run lint`, `npm run build`, and `npm run scan:public`.
+Agent 1 vote: APPROVE
+Agent 1 reason: Targeted regression tests must prove the bad template is blocked and core UI contracts remain.
+Agent 2 vote: APPROVE
+Agent 2 reason: Typecheck/build verifies the frontend change did not break API/admin integration at compile level.
+Agent 3 vote: APPROVE
+Agent 3 reason: Public bundle scan is required before any future deploy.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Execute verification commands.
+Status: APPROVED
+
+---
+
+Decision ID: DEC-RETEST-DESIGN-001
+Decision title: Accept rejected template removal retest
+Decision type: Retest approval
+Related bug IDs: DESIGN-REGRESSION-001
+Evidence from reports: `src/yapayzekalab/` removed; rejected fingerprints absent from active source and public bundle; template guard, full tests, lint, build, public scan, secret scan, and local UAT smoke passed.
+Files likely affected: `src/App.tsx`, `index.html`, `package.json`, `package-lock.json`, `scripts/scan-public-bundle.mjs`, `src/rejected-template-guard.test.ts`, reports.
+Risk level: Low for local acceptance; live deploy still pending.
+Design/template impact: Rejected template source deleted; active production app style/classes were not replaced by another template.
+Security impact: Fake API-key-looking examples from rejected module deleted; secret scan clean.
+Backend/API/billing impact: Admin owner, API docs, payment/billing contract tests remain green; no backend files changed.
+Proposed action: Mark local template removal accepted and keep live deploy gated behind separate approval/screenshot smoke.
+Agent 1 vote: APPROVE
+Agent 1 reason: UAT smoke 10/10 and source guard prove the rejected copy/module is gone locally.
+Agent 2 vote: APPROVE
+Agent 2 reason: Full Vitest and build prove no known backend/API/admin contract broke from this cleanup.
+Agent 3 vote: APPROVE
+Agent 3 reason: Public bundle scan and secret scan are clean; no live deploy was performed without a new gate.
+Approval count: 3/3
+Final decision: APPROVED_LOCAL
+Allowed next action: Prepare Git backup or deploy only after explicit live deploy gate.
+Status: COMPLETED
+
+---
+
+Decision ID: DEC-FIX-DESIGN-002
+Decision title: Delete untracked modular rejected template directory and restore tracked app entry
+Decision type: Code cleanup approval
+Related bug IDs: DESIGN-REGRESSION-001
+Evidence from reports: `src/yapayzekalab/` contains the rejected live-template fingerprints: generated tweak panel, mock data, fake `yzk_live_*` examples, `Türkiye'nin Yapay Zekâ API Geçidi`, and cost-calculator copy. `src/App.tsx` was unexpectedly replaced with a wrapper importing that directory, causing build failure.
+Files likely affected: `src/App.tsx`, `src/yapayzekalab/*`
+Risk level: Medium
+Design/template impact: Removes the rejected template implementation entirely; keeps the tracked production app source as the functional base.
+Security impact: Deletes fake API-key-looking examples and mock admin/token UI from the rejected directory.
+Backend/API/billing impact: Keeps existing tracked API/admin/payment integrations; no backend files changed.
+Proposed action: Remove `src/yapayzekalab/`, restore `src/App.tsx` from the tracked production source, then reapply text-only rejected-fingerprint cleanup and guard tests.
+Agent 1 vote: APPROVE
+Agent 1 reason: The untracked modular directory is exactly the rejected template and must not remain available for future imports.
+Agent 2 vote: APPROVE
+Agent 2 reason: Restoring tracked App avoids breaking existing backend/payment/admin wiring while deleting the bad template module.
+Agent 3 vote: APPROVE
+Agent 3 reason: Deleting the rejected template source is required to prevent accidental redeploy; no secrets are exposed.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Delete `src/yapayzekalab/`, restore tracked `src/App.tsx`, reapply guard-safe copy edits.
+Status: APPROVED
+
+---
+
 Decision ID: DEC-LIVE-BILLING-TEST-001
 Decision title: Create isolated live test API keys to verify billing headers, balance decrement, and low-balance behavior
 Decision type: Live test data approval
@@ -606,4 +798,115 @@ Agent 3 reason: Design lock is explicit and deploy/provider operations remain bl
 Approval count: 3/3
 Final decision: APPROVED
 Allowed next action: Write `REPAIR_PHASE_PLAN.md`, then open `DEC-FIX-001` before code edits.
+Status: COMPLETED
+Decision ID: DEC-FIX-DESIGN-RESTORE-001
+Decision title: Remove rejected template code and restore approved YapayZekaLab visual shell
+Decision type: Code/edit approval
+Related bug IDs: DESIGN-REGRESSION-001
+Evidence from reports:
+- User explicitly rejected the current dashboard/template look and ordered its code removed everywhere.
+- `DESIGN_REGRESSION_ACCOUNTABILITY.md` identifies current `src/App.tsx` as the wrong frontend source deployed live.
+- Approved visual source candidate exists under `/Users/ufuk/tam-aktarma-turkapiprojesi-2026-05-26/sources/turkapiprojesi/src/yapayzekalab`.
+- Agent 2 warned that `/Users/ufuk/Desktop/yapayzekalab/src/App.tsx` must not be copied because it contains `/api/files` and `/api/route-agent` scientific/demo flows.
+- Agent 3 corrected guard rules: `Türkiye'nin Yapay Zekâ API Geçidi` and `Ayda ne kadar ödersin?` are approved fingerprints; scientific/demo and current rejected dashboard fingerprints must be blocked.
+Files likely affected:
+- `src/App.tsx`
+- `src/main.tsx`
+- `src/yapayzekalab/*`
+- `src/rejected-template-guard.test.ts`
+- `scripts/scan-rejected-template.mjs`
+- `package.json`
+- existing source-contract tests
+Risk level: High
+Design/template impact: Intended restore of approved old visual shell; rejected template removed.
+Security impact: Admin password flow must remain removed; admin access stays bound to Google/user token and `cix.crazy666@gmail.com`.
+Backend/API/billing impact: Payment, API key, docs and admin endpoint calls must continue using current backend routes.
+Proposed action:
+1. Import the approved `src/yapayzekalab` visual shell from the transferred source.
+2. Replace current `src/App.tsx` with a thin route-to-tab wrapper instead of the rejected template implementation.
+3. Patch the imported shell to use the existing user token aliases and remove `/api/admin/login`, admin password and `yz_admin_token` code.
+4. Add static source/build guard tests that fail if scientific/demo or rejected dashboard fingerprints return.
+5. Update existing contract tests to inspect the restored source locations.
+6. Run lint, tests, build, template scan and public scan before any deploy.
+Agent 1 vote: APPROVE
+Agent 1 reason: Restoring the old visible shell directly addresses the user-facing regression; guard tests are required so it cannot regress silently.
+Agent 2 vote: APPROVE
+Agent 2 reason: Approved only with preserved auth/admin/payment/API contracts and no direct copy of the scientific desktop App.
+Agent 3 vote: APPROVE
+Agent 3 reason: Approved only with forbidden fingerprint scanning and no separate admin password/code path.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Perform targeted frontend restore and add guard tests.
+Status: IN_PROGRESS
+
+---
+
+Decision ID: DEC-FIX-UX-FAKE-LIVE-001
+Decision title: Remove fake live API/playground claims without changing the restored theme
+Decision type: Code/edit approval
+Related bug IDs: R-BUG-004, R-BUG-006, DESIGN-REGRESSION-001
+Evidence from reports: QA and repair reports mark valid funded `/v1` billing as unverified; source inspection found the restored home playground still says `Playground · canlı test`, `sağlayıcı çağrılıyor…`, and shows a random-looking `yzk_live_a8f3…` demo value. That can mislead users into thinking a real provider call/key exists.
+Files likely affected: `src/api-docs-content.test.ts`, `src/yapayzekalab/tab-home.jsx`, `src/yapayzekalab/App.jsx`, `src/yapayzekalab/tab-account.jsx`
+Risk level: Low
+Design/template impact: None; text/data-only change. No CSS, class names, layout, spacing, colors, icons, cards, modals, or responsive rules may change.
+Security impact: Reduces fake key exposure and avoids implying unverified live provider execution.
+Backend/API/billing impact: None; frontend copy only.
+Proposed action: Add a contract test banning fake live playground wording and random-looking demo key text, then replace those strings with explicit example/placeholder wording.
+Agent 1 vote: APPROVE
+Agent 1 reason: User-facing copy must not claim live API success while funded billing remains unverified.
+Agent 2 vote: APPROVE
+Agent 2 reason: The change is frontend text/data only and does not affect gateway, balance, payments, or API key backend behavior.
+Agent 3 vote: APPROVE
+Agent 3 reason: It preserves the restored visual shell and reduces security/launch-risk ambiguity.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Write failing source-contract test, verify RED, then patch text/data only.
+Status: IN_PROGRESS
+
+---
+
+Decision ID: DEC-CMD-REGRESSION-UX-001
+Decision title: Run full local regression after fake-live copy removal
+Decision type: Command/test approval
+Related bug IDs: R-BUG-004, R-BUG-005, R-BUG-006, DESIGN-REGRESSION-001
+Evidence from reports: Restored frontend was changed in text/data only; prior launch gates require lint, tests, build, public scan, secret scan, and UAT before any completion or deploy claim.
+Files likely affected: None by commands, except build/QA artifacts generated by build/UAT tools.
+Risk level: Low
+Design/template impact: None expected; commands verify source/build guards.
+Security impact: Secret scan and public scan check leakage.
+Backend/API/billing impact: Local UAT/API smoke checks public/backend behavior without paid provider calls.
+Proposed action: Run `npm run lint`, `npm test`, `npm run build`, `npm run scan:public`, `node scripts/scan-secrets.mjs`, and `npm run qa:uat`.
+Agent 1 vote: APPROVE
+Agent 1 reason: Full regression is required before accepting the text/data repair.
+Agent 2 vote: APPROVE
+Agent 2 reason: Commands do not spend provider credits and verify backend-facing contracts.
+Agent 3 vote: APPROVE
+Agent 3 reason: Public/secret scans are required before any deploy or readiness claim.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Run approved regression commands and record exact results.
+Status: APPROVED
+
+---
+
+Decision ID: DEC-RETEST-UX-FAKE-LIVE-001
+Decision title: Accept fake-live playground copy retest
+Decision type: Retest acceptance
+Related bug IDs: R-BUG-004, R-BUG-006, UX-FAKE-LIVE-001
+Evidence from reports: RED test first failed on `yzk_live_a8f3` and fake live copy. After text/data-only patch, `npm test -- src/api-docs-content.test.ts` passed 5/5; full `npm test` passed 27 files / 113 tests; lint/build/public scan/secret scan/local UAT passed; browser smoke found old hero present, rejected template absent, Admin hidden, fake-live claim absent.
+Files likely affected: `src/api-docs-content.test.ts`, `src/yapayzekalab/tab-home.jsx`, `src/yapayzekalab/App.jsx`, `src/yapayzekalab/tab-account.jsx`, reports.
+Risk level: Low
+Design/template impact: None; no CSS/class/layout/theme/button/card/modal change.
+Security impact: Positive; removes random-looking fake key display from demo copy.
+Backend/API/billing impact: None; it avoids claiming successful billing until real funded-key test passes.
+Proposed action: Mark the local fake-live copy cleanup accepted and keep release blocked pending live deploy, funded billing, OAuth/provider/payment E2E gates.
+Agent 1 vote: APPROVE
+Agent 1 reason: Browser and source contracts now show examples as placeholders, not verified live calls.
+Agent 2 vote: APPROVE
+Agent 2 reason: No backend behavior changed; billing success is still correctly not claimed.
+Agent 3 vote: APPROVE
+Agent 3 reason: Visual lock preserved and public scan/secret scan stayed clean.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Continue launch-blocker verification and prepare rollbackable Git backup before any deploy.
 Status: COMPLETED

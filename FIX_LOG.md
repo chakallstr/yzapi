@@ -101,3 +101,43 @@ Operasyon tarihi: 2026-05-26
 - Test: Low-balance `402`, invalid key `401`, upstream failure zero-cost/no-decrement PASS. Direct `/credits` and `/models` PASS.
 - Retest: Successful billing FAIL/BLOCKED because OpenAI/Anthropic/Deepseek/Google direct inference returned `502`.
 - Sonuç: NOT FIXED. Provider/upstream inference düzelmeden launch billing acceptance verilemez.
+
+## DESIGN-REGRESSION-001
+
+- Problem: Reddedilen template görünümü ve kodu tekrar aktif kaynak içine girebildi; ayrıca untracked `src/yapayzekalab/` klasörü reddedilen template'in modüler kopyasını taşıyordu.
+- Kök neden: Deploy/repair akışında doğru görsel kaynak doğrulanmadan frontend bundle değiştirildi; ayrıca template parmak izlerini engelleyen otomatik guard yoktu.
+- Karar: DEC-FIX-DESIGN-RESTORE-001, 3/3 APPROVED.
+- Yapılan değişiklik: Eski onaylı YapayZekaLab görsel shell'i `src/yapayzekalab/` altında aktif kaynak olarak restore edildi; `src/App.tsx` sadece route-to-tab wrapper oldu. Reddedilen bilimsel/dashboard/template fingerprintleri `src/rejected-template-guard.test.ts`, `vite.config.ts` ve `scripts/scan-public-bundle.mjs` ile engelleniyor. Ayrı admin şifresi geri getirilmedi; admin görünürlüğü allowlisted Google/user session mantığında kaldı.
+- Test: `src/rejected-template-guard.test.ts`; `npm test`; `npm run lint`; `npm run build`; `npm run scan:public`; `node scripts/scan-secrets.mjs`; lokal `qa:uat`; Playwright browser smoke.
+- Retest: 27 test file / 111 test PASS; lint PASS; build PASS; public bundle scan 0 hit; secret scan 0 hit; lokal UAT smoke 10/10 PASS. Browser smoke: eski hero var, reddedilen template yok, anonim Admin görünmüyor.
+- Sonuç: FIXED LOCAL. Canlı deploy hâlâ ayrı backup/live smoke gate gerektirir.
+
+## UX-FAKE-LIVE-001
+
+- Problem: Eski temadaki playground ve onboarding akışı örnek simülasyonu `canlı test`, `sağlayıcı çağrılıyor` ve random görünümlü `yzk_live_a8f3…` değerleriyle gerçek doğrulanmış API/billing çağrısı gibi gösterebiliyordu.
+- Kök neden: Restore edilen görsel shell içinde demo/mock metinler gerçek provider/billing kanıtından ayrılmamıştı.
+- Karar: DEC-FIX-UX-FAKE-LIVE-001, 3/3 APPROVED.
+- Yapılan değişiklik: Yalnızca metin/veri değişti; playground `örnek akış`, fake key `yzk_live_YOUR_KEY`, onboarding çağrısı `örnek yanıt` olarak netleştirildi. CSS, layout, class, renk, kart/modal/button stili değişmedi.
+- Test: `npm test -- src/api-docs-content.test.ts`; `npm run lint`; `npm test`; `npm run build`; `npm run scan:public`; `node scripts/scan-secrets.mjs`; `npm run qa:uat`; Playwright browser smoke.
+- Retest: Targeted docs/content test PASS 5/5; full regression PASS; browser smoke fake-live claim yok.
+- Sonuç: FIXED LOCAL.
+
+## DESIGN-CSS-001
+
+- Problem: Eski tema restore edilmesine rağmen `src/main.tsx` hâlâ önceki template'e ait `src/index.css` dosyasını yüklüyordu. Bu dosyada Tailwind, Inter, Space Grotesk, JetBrains Mono ve skeleton shimmer global template stilleri vardı.
+- Kök neden: Entry point temizlenmeden eski tema `tokens.css` yanında önceki template global CSS’i de bundle’a giriyordu.
+- Karar: DEC-FIX-DESIGN-CSS-001, 3/3 APPROVED.
+- Yapılan değişiklik: Guard testine leftover template CSS fingerprintleri eklendi; `src/main.tsx` içindeki `./index.css` import’u kaldırıldı; `src/index.css` silindi; `@tailwindcss/vite` ve `tailwindcss` dependency/config wiring kaldırıldı. Eski tema `src/yapayzekalab/tokens.css` ile çalışmaya devam ediyor.
+- Test: `npm test -- src/rejected-template-guard.test.ts`; `npm run lint`; `npm test`; `npm run build`; `npm run scan:public`; `node scripts/scan-secrets.mjs`; `npm run qa:uat`; Playwright browser CSS smoke.
+- Retest: Guard PASS 7/7; full regression PASS 27 files / 114 tests; build CSS 6.42 kB; public/secret scan 0 hit; UAT 10/10; browser CSS smoke Tailwind/Inter template CSS yok.
+- Sonuç: FIXED LOCAL.
+
+## SECURITY-DEPS-001
+
+- Problem: `npm audit` 1 high ve 5 moderate vulnerability raporladı. High bulgu `drizzle-orm <0.45.2` SQL injection advisory idi.
+- Kök neden: Eski `drizzle-orm`, `uuid` ve `drizzle-kit` sürümleri lock dosyasında kalmıştı.
+- Karar: DEC-FIX-SEC-DEPS-001, 3/3 APPROVED.
+- Yapılan değişiklik: `drizzle-orm` `0.45.2`, `uuid` `14.0.0`, `drizzle-kit` `0.31.10` seviyesine güncellendi; obsolete `@types/uuid` kaldırıldı. `npm audit fix --force` kullanılmadı.
+- Test: `npm audit --omit=dev --json`; `npm run lint`; `npm test`; `npm run build`; `npm run scan:public`; `node scripts/scan-secrets.mjs`; `npm run qa:uat`.
+- Retest: Production audit 0 vulnerability; full regression PASS 27 files / 114 tests; build/scans/UAT PASS. Genel `npm audit` hâlâ dev-only `drizzle-kit` zincirinde 4 moderate raporluyor; production runtime audit temiz.
+- Sonuç: FIXED FOR PRODUCTION RUNTIME / DEV-ONLY MODERATE FOLLOW-UP.

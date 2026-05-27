@@ -77,3 +77,116 @@ Agent 2 retest vote: REJECT_FULL_RELEASE
 Agent 3 retest vote: REJECT_FULL_RELEASE
 Approval count: 0/3
 Final retest status: FAILURE_PATH_PASS_SUCCESS_BILLING_BLOCKED_BY_UPSTREAM_502
+
+## DESIGN-REGRESSION-001 Template Removal Retest
+
+Bug ID: DESIGN-REGRESSION-001
+Fix decision ID: DEC-FIX-DESIGN-RESTORE-001
+Retest decision ID: DEC-RETEST-DESIGN-RESTORE-001
+Command or manual flow:
+- `npm test -- src/rejected-template-guard.test.ts src/admin-single-owner-contract.test.ts src/api-docs-content.test.ts`
+- `npm test`
+- `npm run lint`
+- `npm run build`
+- `npm run scan:public`
+- `node scripts/scan-secrets.mjs`
+- `npm run qa:uat`
+- Playwright browser smoke at `http://localhost:4567/`
+Expected:
+- Rejected template fingerprints do not exist in active source, HTML, or public bundle.
+- Old approved YapayZekaLab hero/theme is active through `src/yapayzekalab/`.
+- Admin single-owner and API docs contracts remain green.
+- Build and smoke UAT pass.
+Actual:
+- `src/yapayzekalab/` is active as the restored old visual shell.
+- Template guard/admin/docs tests PASS.
+- Full Vitest PASS, 27 files / 113 tests.
+- `npm run lint` PASS.
+- `npm run build` PASS with existing chunk-size warning only.
+- `npm run scan:public` PASS, 3 scanned / 0 hits.
+- `node scripts/scan-secrets.mjs` PASS, 226 scanned / 0 hits.
+- Local UAT smoke PASS, 10/10.
+- Browser smoke: old hero present, rejected dashboard/template absent, anonymous Admin hidden.
+Passed/Failed: Passed locally
+Evidence:
+- `qa-artifacts/uat-smoke-2026-05-27T06-27-08-404Z/uat-smoke-report.md`
+- Browser screenshot: `yzapi-home-after-copy-fix.png`
+- Public scan returned zero hits.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: LOCAL_PASS_LIVE_DEPLOY_PENDING
+
+## UX-FAKE-LIVE-001 Fake Live Claim Retest
+
+Bug ID: UX-FAKE-LIVE-001
+Fix decision ID: DEC-FIX-UX-FAKE-LIVE-001
+Retest decision ID: DEC-RETEST-UX-FAKE-LIVE-001
+Command or manual flow:
+- `npm test -- src/api-docs-content.test.ts`
+- `npm run lint`
+- `npm test`
+- `npm run build`
+- `npm run scan:public`
+- `node scripts/scan-secrets.mjs`
+- `npm run qa:uat`
+- Playwright browser smoke.
+Expected: Public source and rendered UI do not show random-looking fake `yzk_live_a8f3`, `Playground · canlı test`, or `sağlayıcı çağrılıyor`; examples remain clearly placeholder-based.
+Actual: Targeted test PASS 5/5; full Vitest PASS 27 files / 113 tests; lint/build/scans/UAT PASS; browser text has `Playground · örnek akış`, `yzk_live_YOUR_KEY`, and no fake-live claim.
+Passed/Failed: Passed locally
+Evidence: `qa-artifacts/uat-smoke-2026-05-27T06-27-08-404Z/uat-smoke-report.md`; browser screenshot `yzapi-home-after-copy-fix.png`.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: LOCAL_PASS_LIVE_DEPLOY_PENDING
+
+## DESIGN-CSS-001 Leftover Template CSS Retest
+
+Bug ID: DESIGN-CSS-001
+Fix decision ID: DEC-FIX-DESIGN-CSS-001
+Retest decision ID: DEC-RETEST-DESIGN-CSS-001
+Command or manual flow:
+- `npm test -- src/rejected-template-guard.test.ts`
+- `npm run lint`
+- `npm test`
+- `npm run build`
+- `npm run scan:public`
+- `node scripts/scan-secrets.mjs`
+- `npm run qa:uat`
+- Playwright browser CSS smoke.
+Expected: `src/main.tsx` does not import the leftover global `index.css`; no Tailwind/Inter/Space Grotesk/JetBrains Mono/skeleton template CSS remains in active source, dependency wiring, public bundle or rendered styles; old theme still renders.
+Actual: Target guard PASS 7/7; lint PASS; full Vitest PASS 27 files / 114 tests; build PASS with existing chunk-size warning; public scan and secret scan PASS 0 hits; local UAT PASS 10/10. Browser smoke: old page renders, anonymous Admin hidden, rejected template absent, template CSS fingerprints absent.
+Passed/Failed: Passed locally
+Evidence: `qa-artifacts/uat-smoke-2026-05-27T06-29-41-955Z/uat-smoke-report.md`; browser screenshot `yzapi-home-final-local-template-clean.png`.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: LOCAL_PASS_LIVE_DEPLOY_PENDING
+
+## SECURITY-DEPS-001 Dependency Security Retest
+
+Bug ID: SECURITY-DEPS-001
+Fix decision ID: DEC-FIX-SEC-DEPS-001
+Retest decision ID: DEC-RETEST-SEC-DEPS-001
+Command or manual flow:
+- `npm audit --json`
+- controlled dependency update, no `--force`
+- `npm audit --omit=dev --json`
+- `npm run lint`
+- `npm test`
+- `npm run build`
+- `npm run scan:public`
+- `node scripts/scan-secrets.mjs`
+- `npm run qa:uat`
+Expected: Production dependency audit has zero high/critical/moderate vulnerabilities; Drizzle/uuid upgrades do not break build, tests, scans, or UAT.
+Actual: Initial audit had 1 high and 5 moderate. After updating `drizzle-orm`, `uuid`, `drizzle-kit` and removing `@types/uuid`, production audit returned 0 vulnerabilities. Full regression PASS 27 files / 114 tests; build/scans/UAT PASS. General audit still reports 4 moderate dev-only advisories under `drizzle-kit`/nested esbuild.
+Passed/Failed: Passed for production runtime; dev-only moderate follow-up remains.
+Evidence: `npm audit --omit=dev --json` metadata total 0; `qa-artifacts/uat-smoke-2026-05-27T06-34-09-399Z/uat-smoke-report.md`.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE_WITH_DEV_FOLLOWUP
+Approval count: 3/3
+Final retest status: PRODUCTION_AUDIT_PASS_DEV_MODERATE_FOLLOWUP

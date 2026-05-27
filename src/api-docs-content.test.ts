@@ -1,18 +1,50 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const appSource = readFileSync("src/App.tsx", "utf8");
+const appSource = [
+  "src/App.tsx",
+  "src/yapayzekalab/App.jsx",
+  "src/yapayzekalab/tab-home.jsx",
+  "src/yapayzekalab/tab-models.jsx",
+  "src/yapayzekalab/tab-account.jsx",
+].map((file) => readFileSync(file, "utf8")).join("\n");
+
+const modelsSource = readFileSync("src/yapayzekalab/tab-models.jsx", "utf8");
 
 describe("API docs content contract", () => {
   it("uses the production YapayZekaLab v1 base URL and live key prefix in examples", () => {
     expect(appSource).not.toContain("https://api.yapayzekalab.com/v1");
     expect(appSource).not.toContain("Bearer YOUR_API_KEY");
-    expect(appSource).toContain("https://yapayzekalab.org/v1/chat/completions");
+    expect(appSource).toContain("https://api.yapayzekalab.org/v1/chat/completions");
     expect(appSource).toContain("Bearer yzk_live_YOUR_KEY");
+  });
+
+  it("documents the adapted public v1 endpoint surface", () => {
+    expect(appSource).toContain("/v1/chat/completions");
+    expect(appSource).toContain("/v1/responses");
+    expect(appSource).toContain("/v1/messages");
+    expect(appSource).toContain("/v1/images/generations");
+    expect(appSource).toContain("/v1/images/edits");
   });
 
   it("explains that video endpoints are beta or limited instead of fully production-ready", () => {
     expect(appSource).toMatch(/Video[\s\S]{0,160}(beta|sınırlı|501)/i);
     expect(appSource).toMatch(/video API endpointleri aktif değilse 501 dönebilir/i);
+    expect(modelsSource).toMatch(/Video[\s\S]{0,220}(beta|sınırlı|501)/i);
+  });
+
+  it("does not expose internal multiplier formulas as public sales copy", () => {
+    expect(appSource).not.toMatch(/Sağlayıcı maliyeti\s*×/i);
+    expect(appSource).not.toMatch(/×\s*3\.0|×\s*2\.3/);
+  });
+
+  it("does not present example playground data as a verified live API call", () => {
+    expect(appSource).not.toContain("yzk_live_a8f3");
+    expect(appSource).not.toMatch(/Playground · canlı test/i);
+    expect(appSource).not.toMatch(/sağlayıcı çağrılıyor/i);
+    expect(appSource).not.toMatch(/gerçek bir istek yapar \(sandbox\)/i);
+    expect(appSource).not.toMatch(/ilk başarılı yanıtın/i);
+    expect(appSource).toMatch(/Playground · örnek akış/i);
+    expect(appSource).toContain("yzk_live_YOUR_KEY");
   });
 });

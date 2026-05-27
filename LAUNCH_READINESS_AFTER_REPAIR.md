@@ -6,6 +6,10 @@ NOT READY — API/BILLING/BALANCE BLOCKERS
 
 ## What Improved
 
+- Old approved YapayZekaLab visual shell restored locally through `src/yapayzekalab/`.
+- Rejected dashboard/scientific/template fingerprints are guarded in source/build/public bundle checks.
+- Leftover Tailwind/Inter template global CSS and unused Tailwind dependency wiring removed; old theme `tokens.css` remains active.
+- Production dependency audit is clean after controlled `drizzle-orm`/`uuid` upgrades.
 - Public `/v1` catalog repair added locally:
   - `/v1/models`
   - `/v1/providers`
@@ -13,9 +17,10 @@ NOT READY — API/BILLING/BALANCE BLOCKERS
 - Catalog payload is sanitized and uses customer-facing computed pricing input instead of raw provider economics.
 - Disabled model overrides are excluded from public catalog/count/provider output.
 - Authenticated proxy route behavior remains separated in tests.
-- Design/template source was not changed.
-- Docs/API examples now use `https://yapayzekalab.org/v1` and `yzk_live_*` key wording locally.
+- Design/template styling was preserved after restore; latest changes were text/data/backend/guard only.
+- Docs/API examples now use `https://api.yapayzekalab.org/v1` and `yzk_live_*` key wording locally.
 - Video support copy now marks video as beta/limited and mentions possible 501 when endpoint is not active.
+- Fake live playground/random API key copy was removed; examples now use `yzk_live_YOUR_KEY`.
 - Local remaining-test run passed lint, full tests, build, public scan, secret scan, backend smoke, catalog smoke and local `qa:uat`.
 
 ## Must-Fix Before Launch
@@ -28,20 +33,16 @@ NOT READY — API/BILLING/BALANCE BLOCKERS
 ## Should-Fix Soon
 
 - Runtime/process manager stability validation.
-- Favicon/static 404 cleanup if confirmed.
+- Live deploy/smoke of the restored theme after rollbackable Git backup.
 
 ## Latest Evidence
 
-- Local runtime smoke: PASS.
-- Local `/v1` catalog smoke: PASS, 33 models / 11 providers / count 33.
-- Local `npm run qa:uat`: PASS 10/10.
-- Live `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`: PASS 10/10 after deploy to the real target `/opt/turkapiprojesi`.
-- Live backend smoke: PASS; live `/v1` catalog endpoints return 200 and no internal-field leak was detected.
-- Live Google OAuth/admin: PASS in standard Chrome for `cix.crazy666@gmail.com`; Admin hidden when anonymous and opens `YZ Admin` dashboard without separate admin password after login.
-- Live billing failure-path: PASS for low-balance `402`, invalid key `401`, upstream failure zero-cost/no-decrement, and test key cleanup.
-- Direct CloseRouter account/catalog: PASS with `/credits` 200 and `/models/count` 34.
-- Direct CloseRouter inference: FAIL/BLOCKED with OpenAI/Anthropic/Deepseek/Google chat and OpenAI responses returning `502`.
-- Regression: `npm run lint`, `npm test`, `npm run build`, `npm run scan:public`, `node scripts/scan-secrets.mjs` all PASS.
+- Latest local regression: `npm run lint` PASS; `npm test` PASS, 27 files / 114 tests; `npm run build` PASS; `npm run scan:public` PASS, 0 hits; `node scripts/scan-secrets.mjs` PASS, 0 hits.
+- Latest local UAT: `npm run qa:uat` PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T06-34-09-399Z/uat-smoke-report.md`.
+- Latest production audit: `npm audit --omit=dev --json` PASS, 0 vulnerabilities. General audit still has 4 moderate dev-only `drizzle-kit`/nested esbuild advisories.
+- Latest browser smoke: old hero present, rejected template absent, anonymous Admin hidden, fake live playground claim absent, Tailwind/Inter template CSS absent.
+- Previous live admin/OAuth evidence exists, but the latest restored-theme local changes have not been deployed/retested live in this pass.
+- Previous billing failure-path evidence exists; successful funded text billing and payment provider E2E are still not approved.
 
 ## Final 3-Agent Vote
 

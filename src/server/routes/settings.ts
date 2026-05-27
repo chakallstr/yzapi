@@ -1,6 +1,35 @@
 import { Router } from "express";
+import { eq } from "drizzle-orm";
+import { db } from "../db/client.js";
+import { systemConfig } from "../db/schema.js";
 
 const router = Router();
+
+type PublicConfigRow = {
+  kur?: string | number | null;
+  updatedAt?: Date | string | null;
+};
+
+const FALLBACK_KUR = 47.084289;
+
+function safeNumber(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export function buildPublicConfigResponse(row?: PublicConfigRow | null) {
+  const updatedAt = row?.updatedAt instanceof Date
+    ? row.updatedAt.toISOString()
+    : typeof row?.updatedAt === "string"
+      ? row.updatedAt
+      : null;
+
+  return {
+    kur: safeNumber(row?.kur, FALLBACK_KUR),
+    updatedAt,
+    source: row ? "system_config" : "fallback",
+  };
+}
 
 // In-memory settings (same as original — not persisted to DB per Phase A scope)
 let defaultSettings = {
@@ -13,6 +42,19 @@ let defaultSettings = {
 
 router.get("/settings", (_req, res) => {
   res.json(defaultSettings);
+});
+
+router.get("/public-config", async (_req, res) => {
+  try {
+    const rows = await db
+      .select({ kur: systemConfig.kur, updatedAt: systemConfig.updatedAt })
+      .from(systemConfig)
+      .where(eq(systemConfig.id, 1))
+      .limit(1);
+    res.json(buildPublicConfigResponse(rows[0] ?? null));
+  } catch {
+    res.json(buildPublicConfigResponse(null));
+  }
 });
 
 router.post("/settings", (req, res) => {

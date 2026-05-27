@@ -10,8 +10,8 @@ describe("payment safety contract", () => {
     expect(source("./server/db/schema.ts")).toMatch(/minBakiyeTL:.*default\("250"\)/);
     expect(source("./server/db/seed.ts")).toContain('minBakiyeTL: "250"');
     expect(source("./server/routes/payments.ts")).toContain('minBakiyeTL: "250"');
-    expect(source("./App.tsx")).toContain("Minimum tahsilat");
-    expect(source("./App.tsx")).toContain('setBakiyeModalMiktar("10")');
+    expect(source("./yapayzekalab/tab-account.jsx")).toContain("const MIN_USD = 2");
+    expect(source("./yapayzekalab/tab-account.jsx")).toContain("amountUsd");
   });
 
   it("does not acknowledge a paid Cryptomus webhook when balance credit fails", () => {
@@ -34,12 +34,13 @@ describe("payment safety contract", () => {
   });
 
   it("uses backend payment method availability before enabling modal actions", () => {
-    const app = source("./App.tsx");
+    const app = source("./yapayzekalab/tab-account.jsx");
 
     expect(app).toContain("paymentMethods");
-    expect(app).toContain("loadPaymentMethods");
-    expect(app).toContain("isPaymentMethodEnabled");
+    expect(app).toContain("/api/payments/methods");
+    expect(app).toContain("paymentMethodEnabled");
     expect(app).toContain("Ödeme yöntemi şu an kapalı");
+    expect(app).not.toContain("setTweak('balanceUSD', balanceUSD + effectiveAmount)");
   });
 
   it("keeps payment callbacks and metadata safe for USD top-ups", () => {

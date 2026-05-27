@@ -5,16 +5,27 @@ function source(path: string): string {
   return readFileSync(path, "utf8");
 }
 
+function frontendSource(): string {
+  return [
+    "src/App.tsx",
+    "src/yapayzekalab/App.jsx",
+    "src/yapayzekalab/tab-admin.jsx",
+  ].map(source).join("\n");
+}
+
 describe("single owner admin contract", () => {
   it("removes separate admin password login from the frontend", () => {
-    const app = source("src/App.tsx");
+    const app = frontendSource();
 
-    expect(app).toContain('ADMIN_EMAIL = "cix.crazy666@gmail.com"');
-    expect(app).toContain("isAdminUser");
+    expect(app).toContain("cix.crazy666@gmail.com");
+    expect(app).toContain("isAdmin");
     expect(app).not.toContain("adminLoginPw");
     expect(app).not.toContain("adminToken");
+    expect(app).not.toContain("yz_admin_token");
     expect(app).not.toContain("/api/admin/login");
     expect(app).not.toContain("Admin Girişi");
+    expect(app).not.toContain("admin parola");
+    expect(app).not.toContain("Admin paneline gir");
   });
 
   it("removes separate admin password requirements from backend config and routes", () => {

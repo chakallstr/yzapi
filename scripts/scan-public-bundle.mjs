@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 const roots = process.argv.slice(2);
 const scanRoots = roots.length ? roots : ["dist/index.html", "dist/assets"];
+const phrase = (...parts) => parts.join("");
 const needles = [
   "CLOSEROUTER_API_KEY",
   "closerouter_",
@@ -14,10 +15,33 @@ const needles = [
   "billingRatio",
   "billing ratio",
   "Satış çarpanı",
+  "Sağlayıcı maliyeti ×",
+  "× 3.0",
+  "× 2.3",
   "1 USD =",
   "formül",
   "formula",
   "2.30x",
+  phrase("Scientific", "Data"),
+  phrase("Molek", "üler analiz"),
+  phrase("Bilimsel ", "veri formatları"),
+  phrase("Demo ", "Modu"),
+  phrase("/api/", "files"),
+  phrase("/api/", "route-agent"),
+  phrase("Route ", "Simulator"),
+  phrase("Dosya ", "analizi"),
+  phrase("api.yzlab.ai", "/v2/route"),
+  phrase("Dataset ", "upload"),
+  phrase("Route ", "Agent"),
+  phrase("File ", "analysis"),
+  phrase("Sim", "ülasyon"),
+  phrase("MODEL MAL", "İYETİNİ SAKLAMAYAN AI API"),
+  phrase("model maliyetini ", "saklamayan"),
+  phrase("TÜRK GELİŞTİRİCİLER ", "İÇİN AI API PLATFORMU"),
+  "tailwindcss",
+  "Space Grotesk",
+  "JetBrains Mono",
+  "skeleton-shimmer",
 ];
 
 async function files(path) {

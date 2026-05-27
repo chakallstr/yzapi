@@ -2,7 +2,19 @@
 
 ## Summary
 
-Post-QA repair intake, triage and phase planning files were created. The first safe code repair, `R-BUG-001` public `/v1` catalog endpoints, was implemented locally without changing frontend design.
+Post-QA repair intake, triage and phase planning files were created. The old approved YapayZekaLab visual shell was restored locally, rejected template fingerprints were guarded, and several safe contract fixes were implemented without changing the restored theme styling.
+
+## Current 2026-05-27 Update
+
+- Restored old theme is active through `src/yapayzekalab/`; `src/App.tsx` is a route wrapper.
+- Rejected dashboard/scientific/template fingerprints are blocked by tests/build/public scan.
+- Public `/api/public-config` was added so the frontend can fetch safe USD/TRY config without 404/retry loops.
+- Favicon 404 was removed with an inline SVG favicon.
+- Video availability copy now clearly says beta/limited/501 when inactive.
+- Fake live playground/onboarding text was changed to example/placeholder wording; no fake random `yzk_live_a8f3` source remains outside guard tests.
+- Leftover rejected global template CSS (`src/index.css`) and unused Tailwind dependency wiring were removed; the restored old shell uses `src/yapayzekalab/tokens.css`.
+- Production dependency audit was cleaned by upgrading `drizzle-orm`/`uuid` and removing obsolete Tailwind/uuid type wiring.
+- Full local regression passed after the latest text/data-only change.
 
 ## Files Read
 
@@ -15,8 +27,14 @@ Key QA inputs included `QA_FINAL_REPORT.md`, `QA_REPORT.md`, `60_MINUTE_SITE_TES
 ## Bugs Fixed
 
 - `R-BUG-001`: `/v1/models`, `/v1/providers`, `/v1/models/count` no longer missing at code level. A public read-only catalog router was added and mounted before authenticated proxy routes.
-- `R-BUG-004`: API examples were aligned locally to `https://yapayzekalab.org/v1` and `yzk_live_*` wording without style/layout changes.
+- `R-BUG-004`: API examples were aligned locally to `https://api.yapayzekalab.org/v1` and placeholder `yzk_live_YOUR_KEY` wording without style/layout changes.
 - `R-BUG-005`: Video support copy now states beta/limited status and possible 501 when video API endpoint is not active.
+- `DESIGN-REGRESSION-001`: Old YapayZekaLab visual shell restored locally; rejected template fingerprints guarded.
+- `UX-FAKE-LIVE-001`: Fake live playground/random API key wording removed.
+- `PUBLIC-CONFIG-001`: `/api/public-config` returns safe public config/fallback JSON.
+- `STATIC-FAVICON-001`: `/favicon.ico` 404 removed via inline SVG link.
+- `DESIGN-CSS-001`: Tailwind/Inter/Space Grotesk template global CSS and dependency/config wiring removed from active app.
+- `SECURITY-DEPS-001`: Production audit high advisory removed; `npm audit --omit=dev` now has 0 vulnerabilities.
 
 ## Bugs Not Fixed
 
@@ -37,10 +55,14 @@ Key QA inputs included `QA_FINAL_REPORT.md`, `QA_REPORT.md`, `60_MINUTE_SITE_TES
 - `npm run scan:public`: PASS, 3 scanned / 0 hits.
 - `node scripts/scan-secrets.mjs`: PASS, 206 scanned / 0 hits.
 - `npm test -- src/api-docs-content.test.ts`: PASS, 2/2.
-- Latest `npm test`: PASS, 24 files / 101 tests.
-- Latest `node scripts/scan-secrets.mjs`: PASS, 211 scanned / 0 hits.
-- `npm run qa:uat`: PASS, 10/10.
-- `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`: FAIL, 8/10 due to live `/sss` copy drift.
+- Latest `npm run lint`: PASS.
+- Latest `npm test`: PASS, 27 files / 114 tests.
+- Latest `npm run build`: PASS with existing chunk-size warning only.
+- Latest `npm run scan:public`: PASS, 3 scanned / 0 hits.
+- Latest `node scripts/scan-secrets.mjs`: PASS, 226 scanned / 0 hits.
+- Latest `npm run qa:uat`: PASS, 10/10, report `qa-artifacts/uat-smoke-2026-05-27T06-34-09-399Z/uat-smoke-report.md`.
+- Latest `npm audit --omit=dev --json`: PASS, 0 vulnerabilities.
+- Live `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`: not rerun after the latest local restore/text cleanup in this pass; deploy/live gate remains pending.
 
 ## Files Changed
 
@@ -64,23 +86,25 @@ Key QA inputs included `QA_FINAL_REPORT.md`, `QA_REPORT.md`, `60_MINUTE_SITE_TES
 
 ## Tests Passed
 
-Local targeted and full regression passed. Public/source secret scans passed. Local Chrome UAT passed 10/10.
+Local targeted and full regression passed. Public/source secret scans passed. Local UAT passed 10/10.
 
 ## Tests Failed
 
-No final command failed after fixes. The initial targeted test failed intentionally before implementation because `v1-catalog` route did not exist.
+No final local command failed after the latest fixes. Earlier targeted tests failed intentionally before implementation as RED checks.
 
 ## Retest Results
 
-`R-BUG-001`, `R-BUG-004` and `R-BUG-005` are locally fixed and retested. Live backend catalog returns 200, but live bundle/content still drifts on `/sss`.
+`R-BUG-001`, `R-BUG-004`, `R-BUG-005`, `DESIGN-REGRESSION-001`, `UX-FAKE-LIVE-001`, `PUBLIC-CONFIG-001`, `STATIC-FAVICON-001`, `DESIGN-CSS-001`, and `SECURITY-DEPS-001` are locally fixed and retested. Live deploy smoke still needs a separate gated run.
 
 ## Design Preservation Result
 
-PASS with caveat: `src/App.tsx` text strings changed, but no CSS/class/layout/template/theme/button/card/modal styling was changed.
+PASS locally: old visual shell restored; latest changes were text/data/backend/guard only. No CSS/class/layout/theme/button/card/modal styling was changed.
 
 ## Remaining Risks
 
 The product is still not launch-ready because real billing, payment provider E2E, Google OAuth callback, admin browser UAT and live deploy smoke are not complete.
+
+General `npm audit` still reports 4 moderate dev-only advisories under `drizzle-kit`/nested esbuild. Production runtime audit is clean, so this is not the current launch-blocking high advisory, but it should stay tracked.
 
 ## Recommended Next Steps
 

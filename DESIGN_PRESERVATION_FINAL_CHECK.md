@@ -2,25 +2,25 @@
 
 ## Result
 
-PASS for the current backend plus text-only docs/video repair phase.
+PASS locally for the restored old YapayZekaLab visual shell and the latest text/data-only cleanup.
 
 ## Checks
 
-- Homepage source layout: unchanged.
-- Models tab source layout: unchanged.
-- SSS tab source layout: unchanged; video copy text changed only.
-- API tab source layout: unchanged; code example URL/key placeholder text changed only.
-- Admin tab source layout: unchanged.
+- Homepage: old approved hero `Türkiye'nin Yapay Zekâ API Geçidi` present in browser smoke.
+- Models tab source layout: unchanged; video beta/limited copy text changed only.
+- SSS/API source layout: unchanged; examples use placeholder `yzk_live_YOUR_KEY`.
+- Admin tab: anonymous Admin hidden in browser smoke; separate admin password flow not restored.
 - Balance modal source layout: unchanged.
 - Buttons/cards/colors/classes/theme tokens: unchanged.
 - Mobile style/breakpoints: unchanged.
 - No new frontend sections added.
 - No frontend sections removed.
 - No major UI order changed.
+- Leftover rejected global template stylesheet and unused Tailwind dependency wiring were removed; approved `src/yapayzekalab/tokens.css` remains the theme source.
 
 ## Evidence
 
-`src/App.tsx` changed only in strings. CSS, public asset, template, class and style files were not changed. Local after-change `qa:uat` passed 10/10.
+`src/App.tsx` is only a route wrapper; the restored visual shell lives under `src/yapayzekalab/`. Latest functional cleanup touched visible strings/data only. The CSS/dependency removal targeted only unused rejected template Tailwind wiring; the old theme's `tokens.css` remains unchanged. Local after-change `qa:uat` passed 10/10 and Playwright smoke captured `yzapi-home-final-local-template-clean.png`.
 
 ## Decision
 

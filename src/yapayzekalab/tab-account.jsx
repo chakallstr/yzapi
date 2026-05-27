@@ -1,0 +1,1030 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  I, Card, Chip, Caption, PulseDot, Dot,
+  PROVIDERS, MODELS, MODELS_BY_ID, MODEL_KEYS, modelMeta,
+  modelsByType, modelsByProvider, ctxFor,
+  computeOurUsd, usdToTL, computeTLPrice, fmt,
+  mockLogs, promptPool, useCountUp, useLogStream, nowTime,
+} from './shared.jsx';
+
+/* ============================================
+   AccountTab — Bakiye (USD birincil) · API anahtarları · ödeme yöntemleri.
+   ============================================ */
+
+const PAY_METHODS = [
+  { id: 'iban',    label: 'IBAN Havalesi',      sub: 'Banka transferi · 0% komisyon',           Ico: I.Database, time: '15 dk' },
+  { id: 'shopier', label: 'Shopier Kart',        sub: 'Kredi / banka kartı · %5 komisyon',       Ico: I.Wallet,   time: 'anlık' },
+  { id: 'crypto',  label: 'Cryptomus USDT',     sub: 'TRC20 ağı · %5 komisyon',                 Ico: I.Coin,     time: '5 dk' },
+];
+
+const mockKeys = [
+  { id: 'k-1', name: 'Production',  prefix: 'yzk_live_DEMO_PROD', last: '24 May 14:32', requests: 12480, status: 'active', scopes: ['chat','messages','images'] },
+  { id: 'k-2', name: 'Geliştirme',  prefix: 'yzk_live_DEMO_DEV',  last: '23 May 09:14', requests: 1284,  status: 'active', scopes: ['chat','messages','images','video'] },
+  { id: 'k-3', name: 'Test',        prefix: 'yzk_live_DEMO_TEST', last: '21 May 18:08', requests: 318,   status: 'paused', scopes: ['chat'] },
+];
+
+const SCOPE_META = {
+  chat:     { label: 'chat',     color: 'var(--accent-ink)', bg: 'var(--accent-bg)' },
+  messages: { label: 'messages', color: 'var(--lav-ink)',    bg: 'var(--t-purple-bg)' },
+  images:   { label: 'images',   color: '#9a3412',            bg: '#fff7ed' },
+  video:    { label: 'video',    color: '#047857',            bg: 'var(--ok-bg)' },
+};
+const ALL_SCOPES = Object.keys(SCOPE_META);
+const ACCESS_TOKEN_KEY = 'yz_access_token';
+const LEGACY_ACCESS_TOKEN_KEY = 'userAccessToken';
+const SANDBOX_TOKEN_LIMIT = 5000;
+const SANDBOX_IMAGE_LIMIT = 2;
+
+const getAccessToken = () => {
+  try {
+    return (
+      window.localStorage?.getItem(ACCESS_TOKEN_KEY) ||
+      window.localStorage?.getItem(LEGACY_ACCESS_TOKEN_KEY) ||
+      ''
+    );
+  } catch {
+    return '';
+  }
+};
+
+const apiJson = async (url, options = {}) => {
+  const token = getAccessToken();
+  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await fetch(url, {
+    ...options,
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(body?.message || body?.error || `İstek başarısız (${response.status})`);
+  }
+  return body;
+};
+
+const downloadWithAuth = async (url, filename) => {
+  const token = getAccessToken();
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const response = await fetch(url, { headers });
+  if (!response.ok) throw new Error(`Rapor indirilemedi (${response.status})`);
+  const blob = await response.blob();
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(href);
+};
+
+const currentMonth = () => new Date().toISOString().slice(0, 7);
+const asNumber = (value, fallback = 0) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+};
+const shortDate = (value) => {
+  if (!value) return '—';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+};
+const maskedKeyText = (key) => key?.maskedKey || (key?.prefix ? `${key.prefix}_••••••••••••` : '—');
+
+// === AutoRechargeCard — bakiye eşiğe düşünce otomatik yükle ========
+const AutoRechargeCard = ({ tweaks, setTweak }) => {
+  const [enabled, setEnabled] = useState(false);
+  const [threshold, setThreshold] = useState(5);
+  const [topUpAmount, setTopUpAmount] = useState(25);
+
+  return (
+    <Card pad={22}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+        <div>
+          <Caption>Otomatik bakiye yükleme</Caption>
+          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>Auto-recharge</div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.5 }}>
+            Bakiyen eşiğin altına düşünce otomatik yüklensin — API kesintisi olmaz.
+          </div>
+        </div>
+        <button onClick={() => setEnabled(v => !v)} style={{
+          width: 48, height: 26, borderRadius: 999,
+          background: enabled ? 'var(--accent)' : 'var(--ink-5)',
+          position: 'relative', transition: 'background 0.2s',
+        }}>
+          <span style={{
+            position: 'absolute', top: 3, left: enabled ? 25 : 3, width: 20, height: 20, borderRadius: '50%',
+            background: '#fff', transition: 'left 0.2s',
+          }} />
+        </button>
+      </div>
+      <div style={{ opacity: enabled ? 1 : 0.5, pointerEvents: enabled ? 'auto' : 'none', transition: 'opacity 0.15s' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', marginBottom: 10 }}>
+          <span style={{ fontSize: 12, color: 'var(--ink-2)', flexShrink: 0 }}>Bakiyem</span>
+          <span style={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>$</span>
+          <input type="number" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))}
+                 style={{ flex: 1, border: 0, outline: 'none', background: 'transparent', fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--ink)', minWidth: 0 }} className="tnum" />
+          <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>altına düşünce</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', marginBottom: 10 }}>
+          <span style={{ fontSize: 12, color: 'var(--ink-2)', flexShrink: 0 }}>otomatik</span>
+          <span style={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>$</span>
+          <input type="number" value={topUpAmount} onChange={(e) => setTopUpAmount(Number(e.target.value))}
+                 style={{ flex: 1, border: 0, outline: 'none', background: 'transparent', fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--ink)', minWidth: 0 }} className="tnum" />
+          <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>yükle</span>
+        </div>
+        <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', fontSize: 11.5, color: 'var(--accent-ink)' }}>
+          <strong>Shopier</strong> ile kayıtlı kartından çekilecek — komisyon %{tweaks?.feePct ?? 5}.
+          Aylık üst limit: <strong>$200</strong>.
+        </div>
+      </div>
+      {!enabled && (
+        <div style={{ fontSize: 10.5, color: 'var(--ink-3)', textAlign: 'center', marginTop: 12, fontFamily: 'var(--font-mono)' }}>
+          devre dışı — bakiyen sıfıra düşene kadar uyarı gelecek
+        </div>
+      )}
+    </Card>
+  );
+};
+
+// === SandboxKeyCard — ücretsiz test anahtarı =======================
+const SandboxKeyCard = ({ sandboxKey, sandboxFullKey, onCreate, busy }) => {
+  const quota = sandboxKey?.sandbox || {};
+  const tokenUsed = asNumber(quota.tokenUsed, 0);
+  const imageUsed = asNumber(quota.imageUsed, 0);
+  const created = Boolean(sandboxKey || sandboxFullKey);
+  return (
+    <Card pad={22} style={{ background: 'linear-gradient(135deg, var(--ok-bg) 0%, var(--surface) 100%)', border: '1px solid #a7f3d0' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: '#10b981', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+          <I.Beaker size={18} stroke="#fff" />
+        </div>
+        <div>
+          <Caption style={{ color: '#047857' }}>Sandbox · ücretsiz</Caption>
+          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>Test anahtarı</div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-2)', marginTop: 4, lineHeight: 1.5 }}>
+            Bakiye düşmez, gerçek istekler döner. Aylık <strong>5.000 token + 2 görsel</strong> limit. Kullanıcı başına tek kez oluşturulur.
+          </div>
+        </div>
+      </div>
+      {!created ? (
+        <button onClick={onCreate} disabled={busy} style={{
+          width: '100%', padding: '10px 14px', borderRadius: 9,
+          background: '#10b981', color: '#fff', fontSize: 12.5, fontWeight: 600,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          opacity: busy ? 0.7 : 1,
+        }}>
+          {busy ? <I.Refresh size={13} stroke="#fff" className="spin-slow" /> : <I.Key size={13} stroke="#fff" />}
+          {busy ? 'Oluşturuluyor…' : 'Sandbox anahtarı oluştur'}
+        </button>
+      ) : (
+        <div className="fade-in" style={{ padding: 12, borderRadius: 9, background: 'var(--surface)', border: '1px dashed #a7f3d0', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: '#047857', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {sandboxFullKey || maskedKeyText(sandboxKey)}
+          </span>
+          <button onClick={() => navigator.clipboard?.writeText(sandboxFullKey || sandboxKey?.maskedKey || '')} style={{ color: '#047857', padding: 4 }}><I.Copy size={12} stroke="#047857" /></button>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 16, marginTop: 14, fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+        <span>{fmt.num(tokenUsed)} / 5.000 token</span>
+        <span>·</span>
+        <span>{fmt.num(imageUsed)} / 2 görsel</span>
+        <span>·</span>
+        <span>tek sefer oluşturulur</span>
+      </div>
+    </Card>
+  );
+};
+
+// === TeamCard — projeye üye davet et ===============================
+const TeamCard = ({ team = [], onInvite, onRemove }) => {
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('developer');
+  const invite = async () => {
+    if (!inviteEmail.includes('@')) return;
+    await onInvite?.(inviteEmail, inviteRole);
+    setInviteEmail('');
+  };
+  const roleTone = { sahip: 'accent', admin: 'purple', developer: 'neutral' };
+  return (
+    <Card pad={22}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+        <div>
+          <Caption>Takım & üyeler</Caption>
+          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>Geliştirici daveti</div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>Aynı bakiye + anahtarlara birden fazla geliştirici erişebilir.</div>
+        </div>
+        <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)' }}>{team.length} üye</Chip>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+        {team.map((u, i) => (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '36px 1fr 80px 80px 70px 20px', gap: 10, alignItems: 'center', padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--accent-bg)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600 }}>
+              {u.name.split(' ').map(w => w[0]).join('').slice(0,2)}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</div>
+              <div style={{ fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</div>
+            </div>
+            <Chip tone={roleTone[u.role] || 'neutral'} style={{ fontSize: 9.5, justifySelf: 'start' }}>{u.role}</Chip>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }} className="tnum">{u.requests > 0 ? fmt.num(u.requests) : '—'}</span>
+            <Chip tone={u.status === 'aktif' ? 'ok' : 'neutral'} style={{ fontSize: 9.5, justifySelf: 'start', background: u.status === 'beklemede' ? '#fffbeb' : undefined, color: u.status === 'beklemede' ? '#a16207' : undefined }}>{u.status}</Chip>
+            <button onClick={() => onRemove?.(u.id)} style={{ color: 'var(--ink-3)', padding: 2 }}>
+              {u.role !== 'sahip' ? <I.Close size={11} stroke="var(--ink-3)" /> : null}
+            </button>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="email@adresi.com"
+               style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', fontSize: 12, outline: 'none' }} />
+        <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}
+                style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', fontSize: 12, fontFamily: 'var(--font-mono)' }}>
+          <option value="developer">developer</option>
+          <option value="admin">admin</option>
+        </select>
+        <button onClick={invite} style={{ padding: '8px 14px', borderRadius: 8, background: 'var(--ink)', color: '#fff', fontSize: 12, fontWeight: 600 }}>Davet et</button>
+      </div>
+    </Card>
+  );
+};
+
+// === WebhookCard — Slack/Discord bildirim entegrasyonu =============
+const eventKeyMap = {
+  lowBalance: 'low_balance',
+  anomaly: 'usage_anomaly',
+  dailyReport: 'daily_summary',
+  providerDown: 'provider_down',
+};
+
+const WebhookCard = ({ webhooks, onSaveWebhook, onTestWebhook }) => {
+  const [slackUrl, setSlackUrl] = useState('');
+  const [discordUrl, setDiscordUrl] = useState('');
+  const [events, setEvents] = useState({ lowBalance: true, anomaly: true, dailyReport: false, providerDown: true });
+  const [testing, setTesting] = useState(null);
+  const selectedEvents = Object.entries(eventKeyMap).filter(([uiKey]) => events[uiKey]).map(([, apiKey]) => apiKey);
+  const save = async () => {
+    await onSaveWebhook?.({ slackUrl, discordUrl, events: selectedEvents });
+  };
+  const test = async (which) => {
+    setTesting(which);
+    try {
+      await onSaveWebhook?.({ slackUrl, discordUrl, events: selectedEvents });
+      await onTestWebhook?.(which);
+    } finally {
+      setTesting(null);
+    }
+  };
+  useEffect(() => {
+    if (!webhooks) return;
+    const incoming = Array.isArray(webhooks.events) ? webhooks.events : [];
+    setSlackUrl(webhooks.slackUrl || '');
+    setDiscordUrl(webhooks.discordUrl || '');
+    setEvents({
+      lowBalance: incoming.includes('low_balance'),
+      anomaly: incoming.includes('usage_anomaly'),
+      dailyReport: incoming.includes('daily_summary'),
+      providerDown: incoming.includes('provider_down'),
+    });
+  }, [webhooks]);
+  return (
+    <Card pad={22}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+        <div>
+          <Caption>Bildirimler · webhook</Caption>
+          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>Slack &amp; Discord entegrasyonu</div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>Anomali, düşük bakiye, sağlayıcı kesintisi anında kanala düşer.</div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {[
+          { id: 'slack',   label: 'Slack',   url: slackUrl,   setUrl: setSlackUrl,   color: '#4a154b', bg: '#f5e6f5' },
+          { id: 'discord', label: 'Discord', url: discordUrl, setUrl: setDiscordUrl, color: '#5865f2', bg: '#eef0fe' },
+        ].map(w => (
+          <div key={w.id} style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600, color: w.color, background: w.bg, padding: '3px 8px', borderRadius: 5 }}>{w.label}</span>
+              <span style={{ fontSize: 10.5, color: w.url ? '#047857' : 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                {w.url ? '● bağlı' : '○ bağlı değil'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input value={w.url} onChange={(e) => w.setUrl(e.target.value)} placeholder="webhook URL"
+                     style={{ flex: 1, padding: '7px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 11, fontFamily: 'var(--font-mono)', outline: 'none' }} />
+              <button onClick={() => test(w.id)} disabled={!w.url || testing === w.id} style={{
+                padding: '7px 12px', borderRadius: 7, fontSize: 11.5, fontWeight: 500,
+                background: testing === w.id ? 'var(--ok-bg)' : 'var(--surface)',
+                color: testing === w.id ? '#047857' : 'var(--ink-2)',
+                border: '1px solid var(--border)', opacity: !w.url ? 0.5 : 1,
+              }}>{testing === w.id ? '✓ gönderildi' : 'Test'}</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: 'var(--accent-bg)', border: '1px solid var(--accent-border)' }}>
+        <Caption style={{ color: 'var(--accent-ink)', marginBottom: 8 }}>Bildirim türleri</Caption>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          {[
+            { k: 'lowBalance',   label: 'Bakiye < $5' },
+            { k: 'anomaly',      label: 'Kullanım anomalisi' },
+            { k: 'providerDown', label: 'Sağlayıcı kesintisi' },
+            { k: 'dailyReport',  label: 'Günlük özet' },
+          ].map(e => (
+            <label key={e.k} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, color: 'var(--accent-ink)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={events[e.k]} onChange={(ev) => setEvents(s => ({ ...s, [e.k]: ev.target.checked }))}
+                     style={{ accentColor: 'var(--accent)' }} />
+              {e.label}
+            </label>
+          ))}
+        </div>
+        <button onClick={save} style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8, background: 'var(--accent)', color: '#fff', fontSize: 11.5, fontWeight: 600 }}>
+          Bildirim ayarlarını kaydet
+        </button>
+      </div>
+    </Card>
+  );
+};
+
+// === MonthlyReportCard — kullanım raporu indir =====================
+const MonthlyReportCard = ({ report, onMonthChange, onDownloadReport }) => {
+  const [month, setMonth] = useState(currentMonth());
+  const [downloading, setDownloading] = useState(null);
+  const summary = report?.summary || {};
+  const dl = async (fmt) => {
+    setDownloading(fmt);
+    try {
+      await onDownloadReport?.(month, fmt);
+    } finally {
+      setDownloading(null);
+    }
+  };
+  const changeMonth = (value) => {
+    setMonth(value);
+    onMonthChange?.(value);
+  };
+  return (
+    <Card pad={22}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+        <div>
+          <Caption>Aylık rapor</Caption>
+          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>Kullanım & ödeme raporu</div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>Vergi/muhasebe için detaylı kullanım dökümü — CSV veya PDF.</div>
+        </div>
+        <select value={month} onChange={(e) => changeMonth(e.target.value)}
+                style={{ padding: '7px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface-2)', fontSize: 11.5, fontFamily: 'var(--font-mono)' }}>
+          {[currentMonth(), '2026-04','2026-03','2026-02','2026-01','2025-12'].filter((m, i, a) => a.indexOf(m) === i).map(m => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+      </div>
+      <div style={{ padding: 14, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', marginBottom: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+          {[
+            { l: 'İstek',      v: fmt.num(asNumber(summary.requestCount, 0)) },
+            { l: 'Token',      v: fmt.num(asNumber(summary.inputTokens, 0) + asNumber(summary.outputTokens, 0)) },
+            { l: 'Maliyet',    v: `$${asNumber(summary.costUsd, 0).toFixed(2)}` },
+            { l: 'Ödeme',      v: `₺${asNumber(summary.paymentTL, 0).toFixed(2)}` },
+          ].map((s, i) => (
+            <div key={i}>
+              <Caption style={{ fontSize: 8.5 }}>{s.l}</Caption>
+              <div style={{ fontSize: 16, fontWeight: 600, marginTop: 4, fontFamily: 'var(--font-mono)' }} className="tnum">{s.v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={() => dl('csv')} disabled={downloading === 'csv'} style={{
+          flex: 1, padding: '10px 14px', borderRadius: 8, background: 'var(--ink)', color: '#fff',
+          fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+        }}>
+          {downloading === 'csv' ? <I.Refresh size={12} stroke="#fff" className="spin-slow" /> : <I.File size={12} stroke="#fff" />}
+          {downloading === 'csv' ? 'Hazırlanıyor…' : 'CSV indir'}
+        </button>
+        <button onClick={() => dl('pdf')} disabled={downloading === 'pdf'} style={{
+          flex: 1, padding: '10px 14px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--ink)',
+          fontSize: 12, fontWeight: 600, border: '1px solid var(--border-st)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+        }}>
+          {downloading === 'pdf' ? <I.Refresh size={12} stroke="var(--ink)" className="spin-slow" /> : <I.File size={12} stroke="var(--ink)" />}
+          {downloading === 'pdf' ? 'Hazırlanıyor…' : 'PDF indir'}
+        </button>
+      </div>
+    </Card>
+  );
+};
+
+const TopUpAmount = ({ amount, selected, onSelect, tlRate }) => (
+  <button onClick={() => onSelect(amount)} style={{
+    padding: '14px 12px', borderRadius: 12,
+    border: `1.5px solid ${selected ? 'var(--accent)' : 'var(--border)'}`,
+    background: selected ? 'var(--accent-bg)' : 'var(--surface)',
+    textAlign: 'center',
+    transition: 'all 0.15s',
+    position: 'relative',
+  }}>
+    {selected && <I.Check size={11} stroke="var(--accent)" style={{ position: 'absolute', top: 6, right: 6 }} />}
+    <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.4, color: selected ? 'var(--accent-ink)' : 'var(--ink)', fontFamily: 'var(--font-sans)' }} className="tnum">
+      ${amount}
+    </div>
+    <div style={{ fontSize: 9.5, color: selected ? 'var(--accent-ink)' : 'var(--ink-3)', marginTop: 2, fontFamily: 'var(--font-mono)' }} className="tnum">
+      ≈ ₺{(amount * tlRate).toFixed(0)}
+    </div>
+  </button>
+);
+
+const AccountTab = ({ ctx }) => {
+  const { tweaks, setTweak, goto } = ctx;
+  const fallbackBalanceUSD = tweaks.balanceUSD ?? 0;
+  const tlRate = tweaks.tlRate ?? 34.5;
+  const MIN_USD = 2;
+
+  // Scroll to sub-section when goto changes (driven by UserMenu items)
+  useEffect(() => {
+    if (!goto) return;
+    const el = document.getElementById('account-' + goto);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      el.classList.add('section-flash');
+      setTimeout(() => el.classList.remove('section-flash'), 1500);
+    }
+  }, [goto]);
+
+  const [topUp, setTopUp] = useState(10);
+  const [customAmount, setCustomAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('iban');
+  const [showNewKey, setShowNewKey] = useState(false);
+  const [newKey, setNewKey] = useState('');
+  const [keyName, setKeyName] = useState('production-key');
+  const [revealKey, setRevealKey] = useState({});
+  const [panelError, setPanelError] = useState('');
+  const [panelBusy, setPanelBusy] = useState(false);
+  const [me, setMe] = useState(null);
+  const [apiKeys, setApiKeys] = useState([]);
+  const [usageRows, setUsageRows] = useState([]);
+  const [paymentRows, setPaymentRows] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState(null);
+  const [team, setTeam] = useState([]);
+  const [webhooks, setWebhooks] = useState(null);
+  const [sandboxKey, setSandboxKey] = useState(null);
+  const [sandboxFullKey, setSandboxFullKey] = useState('');
+  const [sandboxBusy, setSandboxBusy] = useState(false);
+  const [monthlyReport, setMonthlyReport] = useState(null);
+
+  const balanceUSD = asNumber(me?.bakiyeUsd, fallbackBalanceUSD);
+  const monthCostUsd = asNumber(monthlyReport?.summary?.costUsd, usageRows.reduce((sum, row) => sum + asNumber(row.costUsd, asNumber(row.costTL, 0) / tlRate), 0));
+  const monthRequests = asNumber(monthlyReport?.summary?.requestCount, usageRows.length);
+
+  const loadMonthlyReport = async (month = currentMonth()) => {
+    const report = await apiJson(`/api/user/reports/monthly?month=${encodeURIComponent(month)}`);
+    setMonthlyReport(report);
+    return report;
+  };
+
+  const loadAccount = async () => {
+    if (!getAccessToken()) return;
+    setPanelBusy(true);
+    setPanelError('');
+    const safe = (promise, fallback) => promise.catch(() => fallback);
+    try {
+      const [meData, keysData, usageData, paymentsData, methodsData, teamData, webhookData, sandboxData, reportData] = await Promise.all([
+        safe(apiJson('/api/user/me'), null),
+        safe(apiJson('/api/user/api-keys'), []),
+        safe(apiJson('/api/user/usage-records'), []),
+        safe(apiJson('/api/payments/me'), []),
+        safe(apiJson('/api/payments/methods'), null),
+        safe(apiJson('/api/user/team/members'), []),
+        safe(apiJson('/api/user/webhooks'), null),
+        safe(apiJson('/api/user/sandbox-key'), null),
+        safe(apiJson(`/api/user/reports/monthly?month=${currentMonth()}`), null),
+      ]);
+      setMe(meData);
+      setApiKeys(Array.isArray(keysData) ? keysData : []);
+      setUsageRows(Array.isArray(usageData) ? usageData : []);
+      setPaymentRows(Array.isArray(paymentsData) ? paymentsData : []);
+      setPaymentMethods(methodsData);
+      setTeam(Array.isArray(teamData) ? teamData : []);
+      setWebhooks(webhookData);
+      setSandboxKey(sandboxData);
+      setMonthlyReport(reportData);
+      if (meData?.bakiyeUsd !== undefined) setTweak('balanceUSD', asNumber(meData.bakiyeUsd, fallbackBalanceUSD));
+    } catch (error) {
+      setPanelError(error instanceof Error ? error.message : 'Panel verileri alınamadı');
+    } finally {
+      setPanelBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAccount();
+  }, []);
+
+  const createApiKey = async () => {
+    const created = await apiJson('/api/user/api-keys', { method: 'POST', body: { ad: keyName || 'production-key' } });
+    setNewKey(created.key);
+    setShowNewKey(true);
+    await loadAccount();
+  };
+
+  const revokeApiKey = async (key) => {
+    if (!key?.id) return;
+    const ok = window.confirm(`${key.ad || key.name || 'API anahtarı'} iptal edilsin mi?`);
+    if (!ok) return;
+    await apiJson(`/api/user/api-keys/${key.id}/revoke`, { method: 'POST' });
+    await loadAccount();
+  };
+
+  const createSandboxKey = async () => {
+    setSandboxBusy(true);
+    setPanelError('');
+    try {
+      const created = await apiJson('/api/user/sandbox-key', { method: 'POST' });
+      setSandboxFullKey(created.key || '');
+      setSandboxKey(created);
+      await loadAccount();
+    } catch (error) {
+      setPanelError(error instanceof Error ? error.message : 'Sandbox anahtarı oluşturulamadı');
+    } finally {
+      setSandboxBusy(false);
+    }
+  };
+
+  const inviteTeamMember = async (email, role) => {
+    await apiJson('/api/user/team/invite', { method: 'POST', body: { email, role } });
+    await loadAccount();
+  };
+
+  const removeTeamMember = async (id) => {
+    if (!id) return;
+    await apiJson(`/api/user/team/members/${id}`, { method: 'DELETE' });
+    await loadAccount();
+  };
+
+  const saveWebhook = async (payload) => {
+    const saved = await apiJson('/api/user/webhooks', { method: 'PATCH', body: payload });
+    setWebhooks(saved);
+  };
+
+  const testWebhook = async (channel) => {
+    await apiJson('/api/user/webhooks/test', { method: 'POST', body: { channel } });
+  };
+
+  const downloadReport = async (month, format) => {
+    await downloadWithAuth(`/api/user/reports/monthly?month=${encodeURIComponent(month)}&format=${format}`, `yapayzekalab-${month}.${format}`);
+  };
+
+  const rawAmount = customAmount ? Number(customAmount) : topUp;
+  const effectiveAmount = Math.max(MIN_USD, isFinite(rawAmount) ? rawAmount : 0);
+  const belowMin = (customAmount && Number(customAmount) > 0 && Number(customAmount) < MIN_USD);
+  const fee = payMethod === 'iban' ? 0 : effectiveAmount * (tweaks.feePct ?? 5) / 100;
+  const total = effectiveAmount + fee;
+  const backendPaymentMethod = payMethod === 'crypto' ? 'cryptomus' : payMethod;
+  const selectedPaymentMethod = paymentMethods?.[backendPaymentMethod];
+  const paymentMethodEnabled = selectedPaymentMethod?.enabled !== false;
+
+  const onTopUp = async () => {
+    if (effectiveAmount < MIN_USD) return;
+    if (!paymentMethodEnabled) {
+      setPanelError(selectedPaymentMethod?.reason || 'Ödeme yöntemi şu an kapalı.');
+      return;
+    }
+    setPanelBusy(true);
+    setPanelError('');
+    try {
+      const result = await apiJson(`/api/payments/${payMethod}/init`, {
+        method: 'POST',
+        body: { amountUsd: effectiveAmount },
+      });
+
+      if (payMethod === 'shopier' && result?.actionUrl && result?.fields) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = result.actionUrl;
+        for (const [name, value] of Object.entries(result.fields)) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = name;
+          input.value = String(value);
+          form.appendChild(input);
+        }
+        document.body.appendChild(form);
+        form.submit();
+        return;
+      }
+
+      if (payMethod === 'crypto' && result?.url) {
+        window.location.assign(result.url);
+        return;
+      }
+
+      if (payMethod === 'iban') {
+        const ref = result?.referansKodu ? ` Referans: ${result.referansKodu}` : '';
+        window.alert(`IBAN ödeme bildirimi oluşturuldu.${ref}`);
+        await loadAccount();
+      }
+    } catch (error) {
+      setPanelError(error instanceof Error ? error.message : 'Ödeme başlatılamadı.');
+    } finally {
+      setPanelBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+
+      {/* Header */}
+      <div>
+        <Caption>Hesap</Caption>
+        <h2 style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.8, margin: '6px 0 6px' }}>
+          Bakiye <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: 'var(--ink-3)' }}>&</span> API anahtarları
+        </h2>
+        <p style={{ fontSize: 12.5, color: 'var(--ink-2)', margin: 0, lineHeight: 1.55 }}>
+          Tüm hesaplamalar <strong>USD</strong> üzerinden yapılır. TL gösterimleri yalnızca bilgi amaçlıdır.
+        </p>
+        {panelError && (
+          <div style={{ marginTop: 10, padding: '9px 12px', borderRadius: 9, background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: 11.5 }}>
+            {panelError}
+          </div>
+        )}
+        {panelBusy && (
+          <div style={{ marginTop: 8, fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>panel verileri güncelleniyor…</div>
+        )}
+      </div>
+
+      {/* Balance + top-up */}
+      <div id="account-balance" style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 18, scrollMarginTop: 80 }}>
+        {/* Balance card */}
+        <Card pad={28} style={{
+          background: 'linear-gradient(135deg, var(--ink) 0%, #1e293b 100%)',
+          color: 'var(--surface)', position: 'relative', overflow: 'hidden',
+        }}>
+          <div style={{
+            position: 'absolute', top: -40, right: -40, width: 200, height: 200,
+            borderRadius: '50%', background: 'var(--accent)', opacity: 0.15, filter: 'blur(40px)',
+          }} />
+          <div style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <Caption style={{ color: 'rgba(255,255,255,0.55)' }}>Mevcut bakiye · USD</Caption>
+              <Chip tone="ok" style={{ background: 'rgba(16,185,129,0.15)', color: '#6ee7b7', border: '1px solid rgba(110,231,183,0.3)' }}>
+                <PulseDot color="#10b981" size={5} withRing={false} /> aktif
+              </Chip>
+            </div>
+            <div style={{ fontSize: 52, fontWeight: 600, letterSpacing: -2.2, lineHeight: 1, marginTop: 14, fontFamily: 'var(--font-sans)' }} className="tnum">
+              ${balanceUSD.toFixed(2)}
+            </div>
+            <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: 'var(--font-mono)' }} className="tnum">
+              ≈ ₺{(balanceUSD * tlRate).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · bilgi · kur ₺{tlRate.toFixed(2)}
+            </div>
+
+            <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,0.1)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+              <div>
+                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', fontFamily: 'var(--font-mono)', letterSpacing: 0.6 }}>BU AY KULLANIM</div>
+                <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.5, marginTop: 4 }} className="tnum">${monthCostUsd.toFixed(2)}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1, fontFamily: 'var(--font-mono)' }}>≈ ₺{(monthCostUsd * tlRate).toFixed(2)}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', fontFamily: 'var(--font-mono)', letterSpacing: 0.6 }}>İSTEK</div>
+                <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.5, marginTop: 4 }} className="tnum">{fmt.num(monthRequests)}</div>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Top-up form */}
+        <Card pad={28}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
+            <Caption>Bakiye yükle · USD</Caption>
+            <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)' }}>min ${MIN_USD}</Chip>
+          </div>
+
+          {/* Quick amounts */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
+            {[2, 10, 25, 50].map(a => (
+              <TopUpAmount key={a} amount={a} selected={!customAmount && topUp === a} tlRate={tlRate}
+                           onSelect={(v) => { setTopUp(v); setCustomAmount(''); }} />
+            ))}
+          </div>
+
+          {/* Custom amount */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, border: `1px solid ${belowMin ? '#fee2e2' : 'var(--border)'}`, background: belowMin ? '#fef2f2' : 'var(--surface-2)', marginBottom: 6 }}>
+            <span style={{ fontSize: 14, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>$</span>
+            <input value={customAmount}
+                   onChange={(e) => setCustomAmount(e.target.value.replace(/[^\d.]/g, ''))}
+                   placeholder={`Özel tutar (min $${MIN_USD})`}
+                   style={{
+                     flex: 1, border: 0, outline: 'none', background: 'transparent',
+                     fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--ink)',
+                   }} className="tnum" />
+            {customAmount && Number(customAmount) > 0 && (
+              <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>≈ ₺{(Number(customAmount) * tlRate).toFixed(0)}</span>
+            )}
+          </div>
+          {belowMin && (
+            <div style={{ fontSize: 10.5, color: '#b91c1c', fontFamily: 'var(--font-mono)', marginBottom: 12 }}>
+              Minimum tutar ${MIN_USD}. Daha yüksek bir miktar girin.
+            </div>
+          )}
+          {!belowMin && <div style={{ marginBottom: 12 }} />}
+
+          {/* Payment method */}
+          <Caption style={{ marginBottom: 10 }}>Ödeme yöntemi</Caption>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
+            {PAY_METHODS.map(m => {
+              const on = payMethod === m.id;
+              const methodKey = m.id === 'crypto' ? 'cryptomus' : m.id;
+              const methodInfo = paymentMethods?.[methodKey];
+              const disabled = methodInfo?.enabled === false;
+              return (
+                <button key={m.id} disabled={disabled} onClick={() => !disabled && setPayMethod(m.id)} style={{
+                  padding: '12px 14px', borderRadius: 12, textAlign: 'left',
+                  border: `1.5px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+                  background: on ? 'var(--accent-bg)' : 'var(--surface)',
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  opacity: disabled ? 0.55 : 1,
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.15s',
+                }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    background: on ? 'var(--accent)' : 'var(--surface-2)',
+                    color: on ? '#fff' : 'var(--ink-2)',
+                    display: 'grid', placeItems: 'center', flexShrink: 0,
+                  }}>
+                    <m.Ico size={16} stroke={on ? '#fff' : 'var(--ink-2)'} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600 }}>{m.label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>{disabled ? (methodInfo?.reason || 'Ödeme yöntemi şu an kapalı') : m.sub}</div>
+                  </div>
+                  <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', letterSpacing: 0.5 }}>{m.time}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Breakdown */}
+          <div style={{ padding: 14, borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--border)', marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0' }}>
+              <span style={{ color: 'var(--ink-2)' }}>Yüklenecek bakiye</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }} className="tnum">${effectiveAmount.toFixed(2)}</span>
+            </div>
+            {fee > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0' }}>
+                <span style={{ color: 'var(--ink-2)' }}>Komisyon %{tweaks.feePct ?? 5}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }} className="tnum">${fee.toFixed(2)}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '8px 0 0', marginTop: 6, borderTop: '1px solid var(--border)' }}>
+              <span style={{ fontWeight: 600 }}>Ödenecek</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-ink)' }} className="tnum">
+                ${total.toFixed(2)}
+                <span style={{ fontWeight: 500, marginLeft: 8, color: 'var(--ink-3)' }}>≈ ₺{(total * tlRate).toFixed(2)}</span>
+              </span>
+            </div>
+          </div>
+
+          <button onClick={onTopUp} disabled={belowMin || effectiveAmount < MIN_USD || !paymentMethodEnabled} style={{
+            width: '100%', padding: '11px 0', borderRadius: 10,
+            background: belowMin || !paymentMethodEnabled ? 'var(--ink-4)' : 'var(--accent)', color: '#fff',
+            fontSize: 13, fontWeight: 600,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            opacity: belowMin || !paymentMethodEnabled ? 0.55 : 1, cursor: belowMin || !paymentMethodEnabled ? 'not-allowed' : 'pointer',
+          }}>
+            <I.Wallet size={14} stroke="#fff" />
+            <span>${total.toFixed(2)} öde · bakiyeye USD ekle</span>
+          </button>
+
+          <div style={{ fontSize: 10.5, color: 'var(--ink-3)', textAlign: 'center', marginTop: 10, fontFamily: 'var(--font-mono)', lineHeight: 1.55 }}>
+            Ücretlendirme USD bazında — TL tutarı yalnızca <strong style={{ color: 'var(--ink-2)' }}>bilgi</strong> amaçlıdır.
+            Minimum yükleme <strong style={{ color: 'var(--ink-2)' }}>${MIN_USD}</strong>.
+          </div>
+        </Card>
+      </div>
+
+      {/* Auto-recharge + Sandbox key cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+        <AutoRechargeCard tweaks={tweaks} setTweak={setTweak} />
+        <SandboxKeyCard sandboxKey={sandboxKey} sandboxFullKey={sandboxFullKey} onCreate={createSandboxKey} busy={sandboxBusy} />
+      </div>
+
+      {/* Team + Webhooks */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 18 }}>
+        <TeamCard team={team} onInvite={inviteTeamMember} onRemove={removeTeamMember} />
+        <WebhookCard webhooks={webhooks} onSaveWebhook={saveWebhook} onTestWebhook={testWebhook} />
+      </div>
+
+      {/* Monthly report */}
+      <MonthlyReportCard report={monthlyReport} onMonthChange={loadMonthlyReport} onDownloadReport={downloadReport} />
+
+      {/* API keys */}
+      <Card pad={22} id="account-keys" style={{ scrollMarginTop: 80 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: -0.2 }}>API anahtarları</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+              Authorization: Bearer <span style={{ fontFamily: 'var(--font-mono)' }}>yzk_live_…</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input value={keyName} onChange={(e) => setKeyName(e.target.value)} placeholder="anahtar adı"
+                   style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', fontSize: 11.5, outline: 'none' }} />
+            <button onClick={createApiKey} style={{
+              background: 'var(--ink)', color: '#fff',
+              padding: '8px 14px', borderRadius: 9,
+              fontSize: 12, fontWeight: 500,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <I.Key size={12} stroke="#fff" /> Yeni anahtar
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 1.8fr 1.2fr 100px 90px 60px', gap: 14,
+            padding: '0 0 10px', borderBottom: '1px solid var(--border)',
+          }}>
+            {['İsim', 'Anahtar', 'Scopes', 'Son kullanım', 'İstek', 'Durum'].map(h => <Caption key={h} style={{ fontSize: 9 }}>{h}</Caption>)}
+          </div>
+          {apiKeys.length === 0 && (
+            <div style={{ padding: '16px 0', fontSize: 12, color: 'var(--ink-3)' }}>
+              Henüz API anahtarı yok. Üretim veya sandbox anahtarı oluşturabilirsiniz.
+            </div>
+          )}
+          {apiKeys.map((k, i) => (
+            <div key={k.id} style={{
+              display: 'grid', gridTemplateColumns: '1fr 1.8fr 1.2fr 100px 90px 60px', gap: 14,
+              padding: '14px 0', borderBottom: i < apiKeys.length - 1 ? '1px solid var(--border)' : 'none',
+              alignItems: 'center', fontSize: 12,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <I.Key size={13} stroke="var(--ink-3)" />
+                <span style={{ fontWeight: 500 }}>{k.ad || k.name || 'API anahtarı'}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {revealKey[k.id] ? maskedKeyText(k) : maskedKeyText(k)}
+                </span>
+                <button onClick={() => setRevealKey(s => ({ ...s, [k.id]: !s[k.id] }))} style={{ color: 'var(--ink-3)', padding: 2 }}>
+                  {revealKey[k.id] ? <I.Close size={11} stroke="var(--ink-3)" /> : <I.Sparkle size={11} stroke="var(--ink-3)" />}
+                </button>
+                <button onClick={() => navigator.clipboard?.writeText(k.maskedKey || k.prefix || '')} style={{ color: 'var(--ink-3)', padding: 2 }} title="Kopyala">
+                  <I.Copy size={11} stroke="var(--ink-3)" />
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {(k.scopes || ALL_SCOPES).map(s => {
+                  const sm = SCOPE_META[s] || { label: s, color: 'var(--ink-3)', bg: 'rgba(15,23,42,0.06)' };
+                  return (
+                    <span key={s} style={{
+                      fontSize: 9.5, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: 0.3,
+                      padding: '2px 6px', borderRadius: 4,
+                      background: sm.bg, color: sm.color,
+                    }}>{sm.label}</span>
+                  );
+                })}
+                <button onClick={() => revokeApiKey(k)} style={{ color: 'var(--ink-3)', padding: '2px 4px', fontSize: 10, fontWeight: 500 }}>iptal</button>
+              </div>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 11 }}>{shortDate(k.sonKullanim || k.olusturma)}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }} className="tnum">{k.kind === 'sandbox' ? `${fmt.num(k.sandbox?.tokenUsed || 0)} tok` : '—'}</span>
+              <Chip tone={k.aktif !== false ? 'ok' : 'neutral'} style={{ fontSize: 9.5 }}>
+                {k.aktif !== false ? 'aktif' : 'pasif'}
+              </Chip>
+            </div>
+          ))}
+        </div>
+
+        {showNewKey && (
+          <div className="fade-in" style={{ marginTop: 18, padding: 16, borderRadius: 12, background: 'var(--accent-bg)', border: '1px solid var(--accent-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <I.Key size={16} stroke="var(--accent-ink)" />
+                <div>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-ink)' }}>Yeni anahtar üretildi</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--accent-ink)', marginTop: 2 }}>{newKey}</div>
+                </div>
+              </div>
+              <button onClick={() => setShowNewKey(false)} style={{ color: 'var(--accent-ink)' }}>
+                <I.Close size={14} stroke="var(--accent-ink)" />
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--accent-ink)', marginTop: 8, fontStyle: 'italic' }}>
+              Bu anahtarı şimdi kopyala — bir daha gösterilmez.
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Usage records (USD primary) */}
+      <Card pad={0} id="account-usage" style={{ overflow: 'hidden', scrollMarginTop: 80 }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>Kullanım geçmişi</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>Son istekler · maliyet & kalan bakiye USD bazında</div>
+          </div>
+          <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)' }}>son {usageRows.length}</Chip>
+        </div>
+        <div style={{
+          display: 'grid', gridTemplateColumns: '120px 1.4fr 80px 1.2fr 90px 110px 70px 70px',
+          gap: 10, padding: '12px 20px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)',
+        }}>
+          {['Request ID','Model','Tür','Token (in/out)','Maliyet','Kalan bakiye','Süre','Durum'].map(h => (
+            <Caption key={h} style={{ fontSize: 9 }}>{h}</Caption>
+          ))}
+        </div>
+        {usageRows.map((u, i) => {
+          const m = modelMeta(u.modelId || u.model);
+          const costUsd = asNumber(u.costUsd, asNumber(u.costTL, 0) / tlRate);
+          const balanceAfterUsd = asNumber(u.remainingUsd, asNumber(u.remainingTL, 0) / tlRate);
+          return (
+            <div key={u.id} style={{
+              display: 'grid', gridTemplateColumns: '120px 1.4fr 80px 1.2fr 90px 110px 70px 70px',
+              gap: 10, padding: '11px 20px',
+              borderBottom: i < usageRows.length - 1 ? '1px solid var(--border)' : 'none',
+              alignItems: 'center', fontSize: 12,
+            }}>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 10.5 }}>{u.requestId || u.id}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <span style={{ width: 6, height: 6, borderRadius: 2, background: m.color, flexShrink: 0 }} />
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.modelId || u.model}</span>
+              </div>
+              <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, justifySelf: 'start' }}>{u.type}</Chip>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-2)', fontSize: 11 }} className="tnum">
+                {fmt.num(u.inputUsage || u.inTok || 0)} <span style={{ color: 'var(--ink-4)' }}>→</span> {fmt.num(u.outputUsage || u.outTok || 0)}
+              </span>
+              <div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }} className="tnum">${costUsd.toFixed(4)}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-4)' }} className="tnum">₺{asNumber(u.costTL, costUsd * tlRate).toFixed(2)}</div>
+              </div>
+              <div>
+                <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }} className="tnum">${balanceAfterUsd.toFixed(2)}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-4)' }} className="tnum">₺{asNumber(u.remainingTL, balanceAfterUsd * tlRate).toFixed(2)}</div>
+              </div>
+              <span style={{ fontFamily: 'var(--font-mono)' }} className="tnum">{u.responseMs || u.ms || 0}ms</span>
+              <span>
+                {u.status === 'success' ? (
+                  <Chip tone="ok" style={{ fontSize: 9.5 }}><I.Check size={9} stroke="#047857" /> ok</Chip>
+                ) : (
+                  <Chip tone="neutral" style={{ background: '#fef2f2', color: '#b91c1c', fontSize: 9.5 }}>{u.errorCode || u.err || 'error'}</Chip>
+                )}
+              </span>
+            </div>
+          );
+        })}
+      </Card>
+
+      {/* Payment history (USD primary) */}
+      <Card pad={0} id="account-profile" style={{ overflow: 'hidden', scrollMarginTop: 80 }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>Ödeme geçmişi</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>Son ödemeler · USD bazında bakiye eklemesi</div>
+        </div>
+        <div style={{
+          display: 'grid', gridTemplateColumns: '110px 110px 100px 90px 100px 110px 110px',
+          gap: 10, padding: '12px 20px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)',
+        }}>
+          {['Ödeme ID','Yöntem','Brüt','Komisyon','Net (USD)','Durum','Tamamlanma'].map(h => (
+            <Caption key={h} style={{ fontSize: 9 }}>{h}</Caption>
+          ))}
+        </div>
+        {paymentRows.map((p, i) => {
+          const method = p.metod || p.method;
+          const methodLabel = { iban: 'IBAN', shopier: 'Shopier', cryptomus: 'Cryptomus' }[method] || method;
+          const statusTone = {
+            tamamlandi: { bg: 'var(--ok-bg)', fg: '#047857', label: 'tamamlandı' },
+            bekliyor:   { bg: '#fffbeb',      fg: '#a16207', label: 'bekliyor'    },
+            iptal:      { bg: '#fef2f2',      fg: '#b91c1c', label: 'iptal'       },
+            basarisiz:  { bg: '#fef2f2',      fg: '#b91c1c', label: 'başarısız'   },
+          }[p.durum || p.status] || { bg: 'var(--surface-2)', fg: 'var(--ink-2)', label: p.durum || p.status || '—' };
+          // Convert TL fields to USD for display
+          const grossTl = asNumber(p.miktarTL ?? p.gross, 0);
+          const feeTl = asNumber(p.kdvTL ?? p.fee, 0);
+          const netTl = asNumber(p.netTL, Math.max(0, grossTl - feeTl));
+          const grossUsd = grossTl / tlRate;
+          const feeUsd = feeTl / tlRate;
+          const netUsd = netTl / tlRate;
+          return (
+            <div key={p.id} style={{
+              display: 'grid', gridTemplateColumns: '110px 110px 100px 90px 100px 110px 110px',
+              gap: 10, padding: '11px 20px',
+              borderBottom: i < paymentRows.length - 1 ? '1px solid var(--border)' : 'none',
+              alignItems: 'center', fontSize: 12,
+            }}>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 10.5 }}>{p.id}</span>
+              <span style={{ fontWeight: 500 }}>{methodLabel}</span>
+              <div>
+                <div style={{ fontFamily: 'var(--font-mono)' }} className="tnum">${grossUsd.toFixed(2)}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-4)' }} className="tnum">₺{grossTl.toFixed(2)}</div>
+              </div>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }} className="tnum">${feeUsd.toFixed(2)}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }} className="tnum">${netUsd.toFixed(2)}</span>
+              <Chip tone="neutral" style={{ background: statusTone.bg, color: statusTone.fg, fontSize: 9.5, justifySelf: 'start' }}>{statusTone.label}</Chip>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 10.5 }}>{shortDate(p.tamamlanma || p.completedAt)}</span>
+            </div>
+          );
+        })}
+      </Card>
+    </div>
+  );
+};
+
+export { AccountTab };
