@@ -671,3 +671,29 @@ Agent 2 retest vote: APPROVE
 Agent 3 retest vote: APPROVE
 Approval count: 3/3
 Final retest status: ACCEPTED
+
+## LOCAL-SHOPIER-TL-COLLECTION-001 Shopier TRY Collection Retest
+
+Bug ID: PAYMENT-SHOPIER-TL-COLLECTION-001
+Fix decision ID: DEC-FIX-SHOPIER-TL-COLLECTION-001
+Retest decision ID: DEC-RETEST-SHOPIER-TL-COLLECTION-001
+Command or manual flow:
+- Added regression coverage for Shopier checkout form fields and payment route source contract.
+- Ran `npm test -- src/server/services/shopier-service.test.ts src/payment-safety-contract.test.ts src/server/services/payment-pricing.test.ts`.
+Expected:
+- User can select USD top-up amount.
+- Backend preserves `amountUsd` metadata for user-facing USD balance.
+- Shopier receives TRY collection payload with `currency=0` and rounded whole-TL `total_order_value`.
+- TL rounding delta is not credited as extra USD balance.
+- No frontend visual/theme/layout change.
+Actual:
+- Test output: 3 files passed, 21 tests passed.
+- `shopier-service.test.ts` verifies `currency=0`, `total_order_value=1182`, and `product_name="Bakiye Yukleme — 1182 TL"`.
+- `payment-safety-contract.test.ts` verifies `/shopier/init` stores `amountUsd`, `payableTL`, `creditTL`, and sends `quote.payableTL` into `buildCheckoutForm`.
+Passed/Failed: Passed locally.
+Evidence: Current session command output; no real provider key, no real payment, no secret printed.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: ACCEPTED_LOCALLY_PROVIDER_E2E_STILL_BLOCKED

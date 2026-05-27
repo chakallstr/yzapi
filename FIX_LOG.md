@@ -263,3 +263,12 @@ Operasyon tarihi: 2026-05-26
 - Yapılan değişiklik: Test yalnızca test dosyasında payload karakterini değiştirerek imzayı deterministik bozuyor. Üretim OAuth kodu değişmedi.
 - Test: Targeted OAuth/payment tests PASS 10/10; full `npm test` PASS 29 files / 130 tests.
 - Sonuç: TEST FLAKE FIXED.
+
+## PAYMENT-SHOPIER-TL-COLLECTION-001 — Shopier TRY collection guard
+
+- Problem: Kullanıcı bakiyesi USD bazlı seçiliyor, ancak Shopier tahsilatının kesin olarak TL ve yukarı yuvarlanmış tam TL olması gerekiyor. Bu davranış kodda vardı, fakat özel regresyon testiyle kilitlenmemişti.
+- Kök neden: Launch/payment raporlarında Shopier E2E hâlâ provider credential nedeniyle bloklu; bu sırada yanlışlıkla USD tutarın Shopier formuna gönderilmesini engelleyen açık test kapsamı güçlendirildi.
+- Karar: `DEC-FIX-SHOPIER-TL-COLLECTION-001`, 3/3 APPROVED, 4th guard test-only approval.
+- Yapılan değişiklik: Üretim kodu değiştirilmedi. `shopier-service` testi artık Shopier formunda `currency=0`, `total_order_value` ve `product_name` alanlarının TL olduğunu doğruluyor. Source contract testi `/shopier/init` içinde `amountUsd` metadata'nın korunduğunu, `miktarTL/payableTL` ile Shopier'e TL gönderildiğini doğruluyor.
+- Test: `npm test -- src/server/services/shopier-service.test.ts src/payment-safety-contract.test.ts src/server/services/payment-pricing.test.ts`
+- Sonuç: PASS, 3 test dosyası / 21 test. Shopier canlı/sandbox E2E hâlâ rotated provider credential ve panel ayarları yapılmadan launch PASS sayılmaz.

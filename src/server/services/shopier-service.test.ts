@@ -132,6 +132,22 @@ describe("verifyCallback — Shopier HMAC", () => {
     expect(result.actionUrl).toContain("shopier.com");
   });
 
+  it("sends the rounded TRY collection amount to Shopier, not the USD top-up amount", async () => {
+    const { buildCheckoutForm } = await import("./shopier-service.js");
+    const result = buildCheckoutForm({
+      userId: "user-123",
+      paymentId: "pay-try-1182",
+      miktarTL: 1182,
+      email: "test@example.com",
+      adSoyad: "Test User",
+    });
+
+    expect(result.fields.currency).toBe("0");
+    expect(result.fields.total_order_value).toBe("1182");
+    expect(result.fields.product_name).toBe("Bakiye Yukleme — 1182 TL");
+    expect(result.fields.product_name).not.toMatch(/usd|\$/i);
+  });
+
   it("returns valid=false when SHOPIER_API_SECRET not set", async () => {
     const origSecret = process.env.SHOPIER_API_SECRET;
     delete process.env.SHOPIER_API_SECRET;

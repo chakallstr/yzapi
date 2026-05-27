@@ -34,6 +34,58 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-FIX-SHOPIER-TL-COLLECTION-001
+Decision title: Lock Shopier top-up collection as TRY while preserving USD balance quote
+Decision type: Test/repair approval
+Related bug IDs: PAYMENT-SHOPIER-TL-001, R-BUG-007
+Evidence from reports: Payment reports require USD balance top-up with Shopier/IBAN TRY collection rounded upward to whole TL. Source inspection shows `/api/payments/shopier/init` stores `amountUsd`, `payableTL`, `creditTL`, `roundingTL` and sends `quote.payableTL` to `buildCheckoutForm`; `shopier-service.ts` sends `currency = 0` and `total_order_value = opts.miktarTL`.
+Files likely affected: `src/server/services/shopier-service.test.ts`, `src/payment-safety-contract.test.ts`, `RETEST_LOG.md`, `FIX_LOG.md`
+Risk level: Low
+Design/template impact: None. No frontend CSS, class, layout, spacing, color, typography, card, button or modal structure changes.
+Security impact: Positive. Prevents accidental USD/TRY confusion in provider payment payloads and avoids over-credit from TL rounding.
+Backend/API/billing impact: No production behavior change planned; adds regression coverage for existing Shopier TRY collection and USD quote metadata.
+Proposed action: Add regression tests proving Shopier checkout form sends whole TRY amount/currency to Shopier, while the payment route preserves USD quote metadata and credits only the selected USD equivalent in TL.
+Agent 1 vote: APPROVE
+Agent 1 reason: The user-facing requirement is specific and can be verified without visual change.
+Agent 2 vote: APPROVE
+Agent 2 reason: The tests protect billing semantics and do not alter live provider credentials or payment credit behavior.
+Agent 3 vote: APPROVE
+Agent 3 reason: This is non-visual, avoids secret exposure, and keeps deploy blocked until real provider E2E passes.
+Agent 4 release guard: APPROVE_FOR_TEST_ONLY
+Agent 4 reason: Safe to add tests; not sufficient for deploy or launch approval.
+Approval count: 3/3 voting agents, 4th guard test-only approval
+Final decision: APPROVED
+Allowed next action: Add tests, run targeted payment test command, then update retest/fix logs.
+Status: COMPLETED
+
+---
+
+Decision ID: DEC-RETEST-SHOPIER-TL-COLLECTION-001
+Decision title: Accept Shopier TRY collection regression retest
+Decision type: Retest acceptance
+Related bug IDs: PAYMENT-SHOPIER-TL-COLLECTION-001, R-BUG-007
+Evidence from reports: Targeted test command `npm test -- src/server/services/shopier-service.test.ts src/payment-safety-contract.test.ts src/server/services/payment-pricing.test.ts` passed 3 files / 21 tests. Tests prove Shopier checkout sends `currency=0`, whole-TL `total_order_value`, and TL product name while route preserves `amountUsd`, `payableTL`, and `creditTL`.
+Files likely affected: `src/server/services/shopier-service.test.ts`, `src/payment-safety-contract.test.ts`, `FIX_LOG.md`, `RETEST_LOG.md`
+Risk level: Low
+Design/template impact: None; frontend visual files were not changed.
+Security impact: Positive; no secret/provider credential used or printed.
+Backend/API/billing impact: No production behavior changed; local regression coverage added. Live Shopier/Cryptomus E2E remains blocked until rotated credentials and panel callback settings are verified.
+Proposed action: Accept local test guard and continue provider panel/env setup separately before any launch approval.
+Agent 1 vote: APPROVE
+Agent 1 reason: The user-facing USD selection to TL Shopier charge behavior is now covered by tests.
+Agent 2 vote: APPROVE
+Agent 2 reason: Billing metadata and provider charge separation are protected without changing runtime behavior.
+Agent 3 vote: APPROVE
+Agent 3 reason: No design change and no secret exposure; launch remains correctly blocked for live provider E2E.
+Agent 4 release guard: NEEDS_MORE_EVIDENCE_FOR_DEPLOY
+Agent 4 reason: Regression tests are not a live Shopier transaction or provider callback proof.
+Approval count: 3/3 voting agents, 4th guard blocks deploy readiness
+Final decision: APPROVED_LOCALLY
+Allowed next action: Configure/verify Shopier panel credentials and callback URL in a secure browser session, then run sandbox/provider E2E without real money.
+Status: COMPLETED
+
+---
+
 Decision ID: DEC-FIX-PAYMENT-INSTRUCTIONS-001
 Decision title: Show IBAN/crypto payment instructions and WhatsApp notification without changing the visual theme
 Decision type: Code/edit approval

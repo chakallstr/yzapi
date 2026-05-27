@@ -115,4 +115,20 @@ describe("payment safety contract", () => {
     expect(paymentsRoute).toMatch(/result\.paidTL[\s\S]{0,260}expectedPaidTL/);
     expect(paymentsRoute).toMatch(/paidAmountUsd[\s\S]{0,320}expectedAmountUsd/);
   });
+
+  it("keeps Shopier collection in TRY while preserving USD balance quote metadata", () => {
+    const paymentsRoute = source("./server/routes/payments.ts");
+    const shopierService = source("./server/services/shopier-service.ts");
+
+    expect(paymentsRoute).toContain("const { quote, amountValidation } = await buildQuoteFromRequest");
+    expect(paymentsRoute).toContain('metod: "shopier"');
+    expect(paymentsRoute).toContain("miktarTL: String(quote.payableTL)");
+    expect(paymentsRoute).toContain("amountUsd: String(quote.amountUsd)");
+    expect(paymentsRoute).toContain("creditTL: String(quote.creditTL)");
+    expect(paymentsRoute).toMatch(/buildCheckoutForm\(\{[\s\S]{0,180}miktarTL:\s*quote\.payableTL/);
+
+    expect(shopierService).toContain("const currency = 0; // TRY");
+    expect(shopierService).toContain("total_order_value: opts.miktarTL");
+    expect(shopierService).toContain("product_name: `Bakiye Yukleme — ${opts.miktarTL} TL`");
+  });
 });
