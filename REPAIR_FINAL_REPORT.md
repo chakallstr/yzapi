@@ -134,13 +134,15 @@ No final local command failed after the latest fixes. Earlier targeted tests fai
 
 `PAYMENT-PROVIDER-AMOUNT-GUARD-001` and `OAUTH-RETURN-001` are fixed and retested locally. They still require live deploy and, for OAuth, post-deploy standard Chrome owner retest.
 
+`OAUTH-STATE-RESTART-001` is fixed and retested locally. It requires live deploy before the production login flow is fully protected from deploy/restart state loss.
+
 ## Design Preservation Result
 
 PASS locally and live: old visual shell restored; latest changes were text/data/backend/guard only. No CSS/class/layout/theme/button/card/modal styling was changed. Live browser and bundle scans show the rejected template is absent. Payment UI alignment changed only existing labels/calculated values inside the existing account card/table.
 
 ## Remaining Risks
 
-The product is still not launch-ready because Shopier/Cryptomus provider E2E remains unproven and the local OAuth return fix has not yet been deployed/retested live. IBAN is live-proven. Temporary OmniRoute funded text billing is live-proven. Latest provider diagnostics show CloseRouter account/catalog/balance are reachable, but inference returns provider `502` for current catalog chat models and Anthropic `/messages`.
+The product is still not launch-ready because Shopier/Cryptomus provider E2E remains unproven and the local OAuth return/restart-safety fixes have not yet been deployed/retested live under the required four-agent gate. IBAN is live-proven. Temporary OmniRoute funded text billing is live-proven. Latest provider diagnostics show CloseRouter account/catalog/balance are reachable, but inference returns provider `502` for current catalog chat models and Anthropic `/messages`.
 
 General `npm audit` still reports 4 moderate dev-only advisories under `drizzle-kit`/nested esbuild. Production runtime audit is clean, so this is not the current launch-blocking high advisory, but it should stay tracked.
 

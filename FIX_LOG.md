@@ -223,3 +223,13 @@ Operasyon tarihi: 2026-05-26
 - Test: `npm test -- src/admin-single-owner-contract.test.ts`; `npm run lint`; `npm test`; `npm run build`; `npm run scan:public`; `node scripts/scan-secrets.mjs`.
 - Retest: Targeted contract PASS 3/3; full regression PASS 28 files / 126 tests; build/scans PASS; live safe smoke/UAT still PASS.
 - Sonuç: FIXED LOCALLY / LIVE DEPLOY AND CHROME OWNER RETEST REQUIRED.
+
+## OAUTH-STATE-RESTART-001
+
+- Problem: Giriş akışı deploy/restart sırasında bozulabiliyor. Google OAuth `state` değeri process içi `Map` içinde tutulduğu için, kullanıcı Google ekranındayken servis restart olursa callback `Invalid or expired state` döner.
+- Kök neden: OAuth state memory-only idi; production deploy/restart bu state'i sıfırlıyordu.
+- Yapılan değişiklik: OAuth state restart-safe imzalı ve süreli hale getirildi. Backend artık `JWT_SECRET` ile HMAC imzalı state üretip doğruluyor; process içi state Map kaldırıldı.
+- Güvenlik etkisi: State hâlâ imzalı ve 5 dakika TTL ile korunuyor; token veya secret loglanmadı.
+- Test: `src/server/services/google-oauth-service.test.ts` önce RED (`createOAuthState is not a function`), sonra PASS.
+- Retest: `npm test -- src/admin-single-owner-contract.test.ts src/server/services/google-oauth-service.test.ts` PASS 5/5; `npm run lint` PASS; `npm test` PASS 29 files / 128 tests; `npm run build` PASS; `npm run scan:public` PASS; `node scripts/scan-secrets.mjs` PASS; live safe smoke PASS.
+- Sonuç: FIXED LOCALLY / LIVE DEPLOY BLOCKED BY 4-AGENT CAPACITY GATE.

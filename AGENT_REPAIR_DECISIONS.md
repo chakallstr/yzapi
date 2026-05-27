@@ -130,6 +130,78 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-GOV-FOUR-AGENT-GATE-001
+Decision title: Require four-agent gate for all future deploy and release decisions
+Decision type: Governance / deploy gate
+Related bug IDs: DESIGN-REGRESSION-001, R-BUG-009, RELEASE-GATE-001
+Evidence from reports: A previous live deploy caused a rejected visual/template regression. User explicitly required three QA agents plus a fourth end-to-end integrity guard before deploy/release decisions. Native sub-agent spawn attempted on 2026-05-27 and failed with `agent thread limit reached`; Ruflo swarm initialized but could not spawn hive workers, and task auto-assignment had no pending task consumer.
+Files likely affected: `DEPLOY_AGENT_GATE.md`, `AGENT_REPAIR_DECISIONS.md`, future deploy/release workflows.
+Risk level: Critical
+Design/template impact: Positive; prevents unreviewed visual/template changes from reaching production.
+Security impact: Positive; prevents silent deploy approval when security/payment/admin review is unavailable.
+Backend/API/billing impact: Positive; deploy decisions remain blocked unless billing/API risks are reviewed.
+Proposed action: Enforce a four-agent gate: Agent 1 QA/UAT, Agent 2 Backend/API/Billing, Agent 3 Security/Visual/Release. At least 2/3 must approve before Agent 4 End-to-End Integrity Guard is consulted. Agent 4 must approve the full-system impact before deploy/release can proceed. If real agent review is unavailable, mark `BLOCKED_BY_AGENT_CAPACITY`.
+Agent 1 vote: NEEDS_MORE_EVIDENCE
+Agent 1 reason: Native agent spawn was capacity-limited, so no real QA agent vote was collected for continuing the current deploy.
+Agent 2 vote: NEEDS_MORE_EVIDENCE
+Agent 2 reason: Backend smoke was healthy, but this governance decision requires real agent review for future actions.
+Agent 3 vote: NEEDS_MORE_EVIDENCE
+Agent 3 reason: Visual/security guard cannot be silently simulated when the user required actual agents.
+Approval count: 0/3
+Final decision: BLOCKED_BY_AGENT_CAPACITY_FOR_CURRENT_DEPLOY_DECISION; GOVERNANCE RULE RECORDED BY DIRECT USER ORDER
+Allowed next action: Read-only smoke/status checks are allowed; deploy/release continuation must wait for real agent capacity or explicit user override of the new gate.
+Status: BLOCKED
+
+---
+
+Decision ID: DEC-FIX-OAUTH-STATE-001
+Decision title: Make Google OAuth state restart-safe to prevent login breakage during deploy/restart
+Decision type: Code/edit approval
+Related bug IDs: R-BUG-003, AUTH-OAUTH-STATE-001
+Evidence from reports: User reported login is broken after the latest live work. Source inspection showed OAuth state was process-local (`Map`), so any service restart while a user is on Google's account/consent screen invalidates the callback state and returns `Invalid or expired state`.
+Files likely affected: `src/server/services/google-oauth-service.ts`, `src/server/routes/auth.ts`, `src/server/services/google-oauth-service.test.ts`, repair reports.
+Risk level: High
+Design/template impact: None. Backend OAuth state handling only.
+Security impact: Positive if implemented with signed, TTL-bound state; no secret/state/token values may be logged.
+Backend/API/billing impact: Auth-only; no payment, API billing, balance or provider behavior change.
+Proposed action: Replace in-memory OAuth state map with HMAC-signed state using `JWT_SECRET`, 5-minute TTL, tamper/expiry rejection, and targeted tests.
+Agent 1 vote: BLOCKED_BY_AGENT_CAPACITY
+Agent 1 reason: Native agent spawn returned `agent thread limit reached`; no real QA agent vote could be collected.
+Agent 2 vote: BLOCKED_BY_AGENT_CAPACITY
+Agent 2 reason: Native agent spawn returned `agent thread limit reached`; no real backend/billing agent vote could be collected.
+Agent 3 vote: BLOCKED_BY_AGENT_CAPACITY
+Agent 3 reason: Native agent spawn returned `agent thread limit reached`; no real security/visual agent vote could be collected.
+Approval count: 0/3
+Final decision: LOCAL_EMERGENCY_FIX_IMPLEMENTED_AND_TESTED; LIVE_DEPLOY_BLOCKED_BY_AGENT_CAPACITY_UNDER_4_AGENT_GATE
+Allowed next action: Commit/push local fix for backup. Do not deploy until the four-agent gate can run or the user explicitly overrides the gate.
+Status: LOCAL_FIXED_DEPLOY_BLOCKED
+
+---
+
+Decision ID: DEC-RETEST-OAUTH-STATE-001
+Decision title: Accept local restart-safe OAuth state retest
+Decision type: Retest acceptance
+Related bug IDs: R-BUG-003, AUTH-OAUTH-STATE-001
+Evidence from reports: RED test failed before implementation. After the patch, targeted OAuth/admin tests passed 5/5, lint passed, full test suite passed 29 files / 128 tests, build passed, public scan passed, secret scan passed, and live safe smoke remained healthy.
+Files likely affected: Auth route/service/tests and reports.
+Risk level: Medium
+Design/template impact: None.
+Security impact: Positive; tampered/expired state rejection covered by tests.
+Backend/API/billing impact: Auth-only; no billing/payment side effects.
+Proposed action: Mark local fix verified; keep live deployment blocked by the 4-agent gate.
+Agent 1 vote: BLOCKED_BY_AGENT_CAPACITY
+Agent 1 reason: Real agent vote unavailable due thread limit.
+Agent 2 vote: BLOCKED_BY_AGENT_CAPACITY
+Agent 2 reason: Real agent vote unavailable due thread limit.
+Agent 3 vote: BLOCKED_BY_AGENT_CAPACITY
+Agent 3 reason: Real agent vote unavailable due thread limit.
+Approval count: 0/3
+Final decision: LOCAL_RETEST_PASSED_BUT_AGENT_ACCEPTANCE_BLOCKED
+Allowed next action: Backup commit only; no deploy/release decision.
+Status: BLOCKED_FOR_DEPLOY
+
+---
+
 Decision ID: DEC-CMD-LIVE-OMNI-PAYMENT-E2E-001
 Decision title: Run safe live OmniRoute billing plus Shopier/Cryptomus server-side E2E verification
 Decision type: Command/test approval

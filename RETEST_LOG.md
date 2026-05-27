@@ -584,3 +584,34 @@ Agent 2 retest vote: APPROVE
 Agent 3 retest vote: APPROVE_WITH_DEPLOY_RETEST_REQUIRED
 Approval count: 3/3
 Final retest status: LOCAL_OAUTH_RETURN_FIX_ACCEPTED_PENDING_LIVE_DEPLOY_RETEST
+
+## LOCAL-OAUTH-STATE-RESTART-001 Restart-Safe Google OAuth State Retest
+
+Bug ID: R-BUG-003, AUTH-OAUTH-STATE-001
+Fix decision ID: DEC-FIX-OAUTH-STATE-001
+Retest decision ID: DEC-RETEST-OAUTH-STATE-001
+Command or manual flow:
+- Reproduced the likely restart/deploy failure mode in code: Google OAuth state was kept only in a process-local `Map`.
+- Added TDD coverage requiring signed OAuth state to verify without in-memory process state, and to reject tampered/expired values.
+- Replaced in-memory OAuth state storage with an HMAC-signed, 5-minute TTL state token.
+Expected:
+- A user who starts Google login before a server restart can still return with a valid signed state inside TTL.
+- Tampered and expired state values are rejected.
+- No visual design changes and no secret logging.
+Actual:
+- RED: `npm test -- src/server/services/google-oauth-service.test.ts` initially failed because `createOAuthState` did not exist.
+- GREEN: targeted OAuth state test PASS 2/2.
+- `npm test -- src/admin-single-owner-contract.test.ts src/server/services/google-oauth-service.test.ts`: PASS 5/5.
+- `npm run lint`: PASS.
+- `npm test`: PASS 29 files / 128 tests.
+- `npm run build`: PASS.
+- `npm run scan:public`: PASS, 0 hits.
+- `node scripts/scan-secrets.mjs`: PASS, 229 scanned / 0 hits.
+- `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`: PASS for live safe public/backend checks.
+Passed/Failed: Passed locally. Live deploy is blocked by the four-agent capacity gate until real agent votes are available.
+Evidence: Current repair session command output; no OAuth token, state value, provider key, or secret printed.
+Agent 1 retest vote: BLOCKED_BY_AGENT_CAPACITY
+Agent 2 retest vote: BLOCKED_BY_AGENT_CAPACITY
+Agent 3 retest vote: BLOCKED_BY_AGENT_CAPACITY
+Approval count: 0/3
+Final retest status: LOCAL_OAUTH_STATE_FIX_VERIFIED_DEPLOY_BLOCKED_BY_AGENT_CAPACITY

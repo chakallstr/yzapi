@@ -1,3 +1,4 @@
+import { createHmac, randomUUID, timingSafeEqual } from "crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { env } from "../lib/env.js";
 
@@ -12,9 +13,42 @@ export interface GoogleProfile {
 const GOOGLE_JWKS = createRemoteJWKSet(
   new URL("https://www.googleapis.com/oauth2/v3/certs")
 );
+const OAUTH_STATE_TTL_MS = 5 * 60 * 1000;
 
 export function isGoogleConfigured(): boolean {
   return !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+}
+
+function base64Url(input: string): string {
+  return Buffer.from(input, "utf8").toString("base64url");
+}
+
+function signStatePayload(payload: string): string {
+  return createHmac("sha256", env.JWT_SECRET).update(payload).digest("base64url");
+}
+
+export function createOAuthState(now = Date.now()): string {
+  const payload = base64Url(JSON.stringify({ nonce: randomUUID(), exp: now + OAUTH_STATE_TTL_MS }));
+  return `${payload}.${signStatePayload(payload)}`;
+}
+
+export function verifyOAuthState(state: string, now = Date.now()): boolean {
+  const [payload, signature] = String(state || "").split(".");
+  if (!payload || !signature) return false;
+
+  const expected = signStatePayload(payload);
+  const actualBuffer = Buffer.from(signature, "base64url");
+  const expectedBuffer = Buffer.from(expected, "base64url");
+  if (actualBuffer.length !== expectedBuffer.length || !timingSafeEqual(actualBuffer, expectedBuffer)) {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { exp?: unknown };
+    return typeof parsed.exp === "number" && parsed.exp >= now;
+  } catch {
+    return false;
+  }
 }
 
 export function buildAuthUrl(state: string): string {

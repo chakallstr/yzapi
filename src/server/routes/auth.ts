@@ -1,9 +1,10 @@
 import { Router } from "express";
-import { randomUUID } from "crypto";
 import {
   buildAuthUrl,
+  createOAuthState,
   exchangeCode,
   verifyIdToken,
+  verifyOAuthState,
   isGoogleConfigured,
 } from "../services/google-oauth-service.js";
 import { signAccessToken, signRefreshToken, rotateRefreshToken, revokeRefreshToken } from "../services/auth-service.js";
@@ -16,16 +17,6 @@ import { logger } from "../lib/logger.js";
 
 const router = Router();
 
-// In-memory state store (UUID → expiry) — TTL 5 min
-const oauthStates = new Map<string, number>();
-
-function pruneStates(): void {
-  const now = Date.now();
-  for (const [k, exp] of oauthStates) {
-    if (exp < now) oauthStates.delete(k);
-  }
-}
-
 // GET /api/auth/google
 router.get("/google", (req, res) => {
   if (!isGoogleConfigured()) {
@@ -33,11 +24,7 @@ router.get("/google", (req, res) => {
     return;
   }
 
-  pruneStates();
-  const state = randomUUID();
-  oauthStates.set(state, Date.now() + 5 * 60 * 1000);
-
-  const url = buildAuthUrl(state);
+  const url = buildAuthUrl(createOAuthState());
   res.redirect(url);
 });
 
@@ -51,12 +38,10 @@ router.get("/google/callback", async (req, res, next) => {
       return;
     }
 
-    pruneStates();
-    if (!oauthStates.has(state) || oauthStates.get(state)! < Date.now()) {
+    if (!verifyOAuthState(state)) {
       res.status(400).json({ error: "Invalid or expired state" });
       return;
     }
-    oauthStates.delete(state);
 
     const { idToken } = await exchangeCode(code);
     const profile = await verifyIdToken(idToken);
