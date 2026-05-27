@@ -105,6 +105,43 @@ Agent 3 retest vote: REJECT
 Approval count: 0/3
 Final retest status: SUCCESS_BILLING_STILL_BLOCKED_BY_UPSTREAM_502
 
+## LIVE-OMNIROUTE-001 Temporary Provider Check
+
+Bug ID: R-BUG-006
+Fix decision ID: DEC-CMD-LIVE-OMNIROUTE-CHECK-001
+Retest decision ID: DEC-RETEST-LIVE-OMNIROUTE-001
+Command or manual flow:
+- Live YapayZekaLab smoke.
+- Public and local OmniRoute no-auth checks.
+- Live VPS env name scan without printing values.
+- Existing CloseRouter key tested against OmniRoute `/v1/models` without printing the key.
+- Read-only OmniRoute DB key lookup without printing the raw key.
+- Authenticated direct OmniRoute `/v1/models`.
+- One direct tiny OmniRoute `/v1/chat/completions` with `max_tokens=4`.
+Expected:
+- Determine whether OmniRoute can temporarily replace CloseRouter.
+- Do not print secrets, do not use real payments, do not mutate customer data.
+- Do not run funded gateway billing unless a safe test key is already present and direct provider gate passes.
+Actual:
+- Live YapayZekaLab smoke PASS.
+- Public OmniRoute no-auth returned expected `401 AUTH_002`.
+- No dedicated OmniRoute env exists in YapayZekaLab live env.
+- Current CloseRouter key is not valid for OmniRoute (`401 AUTH_002`).
+- Active OmniRoute DB key found but not printed.
+- Authenticated direct OmniRoute `/v1/models` returned `200`, `70` models.
+- Direct tiny OmniRoute chat returned `200`, request id `chatcmpl-1779896002128`, usage `total_tokens=6125`.
+- Live YapayZekaLab env was not switched because no safe funded gateway key was present and the large OmniRoute prompt usage creates billing-risk.
+Passed/Failed: Partial. OmniRoute direct provider is working; YapayZekaLab funded billing is still unverified.
+Evidence: `API_TEST_REPORT.md` temporary OmniRoute section dated `2026-05-27 18:28 TRT`.
+Agent 1 retest vote: NEEDS_MORE_EVIDENCE
+Agent 1 reason: Direct OmniRoute works, but end-user first API request through YapayZekaLab is not yet proven.
+Agent 2 retest vote: NEEDS_MORE_EVIDENCE
+Agent 2 reason: Provider usage is unusually high for a tiny prompt; billing impact must be verified before routing customers through it.
+Agent 3 retest vote: NEEDS_MORE_EVIDENCE
+Agent 3 reason: No secrets leaked and no customer data mutated, but live switch requires rollback and billing guard.
+Approval count: 0/3
+Final retest status: OMNIROUTE_DIRECT_PASS_GATEWAY_BILLING_BLOCKED
+
 ## DESIGN-REGRESSION-001 Template Removal Retest
 
 Bug ID: DESIGN-REGRESSION-001

@@ -202,6 +202,54 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-CMD-LIVE-OMNIROUTE-CHECK-001
+Decision title: Check temporary OmniRoute upstream viability without live switch
+Decision type: Command/test approval
+Related bug IDs: R-BUG-006
+Evidence from reports: CloseRouter direct inference remains blocked by upstream `502`; user requested temporary OmniRoute usage. Memory/live context shows OmniRoute exists as `api.seslab.tr` and local VPS container `omniroute`.
+Files likely affected: Report files only.
+Risk level: Medium
+Design/template impact: None.
+Security impact: Must not print OmniRoute API key, env values, cookies, provider secrets, or raw DB secret fields.
+Backend/API/billing impact: Direct provider checks may spend a tiny amount only if successful; no YapayZekaLab customer data or payment data mutation. Do not switch live env until billing risk and rollback are documented.
+Proposed action: Verify live smoke, no-auth OmniRoute behavior, live env key presence, current key compatibility, read-only active OmniRoute API key availability, and one tiny direct text call.
+Agent 1 vote: APPROVE
+Agent 1 reason: Determines whether OmniRoute can unblock the first API request path.
+Agent 2 vote: APPROVE
+Agent 2 reason: Direct provider viability must be known before any gateway routing change.
+Agent 3 vote: APPROVE
+Agent 3 reason: Approved with strict secret redaction and no live config/customer mutation.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Run read-only OmniRoute viability checks and one bounded direct text call.
+Status: COMPLETED
+
+---
+
+Decision ID: DEC-RETEST-LIVE-OMNIROUTE-001
+Decision title: Is OmniRoute ready to be used by YapayZekaLab live gateway now?
+Decision type: Retest acceptance
+Related bug IDs: R-BUG-006
+Evidence from reports: Live smoke passed. OmniRoute no-auth returned `401 AUTH_002`. Existing CloseRouter key failed against OmniRoute. Read-only OmniRoute DB lookup found one active key without printing it. Authenticated direct `/v1/models` returned `200` and `70` models. One tiny direct chat returned `200`, request id `chatcmpl-1779896002128`, but usage was `total_tokens=6125` for a tiny prompt.
+Files likely affected: `API_TEST_REPORT.md`, `RETEST_LOG.md`, `LAUNCH_READINESS_AFTER_REPAIR.md`, `AGENT_REPAIR_DECISIONS.md`.
+Risk level: High for billing if switched blindly.
+Design/template impact: None.
+Security impact: No secrets printed. Live switch would need a no-print env backup/edit and rollback.
+Backend/API/billing impact: Direct provider works, but gateway billing still unverified and provider-reported usage may be unexpectedly high.
+Proposed action: Do not mark launch ready. Before switching customer traffic, create a rollbackable env-switch decision and run safe funded gateway billing test with OmniRoute.
+Agent 1 vote: NEEDS_MORE_EVIDENCE
+Agent 1 reason: Customer path through YapayZekaLab is not proven yet.
+Agent 2 vote: NEEDS_MORE_EVIDENCE
+Agent 2 reason: Billing must be validated because OmniRoute reported 6125 tokens for a tiny request.
+Agent 3 vote: NEEDS_MORE_EVIDENCE
+Agent 3 reason: A live switch without rollback and billing guard is not release-safe.
+Approval count: 0/3
+Final decision: NOT APPROVED
+Allowed next action: Prepare rollbackable OmniRoute env switch and funded billing verification if a safe test key is available.
+Status: COMPLETED
+
+---
+
 Decision ID: DEC-RETEST-LIVE-CLOSEROUTER-HEARTBEAT-001
 Decision title: Did the heartbeat recheck unblock successful funded API billing?
 Decision type: Retest acceptance

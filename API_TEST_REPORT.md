@@ -141,3 +141,30 @@ The failure is not caused by YapayZekaLab using stale model IDs. Live catalog an
 ## Updated API Verdict
 
 Direct provider inference is still not resolved. Because the direct tiny inference failed, the funded YapayZekaLab gateway billing verification was not run. Successful API billing remains blocked until a direct text inference succeeds, then a safe funded `yzk_live_*` gateway key can prove billing headers, balance decrement, transaction ledger and success `usage_records`.
+
+---
+
+# Temporary OmniRoute Provider Check — 2026-05-27 18:28 TRT
+
+## Reason
+
+CloseRouter direct inference remains unreliable (`502 upstream_error`). User requested temporary OmniRoute usage.
+
+## Safe Evidence
+
+- Live YapayZekaLab smoke stayed PASS: `/health`, `/status`, `/api/models`, authless `/v1/chat/completions` `401`, unknown `/api/*` and `/v1/*` JSON `404`.
+- Public OmniRoute endpoint `https://api.seslab.tr/v1/models` returns `401 AUTH_002` without a valid OmniRoute key, as expected.
+- Live VPS has an `omniroute` container bound to `127.0.0.1:20128`.
+- Existing YapayZekaLab live env only has `CLOSEROUTER_API_KEY` / `CLOSEROUTER_BASE_URL`; no dedicated OmniRoute env was present.
+- The current CloseRouter key does not authenticate against OmniRoute; both `Authorization` and `x-api-key` returned `401 AUTH_002`.
+- OmniRoute DB contains one active API key; the raw key was not printed.
+- Authenticated direct OmniRoute `/v1/models` returned `200`, `70` models.
+- One direct tiny OmniRoute text request returned `200` with `model=kr/claude-haiku-4.5`, request id `chatcmpl-1779896002128`, and usage `total_tokens=6125`, `prompt_tokens=6124`, `completion_tokens=1`.
+
+## Billing Risk
+
+OmniRoute inference works, but its tiny call reported a large prompt token count. Because YapayZekaLab bills from provider-reported usage, switching live traffic to OmniRoute without a funded gateway billing test could overcharge or distort customer usage. Live env was not switched in this heartbeat.
+
+## Updated API Verdict
+
+OmniRoute is a viable temporary upstream candidate, but production gateway billing remains blocked until a rollbackable env switch is made with a safe funded `yzk_live_*` test key and the billing headers, balance decrement, transaction ledger and `usage_records` are verified against OmniRoute usage.
