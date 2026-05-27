@@ -39,6 +39,7 @@ NOT READY — PAYMENT SECURITY BLOCKERS
 ## Must-Fix Before Launch
 
 - Install rotated Shopier provider credentials into the live server env and complete valid/invalid/fail/duplicate callback E2E without real money.
+- Save/activate the Shopier OSB URL in the provider panel after confirming the global notification change, then complete valid/invalid/fail/duplicate callback E2E.
 - Install rotated Cryptomus merchant credentials into the live server env and complete init plus valid/invalid/non-credit/duplicate webhook E2E without real money.
 - Decide whether temporary OmniRoute should remain the production provider while CloseRouter inference is unhealthy; if yes, keep usage monitoring active because one direct OmniRoute Claude route previously reported unexpectedly high token usage.
 - Complete admin destructive/action tab UAT and audit coverage without mutating real customer data.
@@ -84,6 +85,8 @@ NOT READY — PAYMENT SECURITY BLOCKERS
 - Latest live auth/payment deployment retest: auth-refresh/payment instruction build is deployed under `manual-20260527T201117Z-6cdcb89`; live smoke PASS and live UAT PASS 10/10.
 - Latest live manual payment config retest: production IBAN display, WhatsApp notification, and manual USDT TRC20 wallet config were applied with backup; safe backend E2E asserted correct reference/method/WhatsApp mapping and cleaned temporary records; Chrome showed manual USDT TRC20 instruction and WhatsApp button.
 - BEP20 remains intentionally not enabled because the supplied wallet address is TRON-format; a separate BEP20 `0x...` address is required before BEP20 can be safely displayed.
+- Latest Shopier OSB relay deploy `2026-05-27 23:57 TRT`: commit `62a1fe4` deployed as `manual-20260527T205709Z-62a1fe4`; live service active; VPS `dist/server.js` contains `/api/payments/shopier/osb`; live env contains `SHOPIER_OSB_FALLBACK_URL`; live smoke PASS; live UAT PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T20-57-26-842Z/uat-smoke-report.md`.
+- Latest Shopier panel state: existing Chrome Shopier OSB field was prepared for `https://yapayzekalab.org/api/payments/shopier/osb`, but final provider-side `KAYDET` has not been submitted yet because this changes the global Shopier notification destination.
 
 ## Final 3-Agent Vote
 

@@ -249,6 +249,22 @@ Remaining live gate: deploy the relay, configure fallback URL server-side, insta
 
 ---
 
+# Shopier OSB Relay Live Deploy - 2026-05-27 23:57 TRT
+
+| Alan | Sonuç | Kanıt |
+|---|---|---|
+| Live relay deploy | PASS LIVE | Deploy `manual-20260527T205709Z-62a1fe4`; service active |
+| Live OSB route code | PASS LIVE | VPS `dist/server.js` contains `/api/payments/shopier/osb` |
+| Existing-service fallback env | PASS LIVE | `SHOPIER_OSB_FALLBACK_URL` key exists in live env; value not printed |
+| Pre-deploy local guard | PASS | Secret scan 233 scanned / 0 hits; targeted Shopier/payment tests 3 files / 22 tests |
+| Live smoke | PASS LIVE | `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` |
+| Live UAT | PASS LIVE | `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` 10/10 |
+| Shopier panel OSB URL | READY_TO_SAVE | Existing Chrome Shopier OSB field prepared as YapayZekaLab endpoint; final `KAYDET` not submitted yet |
+
+Updated payment/billing verdict: manual IBAN, manual USDT TRC20, temporary OmniRoute text billing, and Shopier relay deployment are live-pass. Automatic Shopier card payment remains pending the provider panel save/activation and live valid/invalid/duplicate callback E2E. Cryptomus provider E2E remains pending rotated credential setup.
+
+---
+
 # Local Provider Callback Hardening — 2026-05-27 20:52 TRT
 
 ## Eklenen Güvenlik Korumaları

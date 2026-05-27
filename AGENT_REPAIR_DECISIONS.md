@@ -34,6 +34,56 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-DEPLOY-SHOPIER-OSB-LIVE-001
+Decision title: Deploy Shopier OSB relay to live with fallback guard
+Decision type: Deploy approval and retest acceptance
+Related bug IDs: R-BUG-007
+Evidence from reports: Local relay implementation passed targeted Shopier/payment tests, full regression, build, public scan and secret scan. Live verification before deploy showed `osb_code=missing` and `fallback_env=missing`; therefore provider-side Shopier OSB could not safely be moved to YapayZekaLab yet.
+Files likely affected: Live `/opt/turkapiprojesi/dist`, live `.env.production` non-secret fallback key, reports.
+Risk level: High
+Design/template impact: None; frontend styling/template files were not edited.
+Security impact: Positive if fallback is present before panel switch; raw secrets are not printed or committed.
+Backend/API/billing impact: Adds live public OSB receiver path while preserving signature, TRY amount, idempotency and unknown-callback fallback behavior.
+Proposed action: Take rollback backup, deploy commit `62a1fe4`, set `SHOPIER_OSB_FALLBACK_URL` key server-side, restart service, run live smoke and UAT, then prepare Shopier panel URL but stop before final provider-side save.
+Agent 1 vote: APPROVE
+Agent 1 reason: Live relay is required before any real end-user Shopier callback can be accepted safely.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend route keeps crediting guarded by stored payment, signature, amount, currency and idempotency checks.
+Agent 3 vote: APPROVE
+Agent 3 reason: Rollback exists, secret scan is clean and no visual/template change is involved.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Live deploy and post-deploy smoke/UAT.
+Status: COMPLETED
+
+Retest evidence: Deploy `manual-20260527T205709Z-62a1fe4`; service active; `osb_code=present`; `fallback_env=present`; live smoke PASS; live UAT PASS 10/10 with report `qa-artifacts/uat-smoke-2026-05-27T20-57-26-842Z/uat-smoke-report.md`.
+
+Agent 4 integrity guard: APPROVE_WITH_PROVIDER_SAVE_PENDING
+
+Decision ID: DEC-PROVIDER-SHOPIER-OSB-SAVE-001
+Decision title: Save Shopier global OSB URL to YapayZekaLab endpoint
+Decision type: External provider configuration approval
+Related bug IDs: R-BUG-007
+Evidence from reports: Live relay and fallback are now deployed and verified. Shopier panel currently has the OSB URL field prepared as `yapayzekalab.org/api/payments/shopier/osb`. Saving changes the global Shopier OSB notification destination, so it can affect existing Shopier payment notifications.
+Files likely affected: None in repo; third-party Shopier account setting only.
+Risk level: High
+Design/template impact: None.
+Security impact: Medium. Incorrect URL would break provider callback delivery; fallback mitigates existing-service impact.
+Backend/API/billing impact: Enables live Shopier callbacks to reach YapayZekaLab relay; valid/invalid/duplicate E2E still required before launch approval.
+Proposed action: Click `KAYDET` in Shopier OSB panel only after explicit action-time confirmation, then run Shopier notification test/activation and safe callback E2E.
+Agent 1 vote: APPROVE
+Agent 1 reason: Needed for real Shopier automatic card flow, but it is not a UI/theme change.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend is ready for callbacks and fallback is configured; provider E2E remains required.
+Agent 3 vote: APPROVE_WITH_CAUTION
+Agent 3 reason: This is a global third-party payment notification change; require final explicit save confirmation and rollback awareness.
+Approval count: 3/3
+Final decision: APPROVED_PENDING_ACTION_TIME_CONFIRMATION
+Allowed next action: Ask for final confirmation immediately before clicking Shopier `KAYDET`.
+Status: WAITING_FOR_PROVIDER_SAVE_CONFIRMATION
+
+---
+
 Decision ID: DEC-FIX-SHOPIER-OSB-RELAY-001
 Decision title: Implement safe Shopier OSB relay/fallback before changing provider panel
 Decision type: Backend payment safety fix

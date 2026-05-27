@@ -83,3 +83,15 @@ Manual IBAN and manual USDT TRC20 are live-pass. Shopier remains `BLOCKED_BY_PRO
 - GREEN: `npm test -- src/payment-safety-contract.test.ts` passed 10/10.
 - Targeted: `npm test -- src/server/services/shopier-service.test.ts src/payment-safety-contract.test.ts src/server/services/payment-pricing.test.ts` passed 3 files / 22 tests.
 - Regression: `npm run lint`, `npm test` 30 files / 135 tests, `npm run build`, `npm run scan:public`, and `node scripts/scan-secrets.mjs` passed.
+
+## Live Deploy Status - 2026-05-27 23:57 TRT
+
+- Deploy ID: `manual-20260527T205709Z-62a1fe4`.
+- Live service: `turkapiprojesi.service` active after restart.
+- Live server code: `dist/server.js` contains `POST /api/payments/shopier/osb`.
+- Live server env: `SHOPIER_OSB_FALLBACK_URL` key is present; value is not printed in reports.
+- Live smoke: `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` passed for health, status, models, authless gateway 401, and JSON 404 checks.
+- Live UAT: `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` passed 10/10, report `qa-artifacts/uat-smoke-2026-05-27T20-57-26-842Z/uat-smoke-report.md`.
+- Shopier panel: OSB URL field was prepared as `https://yapayzekalab.org/api/payments/shopier/osb`, but the final `KAYDET` click was not submitted yet because it is a global payment notification setting.
+
+Current state: YapayZekaLab can safely receive Shopier OSB callbacks after the panel URL is saved. Automatic card payment still cannot be called launch-ready until the provider-side save, activation/test step, and valid/invalid/duplicate callback E2E are completed.

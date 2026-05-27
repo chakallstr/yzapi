@@ -757,6 +757,42 @@ Final retest status: ACCEPTED_LIVE_MANUAL_PAYMENT_CONFIG
 
 Agent 4 integrity guard: APPROVE
 
+## SHOPIER-OSB-LIVE-DEPLOY-001 Live Relay Deploy Retest
+
+Bug ID: R-BUG-007
+Fix decision ID: DEC-FIX-SHOPIER-OSB-RELAY-001
+Retest decision ID: DEC-RETEST-SHOPIER-OSB-LIVE-DEPLOY-001
+Command or manual flow:
+- Ran local secret scan and targeted Shopier/payment tests before live mutation.
+- Created rollback backup on the VPS and deployed local `dist/` from commit `62a1fe4`.
+- Added only the non-secret `SHOPIER_OSB_FALLBACK_URL` env key to the live server env.
+- Restarted `turkapiprojesi.service`.
+- Ran live smoke and live UAT against `https://yapayzekalab.org`.
+- Opened the existing standard Chrome Shopier tab and prepared the OSB URL field for YapayZekaLab.
+Expected:
+- Live service remains active.
+- Live code contains `/api/payments/shopier/osb`.
+- Existing service fallback key exists server-side before any Shopier panel OSB URL change.
+- Live smoke and UAT still pass.
+- No secrets are printed or committed.
+Actual:
+- Pre-deploy secret scan PASS: 233 scanned / 0 hits.
+- Targeted tests PASS: `npm test -- src/server/services/shopier-service.test.ts src/payment-safety-contract.test.ts src/server/services/payment-pricing.test.ts`, 3 files / 22 tests.
+- Deploy ID `manual-20260527T205709Z-62a1fe4` completed; service active.
+- VPS verification: `osb_code=present`, `fallback_env=present`.
+- Live smoke PASS.
+- Live UAT PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T20-57-26-842Z/uat-smoke-report.md`.
+- Shopier panel field is prepared but not saved; final save remains a provider-side global setting change.
+Passed/Failed: Passed for live relay deployment. Provider-side Shopier OSB save and live callback E2E remain pending.
+Evidence: Current session command output and standard Chrome state. Raw Shopier credentials were not copied into files or reports.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: ACCEPTED_LIVE_RELAY_DEPLOY_PROVIDER_SAVE_PENDING
+
+Agent 4 integrity guard: APPROVE_WITH_PROVIDER_SAVE_PENDING
+
 ## SHOPIER-OSB-RELAY-001 Local Backend Relay Retest
 
 Bug ID: R-BUG-007
