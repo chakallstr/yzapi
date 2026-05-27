@@ -34,6 +34,54 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-FIX-SHOPIER-OSB-RELAY-001
+Decision title: Implement safe Shopier OSB relay/fallback before changing provider panel
+Decision type: Backend payment safety fix
+Related bug IDs: R-BUG-007
+Evidence from reports: Shopier OSB is a legacy global notification URL in the panel and currently points to another service. YapayZekaLab needs automatic Shopier credit without breaking that service. Existing Shopier tests already verify TRY collection and amount/currency guards.
+Files likely affected: `src/server/routes/payments.ts`, `src/server/lib/env.ts`, `.env.example`, `src/payment-safety-contract.test.ts`, `SHOPIER_INTEGRATION_STATUS.md`, payment/retest reports.
+Risk level: Medium
+Design/template impact: None; backend/env/report only.
+Security impact: Positive; uses fixed fallback URL only, keeps callback payload logs sanitized, and does not commit credentials.
+Backend/API/billing impact: Adds a new public OSB endpoint that reuses existing Shopier signature, TRY amount, idempotency and balance-credit rules. Existing callback route behavior remains redirect-based.
+Proposed action: Add RED contract test, implement `/api/payments/shopier/osb` with optional `SHOPIER_OSB_FALLBACK_URL`, run full regression, then deploy only after git backup.
+Agent 1 vote: APPROVE
+Agent 1 reason: Enables a real user payment path while preserving existing Shopier-dependent service continuity.
+Agent 2 vote: APPROVE
+Agent 2 reason: Automatic balance credit remains guarded by payment row, signature, currency, amount and idempotency checks.
+Agent 3 vote: APPROVE
+Agent 3 reason: No visual change and no credential misuse; fallback avoids breaking SesLab OSB unexpectedly.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Commit, push, and prepare rollbackable live deploy.
+Status: COMPLETED
+
+---
+
+Decision ID: DEC-RETEST-SHOPIER-OSB-RELAY-001
+Decision title: Accept local Shopier OSB relay retest
+Decision type: Retest acceptance
+Related bug IDs: R-BUG-007
+Evidence from reports: RED source contract failed before `SHOPIER_OSB_FALLBACK_URL` and `/shopier/osb`; after implementation targeted tests passed 3 files / 22 tests; full `npm test` passed 30 files / 135 tests; lint/build/public scan/secret scan passed.
+Files likely affected: Same as fix decision.
+Risk level: Medium until live provider E2E.
+Design/template impact: None.
+Security impact: Secret scan passed; no raw Shopier credentials committed.
+Backend/API/billing impact: Local callback safety accepted; live provider E2E still required.
+Proposed action: Accept local fix and keep launch gate pending live deploy + Shopier credential/panel E2E.
+Agent 1 vote: APPROVE
+Agent 1 reason: Local behavior is covered and no UI regression was introduced.
+Agent 2 vote: APPROVE
+Agent 2 reason: Billing/credit path remains protected and fallback is bounded to a fixed env URL.
+Agent 3 vote: APPROVE
+Agent 3 reason: Visual lock preserved and provider secrets stayed out of repo.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Backup and deploy relay, then configure live env/panel when credentials are available.
+Status: COMPLETED
+
+---
+
 Decision ID: DEC-SHOPIER-SETUP-001
 Decision title: Keep Shopier disabled until safe credential and callback path is confirmed
 Decision type: Provider setup / release gate

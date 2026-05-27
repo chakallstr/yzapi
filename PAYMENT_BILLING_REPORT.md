@@ -235,6 +235,20 @@ Detailed plan: `SHOPIER_INTEGRATION_STATUS.md`.
 
 ---
 
+# Shopier OSB Relay Implementation — 2026-05-28 00:55 TRT
+
+| Alan | Sonuç | Kanıt |
+|---|---|---|
+| OSB relay endpoint | PASS LOCAL | Added `POST /api/payments/shopier/osb` with JSON acknowledgement mode |
+| Existing service fallback | PASS LOCAL | Unknown/invalid/non-YapayZekaLab callbacks can be forwarded to fixed `SHOPIER_OSB_FALLBACK_URL` as form-urlencoded body |
+| YapayZekaLab credit path | PASS LOCAL | Existing signature, TRY currency, amount match, idempotent credit and safe payload redaction are reused |
+| Dynamic TRY collection | PASS LOCAL | Targeted Shopier tests still verify rounded TRY form fields |
+| Regression | PASS LOCAL | `npm run lint`; `npm test` 30 files / 135 tests; `npm run build`; public scan and secret scan PASS |
+
+Remaining live gate: deploy the relay, configure fallback URL server-side, install true legacy checkout `API_key/API_secret`, then update Shopier OSB panel and run provider E2E. No real payment has been taken yet.
+
+---
+
 # Local Provider Callback Hardening — 2026-05-27 20:52 TRT
 
 ## Eklenen Güvenlik Korumaları

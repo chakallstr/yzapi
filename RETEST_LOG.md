@@ -757,6 +757,34 @@ Final retest status: ACCEPTED_LIVE_MANUAL_PAYMENT_CONFIG
 
 Agent 4 integrity guard: APPROVE
 
+## SHOPIER-OSB-RELAY-001 Local Backend Relay Retest
+
+Bug ID: R-BUG-007
+Fix decision ID: DEC-FIX-SHOPIER-OSB-RELAY-001
+Retest decision ID: DEC-RETEST-SHOPIER-OSB-RELAY-001
+Command or manual flow:
+- Added RED source contract for `SHOPIER_OSB_FALLBACK_URL` and `/api/payments/shopier/osb`.
+- Implemented backend-only OSB relay/fallback; no frontend/template/style change.
+- Ran targeted Shopier/payment tests, lint, full tests, build, public scan and secret scan.
+Expected:
+- YapayZekaLab Shopier callbacks still require signature, TRY currency and exact amount match before crediting.
+- Unknown/non-YapayZekaLab callbacks can be forwarded to a fixed fallback URL so an existing service is not broken by a global OSB URL change.
+- No secrets are committed.
+Actual:
+- RED failed before the relay existed.
+- GREEN source contract passed 10/10.
+- Targeted Shopier/payment tests passed 3 files / 22 tests.
+- Full regression passed: `npm run lint`, `npm test` 30 files / 135 tests, `npm run build`, `npm run scan:public`, `node scripts/scan-secrets.mjs`.
+Passed/Failed: Passed locally. Live Shopier E2E still pending provider credentials and panel configuration.
+Evidence: Current session command output; raw Shopier credentials were not printed or committed.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: ACCEPTED_LOCAL_RELAY_LIVE_E2E_PENDING
+
+Agent 4 integrity guard: APPROVE
+
 ## SHOPIER-SETUP-001 Provider Setup Guard Retest
 
 Bug ID: R-BUG-007

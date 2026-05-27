@@ -131,4 +131,20 @@ describe("payment safety contract", () => {
     expect(shopierService).toContain("total_order_value: opts.miktarTL");
     expect(shopierService).toContain("product_name: `Bakiye Yukleme — ${opts.miktarTL} TL`");
   });
+
+  it("supports a safe Shopier OSB relay without breaking an existing Shopier service", () => {
+    const paymentsRoute = source("./server/routes/payments.ts");
+    const env = source("./server/lib/env.ts");
+    const exampleEnv = source("../.env.example");
+
+    expect(env).toContain("SHOPIER_OSB_FALLBACK_URL");
+    expect(exampleEnv).toContain("SHOPIER_OSB_FALLBACK_URL");
+    expect(paymentsRoute).toContain('"/shopier/osb"');
+    expect(paymentsRoute).toContain("forwardShopierOsbFallback");
+    expect(paymentsRoute).toContain("env.SHOPIER_OSB_FALLBACK_URL");
+    expect(paymentsRoute).toContain("new URLSearchParams");
+    expect(paymentsRoute).toContain("application/x-www-form-urlencoded");
+    expect(paymentsRoute).toContain("forwarded: true");
+    expect(paymentsRoute).toContain("mode: \"json\"");
+  });
 });

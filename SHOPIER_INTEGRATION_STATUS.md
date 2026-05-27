@@ -1,6 +1,6 @@
 # Shopier Integration Status
 
-Last checked: 2026-05-28 00:10 TRT
+Last checked: 2026-05-28 00:55 TRT
 
 ## 4-Agent Gate
 
@@ -16,7 +16,7 @@ Reason: No frontend style/template change is needed; previously shared PAT/JWT v
 Agent 4 - Integrity/Release Guard: APPROVE WITH BLOCKER  
 Reason: Do not overwrite the existing global OSB notification URL until a YapayZekaLab-safe callback/webhook path is confirmed.
 
-Final decision: Shopier is planned but not release-approved. Keep disabled until a safe credential/callback route is available.
+Final decision: Shopier backend relay is implemented locally and test-passed. Keep the payment method disabled in production until live legacy checkout credentials are installed and OSB/panel E2E is completed.
 
 ## What Is Already Ready
 
@@ -28,6 +28,10 @@ Final decision: Shopier is planned but not release-approved. Keep disabled until
   - `product_name=Bakiye Yukleme - <TRY> TL`
 - No fixed package/product is required in YapayZekaLab code. The payment row is created for the user-entered amount before redirecting to Shopier.
 - Existing tests verify that Shopier receives TRY, not the USD balance amount.
+- `POST /api/payments/shopier/osb` exists as a safe OSB relay endpoint:
+  - If the callback belongs to a YapayZekaLab payment and signature/TRY/amount checks pass, it credits balance idempotently.
+  - If the callback is not ours or has an unknown payment ID, it can forward the original form body to `SHOPIER_OSB_FALLBACK_URL`.
+  - This lets a single Shopier OSB URL preserve an existing service while YapayZekaLab processes its own payment rows.
 
 ## Panel / Docs Findings
 
@@ -48,12 +52,13 @@ Use the current code path.
 
 Requirements:
 - Correct legacy Shopier `API_key` and `API_secret` for checkout form, not PAT/JWT.
-- Confirm whether the account supports a separate YapayZekaLab website/callback index, or add a safe fan-out callback that does not break the existing service.
+- Configure `SHOPIER_OSB_FALLBACK_URL` to the existing service before changing the Shopier panel OSB URL.
+- Configure the Shopier panel OSB URL to `https://yapayzekalab.org/api/payments/shopier/osb`.
 - Configure server env only; never commit credentials.
 - Run init-only test first, then callback valid/invalid/fail/duplicate E2E in sandbox or smallest safe real test.
 
 Risk:
-- If OSB/callback is global for the account, changing it can break the existing service.
+- If fallback URL is missing or wrong, changing the global OSB URL can still break the existing service.
 
 ### Option B - Modern App / Webhook
 
@@ -70,5 +75,11 @@ Risk:
 
 ## Current Release Gate
 
-Manual IBAN and manual USDT TRC20 are live-pass. Shopier remains `BLOCKED_BY_PROVIDER_SETUP` until one of the safe implementation options above is completed and retested.
+Manual IBAN and manual USDT TRC20 are live-pass. Shopier remains `BLOCKED_BY_PROVIDER_SETUP` until the relay is deployed, legacy checkout credentials are installed, OSB fallback is configured, and live provider E2E is completed.
 
+## Verification
+
+- RED: `npm test -- src/payment-safety-contract.test.ts` failed before `SHOPIER_OSB_FALLBACK_URL` and `/shopier/osb` existed.
+- GREEN: `npm test -- src/payment-safety-contract.test.ts` passed 10/10.
+- Targeted: `npm test -- src/server/services/shopier-service.test.ts src/payment-safety-contract.test.ts src/server/services/payment-pricing.test.ts` passed 3 files / 22 tests.
+- Regression: `npm run lint`, `npm test` 30 files / 135 tests, `npm run build`, `npm run scan:public`, and `node scripts/scan-secrets.mjs` passed.

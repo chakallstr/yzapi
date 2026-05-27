@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Response } from "express";
 import express from "express";
 import { db } from "../db/client.js";
 import { payments, pendingIbanPayments, systemConfig, users, transactions } from "../db/schema.js";
@@ -170,6 +170,164 @@ function serializeIban(p: typeof pendingIbanPayments.$inferSelect) {
   };
 }
 
+type ShopierResponseMode = "redirect" | "json";
+
+function finishShopierResponse(
+  res: Response,
+  mode: ShopierResponseMode,
+  ok: boolean,
+  extra: Record<string, unknown> = {},
+) {
+  if (mode === "json") {
+    res.status(ok ? 200 : 400).json({ ok, ...extra });
+    return;
+  }
+
+  res.redirect(`${env.APP_BASE_URL}/?payment=${ok ? "success" : "fail"}`);
+}
+
+async function forwardShopierOsbFallback(body: Record<string, string>): Promise<boolean> {
+  const fallbackUrl = env.SHOPIER_OSB_FALLBACK_URL?.trim();
+  if (!fallbackUrl) return false;
+
+  const payload = new URLSearchParams();
+  for (const [key, value] of Object.entries(body)) {
+    payload.set(key, String(value));
+  }
+
+  try {
+    const response = await fetch(fallbackUrl, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: payload,
+    });
+
+    if (!response.ok) {
+      logger.warn({
+        status: response.status,
+        paymentId: body.platform_order_id,
+      }, "Shopier OSB fallback failed");
+    }
+
+    return response.ok;
+  } catch (err) {
+    logger.error({
+      err,
+      paymentId: body.platform_order_id,
+    }, "Shopier OSB fallback request failed");
+    return false;
+  }
+}
+
+async function handleShopierCallbackBody(
+  body: Record<string, string>,
+  res: Response,
+  opts: { mode: ShopierResponseMode; allowFallback: boolean },
+) {
+  logger.info({ callback: safeShopierCallbackLog(body) }, "Shopier callback received");
+
+  const result = verifyCallback(body);
+  if (!result.valid) {
+    if (opts.allowFallback && await forwardShopierOsbFallback(body)) {
+      res.status(200).json({ ok: true, forwarded: true });
+      return;
+    }
+
+    logger.warn({ callback: safeShopierCallbackLog(body) }, "Shopier callback signature invalid");
+    adminPaymentNotificationEmail({
+      title: "Shopier callback imza hatası",
+      method: "shopier",
+      reference: body.platform_order_id,
+      status: "invalid_signature",
+    }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
+    finishShopierResponse(res, opts.mode, false);
+    return;
+  }
+
+  if (result.status !== "success") {
+    if (result.platformOrderId) {
+      await db.update(payments)
+        .set({ durum: "basarisiz", tamamlanma: new Date() })
+        .where(eq(payments.id, result.platformOrderId));
+    }
+    adminPaymentNotificationEmail({
+      title: "Shopier ödeme başarısız",
+      method: "shopier",
+      reference: result.platformOrderId,
+      status: result.status ?? "fail",
+    }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
+    finishShopierResponse(res, opts.mode, opts.mode === "json", { status: result.status ?? "fail" });
+    return;
+  }
+
+  const paymentId = result.platformOrderId!;
+  const paymentRows = await db.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
+  if (!paymentRows.length) {
+    if (opts.allowFallback && await forwardShopierOsbFallback(body)) {
+      res.status(200).json({ ok: true, forwarded: true });
+      return;
+    }
+
+    logger.warn({ paymentId }, "Shopier callback: payment not found");
+    finishShopierResponse(res, opts.mode, false, { error: "payment_not_found" });
+    return;
+  }
+
+  const payment = paymentRows[0];
+  if (result.currency !== undefined && result.currency !== "0") {
+    logger.warn({
+      paymentId,
+      currency: result.currency,
+    }, "Shopier callback currency mismatch");
+    adminPaymentNotificationEmail({
+      title: "Shopier ödeme para birimi uyuşmadı",
+      method: "shopier",
+      reference: paymentId,
+      status: "currency_mismatch",
+    }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
+    finishShopierResponse(res, opts.mode, false, { error: "currency_mismatch" });
+    return;
+  }
+
+  const expectedPaidTL = Number(payment.payableTL ?? payment.miktarTL);
+  if (result.paidTL !== undefined && Math.abs(result.paidTL - expectedPaidTL) > 0.01) {
+    logger.warn({
+      paymentId,
+      paidTL: result.paidTL,
+      expectedPaidTL,
+    }, "Shopier callback amount mismatch");
+    adminPaymentNotificationEmail({
+      title: "Shopier ödeme tutarı uyuşmadı",
+      method: "shopier",
+      reference: paymentId,
+      status: "amount_mismatch",
+      payableTL: expectedPaidTL,
+    }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
+    finishShopierResponse(res, opts.mode, false, { error: "amount_mismatch" });
+    return;
+  }
+
+  const creditTL = Number(payment.creditTL ?? payment.miktarTL);
+  const credit = await creditUserBalance(
+    payment.userId,
+    paymentId,
+    creditTL,
+    "shopier",
+    paymentId,
+    safeProviderPayload(body),
+    {
+      paidTL: Number(payment.payableTL ?? payment.miktarTL),
+      amountUsd: payment.amountUsd === null ? undefined : Number(payment.amountUsd),
+      kurAtPayment: payment.kurAtPayment === null ? undefined : Number(payment.kurAtPayment),
+      roundingTL: payment.roundingTL === null ? undefined : Number(payment.roundingTL),
+    },
+  );
+
+  finishShopierResponse(res, opts.mode, credit.success || Boolean(credit.alreadyCredited), {
+    alreadyCredited: Boolean(credit.alreadyCredited),
+  });
+}
+
 // ── GET /api/payments/methods ─────────────────────────────────────────────────
 router.get("/methods", userAuth, async (_req, res, next) => {
   try {
@@ -277,101 +435,19 @@ router.post(
   async (req, res, next) => {
     try {
       const body = req.body as Record<string, string>;
-      logger.info({ callback: safeShopierCallbackLog(body) }, "Shopier callback received");
+      await handleShopierCallbackBody(body, res, { mode: "redirect", allowFallback: false });
+    } catch (e) { next(e); }
+  }
+);
 
-      const result = verifyCallback(body);
-      if (!result.valid) {
-        logger.warn({ callback: safeShopierCallbackLog(body) }, "Shopier callback signature invalid");
-        adminPaymentNotificationEmail({
-          title: "Shopier callback imza hatası",
-          method: "shopier",
-          reference: body.platform_order_id,
-          status: "invalid_signature",
-        }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
-        res.redirect(`${env.APP_BASE_URL}/?payment=fail`);
-        return;
-      }
-
-      if (result.status !== "success") {
-        // Mark payment as failed
-        if (result.platformOrderId) {
-          await db.update(payments)
-            .set({ durum: "basarisiz", tamamlanma: new Date() })
-            .where(eq(payments.id, result.platformOrderId));
-        }
-        adminPaymentNotificationEmail({
-          title: "Shopier ödeme başarısız",
-          method: "shopier",
-          reference: result.platformOrderId,
-          status: result.status ?? "fail",
-        }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
-        res.redirect(`${env.APP_BASE_URL}/?payment=fail`);
-        return;
-      }
-
-      const paymentId = result.platformOrderId!;
-      const paymentRows = await db.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
-      if (!paymentRows.length) {
-        logger.warn({ paymentId }, "Shopier callback: payment not found");
-        res.redirect(`${env.APP_BASE_URL}/?payment=fail`);
-        return;
-      }
-
-      const payment = paymentRows[0];
-      if (result.currency !== undefined && result.currency !== "0") {
-        logger.warn({
-          paymentId,
-          currency: result.currency,
-        }, "Shopier callback currency mismatch");
-        adminPaymentNotificationEmail({
-          title: "Shopier ödeme para birimi uyuşmadı",
-          method: "shopier",
-          reference: paymentId,
-          status: "currency_mismatch",
-        }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
-        res.redirect(`${env.APP_BASE_URL}/?payment=fail`);
-        return;
-      }
-
-      const expectedPaidTL = Number(payment.payableTL ?? payment.miktarTL);
-      if (result.paidTL !== undefined && Math.abs(result.paidTL - expectedPaidTL) > 0.01) {
-        logger.warn({
-          paymentId,
-          paidTL: result.paidTL,
-          expectedPaidTL,
-        }, "Shopier callback amount mismatch");
-        adminPaymentNotificationEmail({
-          title: "Shopier ödeme tutarı uyuşmadı",
-          method: "shopier",
-          reference: paymentId,
-          status: "amount_mismatch",
-          payableTL: expectedPaidTL,
-        }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
-        res.redirect(`${env.APP_BASE_URL}/?payment=fail`);
-        return;
-      }
-
-      const creditTL = Number(payment.creditTL ?? payment.miktarTL);
-      const credit = await creditUserBalance(
-        payment.userId,
-        paymentId,
-        creditTL,
-        "shopier",
-        paymentId,
-        safeProviderPayload(body),
-        {
-          paidTL: Number(payment.payableTL ?? payment.miktarTL),
-          amountUsd: payment.amountUsd === null ? undefined : Number(payment.amountUsd),
-          kurAtPayment: payment.kurAtPayment === null ? undefined : Number(payment.kurAtPayment),
-          roundingTL: payment.roundingTL === null ? undefined : Number(payment.roundingTL),
-        },
-      );
-
-      if (credit.success) {
-        res.redirect(`${env.APP_BASE_URL}/?payment=success`);
-      } else {
-        res.redirect(`${env.APP_BASE_URL}/?payment=fail`);
-      }
+// ── POST /api/payments/shopier/osb (PUBLIC — Shopier OSB relay) ───────────────
+router.post(
+  "/shopier/osb",
+  express.urlencoded({ extended: false }),
+  async (req, res, next) => {
+    try {
+      const body = req.body as Record<string, string>;
+      await handleShopierCallbackBody(body, res, { mode: "json", allowFallback: true });
     } catch (e) { next(e); }
   }
 );

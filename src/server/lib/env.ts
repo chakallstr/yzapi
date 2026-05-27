@@ -33,6 +33,7 @@ const schema = z.object({
   SHOPIER_API_KEY: z.string().optional(),
   SHOPIER_API_SECRET: z.string().optional(),
   SHOPIER_RETURN_URL: z.string().optional(),
+  SHOPIER_OSB_FALLBACK_URL: z.string().optional(),
 
   // Cryptomus payment (optional — returns 503 when unset)
   CRYPTOMUS_MERCHANT_ID: z.string().optional(),
