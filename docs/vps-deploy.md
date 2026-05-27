@@ -2,7 +2,7 @@
 
 ## Hedef
 
-Tek VPS üzerinde `yapayzekalab.org` panel ve API aynı Express app olarak çalışır. Nginx `127.0.0.1:4567` üstündeki Node servisine proxy yapar.
+Tek VPS üzerinde `yapayzekalab.org` panel ve API aynı Express app olarak çalışır. Mevcut canlı hedefte Nginx `127.0.0.1:4568` üstündeki Node servisine proxy yapar.
 
 ## Sunucu
 
@@ -10,9 +10,9 @@ Tek VPS üzerinde `yapayzekalab.org` panel ve API aynı Express app olarak çal�
 - Node.js 22
 - Nginx
 - PostgreSQL client (`pg_dump` backup için)
-- systemd service: `yapayzekalab`
-- App path: `/opt/yapayzekalab`
-- Env file: `/opt/yapayzekalab/.env.production`
+- systemd service: `turkapiprojesi`
+- App path: `/opt/turkapiprojesi`
+- Env file: `/opt/turkapiprojesi/.env.production`
 
 ## İlk Kurulum
 
@@ -30,15 +30,15 @@ CentOS/RHEL yolunda mevcut `/etc/nginx/conf.d/seslab.com.tr.conf` gibi canlı co
 Repo VPS'e klonlandıktan sonra:
 
 ```bash
-sudo chown -R yapayzekalab:yapayzekalab /opt/yapayzekalab
-sudo -u yapayzekalab cp .env.example /opt/yapayzekalab/.env.production
-sudo chmod 600 /opt/yapayzekalab/.env.production
+sudo chown -R turkapi:turkapi /opt/turkapiprojesi
+sudo -u turkapi cp .env.example /opt/turkapiprojesi/.env.production
+sudo chmod 600 /opt/turkapiprojesi/.env.production
 ```
 
 `.env.production` içine gerçek değerler girilir:
 
 - `NODE_ENV=production`
-- `PORT=4567`
+- `PORT=4568`
 - `DATABASE_URL`
 - `JWT_SECRET`
 - `APP_BASE_URL=https://yapayzekalab.org`
@@ -53,7 +53,7 @@ Deploy scripti required alanları boş bırakılmışsa durur. `.env.production`
 ## Deploy
 
 ```bash
-APP_DIR=/opt/yapayzekalab bash scripts/vps-deploy.sh
+APP_DIR=/opt/turkapiprojesi SERVICE=turkapiprojesi SMOKE_BASE_URL=http://127.0.0.1:4568 bash scripts/vps-deploy.sh
 ```
 
 Deploy scripti sırasıyla:
@@ -66,13 +66,13 @@ Deploy scripti sırasıyla:
 6. `npm run scan:public` ile public bundle secret/formül taraması yapar.
 7. `pg_dump` ile migration öncesi backup alır.
 8. `NODE_ENV=production npm run db:migrate` çalıştırır.
-9. `systemctl restart yapayzekalab` ile servisi yeniler.
+9. `systemctl restart turkapiprojesi` ile servisi yeniler.
 10. `npm run smoke:vps` ile `/health`, `/status`, `/api/models`, auth `401`, JSON `404` ve opsiyonel canlı API key smoke kontrollerini çalıştırır.
 
 Opsiyonel canlı smoke değişkenleri:
 
 ```bash
-SMOKE_BASE_URL=http://127.0.0.1:4567
+SMOKE_BASE_URL=http://127.0.0.1:4568
 SMOKE_API_KEY=yzk_live_...
 SMOKE_LOW_BALANCE_API_KEY=yzk_live_...
 SMOKE_CHAT_MODEL=anthropic/claude-haiku-4.5
@@ -130,7 +130,7 @@ Reconciliation raporu kullanıcı bakiyesi ile ledger transaction toplamını ka
 VPS üzerinde:
 
 ```bash
-APP_DIR=/opt/yapayzekalab SERVICE=yapayzekalab npm run ops:vps-status
+APP_DIR=/opt/turkapiprojesi SERVICE=turkapiprojesi npm run ops:vps-status
 ```
 
 Bu komut systemd, Nginx config, port, disk/RAM ve son logları read-only gösterir.
@@ -140,8 +140,8 @@ Bu komut systemd, Nginx config, port, disk/RAM ve son logları read-only göster
 Önceki commit'e dön:
 
 ```bash
-cd /opt/yapayzekalab
-sudo -u yapayzekalab /opt/yapayzekalab/.deploy/rollback-last.sh
+cd /opt/turkapiprojesi
+sudo -u turkapi /opt/turkapiprojesi/.deploy/rollback-last.sh
 ```
 
 Migration sonrası geri alma gerekiyorsa DB backup dosyaları `.deploy/db-backups/` altındadır. Para/ledger tabloları için DB geri dönüşü manuel karar gerektirir; sadece kod rollback'i migration etkisini geri almaz.

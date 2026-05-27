@@ -175,3 +175,13 @@ Operasyon tarihi: 2026-05-26
 - Live deploy: `manual-20260527T071659Z-ddee303` deployed to `/opt/turkapiprojesi`, service `turkapiprojesi.service`.
 - Live retest: `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` PASS; `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` PASS 10/10; live bundle contains `Bakiye USD`, `Tahsilat TL`, `Yuvarlama`, `yukarı tam liraya`; forbidden `%5 komisyon`, `Komisyon %`, rejected template/admin password/fake-live strings absent.
 - Sonuç: FIXED LIVE.
+
+## DEPLOY-TARGET-METADATA-001
+
+- Problem: Repo deploy script/runbook eski hedefi (`/opt/yapayzekalab`, servis `yapayzekalab`, port `4567`) gösteriyordu; gerçek canlı hedef `/opt/turkapiprojesi`, servis `turkapiprojesi.service`, port `4568`. Ayrıca son payment UI deploy manifesti yazılmadığı için `/status.deploy.id` eski restored-theme deploy’unu gösteriyordu.
+- Kök neden: Manuel deploy gerçek hedefe doğru yapılmıştı, fakat generic deploy tooling ve dokümantasyon eski placeholder hedefte kalmıştı; payment UI deploy’u release manifesti üretmedi.
+- Karar: DEC-FIX-DEPLOY-TARGET-METADATA-001 ve DEC-FIX-LIVE-LEGACY-ADMINPASSWORD-ENV-001, 3/3 APPROVED.
+- Yapılan değişiklik: `scripts/vps-deploy.sh` varsayılan canlı hedefe hizalandı; `docs/vps-deploy.md` ve `docs/release-vps-beta-checklist.md` gerçek servis/path/port ile güncellendi; `src/deploy-target-contract.test.ts` eklendi. Test setup ve aktif dokümanlardan legacy `ADMIN_PASSWORD` placeholder’ları kaldırıldı. Canlı `.deploy/releases/manual-20260527T071659Z-ddee303.json` manifesti yazıldı. Canlı eski env backup dosyası root-only secure alana taşındı; live `.env.production` içindeki kullanılmayan legacy `ADMIN_PASSWORD` satırı kaldırıldı.
+- Test: `npm test -- src/deploy-target-contract.test.ts` önce RED 2/2 fail, sonra PASS 2/2; `npm test -- src/admin-single-owner-contract.test.ts` önce RED, sonra PASS; `bash -n scripts/vps-deploy.sh scripts/vps-live-preflight.sh scripts/vps-setup.sh` PASS; `npm run lint` PASS; `npm test` PASS 28 files / 118 tests; `npm run build` PASS; `npm run scan:public` PASS; `node scripts/scan-secrets.mjs` PASS.
+- Live retest: `turkapiprojesi.service` active; `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` PASS; `/status.deploy.id=manual-20260527T071659Z-ddee303`; legacy admin password line absent; env backup no longer in public deploy backup directory and secure copy is `600 root:root`.
+- Sonuç: FIXED LIVE FOR DEPLOY OBSERVABILITY / RELEASE STILL BLOCKED BY PROVIDER BILLING AND SHOPIER-CRYPTOMUS E2E.

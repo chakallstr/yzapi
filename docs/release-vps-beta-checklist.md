@@ -28,7 +28,7 @@ npm run scan:public
 VPS üzerinde:
 
 ```bash
-APP_DIR=/opt/yapayzekalab bash scripts/vps-deploy.sh
+APP_DIR=/opt/turkapiprojesi SERVICE=turkapiprojesi SMOKE_BASE_URL=http://127.0.0.1:4568 bash scripts/vps-deploy.sh
 ```
 
 Başarı kriterleri:
@@ -47,7 +47,7 @@ Başarı kriterleri:
 Canlı deploy sonrası düşük trafikte:
 
 ```bash
-sudo -u yapayzekalab /opt/yapayzekalab/.deploy/rollback-last.sh
+sudo -u turkapi /opt/turkapiprojesi/.deploy/rollback-last.sh
 ```
 
 Rollback smoke geçmeden release güvenli sayılmaz.

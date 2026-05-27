@@ -103,3 +103,25 @@ Visual diff notes:
 - No class names, inline style objects, CSS variables, spacing, colors, card/button/modal structure, or responsive breakpoints were changed.
 - Only existing payment text and displayed values changed to match backend rounded TL quote behavior.
 - Live deploy `manual-20260527T071659Z-ddee303` preserved the restored old theme. Live UAT `qa-artifacts/uat-smoke-2026-05-27T07-17-37-093Z/desktop-home.png` shows the old YapayZekaLab hero and no rejected template.
+
+---
+
+## 2026-05-27 Deploy Metadata / Security Hygiene
+
+Files checked for visual/template risk:
+
+- `scripts/vps-deploy.sh`: deploy target defaults only.
+- `docs/vps-deploy.md`: operations docs only.
+- `docs/release-vps-beta-checklist.md`: operations docs only.
+- `src/deploy-target-contract.test.ts`: test only.
+
+Verification:
+
+- No frontend component, CSS, token, layout, card, button, modal, icon, typography or responsive files were changed.
+- `npm run build`: PASS.
+- `npm run scan:public`: PASS, 0 hits.
+- Live smoke after restart: PASS.
+
+Visual diff notes:
+
+- No visual diff possible from this phase; it only corrected deploy target metadata and secret hygiene.

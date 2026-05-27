@@ -26,6 +26,8 @@ NOT READY — API/BILLING/BALANCE BLOCKERS
 - Live smoke and live `qa:uat` passed after deploy; live bundle rejected-template scan found no forbidden fingerprints.
 - Live IBAN payment schema/init/admin approve/reject/idempotency/audit E2E passed with temporary test data and cleanup.
 - Account payment UI now shows backend-aligned rounded TL collection and USD credit fields; unimplemented frontend commission copy removed without visual style changes.
+- Deploy script/runbook now defaults to the real live target `/opt/turkapiprojesi`, service `turkapiprojesi`, port `4568`; live `/status.deploy.id` now reports the latest payment UI deploy `manual-20260527T071659Z-ddee303`.
+- Legacy live `ADMIN_PASSWORD` env line was removed and stale env backup artefact was moved out of the regular deploy backup directory into root-only secure storage.
 
 ## Must-Fix Before Launch
 
@@ -42,7 +44,7 @@ NOT READY — API/BILLING/BALANCE BLOCKERS
 
 ## Latest Evidence
 
-- Latest local regression: `npm run lint` PASS; `npm test` PASS, 27 files / 114 tests; `npm run build` PASS; `npm run scan:public` PASS, 0 hits; `node scripts/scan-secrets.mjs` PASS, 0 hits.
+- Latest local regression: `npm run lint` PASS; `npm test` PASS, 28 files / 118 tests; `npm run build` PASS; `npm run scan:public` PASS, 0 hits; `node scripts/scan-secrets.mjs` PASS, 0 hits.
 - Latest local UAT: `npm run qa:uat` PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T06-41-54-340Z/uat-smoke-report.md`.
 - Latest production audit: `npm audit --omit=dev --json` PASS, 0 vulnerabilities. General audit still has 4 moderate dev-only `drizzle-kit`/nested esbuild advisories.
 - Latest live deploy: `manual-20260527T064341Z-6021b8e`, rollback `/opt/turkapiprojesi/.deploy/rollback-manual-20260527T064341Z-6021b8e.sh`.
@@ -53,6 +55,7 @@ NOT READY — API/BILLING/BALANCE BLOCKERS
 - Latest live IBAN E2E: `$10` init produced `payableTL=473`, `creditTL=472.7961`, `roundingTL=0.2039`; admin approve credited once, duplicate approve `409`, reject reason guard `400`, audit entries present, cleanup complete.
 - Latest payment UI local regression: `npm test -- src/api-docs-content.test.ts` PASS 7/7; `npm run lint` PASS; `npm test` PASS 27 files / 116 tests; `npm run build` PASS; scans PASS; `npm run qa:uat` PASS 10/10.
 - Latest payment UI live deploy: `manual-20260527T071659Z-ddee303`; live smoke PASS; live UAT PASS 10/10; live bundle includes rounded quote labels and excludes stale commission/rejected-template fingerprints.
+- Latest deploy metadata/security hygiene retest: `/status.deploy.id=manual-20260527T071659Z-ddee303`, live smoke PASS, legacy admin password line absent, env backup artefact secured outside regular backup dir.
 - Latest direct CloseRouter recheck: `/credits` and `/models/count` still 200, but tiny inference timed out across tested Anthropic/OpenAI/DeepSeek/Google/Moonshot/Qwen models.
 - Latest direct CloseRouter diagnostic: live catalog returns 18 text/chat models, but current low-cost chat candidates and `anthropic/claude-haiku-4.5` `/messages` still return provider `502` with request ids `c2c53a5e-1cd3-474d-8136-17da70c0d922` and `98a159de-f6df-4a97-a7e6-78516f90bf65`.
 - Standard Chrome automation was unavailable to this Codex session, so post-deploy logged-in Google admin click-through was not rerun in the user's existing Chrome profile.

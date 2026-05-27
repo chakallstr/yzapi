@@ -214,7 +214,7 @@ Express + TypeScript API. Kullanıcı bakiye yükler, API key alır, model bazl�
 | VPS env file | `/opt/yapayzekalab/.env.production` present |
 | Env permission | `600` |
 | Non-secret prod ayarları | `NODE_ENV`, `PORT`, `APP_BASE_URL`, `FRONTEND_AUTH_RETURN`, `CLOSEROUTER_BASE_URL`, rate limit set |
-| Missing secrets | `DATABASE_URL`, `ADMIN_PASSWORD`, `JWT_SECRET`, `CLOSEROUTER_API_KEY` |
+| Missing secrets | `DATABASE_URL`, `JWT_SECRET`, `CLOSEROUTER_API_KEY` |
 | Smoke keys | `SMOKE_API_KEY` missing, `SMOKE_LOW_BALANCE_API_KEY` missing |
 | Service | `yapayzekalab` inactive |
 
@@ -228,7 +228,7 @@ Express + TypeScript API. Kullanıcı bakiye yükler, API key alır, model bazl�
 ### 23:42 Sıradaki Faz
 
 - Gerçek production secretları girilmeden Faz 2D başlatılmayacak.
-- Gerekli değerler: `DATABASE_URL`, `ADMIN_PASSWORD`, `JWT_SECRET`, `CLOSEROUTER_API_KEY`, funded smoke key ve düşük bakiye smoke key.
+- Gerekli değerler: `DATABASE_URL`, `JWT_SECRET`, `CLOSEROUTER_API_KEY`, funded smoke key ve düşük bakiye smoke key.
 
 ## Son Codex Aktivitesi (2026-05-24 ~22:32)
 
@@ -371,7 +371,7 @@ Express + TypeScript API. Kullanıcı bakiye yükler, API key alır, model bazl�
 - **Sistem kurulum turu** (17:00): `/v1/responses` ve `/v1/messages` eklendi. Proxy guard artik model endpoint desteğini, admin `model_overrides.enabled=false` durumunu, rate limit ve bakiye ön kontrolünü provider'a gitmeden denetliyor. VPS hedefi için `deploy/vps/`, `scripts/vps-setup.sh`, `scripts/vps-deploy.sh`, `docs/vps-deploy.md` eklendi. Production env dosyası `.env.production` olarak destekleniyor.
 - **Proxy/Auth API spec** (17:07): `docs/proxy-and-auth-apis.md` YENİ (29KB) — CloseRouter API tam spec: canonical domain `closerouter.dev`, bearer auth prefix `closerouter_`, `/v1/models` auth-gerekli, `POST /v1/keys` key yönetimi. Google OAuth 2.0 web server flow da belgelendi. README güncellendi (1315b) — aktif mimari kararı, `ProviderAdapter` + CloseRouter upstream, VPS deploy ref eklendi.
 - **Test + env refactor** (17:04): `src/server/lib/env.ts` production'da `.env.production` okuyacak şekilde güncellendi; `closerouter-service.test.ts` 2 test eklendi; `__tests__/setup.ts` CloseRouter test key ayarıyla güncellendi.
-- **Env validation** (17:04): `src/server/lib/env.ts` YENİ — Zod schema ile tüm env var'lar tip güvenli. Required: `DATABASE_URL`, `ADMIN_PASSWORD`, `JWT_SECRET`. Optional (graceful degrade): `CLOSEROUTER_API_KEY`, `SHOPIER_*`, `CRYPTOMUS_*`, `RESEND_API_KEY`. `KDV_RATE` default `0.20`, JWT access 15dk / refresh 30 gün.
+- **Env validation** (17:04): `src/server/lib/env.ts` YENİ — Zod schema ile tüm env var'lar tip güvenli. Current required values: `DATABASE_URL`, `JWT_SECRET`. Admin ayrı şifre kullanmaz; admin yetkisi allowlisted Google/user oturumuyla verilir. Optional (graceful degrade): `CLOSEROUTER_API_KEY`, `SHOPIER_*`, `CRYPTOMUS_*`, `RESEND_API_KEY`. `KDV_RATE` default `0.20`, JWT access 15dk / refresh 30 gün.
 - **Error handling refactor** (17:02): `src/server/lib/errors.ts` YENİ — typed error hiyerarşisi: `AppError`, `InsufficientBalanceError`, `RateLimitError`, `ModelNotFoundError`, `ModelDisabledError`, `BadRequestError`. `proxy.ts` (10910 bytes, +2KB) ve `closerouter-service.ts` (7105 bytes) bu typed error'ları import ediyor. `InsufficientBalance → 402`, `RateLimit → 429` gibi HTTP kodu eşlemesi düzgün yapıldı.
 
 - **Router kararı kesinleşti** (16:51): `agent-team/ROUTER_DECISION_2026-05-24.md` oluşturuldu. MVP = `YapayZekaLab Backend → CloseRouter`. 9Router ana satış katmanı DEĞİL — sadece Faz-2 POC/fallback (feature flag arkasında). Billing/auth/ledger her zaman bizim backend'de kalır.

@@ -58,6 +58,78 @@ Status: APPROVED
 
 ---
 
+Decision ID: DEC-RETEST-DEPLOY-TARGET-METADATA-001
+Decision title: Accept deploy target metadata and live secret hygiene retest
+Decision type: Retest acceptance
+Related bug IDs: R-BUG-002, R-BUG-009, DEPLOY-TARGET-METADATA-001, LIVE-LEGACY-ADMINPASSWORD-ENV-001
+Evidence from reports: Deploy target contract test failed before patch on old `/opt/yapayzekalab`, `yapayzekalab`, `4567` defaults, then passed after script/docs were aligned to `/opt/turkapiprojesi`, `turkapiprojesi`, `4568`. `bash -n` deploy scripts passed. Full `npm test` passed 28 files / 118 tests. Build/public scan/secret scan passed. Live service restarted active; smoke passed; `/status.deploy.id` now reports `manual-20260527T071659Z-ddee303`; legacy `ADMIN_PASSWORD` line is absent; env backup artefact is outside regular `.deploy/backups` and secured as `600 root:root`.
+Files likely affected: `scripts/vps-deploy.sh`, `docs/vps-deploy.md`, `docs/release-vps-beta-checklist.md`, `src/deploy-target-contract.test.ts`, report files, remote deploy metadata/config hygiene.
+Risk level: Low after retest.
+Design/template impact: None; no frontend component/CSS/theme/layout files changed.
+Security impact: Positive; stale env backup artefact secured and unused legacy admin password removed from live env. Provider-side credential rotation remains recommended.
+Backend/API/billing impact: No billing behavior changed; live smoke stayed PASS.
+Proposed action: Mark deploy target metadata and live secret hygiene accepted; continue release blocking on provider inference billing and Shopier/Cryptomus E2E.
+Agent 1 vote: APPROVE
+Agent 1 reason: This prevents future stale live-target/template deploy mistakes and live smoke still passes.
+Agent 2 vote: APPROVE
+Agent 2 reason: Runtime metadata is now accurate and backend smoke stayed healthy.
+Agent 3 vote: APPROVE
+Agent 3 reason: Visual surface untouched and secret hygiene improved.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Commit/push deploy metadata and report updates after final secret scan.
+Status: COMPLETED
+
+---
+
+Decision ID: DEC-FIX-LIVE-LEGACY-ADMINPASSWORD-ENV-001
+Decision title: Remove unused legacy ADMIN_PASSWORD from live env without printing secrets
+Decision type: Live config hygiene approval
+Related bug IDs: DESIGN-REGRESSION-001, R-BUG-008
+Evidence from reports: Admin password flow is removed in source and live UI. `src/server/lib/env.ts` no longer requires `ADMIN_PASSWORD`; `/api/admin/login` returns 410. Live env still contains an unused legacy `ADMIN_PASSWORD` key, which is inconsistent with the single-owner Google admin model.
+Files likely affected: Remote `/opt/turkapiprojesi/.env.production`; service restart; reports.
+Risk level: Medium
+Design/template impact: None.
+Security impact: Positive; no secret values may be printed. Other credentials still require provider-side rotation if considered exposed.
+Backend/API/billing impact: Low; source does not read `ADMIN_PASSWORD`, but service smoke must pass after restart.
+Proposed action: Remove only the `ADMIN_PASSWORD=` line from live `.env.production` using a non-printing edit, keep file mode 600, restart `turkapiprojesi.service`, then run live smoke.
+Agent 1 vote: APPROVE
+Agent 1 reason: Aligns live config with the verified no-admin-password UX.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend schema/routes no longer require this env key and smoke will catch runtime issues.
+Agent 3 vote: APPROVE
+Agent 3 reason: Reduces secret surface and supports the release guard without visual impact.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Remove legacy live `ADMIN_PASSWORD` line without printing env contents and retest.
+Status: APPROVED
+
+---
+
+Decision ID: DEC-FIX-DEPLOY-TARGET-METADATA-001
+Decision title: Align deploy script/runbook with real VPS target and repair live deploy metadata
+Decision type: Code/docs/live-metadata approval
+Related bug IDs: R-BUG-002, R-BUG-009
+Evidence from reports: Live active service is `turkapiprojesi.service` under `/opt/turkapiprojesi` on port `4568`, but `scripts/vps-deploy.sh` and deploy docs still default to `/opt/yapayzekalab`, `yapayzekalab`, and port `4567`. Latest `/status.deploy.id` still shows the restored-theme deploy instead of the later payment UI deploy because the manual deploy did not write a release manifest.
+Files likely affected: `scripts/vps-deploy.sh`, `docs/vps-deploy.md`, `docs/release-vps-beta-checklist.md`, a deploy contract test, report files, and remote `.deploy/releases/manual-20260527T071659Z-ddee303.json`.
+Risk level: Medium
+Design/template impact: None.
+Security impact: Do not print env contents. Remove or quarantine plaintext env backup artifacts from `.deploy/backups` if present. No secret values in source/report files.
+Backend/API/billing impact: No app code or DB behavior change; improves deploy safety and `/status` observability.
+Proposed action: Add a failing contract test for the real live deploy target, update script/docs defaults, create the missing live release manifest for the latest deploy, secure stale env backup file without exposing contents, run targeted test and secret scan, then update reports.
+Agent 1 vote: APPROVE
+Agent 1 reason: Correct deploy metadata and docs reduce future stale-template/live-drift regressions.
+Agent 2 vote: APPROVE
+Agent 2 reason: This does not touch billing logic but protects the real runtime path used for live verification.
+Agent 3 vote: APPROVE
+Agent 3 reason: Approved because it is non-visual and explicitly includes secret hygiene for env backup artifacts.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Add RED deploy-target test, patch deploy script/docs, repair remote manifest and secure env backup.
+Status: APPROVED
+
+---
+
 Decision ID: DEC-CMD-LIVE-CLOSEROUTER-DIAGNOSTICS-002
 Decision title: Re-read live CloseRouter catalog and attempt one bounded tiny text inference
 Decision type: Command/test approval

@@ -19,6 +19,8 @@ Post-QA repair intake, triage and phase planning files were created. The old app
 - Live smoke, live UAT, live `/v1` catalog checks, live bundle fingerprint scan and browser visual/admin anonymous checks passed after deploy.
 - Live payment quote schema was aligned with deployed code and IBAN init/approve/reject E2E passed with temporary data.
 - Account payment UI now shows backend-aligned rounded TL collection, USD credit and rounding fields without changing layout/style.
+- Deploy script/runbook now points at the real live target and `/status.deploy.id` reports the latest live deploy.
+- Legacy live admin password env line was removed and old env backup artefact was secured outside the regular deploy backup directory.
 
 ## Files Read
 
@@ -41,10 +43,12 @@ Key QA inputs included `QA_FINAL_REPORT.md`, `QA_REPORT.md`, `60_MINUTE_SITE_TES
 - `SECURITY-DEPS-001`: Production audit high advisory removed; `npm audit --omit=dev` now has 0 vulnerabilities.
 - `PAYMENT-LIVE-001`: Production DB quote columns added safely; live IBAN queue approve/reject and duplicate protection passed.
 - `PAYMENT-UI-001`: Account top-up/payment history display now matches backend USD→TL quote fields and removes unimplemented commission copy.
+- `DEPLOY-TARGET-METADATA-001`: Deploy script/docs now default to `/opt/turkapiprojesi`, `turkapiprojesi`, and `127.0.0.1:4568`; latest live deploy manifest/status metadata fixed.
+- `LIVE-LEGACY-ADMINPASSWORD-ENV-001`: Unused legacy `ADMIN_PASSWORD` removed from live env and stale env backup artefact secured.
 
 ## Bugs Not Fixed
 
-- `R-BUG-002`: Runtime stability/process model needs prod-like validation.
+- `R-BUG-002`: Deploy target metadata and smoke stability improved; longer runtime/process manager endurance still needs prod-like validation.
 - `R-BUG-003`: Google OAuth callback requires real env/session verification.
 - `R-BUG-006`: Successful funded API billing flow blocked by missing safe test key/upstream env.
 - `R-BUG-007`: IBAN live E2E passed; Shopier/Cryptomus E2E remains blocked by missing rotated sandbox credentials.
@@ -78,6 +82,7 @@ Key QA inputs included `QA_FINAL_REPORT.md`, `QA_REPORT.md`, `60_MINUTE_SITE_TES
 - Payment UI regression: `npm test -- src/api-docs-content.test.ts` PASS 7/7; `npm run lint` PASS; `npm test` PASS 27 files / 116 tests; `npm run build` PASS; `npm run scan:public` PASS; `node scripts/scan-secrets.mjs` PASS; `npm run qa:uat` PASS 10/10.
 - Payment UI live deploy: `manual-20260527T071659Z-ddee303`, live smoke PASS, live UAT PASS 10/10, live bundle payment labels present and old commission/rejected-template fingerprints absent.
 - Direct CloseRouter recheck: `/credits` and `/models/count` 200; live text catalog 18 models; tiny chat/messages inference returned provider `502` across current low-cost text models and Anthropic messages.
+- Deploy target metadata/security hygiene: RED test failed before patch, then `npm test -- src/deploy-target-contract.test.ts` PASS 2/2; `bash -n` deploy scripts PASS; full `npm test` PASS 28 files / 118 tests; live smoke PASS; `/status.deploy.id=manual-20260527T071659Z-ddee303`.
 
 ## Files Changed
 
@@ -85,7 +90,15 @@ Key QA inputs included `QA_FINAL_REPORT.md`, `QA_REPORT.md`, `60_MINUTE_SITE_TES
 - `src/server/routes/v1-catalog.ts`
 - `src/server/routes/v1-catalog.test.ts`
 - `src/api-docs-content.test.ts`
+- `src/deploy-target-contract.test.ts`
 - `src/App.tsx`
+- `scripts/vps-deploy.sh`
+- `docs/vps-deploy.md`
+- `docs/release-vps-beta-checklist.md`
+- `src/admin-single-owner-contract.test.ts`
+- `src/server/__tests__/setup.ts`
+- `CLAUDE.md`
+- `docs/superpowers/plans/2026-05-24-yapayzekalab-next-phases.md`
 - `FIX_LOG.md`
 - `RETEST_LOG.md`
 - `REPAIR_INPUT_FILES.md`
@@ -101,7 +114,7 @@ Key QA inputs included `QA_FINAL_REPORT.md`, `QA_REPORT.md`, `60_MINUTE_SITE_TES
 
 ## Tests Passed
 
-Local targeted and full regression passed. Public/source secret scans passed. Local UAT passed 10/10.
+Local targeted and full regression passed. Public/source secret scans passed. Local UAT passed 10/10. Latest full test suite passed 28 files / 118 tests after deploy target docs/script guard.
 
 ## Tests Failed
 
@@ -109,7 +122,7 @@ No final local command failed after the latest fixes. Earlier targeted tests fai
 
 ## Retest Results
 
-`R-BUG-001`, `R-BUG-004`, `R-BUG-005`, `R-BUG-009`, `DESIGN-REGRESSION-001`, `UX-FAKE-LIVE-001`, `PUBLIC-CONFIG-001`, `STATIC-FAVICON-001`, `DESIGN-CSS-001`, `SECURITY-DEPS-001`, `LIVE-DEPLOY-RESTORED-THEME-001`, `PAYMENT-LIVE-001` and `PAYMENT-UI-001` are fixed and retested locally/live where applicable.
+`R-BUG-001`, `R-BUG-004`, `R-BUG-005`, `R-BUG-009`, `DESIGN-REGRESSION-001`, `UX-FAKE-LIVE-001`, `PUBLIC-CONFIG-001`, `STATIC-FAVICON-001`, `DESIGN-CSS-001`, `SECURITY-DEPS-001`, `LIVE-DEPLOY-RESTORED-THEME-001`, `PAYMENT-LIVE-001`, `PAYMENT-UI-001`, `DEPLOY-TARGET-METADATA-001` and `LIVE-LEGACY-ADMINPASSWORD-ENV-001` are fixed and retested locally/live where applicable.
 
 ## Design Preservation Result
 

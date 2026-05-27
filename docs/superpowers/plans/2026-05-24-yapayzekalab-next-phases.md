@@ -190,7 +190,6 @@
   NODE_ENV=production
   PORT=4567
   DATABASE_URL=<production database url>
-  ADMIN_PASSWORD=<strong admin password>
   JWT_SECRET=<32+ char secret>
   APP_BASE_URL=https://yapayzekalab.org
   FRONTEND_AUTH_RETURN=/

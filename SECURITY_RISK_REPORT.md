@@ -45,3 +45,11 @@ Durum: 60 dakikalık site testi sonrası doldurulacak.
 - Payment quote schema migration yedekli ve additive uygulandı.
 - Payment UI backend tahsilatından farklı frontend komisyon/ondalıklı TL göstermeyecek şekilde düzeltildi.
 - Kalan risk: Shopier/Cryptomus gerçek/sandbox provider webhook E2E ve successful funded `/v1` billing hâlâ kanıtlanmadı.
+
+## Live Secret Hygiene Update — 2026-05-27 10:38 TRT
+
+- Regular `.deploy/backups` altında env backup artefacti bırakılmadı.
+- Secure env backup copy root-only `600 root:root`.
+- Legacy `ADMIN_PASSWORD` live env’den kaldırıldı; admin auth Google/email allowlist modeliyle kalıyor.
+- Live smoke ve `/status` restart sonrası PASS.
+- Release risk değişmedi: CloseRouter successful inference/billing ve Shopier/Cryptomus sandbox E2E hâlâ bloklu.

@@ -34,7 +34,7 @@ Operasyon tarihi: 2026-05-26
 
 ## Secret Notu
 
-Gerçek `.env` değerleri raporlanmadı. Komut çıktılarında token, parola veya full API key yazılmadı.
+Gerçek `.env` değerleri committed raporlara yazılmadı. Eski canlı env backup artefacti regular `.deploy/backups` içinden çıkarılıp root-only secure alana taşındı; live `.env.production` içindeki kullanılmayan legacy `ADMIN_PASSWORD` satırı kaldırıldı. Kullanıcının daha önce chat içinde paylaştığı veya canlı panel/env tarafında bulunan sağlayıcı anahtarları yine de rotate edilmelidir.
 
 ## Sonuç
 
@@ -61,3 +61,17 @@ Security açısından temel kontroller iyi; fakat admin allowlist, gerçek OAuth
 - Successful funded `/v1` text response ve pozitif billing headers hâlâ CloseRouter upstream `502` nedeniyle kanıtlanmadı.
 
 Güncel security verdict: IBAN admin/payment güvenliği güçlendi; genel release hâlâ billing/provider kanıtına bağlı.
+
+---
+
+# Live Deploy Secret Hygiene Update — 2026-05-27 10:38 TRT
+
+- Live `.deploy/backups` içinde kalan eski env backup artefacti normal backup dizininden kaldırıldı.
+- Secure copy root-only `600 root:root` olarak tutuldu.
+- Live `.env.production` içindeki artık kullanılmayan `ADMIN_PASSWORD` satırı kaldırıldı.
+- Test setup ve aktif deploy dokümanlarındaki legacy `ADMIN_PASSWORD` gereksinimi kaldırıldı.
+- `turkapiprojesi.service` restart sonrası active döndü.
+- Live smoke PASS.
+- Source secret scan PASS, 227 scanned / 0 hits.
+
+Kalan security gereksinimi: Provider-side credential rotation hâlâ önerilir; Shopier/Cryptomus sandbox E2E ve successful funded API billing geçmeden release onayı yok.

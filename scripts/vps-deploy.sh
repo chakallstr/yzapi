@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="${APP_DIR:-/opt/yapayzekalab}"
-SERVICE="${SERVICE:-yapayzekalab}"
-SMOKE_BASE_URL="${SMOKE_BASE_URL:-http://127.0.0.1:4567}"
+APP_DIR="${APP_DIR:-/opt/turkapiprojesi}"
+SERVICE="${SERVICE:-turkapiprojesi}"
+SMOKE_BASE_URL="${SMOKE_BASE_URL:-http://127.0.0.1:4568}"
 DEPLOY_STATE_DIR="${DEPLOY_STATE_DIR:-${APP_DIR}/.deploy}"
 BACKUP_DIR="${BACKUP_DIR:-${DEPLOY_STATE_DIR}/db-backups}"
 RELEASE_DIR="${RELEASE_DIR:-${DEPLOY_STATE_DIR}/releases}"

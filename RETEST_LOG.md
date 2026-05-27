@@ -362,3 +362,41 @@ Agent 2 retest vote: REJECT
 Agent 3 retest vote: REJECT
 Approval count: 0/3
 Final retest status: SUCCESS_BILLING_STILL_BLOCKED_BY_CLOSEROUTER_PROVIDER_502
+
+## DEPLOY-TARGET-METADATA-001 Deploy Target and Live Metadata Retest
+
+Bug ID: R-BUG-002, R-BUG-009, DEPLOY-TARGET-METADATA-001
+Fix decision ID: DEC-FIX-DEPLOY-TARGET-METADATA-001, DEC-FIX-LIVE-LEGACY-ADMINPASSWORD-ENV-001
+Retest decision ID: DEC-RETEST-DEPLOY-TARGET-METADATA-001
+Command or manual flow:
+- Added a deploy target contract test and verified it failed before the script/docs patch.
+- Updated deploy script/docs to the real live target.
+- Created the missing live release manifest for `manual-20260527T071659Z-ddee303`.
+- Moved stale env backup artifact out of the regular deploy backup directory into root-only secure storage.
+- Removed unused legacy `ADMIN_PASSWORD` line from live `.env.production` without printing env contents.
+- Restarted `turkapiprojesi.service` and ran live smoke/status checks.
+Expected:
+- Deploy tooling defaults to `/opt/turkapiprojesi`, `turkapiprojesi`, and `127.0.0.1:4568`.
+- `/status.deploy.id` shows the latest payment UI deploy.
+- Legacy admin password config is absent and service remains healthy.
+- Secret scan remains clean.
+Actual:
+- RED test initially failed 2/2 against old `/opt/yapayzekalab` defaults.
+- After patch, targeted test passed 2/2.
+- `bash -n scripts/vps-deploy.sh scripts/vps-live-preflight.sh scripts/vps-setup.sh`: PASS.
+- `npm run lint`: PASS.
+- `npm test`: PASS, 28 files / 118 tests.
+- `npm run build`: PASS.
+- `npm run scan:public`: PASS, 0 hits.
+- `node scripts/scan-secrets.mjs`: PASS, 227 scanned / 0 hits.
+- Live smoke: PASS for health/status/models/authless/JSON-404 checks.
+- `/status.deploy.id`: `manual-20260527T071659Z-ddee303`.
+- Live legacy admin password line: absent.
+- Stale env backup artifact: moved to secure `600 root:root` storage; none remains in regular `.deploy/backups`.
+Passed/Failed: Passed for deploy target/metadata/security hygiene.
+Evidence: Current repair session command output; no env contents or secret values are included in committed files.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: DEPLOY_TARGET_METADATA_FIXED_LIVE_RELEASE_STILL_BLOCKED_BY_PROVIDER_BILLING

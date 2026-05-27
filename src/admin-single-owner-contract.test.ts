@@ -30,6 +30,7 @@ describe("single owner admin contract", () => {
 
   it("removes separate admin password requirements from backend config and routes", () => {
     expect(source("src/server/lib/env.ts")).not.toContain("ADMIN_PASSWORD");
+    expect(source("src/server/__tests__/setup.ts")).not.toContain("ADMIN_PASSWORD");
 
     const adminAuthRoute = source("src/server/routes/admin-auth.ts");
     expect(adminAuthRoute).not.toContain("signAccessToken");
