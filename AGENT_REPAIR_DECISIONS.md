@@ -84,6 +84,32 @@ Status: WAITING_FOR_PROVIDER_SAVE_CONFIRMATION
 
 ---
 
+Decision ID: DEC-RETEST-FULL-LIVE-REGRESSION-20260528-001
+Decision title: Full live regression after Shopier OSB save
+Decision type: Retest and launch decision
+Related bug IDs: R-BUG-006, R-BUG-007, PAYMENT-INSTRUCTIONS-001
+Evidence from reports: Shopier OSB URL was saved in the provider panel. Safe negative callback returned `400 JSON` and created no payment/transaction rows. Local lint, full tests, build, public scan and secret scan passed. Live smoke and UAT passed. Temporary funded API billing returned 200 with billing headers, balance decrement and usage record. Low-balance returned 402 with no spend. IBAN/manual crypto init returned reference/instructions/WhatsApp. Shopier/Cryptomus live provider credentials remain unset.
+Files likely affected: Reports only.
+Risk level: High
+Design/template impact: None.
+Security impact: Positive for verified negative callback, auth guards and secret scan; remaining provider E2E gap is still a release blocker.
+Backend/API/billing impact: API billing and manual payments pass; automatic provider payment still blocked by missing credentials/E2E.
+Proposed action: Record partial pass and keep full sales-ready verdict rejected until automatic Shopier and Cryptomus provider flows are proven or explicitly removed from launch scope.
+Agent 1 vote: REJECT
+Agent 1 reason: Live UAT and user-visible manual payment paths pass, but not every advertised payment option is ready because Shopier card is disabled and Cryptomus provider E2E is absent.
+Agent 2 vote: REJECT
+Agent 2 reason: Funded/low-balance API billing is proven, but provider payment valid/invalid/duplicate callbacks are not proven due unset credentials.
+Agent 3 vote: REJECT
+Agent 3 reason: Security guards pass, but release risk remains if the site claims automatic card/crypto provider payment without live E2E proof.
+Approval count: 0/3
+Final decision: NOT APPROVED FOR FULL SALES LAUNCH
+Allowed next action: Either install true rotated provider credentials and run provider E2E, or launch with Shopier/Cryptomus provider methods disabled and clearly scope sales to IBAN/manual USDT.
+Status: COMPLETED
+
+Agent 4 integrity guard: REJECT_FULL_RELEASE_UNTIL_PROVIDER_E2E_OR_SCOPE_REDUCTION
+
+---
+
 Decision ID: DEC-FIX-SHOPIER-OSB-RELAY-001
 Decision title: Implement safe Shopier OSB relay/fallback before changing provider panel
 Decision type: Backend payment safety fix

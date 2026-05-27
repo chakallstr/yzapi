@@ -265,6 +265,29 @@ Updated payment/billing verdict: manual IBAN, manual USDT TRC20, temporary OmniR
 
 ---
 
+# Full Live Payment/Billing Recheck - 2026-05-28 00:18 TRT
+
+| Alan | Sonuç | Kanıt |
+|---|---|---|
+| Shopier OSB panel save | PASS PANEL | Existing Chrome Shopier panel saved URL as YapayZekaLab OSB endpoint |
+| Shopier OSB negative callback | PASS LIVE SAFE | Incomplete callback returned `400 JSON`, no payment credit |
+| Shopier callback DB side effect | PASS SAFE | Recent Shopier payments `0`, payment transactions `0` after negative test |
+| Shopier checkout env | BLOCKED | `SHOPIER_API_KEY` and `SHOPIER_API_SECRET` still unset in live env |
+| Shopier init disabled behavior | PASS LIVE SAFE | Temp authenticated `/api/payments/shopier/init` returned `503`, rows `0 -> 0` |
+| IBAN init | PASS LIVE | Temp authenticated init returned reference, instructions and WhatsApp path |
+| Manual crypto init | PASS LIVE | Temp authenticated init returned reference, USDT manual instructions and WhatsApp path |
+| Funded API billing | PASS LIVE | Temp key `/v1/chat/completions` status `200`, billing headers present, balance `50 -> 49.9679`, usage success |
+| Low-balance API billing | PASS LIVE SAFE | Temp zero-balance key returned `402`, no spend, no requests, no usage row |
+| Cleanup | PASS LIVE | Temp users/payments cleaned; leftovers `0` |
+| Google OAuth start | PASS LIVE | `/api/auth/google` returned `302` with production callback domain |
+| Admin anonymous guard | PASS LIVE | Admin/user payment admin endpoints returned `401 JSON` without auth |
+| Local regression | PASS | lint, 30/30 tests, build, public scan, secret scan |
+| Live UAT | PASS | `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` 10/10 |
+
+Updated verdict: API billing, low balance, IBAN and manual crypto are live-pass. Shopier notification URL is saved and the receiver is safe, but automatic Shopier card payment is not launch-approved because true checkout credentials are not installed and no valid provider order/callback E2E has run. Cryptomus provider API remains disabled; manual USDT is pass, automatic Cryptomus webhook E2E is not pass.
+
+---
+
 # Local Provider Callback Hardening — 2026-05-27 20:52 TRT
 
 ## Eklenen Güvenlik Korumaları

@@ -95,3 +95,14 @@ Manual IBAN and manual USDT TRC20 are live-pass. Shopier remains `BLOCKED_BY_PRO
 - Shopier panel: OSB URL field was prepared as `https://yapayzekalab.org/api/payments/shopier/osb`, but the final `KAYDET` click was not submitted yet because it is a global payment notification setting.
 
 Current state: YapayZekaLab can safely receive Shopier OSB callbacks after the panel URL is saved. Automatic card payment still cannot be called launch-ready until the provider-side save, activation/test step, and valid/invalid/duplicate callback E2E are completed.
+
+## Provider Panel Save - 2026-05-28 00:18 TRT
+
+- Shopier OSB panel URL was saved as `https://yapayzekalab.org/api/payments/shopier/osb`.
+- Panel confirmation: successful save, then redirected to the OSB test tab.
+- OSB test tab requires an existing Shopier order number. No historical/random order was used because that can retrigger delivery logic for another service through the fallback path.
+- Safe live negative callback test: incomplete form callback returned `400 application/json` with `{ "ok": false }`.
+- DB side-effect check after the negative callback: recent Shopier payments `0`, payment transactions `0`.
+- Current live env still has `SHOPIER_API_KEY` and `SHOPIER_API_SECRET` unset, so YapayZekaLab correctly keeps the Shopier method disabled and `/api/payments/shopier/init` returns `503` without creating a payment row.
+
+Conclusion: The Shopier notification destination is now saved and the receiving endpoint is safe. Automatic card payment is still not launch-approved until true checkout credentials are installed and a real provider test order/callback proves valid, invalid, failed and duplicate behavior.

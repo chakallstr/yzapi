@@ -87,19 +87,20 @@ NOT READY — PAYMENT SECURITY BLOCKERS
 - BEP20 remains intentionally not enabled because the supplied wallet address is TRON-format; a separate BEP20 `0x...` address is required before BEP20 can be safely displayed.
 - Latest Shopier OSB relay deploy `2026-05-27 23:57 TRT`: commit `62a1fe4` deployed as `manual-20260527T205709Z-62a1fe4`; live service active; VPS `dist/server.js` contains `/api/payments/shopier/osb`; live env contains `SHOPIER_OSB_FALLBACK_URL`; live smoke PASS; live UAT PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T20-57-26-842Z/uat-smoke-report.md`.
 - Latest Shopier panel state: existing Chrome Shopier OSB field was prepared for `https://yapayzekalab.org/api/payments/shopier/osb`, but final provider-side `KAYDET` has not been submitted yet because this changes the global Shopier notification destination.
+- Latest full live recheck `2026-05-28 00:18 TRT`: Shopier OSB URL was saved in the provider panel; incomplete callback returned `400 JSON` and created no Shopier payment/transaction rows; local lint/tests/build/public scan/secret scan PASS; live smoke PASS; live UAT PASS 10/10; funded gateway billing PASS with balance decrement and usage record; low-balance key returned 402 without spend; IBAN/manual crypto temp init PASS; Shopier init remains safe-disabled with 503 because checkout credentials are unset.
 
 ## Final 3-Agent Vote
 
 DEC-FINAL-REPAIR-RELEASE-001:
 
 Agent 1 — QA / UAT / Regression: REJECT
-Reason: User-facing theme, live smoke/UAT, IBAN and temporary OmniRoute first API billing are proven, but Shopier/Cryptomus provider E2E and final admin/OAuth browser sweep remain incomplete.
+Reason: User-facing theme, live smoke/UAT, Google OAuth start, IBAN/manual crypto and temporary OmniRoute first API billing are proven, but automatic Shopier/Cryptomus provider E2E and full admin owner browser sweep remain incomplete.
 
 Agent 2 — Backend / API / Billing: REJECT
-Reason: Temporary OmniRoute gateway billing, usage ledger and balance deduction pass. Shopier/Cryptomus live credentials are unset, so provider valid/invalid/duplicate callback/webhook E2E cannot be accepted.
+Reason: Temporary OmniRoute gateway billing, usage ledger, low-balance behavior and manual payment instructions pass. Shopier OSB URL is saved and safe-negative tested, but checkout credentials are unset; Cryptomus provider credentials are also unset, so valid/invalid/duplicate provider E2E cannot be accepted.
 
 Agent 3 — Visual Integrity / Security / Release Guard: REJECT
-Reason: Design was preserved and secret scan is clean, but release cannot be approved while live non-IBAN payment providers are missing rotated env and only disabled-state behavior is proven.
+Reason: Design was preserved and secret scan is clean, but full release cannot be approved while live automatic card/crypto provider flows are not proven end-to-end.
 
 Approval count: 0/3
 

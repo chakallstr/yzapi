@@ -793,6 +793,51 @@ Final retest status: ACCEPTED_LIVE_RELAY_DEPLOY_PROVIDER_SAVE_PENDING
 
 Agent 4 integrity guard: APPROVE_WITH_PROVIDER_SAVE_PENDING
 
+## FULL-LIVE-REGRESSION-20260528-001 Shopier Save And Launch Gate Retest
+
+Bug ID: R-BUG-006, R-BUG-007, PAYMENT-INSTRUCTIONS-001
+Fix decision ID: DEC-PROVIDER-SHOPIER-OSB-SAVE-001
+Retest decision ID: DEC-RETEST-FULL-LIVE-REGRESSION-20260528-001
+Command or manual flow:
+- Saved the Shopier OSB URL in the existing standard Chrome Shopier tab.
+- Read the Shopier OSB test tab; it requires an existing Shopier order number.
+- Ran safe incomplete Shopier callback test against the live YapayZekaLab OSB endpoint.
+- Checked DB side effects for recent Shopier payments and payment transactions.
+- Ran local lint/typecheck, full tests, build, public bundle scan and secret scan.
+- Ran live smoke and live UAT.
+- Ran live funded and low-balance API gateway billing with temporary users/keys and cleanup.
+- Ran live authenticated payment-method, IBAN init, manual crypto init and Shopier disabled-state checks with temporary user/session and cleanup.
+- Checked Google OAuth start redirect and unauthenticated admin/API guards.
+Expected:
+- Shopier panel saves the YapayZekaLab OSB URL.
+- Incomplete callback returns JSON error and does not credit or create payment rows.
+- Funded text API call returns 200, billing headers, usage record and balance decrement.
+- Low-balance key returns 402 with no spend/usage.
+- IBAN and manual crypto instructions return references and WhatsApp notification path.
+- Shopier remains disabled until true checkout credentials are installed.
+- No secrets are committed or leaked by scans.
+Actual:
+- Shopier panel save PASS; URL persisted as YapayZekaLab OSB endpoint.
+- Safe negative callback PASS: `400 application/json`, `{"ok":false}`.
+- DB side effects PASS: recent Shopier payments `0`, recent payment transactions `0`.
+- Local regression PASS: `npm run lint`; `npm test` 30 files / 135 tests; `npm run build`; `npm run scan:public`; `node scripts/scan-secrets.mjs`.
+- Live smoke PASS.
+- Live UAT PASS 10/10: `qa-artifacts/uat-smoke-2026-05-27T21-12-22-270Z/uat-smoke-report.md`.
+- Funded gateway billing PASS: status `200`, all three billing headers present, balance `50 -> 49.9679`, spend `0.0321`, requests `1`, `usage_records.status=success`, cleanup leftovers `0`.
+- Low-balance PASS: status `402`, balance/spend/requests unchanged, usage rows `0`.
+- Payment methods PASS under temp JWT: IBAN enabled, Shopier disabled; IBAN init and manual crypto init returned reference/instructions/WhatsApp; Shopier init `503` and created `0` rows; cleanup leftovers `0`.
+- Google OAuth start PASS: `/api/auth/google` returned `302` to Google with callback domain `https://yapayzekalab.org/api/auth/google/callback`.
+- Admin anonymous guard PASS: `/api/admin/me`, `/api/admin/config`, `/api/admin/users`, `/api/admin/api-keys`, `/api/payments/admin/all`, `/api/payments/admin/pending-iban` all returned `401 JSON`.
+Passed/Failed: Passed for verified surfaces. Launch still blocked for automatic Shopier card payment and Cryptomus provider E2E because live provider credentials are unset.
+Evidence: Current session command output and Chrome state. No real money, no image/video generation, no persistent test data.
+Agent 1 retest vote: APPROVE_FOR_VERIFIED_SURFACES / REJECT_FULL_SALES_READY
+Agent 2 retest vote: APPROVE_FOR_API_BILLING_AND_MANUAL_PAYMENTS / REJECT_PROVIDER_PAYMENT_READY
+Agent 3 retest vote: APPROVE_SECURITY_GUARDS / REJECT_FULL_RELEASE
+Approval count: 0/3 for full sales readiness
+Final retest status: VERIFIED_PARTIAL_NOT_FULL_LAUNCH_READY
+
+Agent 4 integrity guard: REJECT_FULL_RELEASE_UNTIL_PROVIDER_E2E
+
 ## SHOPIER-OSB-RELAY-001 Local Backend Relay Retest
 
 Bug ID: R-BUG-007
