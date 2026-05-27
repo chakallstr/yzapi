@@ -34,6 +34,7 @@ NOT READY — PAYMENT SECURITY BLOCKERS
 - Local Google OAuth return fix now stores backend `at/rt` callback tokens, removes them from the URL, and maps `/dashboard` to the existing account/API area without visual changes.
 - Local Google OAuth state fix now survives server restart/deploy during the Google login round-trip by using a signed, TTL-bound state token instead of process-local memory.
 - Local manual payment instruction fix now shows IBAN bank/recipient/IBAN/reference/amount and WhatsApp notification path instead of a reference-only alert. Admin can configure non-secret WhatsApp/manual crypto wallet settings locally; manual crypto creates a pending payment instruction and does not auto-credit balance.
+- Local protected account/payment request fix now refreshes expired access tokens through `/api/auth/refresh` and retries once, so stale access tokens should no longer block IBAN/crypto instruction display after deploy.
 
 ## Must-Fix Before Launch
 
@@ -44,6 +45,7 @@ NOT READY — PAYMENT SECURITY BLOCKERS
 - Deploy the local Google OAuth return fix, then re-run Google OAuth/admin owner session in the user's standard Chrome profile; anonymous admin exposure is verified live, but owner login must be rechecked after deploy.
 - Deploy the local restart-safe OAuth state fix only after the required four-agent deploy gate is available or explicitly overridden.
 - Deploy the manual payment settings migration (`0006_manual_payment_settings.sql`) before starting the new server build, then configure WhatsApp/crypto wallet values in Admin and re-run real Chrome IBAN/manual crypto UAT.
+- Deploy the local auth-refresh patch, then re-run the exact standard Chrome payment button flow that previously returned `Invalid or expired token`.
 
 ## Should-Fix Soon
 
@@ -74,6 +76,9 @@ NOT READY — PAYMENT SECURITY BLOCKERS
 - Latest local OAuth/payment hardening regression `2026-05-27 20:52 TRT`: `npm test -- src/admin-single-owner-contract.test.ts` PASS 3/3; `npm run lint` PASS; `npm test` PASS 28 files / 126 tests; `npm run build` PASS; public scan PASS 0 hits; secret scan PASS 227 scanned / 0 hits.
 - Latest local login restart-safety regression: OAuth state test first failed RED, then `npm test -- src/admin-single-owner-contract.test.ts src/server/services/google-oauth-service.test.ts` PASS 5/5; `npm run lint` PASS; `npm test` PASS 29 files / 128 tests; `npm run build` PASS; public scan PASS 0 hits; secret scan PASS 229 scanned / 0 hits.
 - Latest local manual payment instruction regression: `npm test -- src/payment-safety-contract.test.ts` first failed RED 2/8, then PASS 8/8; targeted OAuth/payment tests PASS 10/10; `npm run lint` PASS; `npm test` PASS 29 files / 130 tests; `npm run build` PASS; public scan PASS 0 hits; secret scan PASS 230 scanned / 0 hits; local `npm run qa:uat` PASS 10/10 with report `qa-artifacts/uat-smoke-2026-05-27T19-24-23-128Z/uat-smoke-report.md`.
+- Latest local auth-refresh regression: `npm test -- src/auth-client-refresh.test.ts` first failed RED 2/2, then PASS 2/2; targeted auth/payment/admin tests PASS 4 files / 15 tests; `npm run lint` PASS; `npm test` PASS 30 files / 134 tests; `npm run build` PASS; public scan PASS 0 hits; secret scan PASS 232 scanned / 0 hits.
+- Latest default local UAT after auth-refresh patch: `npm run qa:uat` FAIL 0/10 because `127.0.0.1:4567` was not listening (`ERR_CONNECTION_REFUSED`); not accepted as product failure, but local browser UAT remains blocked until a local server is started.
+- Latest live safe UAT after auth-refresh local build: `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T20-04-37-048Z/uat-smoke-report.md`. This verifies current live surface only; the auth-refresh patch still requires deploy and live payment retest.
 - Latest live safe smoke after local fix build: `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T17-51-32-980Z/uat-smoke-report.md`; `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` PASS for health/status/models/authless/JSON-404 checks, funded/low-balance keys skipped because safe env keys were absent.
 - Standard Chrome automation was unavailable to this Codex session, so post-deploy logged-in Google admin click-through was not rerun in the user's existing Chrome profile.
 - Previous billing failure-path evidence exists; successful funded text billing is now approved for the temporary OmniRoute GPT path. Shopier/Cryptomus provider E2E is still not approved because live rotated provider env is missing. IBAN payment E2E is approved.

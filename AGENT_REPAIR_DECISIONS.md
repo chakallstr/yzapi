@@ -34,6 +34,79 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-FIX-AUTH-REFRESH-PROTECTED-POST-001
+Decision title: Refresh expired user access token before protected payment/account requests
+Decision type: Code/edit approval
+Related bug IDs: AUTH-SESSION-REFRESH-001, PAYMENT-INSTRUCTIONS-001
+Evidence from reports:
+- Live Chrome UAT showed the dashboard still rendered user balance, but clicking the IBAN top-up button returned `Invalid or expired token` instead of showing IBAN/WhatsApp instructions.
+- Source inspection shows `src/yapayzekalab/tab-account.jsx` sends `Authorization: Bearer <stored access token>` through `apiJson`, but never calls `/api/auth/refresh` on 401.
+- Backend `/api/auth/refresh` already rotates refresh tokens safely; frontend does not use it for protected account/payment POSTs.
+Files likely affected:
+- `src/yapayzekalab/auth-client.js`
+- `src/yapayzekalab/App.jsx`
+- `src/yapayzekalab/tab-account.jsx`
+- `src/auth-client-refresh.test.ts`
+- `FIX_LOG.md`
+- `RETEST_LOG.md`
+Risk level: High
+Design/template impact: None. Auth request helper only; no CSS, class names, layout, colors, typography, cards, buttons, modals, icons, or responsive rules may change.
+Security impact: Positive if implemented correctly. Expired access tokens are refreshed with the existing refresh token; failed refresh must clear stale auth and must not leak tokens.
+Backend/API/billing impact: Positive for protected payment/account requests. No backend route behavior, billing calculation, payment crediting, Shopier/Cryptomus callback, or DB schema change.
+Proposed action:
+1. Add RED tests for protected request retry after a 401 and for stale auth cleanup when refresh fails.
+2. Add a small shared frontend auth client helper that reads/stores the existing token aliases, calls `/api/auth/refresh` once, retries the original request once, and clears stale tokens on refresh failure.
+3. Switch `AccountTab` account/payment requests and `App.jsx` profile load to the helper.
+4. Run targeted tests, full tests, lint/build/scans if targeted tests pass.
+Agent 1 vote: APPROVE
+Agent 1 reason: This directly addresses the live user-visible payment instruction failure and login/session breakage without redesign.
+Agent 2 vote: APPROVE
+Agent 2 reason: It reuses the existing backend refresh contract and does not alter payment crediting, billing, or API key behavior.
+Agent 3 vote: APPROVE
+Agent 3 reason: Approved only because the change is non-visual and reduces stale token/security risk by clearing unusable credentials on refresh failure.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Write failing auth-client regression tests, verify RED, then implement minimal helper and integrations.
+Status: COMPLETED_LOCAL_RETEST_PENDING_LIVE_DEPLOY
+
+---
+
+Decision ID: DEC-RETEST-AUTH-REFRESH-PROTECTED-POST-001
+Decision title: Accept local retest for expired-token refresh on protected payment/account requests
+Decision type: Retest acceptance
+Related bug IDs: AUTH-SESSION-REFRESH-001, PAYMENT-INSTRUCTIONS-001
+Evidence from reports:
+- RED test failed before implementation because the shared frontend auth client did not exist.
+- GREEN targeted auth test passed after implementation.
+- Targeted payment/admin regression passed 4 files / 15 tests.
+- Full regression passed: lint, 30 test files / 134 tests, build, public bundle scan, secret scan.
+- Default local UAT smoke failed due to `ERR_CONNECTION_REFUSED` on `127.0.0.1:4567`, not an application assertion failure.
+- Live smoke against `https://yapayzekalab.org` passed 10/10, but the new auth refresh patch is not proven live until deploy.
+Files likely affected:
+- `src/yapayzekalab/auth-client.js`
+- `src/yapayzekalab/App.jsx`
+- `src/yapayzekalab/tab-account.jsx`
+- `src/auth-client-refresh.test.ts`
+- `FIX_LOG.md`
+- `RETEST_LOG.md`
+Risk level: Medium
+Design/template impact: None. Source diff only changes auth request wiring and adds a helper/test.
+Security impact: Positive; stale tokens are cleared if refresh fails, and token values are not logged.
+Backend/API/billing impact: No backend behavior changed. Protected frontend account/payment calls can now recover from expired access tokens.
+Proposed action: Accept local fix, create rollbackable Git backup, then deploy only after 4-agent deploy gate and run live payment-button retest.
+Agent 1 vote: APPROVE
+Agent 1 reason: The exact user-facing stale-token failure is covered by RED/GREEN regression and account/payment paths use the helper.
+Agent 2 vote: APPROVE
+Agent 2 reason: Existing `/api/auth/refresh` contract is reused; payment crediting and billing logic are untouched.
+Agent 3 vote: APPROVE
+Agent 3 reason: No style/template files changed beyond auth imports; secret scan and public scan passed.
+Approval count: 3/3
+Final decision: APPROVED_LOCALLY
+Allowed next action: Commit/push backup and prepare deploy candidate; live payment retest remains required.
+Status: COMPLETED_LOCAL_RETEST_ACCEPTED
+
+---
+
 Decision ID: DEC-FIX-SHOPIER-TL-COLLECTION-001
 Decision title: Lock Shopier top-up collection as TRY while preserving USD balance quote
 Decision type: Test/repair approval

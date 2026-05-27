@@ -9,6 +9,13 @@ import { ActivityTab } from './tab-activity.jsx';
 import { AdminTab } from './tab-admin.jsx';
 import { HomeTab } from './tab-home.jsx';
 import { ModelsTab } from './tab-models.jsx';
+import {
+  apiJson,
+  clearStoredAuth,
+  getAccessToken,
+  hasStoredAuth,
+  storeAuthTokens,
+} from './auth-client.js';
 
 /* ============================================
    YapayZekaLab — Main App
@@ -61,58 +68,9 @@ const ACCENT_MAP = {
   '#7a5af0': 'lav',
 };
 
-const ACCESS_TOKEN_KEY = 'yz_access_token';
-const REFRESH_TOKEN_KEY = 'yz_refresh_token';
-const LEGACY_ACCESS_TOKEN_KEY = 'userAccessToken';
-const LEGACY_REFRESH_TOKEN_KEY = 'userRefreshToken';
 const ADMIN_EMAIL = 'cix.crazy666@gmail.com';
 const FALLBACK_USD_TRY = 47.084289;
 const PROTECTED_TABS = new Set(['activity', 'account', 'admin']);
-
-const hasStoredAuth = () => {
-  try {
-    return Boolean(
-      window.localStorage?.getItem(ACCESS_TOKEN_KEY) ||
-      window.localStorage?.getItem(LEGACY_ACCESS_TOKEN_KEY)
-    );
-  } catch {
-    return false;
-  }
-};
-
-const storeAuthTokens = ({ accessToken, refreshToken }) => {
-  if (accessToken) {
-    window.localStorage?.setItem(ACCESS_TOKEN_KEY, accessToken);
-    window.localStorage?.setItem(LEGACY_ACCESS_TOKEN_KEY, accessToken);
-  }
-  if (refreshToken) {
-    window.localStorage?.setItem(REFRESH_TOKEN_KEY, refreshToken);
-    window.localStorage?.setItem(LEGACY_REFRESH_TOKEN_KEY, refreshToken);
-  }
-};
-
-const clearStoredAuth = () => {
-  try {
-    window.localStorage?.removeItem(ACCESS_TOKEN_KEY);
-    window.localStorage?.removeItem(REFRESH_TOKEN_KEY);
-    window.localStorage?.removeItem(LEGACY_ACCESS_TOKEN_KEY);
-    window.localStorage?.removeItem(LEGACY_REFRESH_TOKEN_KEY);
-  } catch {
-    // Storage can be unavailable in hardened browser contexts.
-  }
-};
-
-const getStoredAccessToken = () => {
-  try {
-    return (
-      window.localStorage?.getItem(ACCESS_TOKEN_KEY) ||
-      window.localStorage?.getItem(LEGACY_ACCESS_TOKEN_KEY) ||
-      ''
-    );
-  } catch {
-    return '';
-  }
-};
 
 const initialsFor = (value) => {
   const clean = String(value || '').trim();
@@ -684,33 +642,28 @@ const App = ({ initialTab = 'home' }) => {
       return undefined;
     }
 
-    const token = getStoredAccessToken();
+    const token = getAccessToken();
     if (!token) {
       setIsAuthenticated(false);
       return undefined;
     }
 
-    fetch('/api/user/me', { headers: { Authorization: `Bearer ${token}` } })
-      .then(async (res) => {
-        if (res.status === 401 || res.status === 403) {
-          clearStoredAuth();
-          if (!cancelled) {
-            setIsAuthenticated(false);
-            setProfile(null);
-          }
-          return null;
-        }
-        if (!res.ok) throw new Error('profile_load_failed');
-        return res.json();
-      })
+    apiJson('/api/user/me')
       .then((data) => {
         if (!cancelled && data) {
           setProfile(data);
           if (data.bakiyeUsd !== undefined) setTweak('balanceUSD', Number(data.bakiyeUsd));
         }
       })
-      .catch(() => {
-        if (!cancelled) setProfile(null);
+      .catch((error) => {
+        const expired = /oturum|unauthorized|invalid|expired|user role/i.test(error?.message || '');
+        if (!cancelled) {
+          setProfile(null);
+          if (expired) {
+            clearStoredAuth();
+            setIsAuthenticated(false);
+          }
+        }
       });
 
     return () => { cancelled = true; };

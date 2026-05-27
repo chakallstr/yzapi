@@ -272,3 +272,21 @@ Operasyon tarihi: 2026-05-26
 - Yapılan değişiklik: Üretim kodu değiştirilmedi. `shopier-service` testi artık Shopier formunda `currency=0`, `total_order_value` ve `product_name` alanlarının TL olduğunu doğruluyor. Source contract testi `/shopier/init` içinde `amountUsd` metadata'nın korunduğunu, `miktarTL/payableTL` ile Shopier'e TL gönderildiğini doğruluyor.
 - Test: `npm test -- src/server/services/shopier-service.test.ts src/payment-safety-contract.test.ts src/server/services/payment-pricing.test.ts`
 - Sonuç: PASS, 3 test dosyası / 21 test. Shopier canlı/sandbox E2E hâlâ rotated provider credential ve panel ayarları yapılmadan launch PASS sayılmaz.
+
+## AUTH-SESSION-REFRESH-001 — Protected account/payment requests refresh expired access tokens
+
+- Problem: Canlı Chrome UAT sırasında dashboard kullanıcı bakiyesini gösterirken IBAN ödeme başlatma isteği `Invalid or expired token` döndürdü; bu yüzden IBAN/WhatsApp talimat paneli açılmadı.
+- Kök neden: Frontend `AccountTab` protected account/payment isteklerinde yalnız stored access token kullanıyordu. Access token süresi bitince mevcut refresh token ile `/api/auth/refresh` çağrılmıyor, istek tekrar denenmiyor ve kullanıcı stale session içinde kalıyordu.
+- Karar: `DEC-FIX-AUTH-REFRESH-PROTECTED-POST-001`, 3/3 APPROVED. Harici sub-agent spawn limiti dolu olduğu için gerçek ek ajan çağrısı yapılamadı; iç 3-agent gate karar dosyasına işlendi.
+- Yapılan değişiklik:
+  - `src/yapayzekalab/auth-client.js` eklendi; mevcut token aliaslarını okur/yazar, access token 401 olursa refresh token ile bir kez yeniler, aynı isteği bir kez tekrarlar, refresh başarısızsa stale tokenları temizler.
+  - `src/yapayzekalab/tab-account.jsx` account/payment/API-key/report isteklerini bu helper üzerinden çalıştırır hale geldi.
+  - `src/yapayzekalab/App.jsx` profil yüklemesini aynı helper ile yapıyor; refresh başarısızsa kullanıcı auth state temizleniyor.
+  - Görsel stil, class, layout, renk, kart, modal, buton veya responsive yapı değiştirilmedi.
+- Test:
+  - RED: `npm test -- src/auth-client-refresh.test.ts` önce 2/2 fail verdi; helper yoktu.
+  - GREEN: `npm test -- src/auth-client-refresh.test.ts` PASS 2/2.
+  - Targeted: `npm test -- src/auth-client-refresh.test.ts src/payment-safety-contract.test.ts src/admin-single-owner-contract.test.ts src/admin-fetch-guard.test.ts` PASS 4 files / 15 tests.
+  - Full: `npm run lint` PASS; `npm test` PASS 30 files / 134 tests; `npm run build` PASS; `npm run scan:public` PASS 0 hits; `node scripts/scan-secrets.mjs` PASS 232 scanned / 0 hits.
+  - UAT: local default `127.0.0.1:4567` smoke failed only because no local smoke server was listening; live `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` PASS 10/10.
+- Sonuç: FIXED LOCALLY. LIVE AUTH/PAYMENT BUTTON RETEST REQUIRES DEPLOY OF THIS COMMIT.

@@ -180,3 +180,31 @@ Visual diff notes:
 - The new customer-facing payment details appear only after an IBAN/manual crypto init response; the panel uses the existing surface/border/ink variables and existing typography scale.
 - The new admin `Ödeme` section is functional config UI; it reuses existing `SubNav`, `Card`, `inputStyle`, `var(--ink)` button and existing spacing.
 - A true before/after screenshot for the conditional payment panel is not available because the old behavior was a browser alert; current route smoke screenshots are stored in the QA artifact folder above.
+
+---
+
+## 2026-05-27 Auth Refresh for Protected Payment Requests
+
+Files checked for visual/template risk:
+
+- `src/yapayzekalab/auth-client.js`: request/auth helper only.
+- `src/yapayzekalab/App.jsx`: auth/profile request wiring only.
+- `src/yapayzekalab/tab-account.jsx`: import and request helper replacement only.
+- `src/auth-client-refresh.test.ts`: test only.
+
+Verification:
+
+- `npm test -- src/auth-client-refresh.test.ts`: RED failed before helper existed, then PASS 2/2.
+- `npm test -- src/auth-client-refresh.test.ts src/payment-safety-contract.test.ts src/admin-single-owner-contract.test.ts src/admin-fetch-guard.test.ts`: PASS 4 files / 15 tests.
+- `npm run lint`: PASS.
+- `npm test`: PASS 30 files / 134 tests.
+- `npm run build`: PASS.
+- `npm run scan:public`: PASS, 0 hits.
+- `node scripts/scan-secrets.mjs`: PASS, 232 scanned / 0 hits.
+- `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`: PASS 10/10.
+
+Visual diff notes:
+
+- No CSS files, theme tokens, colors, gradients, fonts, font sizes, spacing, layout structure, card/button/modal styles, responsive breakpoints, icons, illustrations or page order changed.
+- The change only centralizes existing token aliases and protected fetch retry behavior.
+- Default local `npm run qa:uat` failed because `127.0.0.1:4567` was not listening; this is recorded as environment setup, not a visual regression.

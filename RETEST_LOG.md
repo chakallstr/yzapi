@@ -697,3 +697,31 @@ Agent 2 retest vote: APPROVE
 Agent 3 retest vote: APPROVE
 Approval count: 3/3
 Final retest status: ACCEPTED_LOCALLY_PROVIDER_E2E_STILL_BLOCKED
+
+## LOCAL-AUTH-SESSION-REFRESH-001 Protected Request Refresh Retest
+
+Bug ID: AUTH-SESSION-REFRESH-001, PAYMENT-INSTRUCTIONS-001
+Fix decision ID: DEC-FIX-AUTH-REFRESH-PROTECTED-POST-001
+Retest decision ID: DEC-RETEST-AUTH-REFRESH-PROTECTED-POST-001
+Command or manual flow:
+- Reproduced source-level root cause from live Chrome symptom: dashboard can have stale auth state while protected payment POST returns `Invalid or expired token`.
+- Added RED test for one-time refresh + retry and stale token cleanup.
+- Added shared auth client helper and wired account/payment/profile requests to it.
+Expected:
+- A protected JSON request returning 401 refreshes with existing refresh token and retries once with the new access token.
+- Refresh failure clears both current and legacy token aliases.
+- IBAN/Crypto payment instruction flow can proceed after access token refresh instead of showing stale-token error.
+- No visual/template/layout/style change.
+Actual:
+- RED: `npm test -- src/auth-client-refresh.test.ts` failed 2/2 because `src/yapayzekalab/auth-client.js` did not exist.
+- GREEN: `npm test -- src/auth-client-refresh.test.ts` passed 2/2.
+- Targeted: `npm test -- src/auth-client-refresh.test.ts src/payment-safety-contract.test.ts src/admin-single-owner-contract.test.ts src/admin-fetch-guard.test.ts` passed 4 files / 15 tests.
+- Full: `npm run lint` PASS; `npm test` PASS 30 files / 134 tests; `npm run build` PASS; `npm run scan:public` PASS 0 hits; `node scripts/scan-secrets.mjs` PASS 232 scanned / 0 hits.
+- UAT: default local smoke failed because `127.0.0.1:4567` was not listening; live smoke `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` passed 10/10.
+Passed/Failed: Passed locally for source/build/regression. Live functional payment-button retest is blocked until this patch is deployed.
+Evidence: Current session command output; no real payment, no provider secret, no API credit spend.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: ACCEPTED_LOCALLY_DEPLOY_AND_LIVE_PAYMENT_RETEST_REQUIRED

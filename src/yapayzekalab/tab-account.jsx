@@ -6,6 +6,7 @@ import {
   computeOurUsd, usdToTL, computeTLPrice, fmt,
   mockLogs, promptPool, useCountUp, useLogStream, nowTime,
 } from './shared.jsx';
+import { apiJson, authFetch, getAccessToken } from './auth-client.js';
 
 /* ============================================
    AccountTab — Bakiye (USD birincil) · API anahtarları · ödeme yöntemleri.
@@ -30,43 +31,11 @@ const SCOPE_META = {
   video:    { label: 'video',    color: '#047857',            bg: 'var(--ok-bg)' },
 };
 const ALL_SCOPES = Object.keys(SCOPE_META);
-const ACCESS_TOKEN_KEY = 'yz_access_token';
-const LEGACY_ACCESS_TOKEN_KEY = 'userAccessToken';
 const SANDBOX_TOKEN_LIMIT = 5000;
 const SANDBOX_IMAGE_LIMIT = 2;
 
-const getAccessToken = () => {
-  try {
-    return (
-      window.localStorage?.getItem(ACCESS_TOKEN_KEY) ||
-      window.localStorage?.getItem(LEGACY_ACCESS_TOKEN_KEY) ||
-      ''
-    );
-  } catch {
-    return '';
-  }
-};
-
-const apiJson = async (url, options = {}) => {
-  const token = getAccessToken();
-  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(url, {
-    ...options,
-    headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(body?.message || body?.error || `İstek başarısız (${response.status})`);
-  }
-  return body;
-};
-
 const downloadWithAuth = async (url, filename) => {
-  const token = getAccessToken();
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
-  const response = await fetch(url, { headers });
+  const response = await authFetch(url);
   if (!response.ok) throw new Error(`Rapor indirilemedi (${response.status})`);
   const blob = await response.blob();
   const href = URL.createObjectURL(blob);
