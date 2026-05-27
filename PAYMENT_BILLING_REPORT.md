@@ -208,6 +208,20 @@ Manual IBAN ve manual USDT TRC20 ödeme talimatları canlıda PASS. Temporary Om
 
 ---
 
+# Live WhatsApp Payment Number Recheck — 2026-05-28 00:00 TRT
+
+| Alan | Sonuç | Kanıt |
+|---|---|---|
+| Payment notification phone | PASS LIVE | Canlı `system_config` değeri supplied WhatsApp ödeme bildirim numarasıyla eşleşti; ham numara rapora yazılmadı |
+| IBAN WhatsApp link | PASS LIVE | Temporary `$2` IBAN init cevabı `wa.me` linki ve aynı referans kodunu içeren mesaj döndürdü |
+| Manual crypto WhatsApp link | PASS LIVE | Temporary `$2` manual USDT/TRC20 init cevabı `wa.me` linki ve aynı referans kodunu içeren mesaj döndürdü |
+| Test data cleanup | PASS LIVE | Temporary user, `pending_iban_payments` ve `payments` satırları silindi |
+| Secret scan | PASS | `node scripts/scan-secrets.mjs`: 232 scanned / 0 hits |
+
+Not: Bu recheck gerçek para, Shopier/Cryptomus provider çağrısı veya bakiye kredisi yapmadı. Shopier/Cryptomus provider E2E hâlâ rotated credential gerektirir.
+
+---
+
 # Local Provider Callback Hardening — 2026-05-27 20:52 TRT
 
 ## Eklenen Güvenlik Korumaları

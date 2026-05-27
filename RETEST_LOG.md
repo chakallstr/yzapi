@@ -756,3 +756,31 @@ Approval count: 3/3
 Final retest status: ACCEPTED_LIVE_MANUAL_PAYMENT_CONFIG
 
 Agent 4 integrity guard: APPROVE
+
+## LIVE-PAYMENT-PHONE-002 Live WhatsApp Payment Number Recheck
+
+Bug ID: PAYMENT-INSTRUCTIONS-001
+Fix decision ID: DEC-LIVE-PAYMENT-CONFIG-001
+Retest decision ID: DEC-RETEST-LIVE-PAYMENT-PHONE-002
+Command or manual flow:
+- Ran live smoke against `https://yapayzekalab.org`.
+- Ran secret scan locally.
+- Ran safe live backend E2E with a temporary short-lived user token: verified the configured WhatsApp number matches the supplied payment notification phone, called `POST /api/payments/iban/init` and `POST /api/payments/crypto/init` with `$2`, checked that both responses include `wa.me` notification links with matching references, then deleted the temporary user/payment rows.
+Expected:
+- Live public/backend smoke remains healthy.
+- Payment notification phone is configured server-side and not committed to the repo.
+- IBAN and manual crypto init responses include WhatsApp notification links tied to the generated payment reference.
+- Temporary test data is cleaned up; no real payment or provider call occurs.
+Actual:
+- Live smoke PASS for `/health`, `/status`, `/api/models`, authless gateway `401`, and JSON 404 checks.
+- Secret scan PASS: 232 scanned / 0 hits.
+- Safe live backend E2E PASS: `livePaymentPhone=pass`, `ibanInstruction=pass`, `cryptoInstruction=pass`, `cleanup=pass`.
+Passed/Failed: Passed.
+Evidence: Current session command output; exact phone, IBAN and wallet values were not written to repo reports.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: ACCEPTED_LIVE_PAYMENT_PHONE_RECHECK
+
+Agent 4 integrity guard: APPROVE

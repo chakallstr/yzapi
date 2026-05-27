@@ -34,6 +34,30 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-RETEST-LIVE-PAYMENT-PHONE-002
+Decision title: Accept live WhatsApp payment phone recheck
+Decision type: Retest acceptance
+Related bug IDs: PAYMENT-INSTRUCTIONS-001
+Evidence from reports: Live smoke passed; local secret scan reported 232 scanned / 0 hits. Safe live backend E2E with a temporary user verified the server-side payment notification phone, IBAN init WhatsApp link/reference, manual crypto init WhatsApp link/reference, and cleanup. Exact phone, IBAN and wallet values were not written to repo reports.
+Files likely affected: `RETEST_LOG.md`, `PAYMENT_BILLING_REPORT.md`, `AGENT_REPAIR_DECISIONS.md`
+Risk level: Low
+Design/template impact: None; no frontend/CSS/layout/template files changed.
+Security impact: Positive; confirms payment notification data is configured server-side while keeping raw values out of committed reports.
+Backend/API/billing impact: Safe verification only; temporary rows were cleaned up and no balance credit/provider payment occurred.
+Proposed action: Mark the live manual payment phone recheck accepted while keeping Shopier/Cryptomus provider E2E blocked until rotated credentials are installed.
+Agent 1 vote: APPROVE
+Agent 1 reason: The end-user missing WhatsApp notification path is now verified for both manual payment methods.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend responses and cleanup were verified without mutating customer balance or provider state.
+Agent 3 vote: APPROVE
+Agent 3 reason: Visual lock is untouched and sensitive payment details were not committed.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Continue Shopier credential/app investigation and provider E2E planning.
+Status: COMPLETED
+
+---
+
 Decision ID: DEC-LIVE-PAYMENT-CONFIG-001
 Decision title: Apply live IBAN, WhatsApp and manual USDT TRC20 payment instructions
 Decision type: Live configuration change / payment UAT gate
