@@ -148,3 +148,33 @@ IBAN akışı canlıda güvenli ve idempotent çalıştı. Ancak Shopier/Cryptom
 - Tiny text inference with `max_tokens <= 4` timed out for Anthropic, OpenAI, DeepSeek, Google, Moonshot and Qwen tested models.
 
 Updated payment/billing verdict: IBAN and payment UI are live-pass. Overall billing launch remains blocked by successful text inference/billing and Shopier/Cryptomus provider E2E.
+
+---
+
+# Live OmniRoute + Payment Method Recheck — 2026-05-27 19:28 TRT
+
+## Canlı Env Durumu
+
+| Alan | Sonuç | Kanıt |
+|---|---|---|
+| OmniRoute gateway billing | PASS LIVE | Temporary funded key ile `/v1/chat/completions` `200`, cost/remaining/request-id headerları mevcut |
+| Usage deduction | PASS LIVE | Balance `50.0000 -> 49.9671`, `usage_records.status=success`, `cost_tl=0.0329`, `total_requests=1` |
+| Cleanup | PASS LIVE | Temporary user marker `qa-omni-recheck-1779899269150`, leftovers `0` |
+| Payment methods | PASS SAFE-DISABLED | User JWT ile 200; `iban.enabled=true`, `shopier.enabled=false`, `cryptomus.enabled=false` |
+| Shopier env | BLOCKED | Live `.env.production` içinde `SHOPIER_API_KEY` ve `SHOPIER_API_SECRET` unset |
+| Shopier init when disabled | PASS SAFE-DISABLED | `/api/payments/shopier/init` returned `503`; no `payments` row created |
+| Cryptomus env | BLOCKED | Live `.env.production` içinde `CRYPTOMUS_API_KEY` ve `CRYPTOMUS_MERCHANT_ID` unset |
+| Cryptomus init when disabled | PASS SAFE-DISABLED | `/api/payments/crypto/init` returned `503`; no `payments` row created |
+| IBAN init | PASS LIVE | `$10` produced `payableTL=473`, `creditTL=472.7961`, `roundingTL=0.2039` |
+| Provider contract unit tests | PASS LOCAL | Shopier/Cryptomus/payment guard/common/pricing tests: 6 files, 32 tests passed |
+| Secret scan | PASS LOCAL | `node scripts/scan-secrets.mjs`: 227 scanned, 0 hits |
+
+## Shopier / Cryptomus E2E Durumu
+
+Gerçek provider E2E hâlâ tamamlanmış sayılmaz, çünkü canlı env’de Shopier ve Cryptomus credential satırları boş. Sistem bu durumda güvenli davranıyor: yöntemleri disabled gösteriyor, init endpointleri 503 dönüyor ve ödeme kaydı oluşturmuyor.
+
+Önemli güvenlik kararı: önceki mesajlarda paylaşılan credential değerleri sızmış kabul edildiği için canlı `.env.production` içine yazılmadı. Provider E2E için panelden rotate edilmiş yeni credential gerekir; değerler server env’e güvenli kanaldan girildikten sonra valid/invalid/duplicate callback/webhook testi tekrar çalıştırılmalı.
+
+## Güncel Billing/Payment Verdict
+
+API usage deduction artık temporary OmniRoute GPT path ile canlıda PASS. IBAN ödeme akışı PASS. Shopier/Cryptomus live provider E2E ise `BLOCKED_BY_MISSING_ROTATED_PROVIDER_ENV`; bu iki yöntem launch için zorunluysa final release hâlâ onaylanamaz.

@@ -184,4 +184,22 @@ Operasyon tarihi: 2026-05-26
 - Yapılan değişiklik: `scripts/vps-deploy.sh` varsayılan canlı hedefe hizalandı; `docs/vps-deploy.md` ve `docs/release-vps-beta-checklist.md` gerçek servis/path/port ile güncellendi; `src/deploy-target-contract.test.ts` eklendi. Test setup ve aktif dokümanlardan legacy `ADMIN_PASSWORD` placeholder’ları kaldırıldı. Canlı `.deploy/releases/manual-20260527T071659Z-ddee303.json` manifesti yazıldı. Canlı eski env backup dosyası root-only secure alana taşındı; live `.env.production` içindeki kullanılmayan legacy `ADMIN_PASSWORD` satırı kaldırıldı.
 - Test: `npm test -- src/deploy-target-contract.test.ts` önce RED 2/2 fail, sonra PASS 2/2; `npm test -- src/admin-single-owner-contract.test.ts` önce RED, sonra PASS; `bash -n scripts/vps-deploy.sh scripts/vps-live-preflight.sh scripts/vps-setup.sh` PASS; `npm run lint` PASS; `npm test` PASS 28 files / 118 tests; `npm run build` PASS; `npm run scan:public` PASS; `node scripts/scan-secrets.mjs` PASS.
 - Live retest: `turkapiprojesi.service` active; `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` PASS; `/status.deploy.id=manual-20260527T071659Z-ddee303`; legacy admin password line absent; env backup no longer in public deploy backup directory and secure copy is `600 root:root`.
+
+## LIVE-OMNI-BILLING-001 — Temporary OmniRoute GPT billing verification
+
+- Problem: CloseRouter inference remained `502`, so successful funded API billing could not be accepted.
+- Kök neden: Upstream provider failure on CloseRouter path; temporary OmniRoute route was requested and configured separately.
+- Yapılan değişiklik: Kod değişikliği bu adımda yapılmadı; canlı temporary OmniRoute route üzerinden bounded funded billing retest yapıldı.
+- Test: Temporary funded `yzk_live_*` key with `/v1/chat/completions`, `model=openai/gpt-5.4-mini`, `max_tokens=4`.
+- Sonuç: HTTP `200`; `X-YZ-Cost-TL=0.0329`, `X-YZ-Remaining-TL=49.97`, request id present; DB balance `49.9671`, spend `0.0329`, `usage_records.status=success`; cleanup leftovers `0`.
+- Durum: API/Billing happy path temporary OmniRoute GPT için accepted; token usage monitoring required.
+
+## LIVE-PAYMENT-PROVIDER-ENV-001 — Shopier/Cryptomus provider gate
+
+- Problem: Shopier/Cryptomus E2E hâlâ launch gate.
+- Kök neden: Live `.env.production` içinde `SHOPIER_API_KEY`, `SHOPIER_API_SECRET`, `CRYPTOMUS_API_KEY`, `CRYPTOMUS_MERCHANT_ID` unset.
+- Yapılan değişiklik: Credential yazılmadı. Önceki sızmış değerler canlı env’e eklenmedi.
+- Test: Temporary user/JWT ile `/api/payments/methods`, `/api/payments/shopier/init`, `/api/payments/crypto/init`, `/api/payments/iban/init`; ayrıca local payment contract tests ve secret scan.
+- Sonuç: Shopier/Cryptomus methods disabled, init `503`, zero payment rows; IBAN init `200` and rounded quote correct; payment contract tests 32/32; secret scan 0 hits.
+- Durum: Safe-disabled PASS; Shopier/Cryptomus provider E2E `BLOCKED_BY_MISSING_ROTATED_PROVIDER_ENV`.
 - Sonuç: FIXED LIVE FOR DEPLOY OBSERVABILITY / RELEASE STILL BLOCKED BY PROVIDER BILLING AND SHOPIER-CRYPTOMUS E2E.

@@ -34,6 +34,78 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-CMD-LIVE-OMNI-PAYMENT-E2E-001
+Decision title: Run safe live OmniRoute billing plus Shopier/Cryptomus server-side E2E verification
+Decision type: Command/test approval
+Related bug IDs: R-BUG-006, R-BUG-007, LIVE-BILLING-OMNI-001, PAYMENT-PROVIDER-E2E-001
+Evidence from reports: CloseRouter inference was blocked by provider 502. Temporary OmniRoute switch has already been deployed and live funded gateway billing produced a successful text response with billing headers, balance decrement, usage record and transaction. Payment reports still require Shopier/Cryptomus valid, invalid and duplicate callback/webhook proof without real money.
+Files likely affected: Reports only: `API_TEST_REPORT.md`, `PAYMENT_BILLING_REPORT.md`, `RETEST_LOG.md`, `LAUNCH_READINESS_AFTER_REPAIR.md`, `AGENT_REPAIR_DECISIONS.md`.
+Risk level: Medium
+Design/template impact: None. No frontend file or styling will be changed.
+Security impact: Test must not print secrets, must not use real payment money, must clean temporary users/payments, and must avoid destructive provider dashboard actions.
+Backend/API/billing impact: Creates temporary live test users/payments only, performs one or few tiny text calls, simulates signed provider callbacks/webhooks server-side, verifies idempotency and cleanup.
+Proposed action: From the live VPS, load env without printing secret values, create isolated test users/JWTs, call payment methods/init endpoints, simulate invalid and valid Shopier/Cryptomus callbacks using live server secrets without printing them, verify balance/transactions/payment statuses/idempotency in DB, clean all temporary rows, then run secret scan and update reports.
+Agent 1 vote: APPROVE
+Agent 1 reason: This is the missing real launch evidence for customer-facing billing and payment behavior, and it does not require real checkout/payment.
+Agent 2 vote: APPROVE
+Agent 2 reason: The test validates exact backend effects: headers, balance, transactions, payments, webhook idempotency and cleanup.
+Agent 3 vote: APPROVE
+Agent 3 reason: Approved because secrets are not printed, no real money is used, and no design/theme surface is touched.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Execute bounded live verification commands and record exact evidence.
+Status: APPROVED
+
+---
+
+Decision ID: DEC-RETEST-LIVE-OMNI-BILLING-001
+Decision title: Accept temporary OmniRoute GPT gateway billing retest
+Decision type: Retest acceptance
+Related bug IDs: R-BUG-006, LIVE-BILLING-OMNI-001
+Evidence from reports: Temporary funded live `yzk_live_*` call to `/v1/chat/completions` returned `200`; `X-YZ-Cost-TL=0.0329`, `X-YZ-Remaining-TL=49.97`, request id present; DB balance `49.9671`, spend `0.0329`, `usage_records.status=success`; cleanup leftovers `0`.
+Files likely affected: `API_TEST_REPORT.md`, `PAYMENT_BILLING_REPORT.md`, `RETEST_LOG.md`, `LAUNCH_READINESS_AFTER_REPAIR.md`.
+Risk level: Medium
+Design/template impact: None
+Security impact: No secrets printed; temporary key/user cleaned up.
+Backend/API/billing impact: Positive evidence for funded text billing through the temporary OmniRoute route. Token usage should still be monitored because direct OmniRoute provider routes have shown inconsistent token reporting.
+Proposed action: Mark R-BUG-006 happy-path billing as accepted for the temporary OmniRoute GPT path, not for the original CloseRouter provider path.
+Agent 1 vote: APPROVE
+Agent 1 reason: The customer-visible first API call path now has live evidence with billing headers and cleanup.
+Agent 2 vote: APPROVE
+Agent 2 reason: Balance decrement, usage record and spend counters were verified in the live DB.
+Agent 3 vote: APPROVE_WITH_MONITORING
+Agent 3 reason: No secret exposure occurred; release still needs monitoring and payment provider gates.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Update launch readiness to remove API/billing blocker for the temporary OmniRoute GPT path.
+Status: COMPLETED
+
+---
+
+Decision ID: DEC-RETEST-LIVE-PAYMENT-PROVIDER-ENV-001
+Decision title: Evaluate live Shopier/Cryptomus provider E2E readiness
+Decision type: Retest acceptance
+Related bug IDs: R-BUG-007, PAYMENT-PROVIDER-E2E-001
+Evidence from reports: Live env has `SHOPIER_API_KEY=UNSET`, `SHOPIER_API_SECRET=UNSET`, `CRYPTOMUS_API_KEY=UNSET`, `CRYPTOMUS_MERCHANT_ID=UNSET`. `/api/payments/methods` disables Shopier/Cryptomus and keeps IBAN enabled. Shopier/Cryptomus init each return `503` and create zero payment rows. Local provider contract tests pass 32/32 and secret scan is clean.
+Files likely affected: `PAYMENT_BILLING_REPORT.md`, `RETEST_LOG.md`, `LAUNCH_READINESS_AFTER_REPAIR.md`.
+Risk level: High for launch if Shopier/Cryptomus are required payment methods.
+Design/template impact: None
+Security impact: Safe-disabled behavior passes; real provider E2E remains unverified.
+Backend/API/billing impact: Payment provider launch is blocked by missing rotated credentials, not by currently observed unsafe credit behavior.
+Proposed action: Keep Shopier/Cryptomus launch status blocked until rotated credentials are installed securely and valid/invalid/fail/duplicate callback/webhook tests pass.
+Agent 1 vote: NEEDS_MORE_EVIDENCE
+Agent 1 reason: Customer cannot use Shopier/Cryptomus while methods are disabled.
+Agent 2 vote: NEEDS_MORE_EVIDENCE
+Agent 2 reason: Backend disabled-state is safe, but successful provider init and callback/webhook credit cannot be tested without env.
+Agent 3 vote: REJECT
+Agent 3 reason: Do not use leaked old credentials; require rotated live/sandbox provider credentials before approval.
+Approval count: 0/3
+Final decision: REJECTED_FOR_LAUNCH
+Allowed next action: Install rotated provider credentials via secure server env path, then rerun provider E2E.
+Status: BLOCKED_BY_MISSING_ROTATED_PROVIDER_ENV
+
+---
+
 Decision ID: DEC-CMD-GIT-BACKUP-PROVIDER-INCIDENT-001
 Decision title: Commit and push provider incident/report-only updates
 Decision type: Command approval

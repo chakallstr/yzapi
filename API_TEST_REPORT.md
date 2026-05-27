@@ -168,3 +168,38 @@ OmniRoute inference works, but its tiny call reported a large prompt token count
 ## Updated API Verdict
 
 OmniRoute is a viable temporary upstream candidate, but production gateway billing remains blocked until a rollbackable env switch is made with a safe funded `yzk_live_*` test key and the billing headers, balance decrement, transaction ledger and `usage_records` are verified against OmniRoute usage.
+
+---
+
+# Live OmniRoute Gateway Billing Retest — 2026-05-27 19:28 TRT
+
+## Reason
+
+CloseRouter inference remained unavailable. The live YapayZekaLab service was already switched to the temporary OmniRoute upstream with a rollback path. This retest verifies the real customer gateway path, not just direct provider access.
+
+## Safe Evidence
+
+- Temporary live test user marker: `qa-omni-recheck-1779899269150`.
+- Temporary funded `yzk_live_*` key was created only in the live DB for this test; raw key was not printed.
+- Request: live service-local `/v1/chat/completions`, client model `openai/gpt-5.4-mini`, `max_tokens=4`.
+- Result: `200`, response contained choices.
+- Billing headers present:
+  - `X-YZ-Cost-TL`: `0.0329`
+  - `X-YZ-Remaining-TL`: `49.97`
+  - `X-YZ-Request-Id`: present
+- DB after call:
+  - user balance: `49.9671`
+  - total spend: `0.0329`
+  - total requests: `1`
+  - `usage_records.status`: `success`
+  - `usage_records.model_id`: `openai/gpt-5.4-mini`
+  - input usage: `2022`
+  - output usage: `66`
+  - usage cost TL: `0.0329`
+  - usage remaining TL: `49.9671`
+  - error code: `null`
+- Cleanup: temporary test user leftovers `0`.
+
+## Updated API Verdict
+
+API text billing through the temporary OmniRoute GPT path is now accepted for the bounded funded-key happy path. CloseRouter itself is still unhealthy, so the launch dependency is now provider-routing/operations rather than YapayZekaLab gateway billing code. Continue monitoring OmniRoute usage because earlier direct OmniRoute tests showed unexpectedly large reported token counts on one Claude route; the live GPT route billed a small amount but still used estimated/provider usage fallback.

@@ -464,3 +464,63 @@ Agent 2 retest vote: APPROVE
 Agent 3 retest vote: APPROVE
 Approval count: 3/3
 Final retest status: DEPLOY_TARGET_METADATA_FIXED_LIVE_RELEASE_STILL_BLOCKED_BY_PROVIDER_BILLING
+
+## LIVE-OMNI-BILLING-001 Temporary OmniRoute GPT Gateway Billing Retest
+
+Bug ID: R-BUG-006, LIVE-BILLING-OMNI-001
+Fix decision ID: DEC-CMD-LIVE-OMNI-PAYMENT-E2E-001
+Retest decision ID: DEC-RETEST-LIVE-OMNI-BILLING-001
+Command or manual flow:
+- Loaded live VPS env without printing secrets.
+- Created isolated temporary live user and temporary funded `yzk_live_*` key.
+- Sent one tiny `/v1/chat/completions` request with `model=openai/gpt-5.4-mini`, `max_tokens=4`.
+- Queried live DB for user balance, spend, request count and latest `usage_records`.
+- Cleaned temporary user/API key/usage/transaction/payment rows.
+Expected:
+- Gateway returns `200`.
+- `X-YZ-Cost-TL`, `X-YZ-Remaining-TL`, and `X-YZ-Request-Id` are present.
+- Balance decreases, `usage_records.status=success`, and no test rows remain.
+Actual:
+- HTTP `200`; response choices present.
+- `X-YZ-Cost-TL=0.0329`, `X-YZ-Remaining-TL=49.97`, request id present.
+- DB balance `49.9671`, total spend `0.0329`, total requests `1`.
+- `usage_records`: model `openai/gpt-5.4-mini`, status `success`, input `2022`, output `66`, cost `0.0329`, remaining `49.9671`, error `null`.
+- Cleanup leftovers `0`.
+Passed/Failed: Passed
+Evidence: Current repair session command output; raw API key and provider secrets were not printed.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE_WITH_MONITORING
+Approval count: 3/3
+Final retest status: LIVE_OMNI_GPT_BILLING_PASS_MONITOR_TOKEN_USAGE
+
+## LIVE-PAYMENT-PROVIDER-ENV-001 Shopier/Cryptomus Live Method Gate Retest
+
+Bug ID: R-BUG-007, PAYMENT-PROVIDER-E2E-001
+Fix decision ID: DEC-CMD-LIVE-OMNI-PAYMENT-E2E-001
+Retest decision ID: DEC-RETEST-LIVE-PAYMENT-PROVIDER-ENV-001
+Command or manual flow:
+- Checked live `.env.production` provider variable presence as SET/UNSET only.
+- Created temporary user/JWT and called `/api/payments/methods`.
+- Called disabled `/api/payments/shopier/init` and `/api/payments/crypto/init`.
+- Called `/api/payments/iban/init` to verify the working fallback payment method.
+- Ran local provider contract tests and secret scan.
+Expected:
+- If provider credentials are absent, Shopier/Cryptomus must be disabled, init must return 503, and no payment rows should be created.
+- IBAN must still work.
+- Secret scan must remain clean.
+Actual:
+- `SHOPIER_API_KEY=UNSET`, `SHOPIER_API_SECRET=UNSET`, `CRYPTOMUS_API_KEY=UNSET`, `CRYPTOMUS_MERCHANT_ID=UNSET`.
+- `/api/payments/methods`: 200; Shopier disabled, Cryptomus disabled, IBAN enabled.
+- `/api/payments/shopier/init`: 503, no Shopier payment row.
+- `/api/payments/crypto/init`: 503, no Cryptomus payment row.
+- `/api/payments/iban/init`: 200; reference present, `payableTL=473`, `creditTL=472.7961`, `roundingTL=0.2039`.
+- `npm test -- src/server/services/shopier-service.test.ts src/server/services/cryptomus-service.test.ts src/payment-safety-contract.test.ts src/server/services/payment-common.test.ts src/server/services/payment-guards.test.ts src/server/services/payment-pricing.test.ts`: 6 files / 32 tests passed.
+- `node scripts/scan-secrets.mjs`: 227 scanned / 0 hits.
+Passed/Failed: Safe-disabled behavior passed; provider E2E remains blocked.
+Evidence: Current repair session command output; no secrets printed.
+Agent 1 retest vote: NEEDS_MORE_EVIDENCE
+Agent 2 retest vote: NEEDS_MORE_EVIDENCE
+Agent 3 retest vote: REJECT_FOR_PROVIDER_LAUNCH
+Approval count: 0/3
+Final retest status: SHOPIER_CRYPTOMUS_PROVIDER_E2E_BLOCKED_BY_MISSING_ROTATED_ENV
