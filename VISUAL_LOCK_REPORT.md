@@ -152,3 +152,31 @@ Visual diff notes:
 - No CSS files, design tokens, colors, typography, spacing, layout, responsive breakpoints, card/button/modal styles or visual hierarchy changed.
 - The frontend patch only maps `/dashboard` to the existing account area and removes OAuth token query parameters after storing them.
 - Provider callback hardening is backend-only and has no visual impact.
+
+---
+
+## 2026-05-27 Manual Payment Instructions
+
+Files checked for visual/template risk:
+
+- `src/yapayzekalab/tab-account.jsx`: conditional payment instruction data rendering only.
+- `src/yapayzekalab/tab-admin.jsx`: admin payment settings section using existing admin card/input/button/subnav patterns.
+- `src/yapayzekalab/tokens.css`, global CSS, theme tokens, homepage/model/SSS/API layout files: not touched.
+
+Verification:
+
+- `npm test -- src/payment-safety-contract.test.ts`: PASS, 8/8 after RED failure.
+- `npm test -- src/server/services/google-oauth-service.test.ts src/payment-safety-contract.test.ts`: PASS, 10/10.
+- `npm run lint`: PASS.
+- `npm test`: PASS, 29 files / 130 tests.
+- `npm run build`: PASS.
+- `npm run scan:public`: PASS, 0 hits.
+- `node scripts/scan-secrets.mjs`: PASS, 230 scanned / 0 hits.
+- `npm run qa:uat`: PASS, 10/10, report `qa-artifacts/uat-smoke-2026-05-27T19-24-23-128Z/uat-smoke-report.md`.
+
+Visual diff notes:
+
+- No colors, gradients, font families, global token values, spacing scale, button/card/modal styling, responsive breakpoints, landing page order, model card layout or API tab layout changed.
+- The new customer-facing payment details appear only after an IBAN/manual crypto init response; the panel uses the existing surface/border/ink variables and existing typography scale.
+- The new admin `Ödeme` section is functional config UI; it reuses existing `SubNav`, `Card`, `inputStyle`, `var(--ink)` button and existing spacing.
+- A true before/after screenshot for the conditional payment panel is not available because the old behavior was a browser alert; current route smoke screenshots are stored in the QA artifact folder above.

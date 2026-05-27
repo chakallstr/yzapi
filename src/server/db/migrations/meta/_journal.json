@@ -36,6 +36,20 @@
       "when": 1779790000000,
       "tag": "0004_min_topup_250",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779793920000,
+      "tag": "0005_payment_usd_quote_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779906000000,
+      "tag": "0006_manual_payment_settings",
+      "breakpoints": true
     }
   ]
 }

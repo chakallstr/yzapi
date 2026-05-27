@@ -33,6 +33,7 @@ NOT READY — PAYMENT SECURITY BLOCKERS
 - Local Shopier/Cryptomus callback hardening now validates signed amount/currency before crediting; full local regression, build, public scan and secret scan pass.
 - Local Google OAuth return fix now stores backend `at/rt` callback tokens, removes them from the URL, and maps `/dashboard` to the existing account/API area without visual changes.
 - Local Google OAuth state fix now survives server restart/deploy during the Google login round-trip by using a signed, TTL-bound state token instead of process-local memory.
+- Local manual payment instruction fix now shows IBAN bank/recipient/IBAN/reference/amount and WhatsApp notification path instead of a reference-only alert. Admin can configure non-secret WhatsApp/manual crypto wallet settings locally; manual crypto creates a pending payment instruction and does not auto-credit balance.
 
 ## Must-Fix Before Launch
 
@@ -42,6 +43,7 @@ NOT READY — PAYMENT SECURITY BLOCKERS
 - Complete admin destructive/action tab UAT and audit coverage without mutating real customer data.
 - Deploy the local Google OAuth return fix, then re-run Google OAuth/admin owner session in the user's standard Chrome profile; anonymous admin exposure is verified live, but owner login must be rechecked after deploy.
 - Deploy the local restart-safe OAuth state fix only after the required four-agent deploy gate is available or explicitly overridden.
+- Deploy the manual payment settings migration (`0006_manual_payment_settings.sql`) before starting the new server build, then configure WhatsApp/crypto wallet values in Admin and re-run real Chrome IBAN/manual crypto UAT.
 
 ## Should-Fix Soon
 
@@ -71,6 +73,7 @@ NOT READY — PAYMENT SECURITY BLOCKERS
 - Local payment contract retest: Shopier/Cryptomus/payment guard/common/pricing tests PASS, 6 files / 32 tests; secret scan PASS, 227 scanned / 0 hits.
 - Latest local OAuth/payment hardening regression `2026-05-27 20:52 TRT`: `npm test -- src/admin-single-owner-contract.test.ts` PASS 3/3; `npm run lint` PASS; `npm test` PASS 28 files / 126 tests; `npm run build` PASS; public scan PASS 0 hits; secret scan PASS 227 scanned / 0 hits.
 - Latest local login restart-safety regression: OAuth state test first failed RED, then `npm test -- src/admin-single-owner-contract.test.ts src/server/services/google-oauth-service.test.ts` PASS 5/5; `npm run lint` PASS; `npm test` PASS 29 files / 128 tests; `npm run build` PASS; public scan PASS 0 hits; secret scan PASS 229 scanned / 0 hits.
+- Latest local manual payment instruction regression: `npm test -- src/payment-safety-contract.test.ts` first failed RED 2/8, then PASS 8/8; targeted OAuth/payment tests PASS 10/10; `npm run lint` PASS; `npm test` PASS 29 files / 130 tests; `npm run build` PASS; public scan PASS 0 hits; secret scan PASS 230 scanned / 0 hits; local `npm run qa:uat` PASS 10/10 with report `qa-artifacts/uat-smoke-2026-05-27T19-24-23-128Z/uat-smoke-report.md`.
 - Latest live safe smoke after local fix build: `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T17-51-32-980Z/uat-smoke-report.md`; `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` PASS for health/status/models/authless/JSON-404 checks, funded/low-balance keys skipped because safe env keys were absent.
 - Standard Chrome automation was unavailable to this Codex session, so post-deploy logged-in Google admin click-through was not rerun in the user's existing Chrome profile.
 - Previous billing failure-path evidence exists; successful funded text billing is now approved for the temporary OmniRoute GPT path. Shopier/Cryptomus provider E2E is still not approved because live rotated provider env is missing. IBAN payment E2E is approved.

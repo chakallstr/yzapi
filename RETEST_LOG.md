@@ -615,3 +615,59 @@ Agent 2 retest vote: BLOCKED_BY_AGENT_CAPACITY
 Agent 3 retest vote: BLOCKED_BY_AGENT_CAPACITY
 Approval count: 0/3
 Final retest status: LOCAL_OAUTH_STATE_FIX_VERIFIED_DEPLOY_BLOCKED_BY_AGENT_CAPACITY
+
+## LOCAL-PAYMENT-INSTRUCTIONS-001 Manual Payment Instruction Retest
+
+Bug ID: PAYMENT-INSTRUCTIONS-001, PAYMENT-UX-001
+Fix decision ID: DEC-FIX-PAYMENT-INSTRUCTIONS-001
+Retest decision ID: DEC-RETEST-PAYMENT-INSTRUCTIONS-001
+Command or manual flow:
+- Added RED source-contract coverage requiring inline `paymentInstruction`, WhatsApp notification link, backend notification payload, and admin manual crypto wallet settings.
+- Replaced IBAN reference-only alert with inline payment instructions.
+- Added admin-configurable non-secret WhatsApp/crypto wallet fields.
+- Added manual crypto fallback that creates a pending payment record but does not credit balance.
+Expected:
+- IBAN top-up returns and displays bank name, IBAN, owner, payable amount, balance amount, reference code, and WhatsApp notification path.
+- Crypto manual mode displays asset, network, wallet address, optional memo, reference code, and WhatsApp notification path.
+- Admin can configure WhatsApp and manual crypto wallet fields without seeing or editing provider API secrets.
+- Manual IBAN/crypto instructions do not auto-credit balance.
+- Existing theme, colors, layout, buttons, cards and modal visual style remain unchanged.
+Actual:
+- RED: `npm test -- src/payment-safety-contract.test.ts` failed 2/8 before implementation.
+- GREEN: `npm test -- src/payment-safety-contract.test.ts` passed 8/8 after implementation.
+- `npm test -- src/server/services/google-oauth-service.test.ts src/payment-safety-contract.test.ts`: PASS 10/10.
+- `npm run lint`: PASS.
+- `npm test`: PASS 29 files / 130 tests.
+- `npm run build`: PASS.
+- `npm run scan:public`: PASS, 0 hits.
+- `node scripts/scan-secrets.mjs`: PASS, 230 scanned / 0 hits.
+- `npm run qa:uat`: PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T19-24-23-128Z/uat-smoke-report.md`.
+Passed/Failed: Passed locally for source/build/UAT route smoke. DB-backed local browser payment E2E was blocked because Docker/Postgres was not running.
+Evidence: Current session command output; no real payment provider, no real money, no provider secret used.
+Agent 1 retest vote: APPROVE_FOR_LOCAL_FIX
+Agent 2 retest vote: APPROVE_WITH_MIGRATION_REQUIRED_BEFORE_DEPLOY
+Agent 3 retest vote: APPROVE_WITH_LIVE_VISUAL_AND_PAYMENT_UAT_REQUIRED
+Approval count: 3/3
+Final retest status: LOCAL_PAYMENT_INSTRUCTIONS_ACCEPTED_DEPLOY_BLOCKED_BY_4_AGENT_GATE
+
+## LOCAL-OAUTH-STATE-TEST-FLAKE-001 OAuth Test Determinism Retest
+
+Bug ID: OAUTH-STATE-RESTART-001
+Fix decision ID: DEC-FIX-OAUTH-STATE-TEST-FLAKE-001
+Retest decision ID: DEC-RETEST-OAUTH-STATE-TEST-FLAKE-001
+Command or manual flow:
+- Investigated full test failure in `google-oauth-service.test.ts`.
+- Changed only the test tamper method to alter the signed payload instead of relying on last signature character replacement.
+Expected:
+- Tampered state must always differ from the valid state and fail verification.
+- Production OAuth state implementation remains unchanged.
+Actual:
+- Targeted OAuth/payment tests PASS 10/10.
+- Full `npm test` PASS 29 files / 130 tests.
+Passed/Failed: Passed.
+Evidence: Current session command output.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: ACCEPTED

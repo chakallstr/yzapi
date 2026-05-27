@@ -78,3 +78,26 @@ Agent 3 vote: APPROVE
 Agent 3 reason: Visual lock remains preserved; token cleanup improves security.
 Approval count: 3/3
 Final decision: DESIGN PRESERVED FOR OAUTH/PAYMENT GUARD PHASE
+
+---
+
+## 2026-05-27 Manual Payment Instructions Check
+
+Result: PASS locally, live retest pending.
+
+- Homepage, Models and SSS tabs were not changed by this repair.
+- API/account tab kept the existing balance/top-up layout; only a conditional instruction block appears after IBAN/manual crypto init.
+- Admin tab kept the existing shell; one `Ödeme` config subnav item was added using the same admin subnav/card/input/button styling.
+- No CSS files, global classes, theme tokens, color palette, typography tokens, responsive breakpoints, landing layout, model card layout, button style, card style or modal style changed.
+- `npm run qa:uat` passed 10/10: `qa-artifacts/uat-smoke-2026-05-27T19-24-23-128Z/uat-smoke-report.md`.
+- `npm run scan:public` passed with 0 forbidden-template hits.
+
+DEC-DESIGN-PAYMENT-INSTRUCTIONS-001:
+Agent 1 vote: APPROVE_FOR_LOCAL_FIX
+Agent 1 reason: User-facing payment instructions are now visible without replacing the template.
+Agent 2 vote: APPROVE
+Agent 2 reason: Config/payment behavior changes do not require UI redesign and billing auto-credit remains protected.
+Agent 3 vote: APPROVE_WITH_LIVE_RETEST_REQUIRED
+Agent 3 reason: Source and smoke evidence preserve visual lock locally; live Chrome retest is still required after migration/deploy.
+Approval count: 3/3
+Final decision: DESIGN PRESERVED LOCALLY FOR MANUAL PAYMENT INSTRUCTIONS

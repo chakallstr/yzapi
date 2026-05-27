@@ -54,6 +54,12 @@ function serializeConfig(cfg: typeof systemConfig.$inferSelect) {
     textBillingRatio: Number(cfg.textBillingRatio),
     platformAdi: cfg.platformAdi,
     destekEmail: cfg.destekEmail,
+    paymentWhatsappNumber: cfg.paymentWhatsappNumber,
+    cryptoWalletEnabled: cfg.cryptoWalletEnabled,
+    cryptoWalletAsset: cfg.cryptoWalletAsset,
+    cryptoWalletNetwork: cfg.cryptoWalletNetwork,
+    cryptoWalletAddress: cfg.cryptoWalletAddress,
+    cryptoWalletMemo: cfg.cryptoWalletMemo,
     maxBakiyeTL: Number(cfg.maxBakiyeTL),
     minBakiyeTL: Number(cfg.minBakiyeTL),
     anomaliEsikTL: Number(cfg.anomaliEsikTL),
@@ -149,6 +155,12 @@ router.post("/config", async (req, res, next) => {
     if (body.textBillingRatio !== undefined) updates.textBillingRatio = String(body.textBillingRatio);
     if (body.platformAdi !== undefined) updates.platformAdi = body.platformAdi;
     if (body.destekEmail !== undefined) updates.destekEmail = body.destekEmail;
+    if (body.paymentWhatsappNumber !== undefined) updates.paymentWhatsappNumber = String(body.paymentWhatsappNumber ?? "");
+    if (body.cryptoWalletEnabled !== undefined) updates.cryptoWalletEnabled = Boolean(body.cryptoWalletEnabled);
+    if (body.cryptoWalletAsset !== undefined) updates.cryptoWalletAsset = String(body.cryptoWalletAsset ?? "USDT");
+    if (body.cryptoWalletNetwork !== undefined) updates.cryptoWalletNetwork = String(body.cryptoWalletNetwork ?? "TRC20");
+    if (body.cryptoWalletAddress !== undefined) updates.cryptoWalletAddress = String(body.cryptoWalletAddress ?? "");
+    if (body.cryptoWalletMemo !== undefined) updates.cryptoWalletMemo = String(body.cryptoWalletMemo ?? "");
     if (body.maxBakiyeTL !== undefined) updates.maxBakiyeTL = String(body.maxBakiyeTL);
     if (body.minBakiyeTL !== undefined) updates.minBakiyeTL = String(body.minBakiyeTL);
     if (body.anomaliEsikTL !== undefined) updates.anomaliEsikTL = String(body.anomaliEsikTL);

@@ -15,6 +15,7 @@ const ADMIN_SECTIONS = [
   { id: 'announce', label: 'Duyurular', Ico: I.Megaphone },
   { id: 'providers', label: 'Sağlayıcı', Ico: I.Server },
   { id: 'kur', label: 'Kur', Ico: I.Coins },
+  { id: 'payments', label: 'Ödeme', Ico: I.Wallet },
   { id: 'apikeys', label: 'API anahtarları', Ico: I.Key },
   { id: 'logs', label: 'Loglar', Ico: I.Terminal },
   { id: 'animations', label: 'Animasyon', Ico: I.Sparkle },
@@ -506,6 +507,106 @@ const AdminKur = ({ config, kurHistory, token, refresh }) => {
   );
 };
 
+const AdminPaymentSettings = ({ config, token, refresh }) => {
+  const [form, setForm] = useState({
+    paymentWhatsappNumber: '',
+    cryptoWalletEnabled: false,
+    cryptoWalletAsset: 'USDT',
+    cryptoWalletNetwork: 'TRC20',
+    cryptoWalletAddress: '',
+    cryptoWalletMemo: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setForm({
+      paymentWhatsappNumber: config?.paymentWhatsappNumber || '',
+      cryptoWalletEnabled: Boolean(config?.cryptoWalletEnabled),
+      cryptoWalletAsset: config?.cryptoWalletAsset || 'USDT',
+      cryptoWalletNetwork: config?.cryptoWalletNetwork || 'TRC20',
+      cryptoWalletAddress: config?.cryptoWalletAddress || '',
+      cryptoWalletMemo: config?.cryptoWalletMemo || '',
+    });
+  }, [config]);
+
+  const setField = (key, value) => {
+    setSaved(false);
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setSaved(false);
+    try {
+      await adminRequest('/api/admin/config', token, { method: 'POST', body: form });
+      setSaved(true);
+      await refresh();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 0.9fr) minmax(320px, 1.1fr)', gap: 18 }}>
+      <Card pad={20}>
+        <Caption>Ödeme bildirimi</Caption>
+        <div style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>WhatsApp yönlendirme</div>
+        <div style={{ fontSize: 11.5, color: 'var(--ink-2)', lineHeight: 1.6, marginTop: 6 }}>
+          IBAN ve manuel kripto ödemelerinde müşteriye ödeme bilgileri gösterilir; bildirim butonu bu numaraya hazır mesaj açar.
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <Caption style={{ marginBottom: 6 }}>WhatsApp numarası</Caption>
+          <input
+            value={form.paymentWhatsappNumber}
+            onChange={(e) => setField('paymentWhatsappNumber', e.target.value)}
+            placeholder="905000000000"
+            style={inputStyle}
+          />
+        </div>
+      </Card>
+
+      <Card pad={20}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+          <div>
+            <Caption>Manuel kripto cüzdanı</Caption>
+            <div style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>USDT adresi</div>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-2)', lineHeight: 1.6, marginTop: 6 }}>
+              Cryptomus kapalıysa bu alan aktif olduğunda kullanıcıya cüzdan, ağ, referans ve WhatsApp bildirimi gösterilir. Bakiye otomatik eklenmez.
+            </div>
+          </div>
+          <button onClick={() => setField('cryptoWalletEnabled', !form.cryptoWalletEnabled)} style={{
+            width: 48, height: 26, borderRadius: 999,
+            background: form.cryptoWalletEnabled ? 'var(--accent)' : 'var(--ink-5)',
+            position: 'relative',
+          }}>
+            <span style={{ position: 'absolute', top: 3, left: form.cryptoWalletEnabled ? 25 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: 10, marginTop: 14 }}>
+          <input value={form.cryptoWalletAsset} onChange={(e) => setField('cryptoWalletAsset', e.target.value)} placeholder="USDT" style={inputStyle} />
+          <input value={form.cryptoWalletNetwork} onChange={(e) => setField('cryptoWalletNetwork', e.target.value)} placeholder="TRC20" style={inputStyle} />
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <input value={form.cryptoWalletAddress} onChange={(e) => setField('cryptoWalletAddress', e.target.value)} placeholder="Cüzdan adresi" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <input value={form.cryptoWalletMemo} onChange={(e) => setField('cryptoWalletMemo', e.target.value)} placeholder="Memo / tag / ek not (opsiyonel)" style={inputStyle} />
+        </div>
+        <button onClick={save} disabled={saving} style={{ marginTop: 14, width: '100%', padding: '10px 12px', borderRadius: 10, background: 'var(--ink)', color: '#fff', fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
+          {saving ? 'Kaydediliyor…' : 'Ödeme ayarlarını kaydet'}
+        </button>
+        {saved && (
+          <div style={{ marginTop: 10, fontSize: 11.5, color: '#047857', background: 'var(--ok-bg)', border: '1px solid #a7f3d0', borderRadius: 9, padding: '8px 10px' }}>
+            Ödeme ayarları kaydedildi.
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+};
+
 const AdminApiKeys = ({ apiKeys, users, token, refresh }) => {
   const [userId, setUserId] = useState('');
   const [name, setName] = useState('admin-created-key');
@@ -751,6 +852,7 @@ const AdminTab = ({ ctx = {} }) => {
         {section === 'announce' && <AdminAnnouncements announcements={data.announcements || []} token={token} refresh={refresh} />}
         {section === 'providers' && <AdminProviders providers={data.providers || []} token={token} refresh={refresh} />}
         {section === 'kur' && <AdminKur config={data.config} kurHistory={data.kurHistory || []} token={token} refresh={refresh} />}
+        {section === 'payments' && <AdminPaymentSettings config={data.config} token={token} refresh={refresh} />}
         {section === 'apikeys' && <AdminApiKeys apiKeys={data.apiKeys || []} users={data.users || []} token={token} refresh={refresh} />}
         {section === 'logs' && <AdminLogs reconciliation={data.reconciliation} auditLogs={data.auditLogs || []} token={token} />}
         {section === 'animations' && <AdminAnimations tweaks={tweaks} setTweak={setTweak} />}

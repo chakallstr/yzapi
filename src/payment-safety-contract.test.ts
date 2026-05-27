@@ -43,6 +43,45 @@ describe("payment safety contract", () => {
     expect(app).not.toContain("setTweak('balanceUSD', balanceUSD + effectiveAmount)");
   });
 
+  it("shows manual IBAN/crypto instructions and WhatsApp payment notification instead of a reference-only alert", () => {
+    const account = source("./yapayzekalab/tab-account.jsx");
+    const paymentsRoute = source("./server/routes/payments.ts");
+
+    expect(account).toContain("paymentInstruction");
+    expect(account).toContain("buildWhatsAppPaymentLink");
+    expect(account).toContain("Banka");
+    expect(account).toContain("IBAN");
+    expect(account).toContain("Alıcı");
+    expect(account).toContain("Referans");
+    expect(account).toContain("WhatsApp");
+    expect(account).not.toContain("IBAN ödeme bildirimi oluşturuldu.");
+
+    expect(paymentsRoute).toContain("buildPaymentNotification");
+    expect(paymentsRoute).toContain("paymentWhatsappNumber");
+    expect(paymentsRoute).toContain("cryptoWalletAddress");
+  });
+
+  it("lets admins configure manual payment notification and crypto wallet instructions without changing provider secrets", () => {
+    const schema = source("./server/db/schema.ts");
+    const adminRoute = source("./server/routes/admin.ts");
+    const adminUi = source("./yapayzekalab/tab-admin.jsx");
+
+    expect(schema).toContain("paymentWhatsappNumber");
+    expect(schema).toContain("cryptoWalletEnabled");
+    expect(schema).toContain("cryptoWalletNetwork");
+    expect(schema).toContain("cryptoWalletAsset");
+    expect(schema).toContain("cryptoWalletAddress");
+    expect(schema).toContain("cryptoWalletMemo");
+
+    expect(adminRoute).toContain("paymentWhatsappNumber");
+    expect(adminRoute).toContain("cryptoWalletAddress");
+    expect(adminUi).toContain("AdminPaymentSettings");
+    expect(adminUi).toContain("paymentWhatsappNumber");
+    expect(adminUi).toContain("cryptoWalletAddress");
+    expect(adminUi).not.toContain("SHOPIER_API_KEY");
+    expect(adminUi).not.toContain("CRYPTOMUS_API_KEY");
+  });
+
   it("keeps payment callbacks and metadata safe for USD top-ups", () => {
     const paymentsRoute = source("./server/routes/payments.ts");
     const schema = source("./server/db/schema.ts");

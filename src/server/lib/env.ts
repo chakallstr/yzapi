@@ -44,6 +44,14 @@ const schema = z.object({
   IBAN_BANK_NAME: z.string().default(""),
   IBAN_NUMBER: z.string().default(""),
   IBAN_OWNER: z.string().default(""),
+  PAYMENT_WHATSAPP_NUMBER: z.string().default(""),
+
+  // Manual crypto wallet instructions (non-secret display config)
+  CRYPTO_WALLET_ENABLED: z.coerce.boolean().default(false),
+  CRYPTO_WALLET_ASSET: z.string().default("USDT"),
+  CRYPTO_WALLET_NETWORK: z.string().default("TRC20"),
+  CRYPTO_WALLET_ADDRESS: z.string().default(""),
+  CRYPTO_WALLET_MEMO: z.string().default(""),
 
   // KDV rate (default 20%)
   KDV_RATE: z.coerce.number().default(0.20),

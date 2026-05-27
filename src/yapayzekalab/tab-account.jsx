@@ -90,6 +90,14 @@ const shortDate = (value) => {
   return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 };
 const maskedKeyText = (key) => key?.maskedKey || (key?.prefix ? `${key.prefix}_••••••••••••` : '—');
+const buildWhatsAppPaymentLink = (paymentInstruction) => {
+  const url = paymentInstruction?.whatsapp?.whatsappUrl;
+  if (url) return url;
+  const number = paymentInstruction?.whatsapp?.whatsappNumber;
+  const message = paymentInstruction?.whatsapp?.whatsappMessage;
+  if (!number || !message) return '';
+  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+};
 
 // === AutoRechargeCard — bakiye eşiğe düşünce otomatik yükle ========
 const AutoRechargeCard = ({ tweaks, setTweak }) => {
@@ -463,6 +471,7 @@ const AccountTab = ({ ctx }) => {
   const [usageRows, setUsageRows] = useState([]);
   const [paymentRows, setPaymentRows] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState(null);
+  const [paymentInstruction, setPaymentInstruction] = useState(null);
   const [team, setTeam] = useState([]);
   const [webhooks, setWebhooks] = useState(null);
   const [sandboxKey, setSandboxKey] = useState(null);
@@ -622,9 +631,35 @@ const AccountTab = ({ ctx }) => {
       }
 
       if (payMethod === 'iban') {
-        const ref = result?.referansKodu ? ` Referans: ${result.referansKodu}` : '';
-        window.alert(`IBAN ödeme bildirimi oluşturuldu.${ref}`);
+        setPaymentInstruction({
+          method: 'iban',
+          title: 'IBAN ödeme bilgileri',
+          reference: result?.referansKodu || '',
+          quote: result?.quote,
+          payableLabel: `₺${Number(result?.quote?.payableTL || payableTL).toFixed(0)}`,
+          balanceLabel: `$${Number(result?.quote?.amountUsd || effectiveAmount).toFixed(2)}`,
+          iban: result?.iban,
+          whatsapp: result?.whatsapp,
+          note: result?.aciklama,
+        });
         await loadAccount();
+        return;
+      }
+
+      if (payMethod === 'crypto' && result?.manual) {
+        setPaymentInstruction({
+          method: 'crypto',
+          title: 'Kripto cüzdan bilgileri',
+          reference: result?.referansKodu || '',
+          quote: result?.quote,
+          payableLabel: `$${Number(result?.quote?.amountUsd || effectiveAmount).toFixed(2)} ${result?.cryptoWallet?.asset || 'USDT'}`,
+          balanceLabel: `$${Number(result?.quote?.amountUsd || effectiveAmount).toFixed(2)}`,
+          cryptoWallet: result?.cryptoWallet,
+          whatsapp: result?.whatsapp,
+          note: result?.aciklama,
+        });
+        await loadAccount();
+        return;
       }
     } catch (error) {
       setPanelError(error instanceof Error ? error.message : 'Ödeme başlatılamadı.');
@@ -788,6 +823,63 @@ const AccountTab = ({ ctx }) => {
               </span>
             </div>
           </div>
+
+          {paymentInstruction && (
+            <div className="fade-in" style={{ padding: 14, borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--border)', marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 10 }}>
+                <div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700 }}>{paymentInstruction.title}</div>
+                  <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 2 }}>
+                    Bakiye {paymentInstruction.balanceLabel} · Ödenecek {paymentInstruction.payableLabel}
+                  </div>
+                </div>
+                <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5 }}>{paymentInstruction.reference || 'referans'}</Chip>
+              </div>
+
+              {paymentInstruction.iban && (
+                <div style={{ display: 'grid', gap: 7, fontSize: 11.5 }}>
+                  <div><strong>Banka:</strong> {paymentInstruction.iban.bankName || 'Tanımlı değil'}</div>
+                  <div><strong>Alıcı:</strong> {paymentInstruction.iban.owner || 'Tanımlı değil'}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}><strong>IBAN:</strong> {paymentInstruction.iban.ibanNumber || 'Tanımlı değil'}</div>
+                  <div><strong>Referans:</strong> {paymentInstruction.reference}</div>
+                </div>
+              )}
+
+              {paymentInstruction.cryptoWallet && (
+                <div style={{ display: 'grid', gap: 7, fontSize: 11.5 }}>
+                  <div><strong>Ağ:</strong> {paymentInstruction.cryptoWallet.network || 'TRC20'}</div>
+                  <div><strong>Varlık:</strong> {paymentInstruction.cryptoWallet.asset || 'USDT'}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}><strong>Cüzdan:</strong> {paymentInstruction.cryptoWallet.address || 'Tanımlı değil'}</div>
+                  {paymentInstruction.cryptoWallet.memo && <div><strong>Memo:</strong> {paymentInstruction.cryptoWallet.memo}</div>}
+                  <div><strong>Referans:</strong> {paymentInstruction.reference}</div>
+                </div>
+              )}
+
+              {paymentInstruction.note && (
+                <div style={{ marginTop: 10, fontSize: 10.5, color: 'var(--ink-2)', lineHeight: 1.5 }}>
+                  {paymentInstruction.note}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                {buildWhatsAppPaymentLink(paymentInstruction) ? (
+                  <a href={buildWhatsAppPaymentLink(paymentInstruction)} target="_blank" rel="noreferrer" style={{
+                    padding: '8px 10px', borderRadius: 9, background: 'var(--ink)', color: '#fff',
+                    fontSize: 11.5, fontWeight: 600, textDecoration: 'none',
+                  }}>
+                    WhatsApp ödeme bildirimi yap
+                  </a>
+                ) : (
+                  <span style={{ fontSize: 10.5, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+                    WhatsApp bildirim numarası henüz tanımlı değil; referans kodunu ödeme açıklamasına yazın.
+                  </span>
+                )}
+                <button onClick={() => navigator.clipboard?.writeText(paymentInstruction.reference || '')} style={{ padding: '8px 10px', borderRadius: 9, border: '1px solid var(--border)', fontSize: 11.5 }}>
+                  Referansı kopyala
+                </button>
+              </div>
+            </div>
+          )}
 
           <button onClick={onTopUp} disabled={belowMin || effectiveAmount < MIN_USD || !paymentMethodEnabled} style={{
             width: '100%', padding: '11px 0', borderRadius: 10,

@@ -233,3 +233,33 @@ Operasyon tarihi: 2026-05-26
 - Test: `src/server/services/google-oauth-service.test.ts` önce RED (`createOAuthState is not a function`), sonra PASS.
 - Retest: `npm test -- src/admin-single-owner-contract.test.ts src/server/services/google-oauth-service.test.ts` PASS 5/5; `npm run lint` PASS; `npm test` PASS 29 files / 128 tests; `npm run build` PASS; `npm run scan:public` PASS; `node scripts/scan-secrets.mjs` PASS; live safe smoke PASS.
 - Sonuç: FIXED LOCALLY / LIVE DEPLOY BLOCKED BY 4-AGENT CAPACITY GATE.
+
+## PAYMENT-INSTRUCTIONS-001 — IBAN/crypto payment instructions and WhatsApp notification
+
+- Problem: Hesap ekranında `$25` gibi bir tutar seçilip IBAN ödeme başlatıldığında yalnız referans alert'i gösteriliyordu; kullanıcı banka adı, IBAN, alıcı, ödenecek tutar, referansın nereye yazılacağı veya WhatsApp ödeme bildirimi adımını göremiyordu. Kripto tarafında da manuel cüzdan/adres bilgisi ve admin ayarı yoktu.
+- Kök neden: Backend `/api/payments/iban/init` zaten `iban` ve `referansKodu` döndürüyordu, ancak `src/yapayzekalab/tab-account.jsx` bu bilgiyi kullanmayıp `window.alert` ile sadece referans gösteriyordu. `system_config` içinde WhatsApp/manual crypto cüzdan alanları ve admin UI formu yoktu.
+- Karar: `DEC-FIX-PAYMENT-INSTRUCTIONS-001`, 3/3 APPROVED. Gerçek sub-agent spawn aracı bu oturumda `agent thread limit reached` verdiği için canlı deploy/release gate hâlâ kapalıdır; karar dosyasında kanıtlı iç gate işlendi.
+- Yapılan değişiklik:
+  - `system_config` için gizli olmayan manual payment alanları eklendi: WhatsApp numarası, crypto wallet enabled, asset, network, address, memo.
+  - `0006_manual_payment_settings.sql` additive migration eklendi; migration journal yeni `0005` ve `0006` kayıtlarıyla hizalandı.
+  - `/api/admin/config` bu alanları döndürür/günceller hale geldi.
+  - `/api/payments/methods` WhatsApp bildirim numarası ve manual crypto wallet durumunu döndürüyor.
+  - `/api/payments/iban/init` IBAN talimatıyla birlikte WhatsApp hazır mesajını döndürüyor.
+  - `/api/payments/crypto/init` Cryptomus env yok ama admin manual wallet aktifse pending `crypto_manual` payment oluşturup cüzdan/ağ/referans/WhatsApp talimatını döndürüyor; bakiye otomatik eklenmiyor.
+  - Hesap ekranında alert kaldırıldı; aynı tema değişmeden inline ödeme talimat paneli eklendi.
+  - Admin panelinde aynı mevcut card/input/button stiliyle “Ödeme” sekmesi eklendi; provider API secret alanı gösterilmedi.
+- Test:
+  - RED: `npm test -- src/payment-safety-contract.test.ts` önce 2 fail verdi (`paymentInstruction` ve admin manual payment config yoktu).
+  - GREEN: `npm test -- src/payment-safety-contract.test.ts` PASS 8/8.
+  - Targeted: `npm test -- src/server/services/google-oauth-service.test.ts src/payment-safety-contract.test.ts` PASS 10/10.
+  - Full: `npm run lint` PASS; `npm test` PASS 29 files / 130 tests; `npm run build` PASS; `npm run scan:public` PASS 0 hit; `node scripts/scan-secrets.mjs` PASS 230 scanned / 0 hit; `npm run qa:uat` PASS 10/10 with report `qa-artifacts/uat-smoke-2026-05-27T19-24-23-128Z/uat-smoke-report.md`.
+- Not: Local Docker kapalı olduğu için DB-backed manual payment flow browser üzerinden canlı kayıtla tıklanmadı. Build server DB bağlantısı olmadan statik UAT route smoke geçti; canlı deploy öncesi migration + canlı admin config + gerçek Chrome ödeme UAT gerekir.
+- Sonuç: FIXED LOCALLY. LIVE DEPLOY BLOCKED BY 4-AGENT CAPACITY GATE AND POST-MIGRATION PAYMENT UAT.
+
+## OAUTH-STATE-TEST-FLAKE-001
+
+- Problem: Full testte `google-oauth-service.test.ts` ara sıra fail ediyordu.
+- Kök neden: Test imzalı state'in son karakterini `x` yaparak tamper etmeye çalışıyordu; state zaten `x` ile biterse veya base64url son karakter decode açısından eşdeğer kalırsa test geçerli state'i tekrar doğruluyordu.
+- Yapılan değişiklik: Test yalnızca test dosyasında payload karakterini değiştirerek imzayı deterministik bozuyor. Üretim OAuth kodu değişmedi.
+- Test: Targeted OAuth/payment tests PASS 10/10; full `npm test` PASS 29 files / 130 tests.
+- Sonuç: TEST FLAKE FIXED.

@@ -47,6 +47,62 @@ async function getPaymentKur(): Promise<number> {
   return Number(rows[0]?.kur ?? 47.084289);
 }
 
+async function getManualPaymentSettings() {
+  const rows = await db
+    .select({
+      paymentWhatsappNumber: systemConfig.paymentWhatsappNumber,
+      cryptoWalletEnabled: systemConfig.cryptoWalletEnabled,
+      cryptoWalletAsset: systemConfig.cryptoWalletAsset,
+      cryptoWalletNetwork: systemConfig.cryptoWalletNetwork,
+      cryptoWalletAddress: systemConfig.cryptoWalletAddress,
+      cryptoWalletMemo: systemConfig.cryptoWalletMemo,
+    })
+    .from(systemConfig)
+    .where(eq(systemConfig.id, 1))
+    .limit(1);
+
+  const cfg = rows[0];
+  return {
+    paymentWhatsappNumber: cfg?.paymentWhatsappNumber || env.PAYMENT_WHATSAPP_NUMBER || "",
+    cryptoWalletEnabled: Boolean(cfg?.cryptoWalletEnabled ?? env.CRYPTO_WALLET_ENABLED),
+    cryptoWalletAsset: cfg?.cryptoWalletAsset || env.CRYPTO_WALLET_ASSET || "USDT",
+    cryptoWalletNetwork: cfg?.cryptoWalletNetwork || env.CRYPTO_WALLET_NETWORK || "TRC20",
+    cryptoWalletAddress: cfg?.cryptoWalletAddress || env.CRYPTO_WALLET_ADDRESS || "",
+    cryptoWalletMemo: cfg?.cryptoWalletMemo || env.CRYPTO_WALLET_MEMO || "",
+  };
+}
+
+function normalizeWhatsappNumber(value: string): string {
+  const digits = value.replace(/[^\d]/g, "");
+  if (digits.startsWith("00")) return digits.slice(2);
+  return digits;
+}
+
+function buildPaymentNotification(opts: {
+  method: string;
+  reference: string;
+  amountUsd: number;
+  payableLabel: string;
+  userEmail?: string;
+  settings: Awaited<ReturnType<typeof getManualPaymentSettings>>;
+}) {
+  const whatsappNumber = normalizeWhatsappNumber(opts.settings.paymentWhatsappNumber);
+  const whatsappMessage = [
+    "YapayZekaLab ödeme bildirimi",
+    `Yöntem: ${opts.method}`,
+    `Referans: ${opts.reference}`,
+    `Bakiye: $${opts.amountUsd.toFixed(2)}`,
+    `Ödeme: ${opts.payableLabel}`,
+    opts.userEmail ? `Hesap: ${opts.userEmail}` : null,
+  ].filter(Boolean).join("\n");
+
+  return {
+    whatsappNumber,
+    whatsappMessage,
+    whatsappUrl: whatsappNumber ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}` : null,
+  };
+}
+
 async function buildQuoteFromRequest(body: Record<string, unknown>) {
   const kur = await getPaymentKur();
   const rawAmountUsd = body.amountUsd ?? (body.miktarTL !== undefined ? Number(body.miktarTL) / kur : undefined);
@@ -119,7 +175,10 @@ router.get("/methods", userAuth, async (_req, res, next) => {
   try {
     const ibanEnabled = isIbanConfigured(env);
     const shopierEnabled = !!(env.SHOPIER_API_KEY && env.SHOPIER_API_SECRET);
-    const cryptomusEnabled = !!(env.CRYPTOMUS_MERCHANT_ID && env.CRYPTOMUS_API_KEY);
+    const settings = await getManualPaymentSettings();
+    const cryptomusProviderEnabled = !!(env.CRYPTOMUS_MERCHANT_ID && env.CRYPTOMUS_API_KEY);
+    const manualCryptoEnabled = settings.cryptoWalletEnabled && !!settings.cryptoWalletAddress.trim();
+    const cryptomusEnabled = cryptomusProviderEnabled || manualCryptoEnabled;
     const limits = await getPaymentLimits();
     const kur = await getPaymentKur();
     res.json({
@@ -137,6 +196,14 @@ router.get("/methods", userAuth, async (_req, res, next) => {
       cryptomus: {
         enabled: cryptomusEnabled,
         reason: cryptomusEnabled ? null : "Kripto ödeme yöntemi şu an kapalı.",
+        mode: cryptomusProviderEnabled ? "cryptomus_invoice" : (manualCryptoEnabled ? "manual_wallet" : "disabled"),
+        cryptoWalletAsset: settings.cryptoWalletAsset,
+        cryptoWalletNetwork: settings.cryptoWalletNetwork,
+        cryptoWalletAddress: manualCryptoEnabled ? settings.cryptoWalletAddress : "",
+        cryptoWalletMemo: manualCryptoEnabled ? settings.cryptoWalletMemo : "",
+      },
+      notification: {
+        paymentWhatsappNumber: normalizeWhatsappNumber(settings.paymentWhatsappNumber),
       },
       limits: {
         minBakiyeTL: Number(limits.minBakiyeTL),
@@ -346,6 +413,7 @@ router.post("/iban/init", userAuth, async (req, res, next) => {
 
     const userRows = await db.select({ email: users.email })
       .from(users).where(eq(users.id, req.user!.id)).limit(1);
+    const settings = await getManualPaymentSettings();
 
     // Create pending iban record
     await db.insert(pendingIbanPayments).values({
@@ -381,6 +449,14 @@ router.post("/iban/init", userAuth, async (req, res, next) => {
         ibanNumber: env.IBAN_NUMBER,
         owner: env.IBAN_OWNER,
       },
+      whatsapp: buildPaymentNotification({
+        method: "IBAN Havalesi",
+        reference: referansKodu,
+        amountUsd: quote.amountUsd,
+        payableLabel: `₺${quote.payableTL.toFixed(0)}`,
+        userEmail: userRows[0]?.email,
+        settings,
+      }),
       aciklama: `Havale açıklamasına mutlaka referans kodunuzu yazın: ${referansKodu}`,
     });
   } catch (e) { next(e); }
@@ -389,7 +465,10 @@ router.post("/iban/init", userAuth, async (req, res, next) => {
 // ── POST /api/payments/crypto/init ───────────────────────────────────────────
 router.post("/crypto/init", userAuth, async (req, res, next) => {
   try {
-    if (!env.CRYPTOMUS_MERCHANT_ID || !env.CRYPTOMUS_API_KEY) {
+    const settings = await getManualPaymentSettings();
+    const cryptomusProviderEnabled = !!(env.CRYPTOMUS_MERCHANT_ID && env.CRYPTOMUS_API_KEY);
+    const manualCryptoEnabled = settings.cryptoWalletEnabled && !!settings.cryptoWalletAddress.trim();
+    if (!cryptomusProviderEnabled && !manualCryptoEnabled) {
       res.status(503).json({ error: "Kripto ödeme yöntemi şu an kullanılamıyor." });
       return;
     }
@@ -401,11 +480,14 @@ router.post("/crypto/init", userAuth, async (req, res, next) => {
     }
 
     const kdv = calcKdv(quote.payableTL);
+    const userRows = await db.select({ email: users.email })
+      .from(users).where(eq(users.id, req.user!.id)).limit(1);
+    const manualReference = generateReferansKodu();
 
     // Create payment row first
     const inserted = await db.insert(payments).values({
       userId: req.user!.id,
-      metod: "cryptomus",
+      metod: cryptomusProviderEnabled ? "cryptomus" : "crypto_manual",
       miktarTL: String(quote.payableTL),
       kdvTL: String(kdv.kdvTL),
       netTL: String(kdv.netTL),
@@ -415,9 +497,36 @@ router.post("/crypto/init", userAuth, async (req, res, next) => {
       kurAtPayment: String(quote.kur),
       roundingTL: String(quote.roundingTL),
       durum: "bekliyor",
+      idempotencyKey: cryptomusProviderEnabled ? undefined : manualReference,
     }).returning({ id: payments.id });
 
     const paymentId = inserted[0].id;
+
+    if (!cryptomusProviderEnabled) {
+      res.json({
+        paymentId,
+        manual: true,
+        referansKodu: manualReference,
+        kdv,
+        quote,
+        cryptoWallet: {
+          asset: settings.cryptoWalletAsset,
+          network: settings.cryptoWalletNetwork,
+          address: settings.cryptoWalletAddress,
+          memo: settings.cryptoWalletMemo,
+        },
+        whatsapp: buildPaymentNotification({
+          method: `${settings.cryptoWalletAsset} ${settings.cryptoWalletNetwork}`,
+          reference: manualReference,
+          amountUsd: quote.amountUsd,
+          payableLabel: `$${quote.amountUsd.toFixed(2)} ${settings.cryptoWalletAsset}`,
+          userEmail: userRows[0]?.email,
+          settings,
+        }),
+        aciklama: `Transfer açıklaması/not alanı varsa referans kodunuzu yazın: ${manualReference}`,
+      });
+      return;
+    }
 
     // Create Cryptomus invoice
     const invoice = await createInvoice({ paymentId, amountUsd: quote.amountUsd });

@@ -34,6 +34,161 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-FIX-PAYMENT-INSTRUCTIONS-001
+Decision title: Show IBAN/crypto payment instructions and WhatsApp notification without changing the visual theme
+Decision type: Code/edit approval
+Related bug IDs: PAYMENT-INSTRUCTIONS-001, PAYMENT-UX-001
+Evidence from reports:
+- User screenshot shows `$25` IBAN top-up creates only a reference alert.
+- Source inspection confirms `/api/payments/iban/init` returns `iban.bankName`, `iban.ibanNumber`, `iban.owner`, `referansKodu`, `quote`, but `src/yapayzekalab/tab-account.jsx` ignores those fields and calls `window.alert`.
+- `/api/payments/methods` has no WhatsApp notification field and no manual crypto wallet instructions.
+- Admin UI has no payment settings section for WhatsApp notification number or crypto wallet/network/address.
+Files likely affected:
+- `src/payment-safety-contract.test.ts`
+- `src/server/db/schema.ts`
+- `src/server/db/seed.ts`
+- `src/server/db/migrations/0006_manual_payment_settings.sql`
+- `src/server/routes/admin.ts`
+- `src/server/routes/payments.ts`
+- `src/yapayzekalab/tab-account.jsx`
+- `src/yapayzekalab/tab-admin.jsx`
+- `.env.example`
+Risk level: Medium
+Design/template impact: Text/data/state only; no theme, color, spacing, class, button/card/modal style, page order, or layout rewrite is allowed.
+Security impact: Manual payment instructions must not auto-credit balance. WhatsApp message must contain only payment reference, amount, method and user-safe context. Provider secrets remain server-only and are not exposed in admin UI.
+Backend/API/billing impact: Adds non-secret manual payment config fields and returns instructions in existing payment endpoints. Shopier/Cryptomus signed callback/webhook credit behavior must remain unchanged.
+Proposed action:
+1. Write source-contract tests first for inline payment instructions, WhatsApp notification, and admin-configurable crypto wallet fields.
+2. Add additive `system_config` columns for non-secret manual payment settings.
+3. Include these fields in admin config serialization/update and payment methods response.
+4. Replace IBAN reference-only alert with an inline instruction panel using existing returned backend data.
+5. Support manual crypto instructions when admin wallet settings are enabled and Cryptomus provider env is absent; this creates a pending payment record but does not credit balance.
+6. Run targeted contract tests, full tests, lint/build/scans as approved.
+Agent 1 vote: APPROVE
+Agent 1 reason: The customer cannot complete a bank transfer without bank/IBAN/recipient/reference and a clear notification path.
+Agent 2 vote: APPROVE
+Agent 2 reason: Additive config and pending-payment-only manual crypto keeps billing safe while improving payment clarity.
+Agent 3 vote: APPROVE
+Agent 3 reason: Approved only because it preserves visual theme and does not expose provider API secrets or auto-credit manual payments.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Verify RED contract tests, then implement the minimal non-visual payment instruction fix.
+Status: IN_PROGRESS
+
+---
+
+Decision ID: DEC-CMD-PAYMENT-INSTRUCTIONS-RED-001
+Decision title: Run targeted payment safety contract as RED test
+Decision type: Command/test approval
+Related bug IDs: PAYMENT-INSTRUCTIONS-001, PAYMENT-UX-001
+Evidence from reports: New contract tests were added before production code changes to prove the missing payment-instruction behavior is covered.
+Files likely affected: None by command.
+Risk level: Low
+Design/template impact: None; test command only.
+Security impact: No provider call, no payment provider, no secret output expected.
+Backend/API/billing impact: No DB mutation, no live API call, no payment mutation.
+Proposed action: Run `npm test -- src/payment-safety-contract.test.ts`.
+Agent 1 vote: APPROVE
+Agent 1 reason: Targeted RED test is required before editing payment UI/backend code.
+Agent 2 vote: APPROVE
+Agent 2 reason: Static/source contract test does not touch DB or payment providers.
+Agent 3 vote: APPROVE
+Agent 3 reason: Safe command and supports visual/security gate.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Run the targeted RED test and record failure.
+Status: APPROVED
+
+---
+
+Decision ID: DEC-FIX-OAUTH-STATE-TEST-FLAKE-001
+Decision title: Make OAuth state tamper test deterministic
+Decision type: Test-only fix approval
+Related bug IDs: OAUTH-STATE-RESTART-001
+Evidence from reports:
+- Full `npm test` failed in `src/server/services/google-oauth-service.test.ts`.
+- Root cause: the test builds `tampered` by replacing the last character with `x`; if the signed state already ends in `x`, the tampered string is identical to the valid state.
+Files likely affected:
+- `src/server/services/google-oauth-service.test.ts`
+Risk level: Low
+Design/template impact: None.
+Security impact: Positive test accuracy only; no production OAuth behavior changes.
+Backend/API/billing impact: None; test-only change.
+Proposed action: Change the tamper helper to flip the final character to a different base64url-safe character.
+Agent 1 vote: APPROVE
+Agent 1 reason: Full regression must be deterministic before accepting payment changes.
+Agent 2 vote: APPROVE
+Agent 2 reason: Test-only correction does not affect auth implementation or billing.
+Agent 3 vote: APPROVE
+Agent 3 reason: It strengthens the security test without changing frontend/design.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Patch the OAuth state test only, then rerun targeted/full tests.
+Status: APPROVED
+
+---
+
+Decision ID: DEC-CMD-PAYMENT-INSTRUCTIONS-REGRESSION-001
+Decision title: Run local regression for manual payment instruction repair
+Decision type: Command/test approval
+Related bug IDs: PAYMENT-INSTRUCTIONS-001, PAYMENT-UX-001
+Evidence from reports: The targeted RED test failed before implementation and now passes after adding manual payment instruction behavior. Broader checks are required before accepting the fix.
+Files likely affected: None by commands except build artifacts.
+Risk level: Low
+Design/template impact: Commands verify source/build; no UI style edit expected.
+Security impact: Secret scan verifies no leaked provider/router/payment tokens.
+Backend/API/billing impact: Typecheck/tests verify payment/admin route changes without hitting payment providers.
+Proposed action: Run `npm run lint`, `npm test`, `npm run build`, `npm run scan:public`, and `node scripts/scan-secrets.mjs`.
+Agent 1 vote: APPROVE
+Agent 1 reason: Payment UX change needs full local regression and build verification.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend/schema/admin/payment route changes require typecheck and full tests.
+Agent 3 vote: APPROVE
+Agent 3 reason: Secret and public bundle scans are mandatory because payment/provider areas were touched.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Run the local regression commands and record results.
+Status: APPROVED
+
+---
+
+Decision ID: DEC-RETEST-PAYMENT-INSTRUCTIONS-001
+Decision title: Accept local manual payment instruction repair
+Decision type: Retest acceptance
+Related bug IDs: PAYMENT-INSTRUCTIONS-001, PAYMENT-UX-001
+Evidence from reports:
+- RED test failed before implementation: `npm test -- src/payment-safety-contract.test.ts` failed on missing `paymentInstruction` and manual payment config fields.
+- GREEN targeted test passed after implementation: `npm test -- src/payment-safety-contract.test.ts` PASS 8/8.
+- Targeted OAuth/payment tests PASS 10/10.
+- Full regression passed: `npm run lint`, `npm test` 29 files / 130 tests, `npm run build`, `npm run scan:public`, `node scripts/scan-secrets.mjs`, and `npm run qa:uat` 10/10.
+Files likely affected:
+- `src/server/db/schema.ts`
+- `src/server/db/seed.ts`
+- `src/server/db/migrations/0006_manual_payment_settings.sql`
+- `src/server/routes/admin.ts`
+- `src/server/routes/payments.ts`
+- `src/yapayzekalab/tab-account.jsx`
+- `src/yapayzekalab/tab-admin.jsx`
+- `.env.example`
+- reports/tests
+Risk level: Medium
+Design/template impact: Preserved locally; frontend touched only with existing style tokens/patterns. Live visual retest required after deploy.
+Security impact: Provider API secrets are not exposed; manual crypto/IBAN do not auto-credit balance; WhatsApp message uses non-secret payment reference/amount/method context.
+Backend/API/billing impact: Additive migration required before deploy. Manual crypto creates pending payment instructions only; provider Cryptomus webhook behavior unchanged.
+Proposed action: Mark local fix accepted, keep launch/deploy blocked until migration, admin config, live Chrome payment UAT, and four-agent deploy gate are complete.
+Agent 1 vote: APPROVE_FOR_LOCAL_FIX
+Agent 1 reason: The reported user failure is addressed locally and smoke passed across desktop/mobile routes.
+Agent 2 vote: APPROVE_WITH_MIGRATION_REQUIRED_BEFORE_DEPLOY
+Agent 2 reason: Backend behavior is safe locally, but new `system_config` columns must exist before live service restart.
+Agent 3 vote: APPROVE_WITH_LIVE_VISUAL_AND_PAYMENT_UAT_REQUIRED
+Agent 3 reason: Visual lock is preserved locally and secret scan is clean; release remains blocked pending live retest.
+Approval count: 3/3
+Final decision: LOCAL_FIX_ACCEPTED_RELEASE_BLOCKED
+Allowed next action: Prepare deploy plan only after four-agent gate is available or explicitly overridden.
+Status: COMPLETED
+
+---
+
 Decision ID: DEC-FIX-OAUTH-RETURN-001
 Decision title: Persist Google OAuth return tokens and map `/dashboard` to account without changing the visual shell
 Decision type: Code/edit approval
