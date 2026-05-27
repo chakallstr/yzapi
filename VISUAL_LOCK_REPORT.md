@@ -73,4 +73,6 @@ Visual diff notes:
 - The restored old visual shell keeps its existing colors, layout, typography, card/modal/button styles and responsive behavior.
 - The latest change was text/data-only: fake live/demo claims were replaced with placeholder wording.
 - The follow-up CSS cleanup removed the rejected global template stylesheet and unused Tailwind dependency wiring; the old shell's own `tokens.css` remains.
-- Live deploy was not performed in this pass.
+- Live deploy performed to the real active service `/opt/turkapiprojesi` as deploy ID `manual-20260527T064341Z-6021b8e`.
+- Live visual/browser smoke after deploy: old YapayZekaLab hero visible, anonymous Admin hidden, rejected template absent, fake-live claim absent, Tailwind/Inter template CSS absent.
+- Live public bundle scan after deploy found no forbidden template/admin-password/fake-live fingerprints.

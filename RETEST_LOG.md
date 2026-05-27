@@ -190,3 +190,49 @@ Agent 2 retest vote: APPROVE
 Agent 3 retest vote: APPROVE_WITH_DEV_FOLLOWUP
 Approval count: 3/3
 Final retest status: PRODUCTION_AUDIT_PASS_DEV_MODERATE_FOLLOWUP
+
+## LIVE-DEPLOY-RESTORED-THEME-001 Live Deploy Retest
+
+Bug ID: LIVE-DEPLOY-RESTORED-THEME-001, DESIGN-REGRESSION-001, DESIGN-CSS-001, UX-FAKE-LIVE-001, R-BUG-009
+Fix decision ID: DEC-LIVE-DEPLOY-RESTORED-THEME-001
+Retest decision ID: DEC-RETEST-LIVE-DEPLOY-RESTORED-THEME-001
+Command or manual flow:
+- Fresh local `npm run lint`
+- Fresh local `npm test`
+- Fresh local `npm run build`
+- Fresh local `npm run scan:public`
+- Fresh local `node scripts/scan-secrets.mjs`
+- Fresh local `npm audit --omit=dev --json`
+- Fresh local `npm run qa:uat`
+- Corrected rollback deploy to `/opt/turkapiprojesi`, service `turkapiprojesi.service`
+- Live `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`
+- Live `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`
+- Live `/v1/models`, `/v1/providers`, `/v1/models/count`, unknown `/v1/*`, authless `/v1/chat/completions`
+- Live bundle forbidden-fingerprint scan
+- Browser visual/admin anonymous smoke
+Expected:
+- Deploy uses the real active service, not inactive `/opt/yapayzekalab`.
+- Rollback script restores from the timestamped backup directory, not `/dist`.
+- Live site shows the restored approved theme.
+- Rejected template, admin password UI, fake live claim, Tailwind/template CSS fingerprints are absent.
+- Anonymous Admin remains hidden.
+- Live smoke and UAT pass.
+Actual:
+- Deploy ID `manual-20260527T064341Z-6021b8e` completed; service returned `active`.
+- Rollback file: `/opt/turkapiprojesi/.deploy/rollback-manual-20260527T064341Z-6021b8e.sh`.
+- Local lint PASS; tests PASS 27/27 files and 114/114 tests; build PASS with existing chunk warning only; public scan hits `[]`; secret scan hits `[]`; production audit vulnerabilities total `0`; local UAT 10/10.
+- Live smoke PASS for `/health`, `/status`, `/api/models`, authless `/v1/chat/completions` 401, unknown `/api/*` and `/v1/*` JSON 404. Successful funded/low-balance key smoke was skipped because no safe key env was present.
+- Live UAT 10/10, report `qa-artifacts/uat-smoke-2026-05-27T06-44-24-709Z/uat-smoke-report.md`.
+- Live public `/v1/models`, `/v1/providers`, `/v1/models/count` returned 200 JSON; unknown `/v1/__missing_template_check__` returned JSON 404.
+- Live bundle forbidden-fingerprint scan found `[]`.
+- Browser visual smoke: old YapayZekaLab hero visible, rejected dashboard/template absent, anonymous Admin hidden, fake-live claim absent.
+Passed/Failed: Passed for live deploy/theme/API smoke; release still blocked for successful funded billing/payment E2E.
+Evidence:
+- Deploy ID `manual-20260527T064341Z-6021b8e`
+- Live UAT report `qa-artifacts/uat-smoke-2026-05-27T06-44-24-709Z/uat-smoke-report.md`
+- Live bundle asset scan returned `hits: []`
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE_WITH_BILLING_GAP
+Agent 3 retest vote: APPROVE_WITH_RELEASE_BLOCKER
+Approval count: 3/3
+Final retest status: LIVE_DEPLOY_PASS_RELEASE_BLOCKED_BY_BILLING_PAYMENT_E2E

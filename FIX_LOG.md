@@ -78,8 +78,8 @@ Operasyon tarihi: 2026-05-26
 - Karar: DEC-FIX-001 ve DEC-FIX-001A, 3/3 APPROVED.
 - Yapılan değişiklik: Public read-only `/v1` catalog router eklendi; payload müşteri-facing computed fiyat/availability üzerinden üretilecek şekilde düzeltildi. Authenticated `/v1` proxy, billing, images/videos ve unknown JSON 404 davranışı değiştirilmedi.
 - Test: `src/server/routes/v1-catalog.test.ts`
-- Retest: Targeted test PASS; lint/test/build PASS; public scan pending.
-- Sonuç: FIXED LOCAL / FULL LIVE ROUTE SMOKE PENDING.
+- Retest: Targeted test PASS; lint/test/build PASS; live `/v1/models`, `/v1/providers`, `/v1/models/count` 200 JSON; unknown `/v1/*` JSON 404.
+- Sonuç: FIXED LIVE.
 
 ## ADMIN-GOOGLE-001
 
@@ -109,8 +109,8 @@ Operasyon tarihi: 2026-05-26
 - Karar: DEC-FIX-DESIGN-RESTORE-001, 3/3 APPROVED.
 - Yapılan değişiklik: Eski onaylı YapayZekaLab görsel shell'i `src/yapayzekalab/` altında aktif kaynak olarak restore edildi; `src/App.tsx` sadece route-to-tab wrapper oldu. Reddedilen bilimsel/dashboard/template fingerprintleri `src/rejected-template-guard.test.ts`, `vite.config.ts` ve `scripts/scan-public-bundle.mjs` ile engelleniyor. Ayrı admin şifresi geri getirilmedi; admin görünürlüğü allowlisted Google/user session mantığında kaldı.
 - Test: `src/rejected-template-guard.test.ts`; `npm test`; `npm run lint`; `npm run build`; `npm run scan:public`; `node scripts/scan-secrets.mjs`; lokal `qa:uat`; Playwright browser smoke.
-- Retest: 27 test file / 111 test PASS; lint PASS; build PASS; public bundle scan 0 hit; secret scan 0 hit; lokal UAT smoke 10/10 PASS. Browser smoke: eski hero var, reddedilen template yok, anonim Admin görünmüyor.
-- Sonuç: FIXED LOCAL. Canlı deploy hâlâ ayrı backup/live smoke gate gerektirir.
+- Retest: 27 test file / 114 test PASS; lint PASS; build PASS; public bundle scan 0 hit; secret scan 0 hit; lokal UAT smoke 10/10 PASS. Live deploy sonrası smoke/UAT PASS; canlı browser smoke eski hero var, reddedilen template yok, anonim Admin görünmüyor.
+- Sonuç: FIXED LIVE.
 
 ## UX-FAKE-LIVE-001
 
@@ -119,8 +119,8 @@ Operasyon tarihi: 2026-05-26
 - Karar: DEC-FIX-UX-FAKE-LIVE-001, 3/3 APPROVED.
 - Yapılan değişiklik: Yalnızca metin/veri değişti; playground `örnek akış`, fake key `yzk_live_YOUR_KEY`, onboarding çağrısı `örnek yanıt` olarak netleştirildi. CSS, layout, class, renk, kart/modal/button stili değişmedi.
 - Test: `npm test -- src/api-docs-content.test.ts`; `npm run lint`; `npm test`; `npm run build`; `npm run scan:public`; `node scripts/scan-secrets.mjs`; `npm run qa:uat`; Playwright browser smoke.
-- Retest: Targeted docs/content test PASS 5/5; full regression PASS; browser smoke fake-live claim yok.
-- Sonuç: FIXED LOCAL.
+- Retest: Targeted docs/content test PASS 5/5; full regression PASS; live bundle fingerprint scan 0 hit; canlı browser smoke fake-live claim yok.
+- Sonuç: FIXED LIVE.
 
 ## DESIGN-CSS-001
 
@@ -129,8 +129,8 @@ Operasyon tarihi: 2026-05-26
 - Karar: DEC-FIX-DESIGN-CSS-001, 3/3 APPROVED.
 - Yapılan değişiklik: Guard testine leftover template CSS fingerprintleri eklendi; `src/main.tsx` içindeki `./index.css` import’u kaldırıldı; `src/index.css` silindi; `@tailwindcss/vite` ve `tailwindcss` dependency/config wiring kaldırıldı. Eski tema `src/yapayzekalab/tokens.css` ile çalışmaya devam ediyor.
 - Test: `npm test -- src/rejected-template-guard.test.ts`; `npm run lint`; `npm test`; `npm run build`; `npm run scan:public`; `node scripts/scan-secrets.mjs`; `npm run qa:uat`; Playwright browser CSS smoke.
-- Retest: Guard PASS 7/7; full regression PASS 27 files / 114 tests; build CSS 6.42 kB; public/secret scan 0 hit; UAT 10/10; browser CSS smoke Tailwind/Inter template CSS yok.
-- Sonuç: FIXED LOCAL.
+- Retest: Guard PASS 7/7; full regression PASS 27 files / 114 tests; build CSS 6.42 kB; public/secret scan 0 hit; local/live UAT 10/10; live bundle/template scan hit yok; browser CSS smoke Tailwind/Inter template CSS yok.
+- Sonuç: FIXED LIVE.
 
 ## SECURITY-DEPS-001
 
@@ -141,3 +141,15 @@ Operasyon tarihi: 2026-05-26
 - Test: `npm audit --omit=dev --json`; `npm run lint`; `npm test`; `npm run build`; `npm run scan:public`; `node scripts/scan-secrets.mjs`; `npm run qa:uat`.
 - Retest: Production audit 0 vulnerability; full regression PASS 27 files / 114 tests; build/scans/UAT PASS. Genel `npm audit` hâlâ dev-only `drizzle-kit` zincirinde 4 moderate raporluyor; production runtime audit temiz.
 - Sonuç: FIXED FOR PRODUCTION RUNTIME / DEV-ONLY MODERATE FOLLOW-UP.
+
+## LIVE-DEPLOY-RESTORED-THEME-001
+
+- Problem: Restore edilmiş eski tema ve template guard düzeltmeleri canlıya alınmadan kullanıcı tarafında reddedilen template riski devam ediyordu.
+- Kök neden: Gerçek canlı hedef `/opt/turkapiprojesi` git checkout değil; generic `scripts/vps-deploy.sh` `/opt/yapayzekalab` varsayılanıyla bu canlı servis için yanlış hedefe bakıyor. Önceki manuel rollback scriptinde backup değişkeni kullanılmadığı için `/dist` gibi hatalı path vardı.
+- Karar: DEC-LIVE-DEPLOY-RESTORED-THEME-001, 3/3 APPROVED.
+- Yapılan değişiklik: Kod değişmedi; taze doğrulanmış `dist/`, `package.json`, `package-lock.json` canlı `/opt/turkapiprojesi` hedefine yedekli olarak yüklendi. Doğru PostgreSQL 14 `pg_dump` ile DB backup alındı, yeni düzgün rollback scripti üretildi, `turkapiprojesi.service` restart edildi.
+- Deploy ID: `manual-20260527T064341Z-6021b8e`.
+- Rollback: `/opt/turkapiprojesi/.deploy/rollback-manual-20260527T064341Z-6021b8e.sh`.
+- Test: `npm run lint`; `npm test`; `npm run build`; `npm run scan:public`; `node scripts/scan-secrets.mjs`; `npm audit --omit=dev --json`; `npm run qa:uat`; live `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`; live `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`; live bundle fingerprint scan; browser visual/admin anonymous smoke.
+- Retest: Local verification PASS; production audit 0; live smoke PASS; live UAT 10/10 PASS; live `/v1` catalog PASS; live rejected-template bundle hits `[]`; browser: eski tema görünüyor, anonim Admin gizli, admin parola/rejected template/fake live claim yok.
+- Sonuç: FIXED LIVE. Full release hâlâ successful funded billing ve payment provider E2E kanıtına bağlı.

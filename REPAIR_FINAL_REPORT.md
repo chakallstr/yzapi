@@ -15,6 +15,8 @@ Post-QA repair intake, triage and phase planning files were created. The old app
 - Leftover rejected global template CSS (`src/index.css`) and unused Tailwind dependency wiring were removed; the restored old shell uses `src/yapayzekalab/tokens.css`.
 - Production dependency audit was cleaned by upgrading `drizzle-orm`/`uuid` and removing obsolete Tailwind/uuid type wiring.
 - Full local regression passed after the latest text/data-only change.
+- Restored-theme build was deployed live to the real active service `/opt/turkapiprojesi` with deploy ID `manual-20260527T064341Z-6021b8e` and a corrected rollback script.
+- Live smoke, live UAT, live `/v1` catalog checks, live bundle fingerprint scan and browser visual/admin anonymous checks passed after deploy.
 
 ## Files Read
 
@@ -43,7 +45,7 @@ Key QA inputs included `QA_FINAL_REPORT.md`, `QA_REPORT.md`, `60_MINUTE_SITE_TES
 - `R-BUG-006`: Successful funded API billing flow blocked by missing safe test key/upstream env.
 - `R-BUG-007`: Shopier/Cryptomus E2E blocked by missing rotated sandbox credentials.
 - `R-BUG-008`: Admin full browser click-through/audit coverage still partial.
-- `R-BUG-009`: Live deploy drift still pending deploy and live smoke.
+- `R-BUG-009`: Live deploy drift fixed for the restored-theme bundle; live smoke/UAT passed after deploy.
 - `R-BUG-010`: Favicon/static cleanup and screenshot baseline remain low-priority pending.
 
 ## Commands Run
@@ -62,7 +64,12 @@ Key QA inputs included `QA_FINAL_REPORT.md`, `QA_REPORT.md`, `60_MINUTE_SITE_TES
 - Latest `node scripts/scan-secrets.mjs`: PASS, 226 scanned / 0 hits.
 - Latest `npm run qa:uat`: PASS, 10/10, report `qa-artifacts/uat-smoke-2026-05-27T06-34-09-399Z/uat-smoke-report.md`.
 - Latest `npm audit --omit=dev --json`: PASS, 0 vulnerabilities.
-- Live `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`: not rerun after the latest local restore/text cleanup in this pass; deploy/live gate remains pending.
+- Live deploy: `manual-20260527T064341Z-6021b8e`, service `turkapiprojesi.service`, rollback `/opt/turkapiprojesi/.deploy/rollback-manual-20260527T064341Z-6021b8e.sh`.
+- Live `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`: PASS for health/status/models/authless/JSON-404 checks; funded and low-balance key checks skipped because safe key env was absent.
+- Live `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`: PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T06-44-24-709Z/uat-smoke-report.md`.
+- Live `/v1/models`, `/v1/providers`, `/v1/models/count`: 200 JSON; unknown `/v1/*`: JSON 404; authless `/v1/chat/completions`: 401 JSON.
+- Live bundle forbidden-fingerprint scan: 0 hits.
+- Live browser visual smoke: restored old hero visible, anonymous Admin hidden, rejected template and fake-live claim absent.
 
 ## Files Changed
 
@@ -94,22 +101,21 @@ No final local command failed after the latest fixes. Earlier targeted tests fai
 
 ## Retest Results
 
-`R-BUG-001`, `R-BUG-004`, `R-BUG-005`, `DESIGN-REGRESSION-001`, `UX-FAKE-LIVE-001`, `PUBLIC-CONFIG-001`, `STATIC-FAVICON-001`, `DESIGN-CSS-001`, and `SECURITY-DEPS-001` are locally fixed and retested. Live deploy smoke still needs a separate gated run.
+`R-BUG-001`, `R-BUG-004`, `R-BUG-005`, `R-BUG-009`, `DESIGN-REGRESSION-001`, `UX-FAKE-LIVE-001`, `PUBLIC-CONFIG-001`, `STATIC-FAVICON-001`, `DESIGN-CSS-001`, `SECURITY-DEPS-001`, and `LIVE-DEPLOY-RESTORED-THEME-001` are fixed and retested locally/live where applicable.
 
 ## Design Preservation Result
 
-PASS locally: old visual shell restored; latest changes were text/data/backend/guard only. No CSS/class/layout/theme/button/card/modal styling was changed.
+PASS locally and live: old visual shell restored; latest changes were text/data/backend/guard only. No CSS/class/layout/theme/button/card/modal styling was changed. Live browser and bundle scans show the rejected template is absent.
 
 ## Remaining Risks
 
-The product is still not launch-ready because real billing, payment provider E2E, Google OAuth callback, admin browser UAT and live deploy smoke are not complete.
+The product is still not launch-ready because successful funded API billing and payment provider E2E remain unproven. Standard Chrome automation was unavailable in this Codex session, so post-deploy admin/OAuth was not re-run in the user's existing Chrome profile during this pass; anonymous admin exposure was verified live.
 
 General `npm audit` still reports 4 moderate dev-only advisories under `drizzle-kit`/nested esbuild. Production runtime audit is clean, so this is not the current launch-blocking high advisory, but it should stay tracked.
 
 ## Recommended Next Steps
 
-1. Run prod-like local or staging smoke for actual `GET /v1/models`, `/v1/providers`, `/v1/models/count` with DB available.
-2. Capture baseline screenshots before touching `src/App.tsx` for docs/video text-only fixes.
-3. Complete funded key billing and low-balance tests with safe test credentials.
-4. Complete Shopier/Cryptomus sandbox E2E with rotated credentials.
-5. GitHub backup, deploy approval, then live `qa:uat` and API smoke.
+1. Complete funded key billing and low-balance tests with safe `SMOKE_API_KEY` / `SMOKE_LOW_BALANCE_API_KEY`.
+2. Complete Shopier/Cryptomus sandbox E2E with rotated credentials and duplicate/invalid callback checks.
+3. Re-run Google OAuth/admin browser UAT in the user's standard Chrome profile when Chrome automation is available.
+4. Keep deploy rollback `manual-20260527T064341Z-6021b8e` available until billing/payment gates pass.

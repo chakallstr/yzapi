@@ -34,6 +34,78 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-LIVE-DEPLOY-RESTORED-THEME-001
+Decision title: Deploy restored approved theme to the real live service with corrected rollback
+Decision type: Deploy approval
+Related bug IDs: DESIGN-REGRESSION-001, R-BUG-009, DESIGN-CSS-001, UX-FAKE-LIVE-001
+Evidence from reports: The restored approved theme, rejected-template guards, fake-live copy cleanup and Tailwind/template CSS removal passed local lint/tests/build/scans/UAT. Read-only VPS inspection confirmed the real live service is `turkapiprojesi.service` with `WorkingDirectory=/opt/turkapiprojesi`; `/opt/yapayzekalab` is not the active service. Existing preflight also showed `/opt/turkapiprojesi` is not a git checkout, so the generic git-based deploy script must not be run blindly. Existing rollback script path from the previous manual deploy is malformed and must be replaced for this deploy.
+Files likely affected: Local `dist/` build artifacts, remote `/opt/turkapiprojesi/dist`, remote `/opt/turkapiprojesi/package.json`, remote `/opt/turkapiprojesi/package-lock.json`, remote `/opt/turkapiprojesi/.deploy/*`.
+Risk level: High
+Design/template impact: Intended live update of the restored approved theme only; no new redesign or template changes.
+Security impact: Must not print or copy `.env.production`; must not print provider/payment/API secrets; must keep anonymous Admin hidden and separate admin password removed.
+Backend/API/billing impact: Live service restart; no DB migration planned for this deploy; payment/provider billing tests remain separate gates.
+Proposed action: Run fresh local predeploy verification, create a remote timestamped backup of current live `dist` and package files, generate a corrected rollback script that restores from that backup path, upload the freshly built local `dist` and package lockfiles to `/opt/turkapiprojesi`, fix ownership to `turkapi:turkapi`, restart `turkapiprojesi.service`, then run live smoke and browser/template checks. If smoke fails, run the corrected rollback script and record the failure.
+Agent 1 vote: APPROVE
+Agent 1 reason: The user-facing rejected template must be removed from live; deployment is acceptable only with post-deploy visual/UAT checks.
+Agent 2 vote: APPROVE
+Agent 2 reason: No schema migration is planned; route/build changes need live smoke, and rollback protects the active service.
+Agent 3 vote: APPROVE
+Agent 3 reason: Approved only because this uses the real active service, avoids secrets, and includes corrected rollback before restart.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Execute fresh verification, then perform the corrected manual live deploy to `/opt/turkapiprojesi`.
+Status: APPROVED
+
+---
+
+Decision ID: DEC-RETEST-LIVE-DEPLOY-RESTORED-THEME-001
+Decision title: Accept live restored-theme deploy and template removal retest
+Decision type: Retest acceptance
+Related bug IDs: DESIGN-REGRESSION-001, DESIGN-CSS-001, UX-FAKE-LIVE-001, R-BUG-001, R-BUG-009
+Evidence from reports: Fresh local verification passed (`lint`, 114 Vitest tests, build, public scan, secret scan, production audit, local UAT). Live deploy `manual-20260527T064341Z-6021b8e` completed on real service `turkapiprojesi.service`. Live smoke and live UAT passed; live `/v1` catalog endpoints returned JSON 200; unknown `/v1/*` returned JSON 404; authless gateway returned JSON 401; live bundle scan returned no rejected template/admin-password/fake-live hits; browser smoke showed old hero and anonymous Admin hidden.
+Files likely affected: Remote `/opt/turkapiprojesi/dist`, remote package files, report files.
+Risk level: Medium
+Design/template impact: Positive; live restored approved shell is active and rejected template is absent.
+Security impact: No secrets printed or committed; anonymous admin exposure check passed; logged-in standard Chrome admin recheck remains blocked by unavailable Chrome automation.
+Backend/API/billing impact: Public and authless gateway smoke passed; funded billing/payment E2E still not accepted.
+Proposed action: Mark the deploy/theme retest accepted while keeping final release blocked by successful funded billing and payment provider E2E.
+Agent 1 vote: APPROVE
+Agent 1 reason: User-facing live theme is restored, template is absent, live UAT passed.
+Agent 2 vote: APPROVE_WITH_BILLING_GAP
+Agent 2 reason: API catalog/authless behavior passed live, but successful funded billing remains a release blocker.
+Agent 3 vote: APPROVE_WITH_RELEASE_BLOCKER
+Agent 3 reason: Visual/security guard passed for anonymous/live bundle; final release must remain blocked until billing/payment evidence exists.
+Approval count: 3/3
+Final decision: APPROVED FOR DEPLOY RETEST ONLY
+Allowed next action: Continue billing/payment/admin-session validation; do not mark production ready.
+Status: COMPLETED
+
+---
+
+Decision ID: DEC-CMD-LIVE-PREDEPLOY-001
+Decision title: Run fresh local predeploy verification before live restore deploy
+Decision type: Command/test approval
+Related bug IDs: DESIGN-REGRESSION-001, R-BUG-009, DESIGN-CSS-001, UX-FAKE-LIVE-001
+Evidence from reports: Verification-before-completion requires fresh evidence before deploy/readiness claims.
+Files likely affected: `dist/` and QA artifacts may be regenerated.
+Risk level: Low
+Design/template impact: Build verifies restored theme bundle; no source styling change.
+Security impact: Secret/public scans required before upload.
+Backend/API/billing impact: Local tests only; no paid provider or live DB mutation.
+Proposed action: Run `npm run lint`, `npm test`, `npm run build`, `npm run scan:public`, `node scripts/scan-secrets.mjs`, `npm audit --omit=dev --json`, and `npm run qa:uat`.
+Agent 1 vote: APPROVE
+Agent 1 reason: Required for current local evidence before deploy.
+Agent 2 vote: APPROVE
+Agent 2 reason: Confirms backend/API/payment guards without mutating production data.
+Agent 3 vote: APPROVE
+Agent 3 reason: Public/secret scans are mandatory before upload.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Run the listed local verification commands.
+Status: APPROVED
+
+---
+
 Decision ID: DEC-FIX-SEC-DEPS-001
 Decision title: Upgrade vulnerable production/dev dependencies without force fixing
 Decision type: Dependency/security fix approval
