@@ -757,6 +757,36 @@ Final retest status: ACCEPTED_LIVE_MANUAL_PAYMENT_CONFIG
 
 Agent 4 integrity guard: APPROVE
 
+## SHOPIER-SETUP-001 Provider Setup Guard Retest
+
+Bug ID: R-BUG-007
+Fix decision ID: DEC-SHOPIER-SETUP-001
+Retest decision ID: DEC-RETEST-SHOPIER-SETUP-001
+Command or manual flow:
+- Read-only Shopier panel inspection for developer app/OSB status.
+- Official Shopier help/docs review for API, PAT and OSB/webhook distinction.
+- Added `SHOPIER_INTEGRATION_STATUS.md` and clarified `.env.example`.
+- Ran `npm test -- src/server/services/shopier-service.test.ts src/payment-safety-contract.test.ts src/server/services/payment-pricing.test.ts`.
+- Ran `node scripts/scan-secrets.mjs`.
+Expected:
+- Dynamic amount support remains covered by tests.
+- PAT/JWT is not documented as legacy checkout `SHOPIER_API_KEY`.
+- Existing OSB-dependent service is not overwritten.
+- No real payment/provider mutation occurs.
+Actual:
+- Targeted tests PASS: 3 files / 21 tests.
+- Secret scan PASS: 233 scanned / 0 hits.
+- Shopier remains disabled until safe legacy credentials plus callback or modern webhook support are verified.
+Passed/Failed: Passed for provider setup guard; provider E2E still blocked.
+Evidence: Current session command output and `SHOPIER_INTEGRATION_STATUS.md`.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: ACCEPTED_GUARD_PROVIDER_E2E_BLOCKED
+
+Agent 4 integrity guard: APPROVE
+
 ## LIVE-PAYMENT-PHONE-002 Live WhatsApp Payment Number Recheck
 
 Bug ID: PAYMENT-INSTRUCTIONS-001

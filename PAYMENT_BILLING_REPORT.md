@@ -222,6 +222,19 @@ Not: Bu recheck gerçek para, Shopier/Cryptomus provider çağrısı veya bakiye
 
 ---
 
+# Shopier Provider Setup Finding — 2026-05-28 00:10 TRT
+
+| Alan | Sonuç | Kanıt |
+|---|---|---|
+| Dynamic amount support | PASS LOCAL | Current code sends rounded TRY `total_order_value` to legacy Shopier checkout form; no fixed package is required |
+| PAT/JWT suitability | BLOCKED | PAT is for Shopier account API access, not confirmed as legacy checkout `API_key` / `API_secret`; do not put PAT into `SHOPIER_API_KEY` |
+| OSB callback safety | BLOCKED | Shopier OSB is legacy and current panel has an existing notification URL for another service; do not overwrite without a safe fan-out or separate YapayZekaLab callback path |
+| Modern webhook path | PLANNED | Requires official webhook payload/signature contract and a new verified backend route before enabling |
+
+Detailed plan: `SHOPIER_INTEGRATION_STATUS.md`.
+
+---
+
 # Local Provider Callback Hardening — 2026-05-27 20:52 TRT
 
 ## Eklenen Güvenlik Korumaları

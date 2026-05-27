@@ -34,6 +34,30 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-SHOPIER-SETUP-001
+Decision title: Keep Shopier disabled until safe credential and callback path is confirmed
+Decision type: Provider setup / release gate
+Related bug IDs: R-BUG-007, PAYMENT-INSTRUCTIONS-001
+Evidence from reports: Current code supports dynamic USD top-up converted to rounded TRY Shopier form fields. Official Shopier help distinguishes PAT/account API access from checkout form credentials, and the panel OSB page marks OSB as legacy. Chrome panel inspection found the existing OSB notification URL configured for another service, so overwriting it could break that service.
+Files likely affected: `.env.example`, `SHOPIER_INTEGRATION_STATUS.md`, `PAYMENT_BILLING_REPORT.md`, `AGENT_REPAIR_DECISIONS.md`
+Risk level: High if enabled blindly; low for documentation-only update.
+Design/template impact: None.
+Security impact: Positive; prevents leaked PAT/JWT from being misused as legacy checkout credentials.
+Backend/API/billing impact: Shopier remains disabled until a verified provider path is available; manual IBAN/manual crypto remain active.
+Proposed action: Document the safe Shopier paths, clarify `.env.example`, and keep provider E2E blocked until legacy credentials plus safe callback or modern webhook support are verified.
+Agent 1 vote: APPROVE
+Agent 1 reason: User-facing Shopier button should stay disabled instead of presenting an unverified payment path.
+Agent 2 vote: APPROVE
+Agent 2 reason: Billing safety requires verified amount/currency/signature/idempotency before automatic credit.
+Agent 3 vote: APPROVE
+Agent 3 reason: Avoids credential misuse and avoids breaking the existing OSB-dependent service.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Search for true legacy checkout credentials or implement modern webhook support only after provider contract is confirmed.
+Status: COMPLETED
+
+---
+
 Decision ID: DEC-RETEST-LIVE-PAYMENT-PHONE-002
 Decision title: Accept live WhatsApp payment phone recheck
 Decision type: Retest acceptance
