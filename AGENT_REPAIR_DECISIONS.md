@@ -34,6 +34,102 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-CMD-GIT-BACKUP-PROVIDER-INCIDENT-001
+Decision title: Commit and push provider incident/report-only updates
+Decision type: Command approval
+Related bug IDs: R-BUG-006
+Evidence from reports: Provider diagnostics add launch-blocking evidence and request ids for support escalation. Secret scan returned zero hits and diff is report-only.
+Files likely affected: Git metadata and remote branch `phase/release-vps-beta`.
+Risk level: Low
+Design/template impact: None.
+Security impact: Secret scan passed; no provider keys or payment credentials are included.
+Backend/API/billing impact: None; report-only backup.
+Proposed action: Commit report-only provider incident updates and push to origin for rollback/audit continuity.
+Agent 1 vote: APPROVE
+Agent 1 reason: QA evidence should be backed up before the next loop.
+Agent 2 vote: APPROVE
+Agent 2 reason: The incident report documents the billing blocker without changing runtime code.
+Agent 3 vote: APPROVE
+Agent 3 reason: Backup is safe after secret scan and avoids losing launch-blocker evidence.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Run git add/commit/push for report-only provider incident updates.
+Status: APPROVED
+
+---
+
+Decision ID: DEC-CMD-LIVE-CLOSEROUTER-DIAGNOSTICS-002
+Decision title: Re-read live CloseRouter catalog and attempt one bounded tiny text inference
+Decision type: Command/test approval
+Related bug IDs: R-BUG-006
+Evidence from reports: Latest live checks show `/credits` and `/models/count` pass, but tiny text inference timed out across several model IDs. Successful funded API billing cannot be accepted until at least one upstream text inference succeeds.
+Files likely affected: None by command; report files may be updated afterward.
+Risk level: Medium
+Design/template impact: None.
+Security impact: Must not print Authorization values, cookies, raw API keys, or env files. Only model IDs, status codes, timing and non-secret error codes may be printed.
+Backend/API/billing impact: Direct provider call may spend a tiny amount only if successful; max output is capped at 4 tokens and testing stops on first success or bounded failures. No database or payment mutation.
+Proposed action: From the live VPS env, read CloseRouter base URL and key without printing the key, fetch current text model catalog, choose current chat-capable low-cost candidates, then try tiny `/chat/completions` calls with `max_tokens <= 4` under timeout. Do not test images/videos.
+Agent 1 vote: APPROVE
+Agent 1 reason: This directly addresses the remaining first API call launch blocker and keeps user-facing UI untouched.
+Agent 2 vote: APPROVE
+Agent 2 reason: It separates model-ID drift from upstream/provider failure with bounded spend and no DB mutation.
+Agent 3 vote: APPROVE
+Agent 3 reason: Approved only with strict secret redaction and no image/video/payment calls.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Run live CloseRouter bounded diagnostic.
+Status: APPROVED
+
+---
+
+Decision ID: DEC-RETEST-LIVE-BILLING-DIAGNOSTICS-002
+Decision title: Is successful live API billing unblocked after current catalog and messages diagnostics?
+Decision type: Retest acceptance
+Related bug IDs: R-BUG-006
+Evidence from reports: Live VPS CloseRouter `/credits` returned 200 with `total_credits=1.99998845`; live `/models?output_modalities=text` returned 18 text/chat-capable models. Tiny `/chat/completions` calls for current low-cost catalog candidates returned `502 upstream_error`. Detailed Deepseek metadata showed `upstream_connection_refused`, request id `c2c53a5e-1cd3-474d-8136-17da70c0d922`. One `/messages` call for `anthropic/claude-haiku-4.5` returned `502 upstream_connect_timeout`, request id `98a159de-f6df-4a97-a7e6-78516f90bf65`.
+Files likely affected: Reports only.
+Risk level: High for release, Low for code.
+Design/template impact: None.
+Security impact: No keys or Authorization values printed; provider request ids are safe to use for support escalation.
+Backend/API/billing impact: Successful billing remains blocked; failure confirms provider inference route is unhealthy despite account/catalog/balance being reachable.
+Proposed action: Mark successful API billing as still blocked, stop large token tests, and escalate provider `502` evidence before another funded gateway success attempt.
+Agent 1 vote: REJECT
+Agent 1 reason: A first API request still cannot complete as a customer.
+Agent 2 vote: REJECT
+Agent 2 reason: Billing headers, positive ledger transaction and success usage record cannot be proven while provider inference returns 502.
+Agent 3 vote: REJECT
+Agent 3 reason: Launch would misrepresent a core paid API capability; keep release blocked.
+Approval count: 0/3
+Final decision: REJECTED
+Allowed next action: Create provider incident notes and continue non-destructive verification only.
+Status: COMPLETED
+
+---
+
+Decision ID: DEC-CMD-LIVE-CLOSEROUTER-MESSAGES-001
+Decision title: Test one bounded Anthropic-style CloseRouter messages route
+Decision type: Command/test approval
+Related bug IDs: R-BUG-006
+Evidence from reports: Direct chat route still returns `502 upstream_connection_refused` across current chat models. CloseRouter public docs/homepage advertise Anthropic-style `/messages`; YapayZekaLab exposes `/v1/messages`, so one bounded direct messages test can determine whether all inference is down or only chat routing is affected.
+Files likely affected: None by command; report files may be updated afterward.
+Risk level: Medium
+Design/template impact: None.
+Security impact: Must not print API keys, env files, Authorization headers, cookies, prompt content beyond safe test text, or full raw response.
+Backend/API/billing impact: May spend a negligible amount if successful; capped to `max_tokens <= 4`, one request only, no images/videos/payments/database mutation.
+Proposed action: From live VPS env, call direct CloseRouter `/messages` once with a current Anthropic text model and `max_tokens <= 4`; print status, timing, error metadata/request id and usage only.
+Agent 1 vote: APPROVE
+Agent 1 reason: A successful `/messages` route would be useful for the first API-call launch path, and a failure gives provider evidence.
+Agent 2 vote: APPROVE
+Agent 2 reason: This isolates endpoint-specific routing without changing billing code or live data.
+Agent 3 vote: APPROVE
+Agent 3 reason: Approved with strict redaction and bounded spend.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Run one bounded direct `/messages` inference diagnostic.
+Status: APPROVED
+
+---
+
 Decision ID: DEC-FIX-LIVE-PAYMENT-MIGRATION-001
 Decision title: Apply missing live payment USD quote columns
 Decision type: Production DB migration approval

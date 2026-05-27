@@ -55,3 +55,13 @@
 - Tiny direct inference recheck timed out before a successful billable response.
 - No image/video generation was attempted.
 - Keep current rule: do not attempt 100k-token plan until one tiny success call proves the provider route and YapayZekaLab billing headers.
+
+---
+
+# Cost Recheck — 2026-05-27 10:31 TRT
+
+- `/credits` still reports `total_credits=1.99998845` and `total_usage=0.00001155`.
+- Live catalog returns 18 text/chat-capable models, so model discovery is not the blocker.
+- Six current low-cost chat candidates returned provider `502`; one Anthropic `/messages` call also returned provider `502`.
+- No image/video calls were made.
+- Budget rule remains unchanged: stop large token testing until one tiny direct inference succeeds, then one funded YapayZekaLab gateway call proves headers, usage record and balance deduction.

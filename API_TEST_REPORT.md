@@ -89,3 +89,32 @@ No image/video calls were made. No provider key was printed.
 ## Updated API Verdict
 
 The account/catalog/balance side of CloseRouter is reachable, but inference remains unavailable from the live VPS. Do not run larger token tests or claim successful YapayZekaLab billing until at least one tiny direct provider call succeeds, then a funded `yzk_live_*` gateway call proves cost headers, transaction, usage record and balance decrement.
+
+---
+
+# Live API/Billing Diagnostic — 2026-05-27 10:31 TRT
+
+## Current Catalog and Endpoint Evidence
+
+- Base URL from live VPS env: `https://api.closerouter.dev/v1`.
+- Live provider key exists and has the expected `closerouter_` prefix; the key value was not printed.
+- `/credits`: `200`, `total_credits=1.99998845`, `total_usage=0.00001155`.
+- `/models?output_modalities=text`: `200`, `18` text models, `18` chat-capable models.
+- Current low-cost chat candidates from live catalog:
+  - `deepseek/deepseek-v4-pro`
+  - `google/gemini-3.1-flash-lite-preview`
+  - `mimo/mimo-v2-pro`
+  - `minimax/minimax-m2.7`
+  - `openai/gpt-5.4-mini`
+  - `qwen/qwen3.6-plus`
+
+## Bounded Inference Evidence
+
+- `POST /chat/completions` `deepseek/deepseek-v4-pro`: `502`, `upstream_connection_refused`, request id `c2c53a5e-1cd3-474d-8136-17da70c0d922`.
+- `POST /chat/completions` low-cost current catalog candidates above: all returned `502 upstream_error` after roughly 21 seconds.
+- `POST /messages` `anthropic/claude-haiku-4.5`: `502`, `upstream_connect_timeout`, request id `98a159de-f6df-4a97-a7e6-78516f90bf65`.
+- No image/video calls were made. No secret values were printed.
+
+## Updated Root Cause Assessment
+
+The failure is not caused by YapayZekaLab using stale model IDs. Live catalog and credits are reachable, but CloseRouter's inference route returns provider-level `502` for both OpenAI-style chat and Anthropic-style messages. Successful funded YapayZekaLab billing remains blocked until CloseRouter inference returns at least one successful text response.

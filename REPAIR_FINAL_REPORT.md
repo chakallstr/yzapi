@@ -77,7 +77,7 @@ Key QA inputs included `QA_FINAL_REPORT.md`, `QA_REPORT.md`, `60_MINUTE_SITE_TES
 - Live payment migration/IBAN E2E: quote columns present; `$10` IBAN init returned `payableTL=473`, `creditTL=472.7961`, duplicate approve `409`, reject reason guard `400`, audit entries present, cleanup completed.
 - Payment UI regression: `npm test -- src/api-docs-content.test.ts` PASS 7/7; `npm run lint` PASS; `npm test` PASS 27 files / 116 tests; `npm run build` PASS; `npm run scan:public` PASS; `node scripts/scan-secrets.mjs` PASS; `npm run qa:uat` PASS 10/10.
 - Payment UI live deploy: `manual-20260527T071659Z-ddee303`, live smoke PASS, live UAT PASS 10/10, live bundle payment labels present and old commission/rejected-template fingerprints absent.
-- Direct CloseRouter recheck: `/credits` and `/models/count` 200; tiny inference timed out across tested text models.
+- Direct CloseRouter recheck: `/credits` and `/models/count` 200; live text catalog 18 models; tiny chat/messages inference returned provider `502` across current low-cost text models and Anthropic messages.
 
 ## Files Changed
 
@@ -117,13 +117,14 @@ PASS locally and live: old visual shell restored; latest changes were text/data/
 
 ## Remaining Risks
 
-The product is still not launch-ready because successful funded API billing and Shopier/Cryptomus provider E2E remain unproven. IBAN is now live-proven. Standard Chrome automation was unavailable in this Codex session, so post-deploy admin/OAuth was not re-run in the user's existing Chrome profile during this pass; anonymous admin exposure was verified live.
+The product is still not launch-ready because successful funded API billing and Shopier/Cryptomus provider E2E remain unproven. IBAN is now live-proven. Latest provider diagnostics show CloseRouter account/catalog/balance are reachable, but inference returns provider `502` for current catalog chat models and Anthropic `/messages`. Standard Chrome automation was unavailable in this Codex session, so post-deploy admin/OAuth was not re-run in the user's existing Chrome profile during this pass; anonymous admin exposure was verified live.
 
 General `npm audit` still reports 4 moderate dev-only advisories under `drizzle-kit`/nested esbuild. Production runtime audit is clean, so this is not the current launch-blocking high advisory, but it should stay tracked.
 
 ## Recommended Next Steps
 
-1. Complete funded key billing and low-balance tests with safe `SMOKE_API_KEY` / `SMOKE_LOW_BALANCE_API_KEY`.
-2. Complete Shopier/Cryptomus sandbox E2E with rotated credentials and duplicate/invalid callback checks.
-3. Re-run Google OAuth/admin browser UAT in the user's standard Chrome profile when Chrome automation is available.
-4. Keep deploy rollback `manual-20260527T064341Z-6021b8e` available until billing/payment gates pass.
+1. Escalate CloseRouter provider `502` with request ids `c2c53a5e-1cd3-474d-8136-17da70c0d922` and `98a159de-f6df-4a97-a7e6-78516f90bf65`, then retry one tiny direct inference only after provider route is fixed.
+2. Complete funded key billing and low-balance tests with safe `SMOKE_API_KEY` / `SMOKE_LOW_BALANCE_API_KEY` after direct inference succeeds.
+3. Complete Shopier/Cryptomus sandbox E2E with rotated credentials and duplicate/invalid callback checks.
+4. Re-run Google OAuth/admin browser UAT in the user's standard Chrome profile when Chrome automation is available.
+5. Keep deploy rollback `manual-20260527T071659Z-ddee303` available until billing/payment gates pass.

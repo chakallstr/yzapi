@@ -336,3 +336,29 @@ Agent 2 retest vote: REJECT
 Agent 3 retest vote: REJECT
 Approval count: 0/3
 Final retest status: SUCCESS_BILLING_STILL_BLOCKED_BY_UPSTREAM_TIMEOUT
+
+## LIVE-BILLING-002 Current Catalog / Messages Diagnostic
+
+Bug ID: R-BUG-006, LIVE-BILLING-002
+Fix decision ID: DEC-CMD-LIVE-CLOSEROUTER-DIAGNOSTICS-002, DEC-CMD-LIVE-CLOSEROUTER-MESSAGES-001
+Retest decision ID: DEC-RETEST-LIVE-BILLING-DIAGNOSTICS-002
+Command or manual flow:
+- Read live CloseRouter env from VPS without printing the key.
+- Fetched `/credits` and `/models?output_modalities=text`.
+- Tested current low-cost chat-capable catalog candidates with `max_tokens <= 4`.
+- Tested one Anthropic-style `/messages` request with `max_tokens <= 4`.
+Expected:
+- If provider inference is healthy, at least one current catalog model should return `200`, allowing a funded YapayZekaLab gateway billing test.
+Actual:
+- `/credits`: `200`, `total_credits=1.99998845`, `total_usage=0.00001155`.
+- Catalog: `200`, 18 text models and 18 chat-capable candidates.
+- `deepseek/deepseek-v4-pro`, `google/gemini-3.1-flash-lite-preview`, `mimo/mimo-v2-pro`, `minimax/minimax-m2.7`, `openai/gpt-5.4-mini`, and `qwen/qwen3.6-plus` all returned `502 upstream_error`.
+- `deepseek/deepseek-v4-pro` detailed metadata: `provider_name=Deepseek`, `failure_reason=upstream_connection_refused`, request id `c2c53a5e-1cd3-474d-8136-17da70c0d922`.
+- `/messages` `anthropic/claude-haiku-4.5`: `502`, `failure_reason=upstream_connect_timeout`, request id `98a159de-f6df-4a97-a7e6-78516f90bf65`.
+Passed/Failed: Failed for success inference readiness.
+Evidence: Current repair session command output; no provider key or Authorization value printed.
+Agent 1 retest vote: REJECT
+Agent 2 retest vote: REJECT
+Agent 3 retest vote: REJECT
+Approval count: 0/3
+Final retest status: SUCCESS_BILLING_STILL_BLOCKED_BY_CLOSEROUTER_PROVIDER_502
