@@ -34,6 +34,102 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-FIX-OAUTH-RETURN-001
+Decision title: Persist Google OAuth return tokens and map `/dashboard` to account without changing the visual shell
+Decision type: Code/edit approval
+Related bug IDs: R-BUG-003, AUTH-OAUTH-RETURN-001
+Evidence from reports: Live Chrome UAT reached `https://yapayzekalab.org/dashboard?at=...&rt=...` after Google login, but the frontend still showed anonymous `Giriş yap` state and Admin stayed hidden for the owner account. The TDD contract in `src/admin-single-owner-contract.test.ts` is RED for missing URL token capture and `/dashboard` route mapping.
+Files likely affected: `src/App.tsx`, `src/yapayzekalab/App.jsx`, `src/admin-single-owner-contract.test.ts`
+Risk level: High
+Design/template impact: None. The fix only reads URL query tokens, stores existing auth token aliases, removes sensitive query parameters from the address bar, and maps a route to the existing account tab. No CSS, class names, colors, layout, spacing, typography, buttons, cards, or modal styles may change.
+Security impact: Positive. Tokens are removed from the URL after storage and are not logged or rendered.
+Backend/API/billing impact: None. Backend OAuth callback already emits `at` and `rt`; this only lets the existing frontend consume them.
+Proposed action: Add a one-time OAuth return effect in the restored frontend shell and map `/dashboard` to the existing account area. Then rerun the targeted contract test, lint, full tests, build, and secret/public scans.
+Agent 1 vote: APPROVE
+Agent 1 reason: This directly fixes the confirmed user-facing Google login return failure.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend token issuance remains unchanged; the frontend only persists already-issued tokens.
+Agent 3 vote: APPROVE
+Agent 3 reason: Approved because it cleans token-bearing URLs and has no visual/template impact.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Apply the minimal non-visual OAuth return patch and run the approved retest commands.
+Status: IN_PROGRESS
+
+---
+
+Decision ID: DEC-FIX-PAYMENT-PROVIDER-AMOUNT-001
+Decision title: Enforce provider callback amount and currency matches before balance credit
+Decision type: Code/edit approval
+Related bug IDs: R-BUG-007, PAYMENT-PROVIDER-E2E-001
+Evidence from reports: Payment reports require invalid, failed, mismatched and duplicate provider callbacks/webhooks to avoid balance credit. Existing local contracts covered signature/idempotency, but route-level amount/currency mismatch checks needed explicit source/test evidence.
+Files likely affected: `src/server/services/shopier-service.ts`, `src/server/routes/payments.ts`, `src/server/services/shopier-service.test.ts`, `src/payment-safety-contract.test.ts`
+Risk level: High
+Design/template impact: None. Backend-only callback validation and tests.
+Security impact: Positive. Prevents signed-but-wrong amount/currency callback/webhook from crediting balance.
+Backend/API/billing impact: Positive. Balance credit remains tied to stored quote/invoice values; no schema or frontend behavior change.
+Proposed action: Preserve existing signature/idempotency behavior while adding amount/currency verification for Shopier and Cryptomus provider callbacks.
+Agent 1 vote: APPROVE
+Agent 1 reason: Payment mismatch behavior is a launch-critical UAT safety requirement.
+Agent 2 vote: APPROVE
+Agent 2 reason: The change narrows credit eligibility and does not alter successful quote creation or IBAN flow.
+Agent 3 vote: APPROVE
+Agent 3 reason: It reduces payment bypass risk and has no visual impact.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Keep the backend hardening patch and run targeted/full regression.
+Status: COMPLETED
+
+---
+
+Decision ID: DEC-RETEST-PAYMENT-PROVIDER-AMOUNT-001
+Decision title: Accept local provider amount/currency guard retest
+Decision type: Retest acceptance
+Related bug IDs: R-BUG-007, PAYMENT-PROVIDER-E2E-001
+Evidence from reports: `npm run lint` PASS; `npm test` PASS 28 files / 126 tests; `npm run build` PASS; public scan PASS 0 hits; secret scan PASS 227 scanned / 0 hits. Payment reports updated to mark local guard coverage accepted while provider E2E remains blocked.
+Files likely affected: Backend payment routes/services/tests and reports.
+Risk level: Medium
+Design/template impact: None.
+Security impact: Positive; no secrets printed or committed.
+Backend/API/billing impact: Positive; successful callback behavior still requires provider E2E after rotated env is installed.
+Proposed action: Accept local hardening as fixed locally, keep launch blocked for Shopier/Cryptomus provider E2E.
+Agent 1 vote: APPROVE
+Agent 1 reason: The mismatch guard behavior is now covered by tests and does not affect UI.
+Agent 2 vote: APPROVE
+Agent 2 reason: Full regression passed and billing credit conditions are stricter.
+Agent 3 vote: APPROVE
+Agent 3 reason: Security posture improved; provider E2E is still correctly not marked as passed.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Deploy only after rollbackable Git backup and then run live provider E2E when rotated env exists.
+Status: COMPLETED
+
+---
+
+Decision ID: DEC-RETEST-OAUTH-RETURN-001
+Decision title: Accept local Google OAuth return fix pending live deploy retest
+Decision type: Retest acceptance
+Related bug IDs: R-BUG-003, AUTH-OAUTH-RETURN-001
+Evidence from reports: Targeted admin/OAuth source contract passed 3/3 after the patch; full lint/test/build/scans passed. Live Chrome previously reproduced the bug, so live owner login must be rerun after deploy.
+Files likely affected: `src/App.tsx`, `src/yapayzekalab/App.jsx`, reports.
+Risk level: Medium
+Design/template impact: None; route/token handling only.
+Security impact: Positive; token-bearing URL is cleaned with `history.replaceState`.
+Backend/API/billing impact: None.
+Proposed action: Accept local fix, deploy with rollback, then rerun Chrome Google OAuth/admin owner UAT.
+Agent 1 vote: APPROVE_FOR_LOCAL_FIX
+Agent 1 reason: The confirmed login return failure has a targeted passing test.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend callback contract remains unchanged.
+Agent 3 vote: APPROVE_WITH_DEPLOY_RETEST_REQUIRED
+Agent 3 reason: Token cleanup is a security improvement, but release needs post-deploy live browser evidence.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Prepare rollbackable Git backup and deploy the local OAuth/payment hardening patch.
+Status: COMPLETED
+
+---
+
 Decision ID: DEC-CMD-LIVE-OMNI-PAYMENT-E2E-001
 Decision title: Run safe live OmniRoute billing plus Shopier/Cryptomus server-side E2E verification
 Decision type: Command/test approval

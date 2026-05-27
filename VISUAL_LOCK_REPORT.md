@@ -125,3 +125,30 @@ Verification:
 Visual diff notes:
 
 - No visual diff possible from this phase; it only corrected deploy target metadata and secret hygiene.
+
+---
+
+## 2026-05-27 OAuth Return and Provider Guard Hardening
+
+Files checked for visual/template risk:
+
+- `src/App.tsx`: route mapping only; no UI rendering or styles.
+- `src/yapayzekalab/App.jsx`: auth-token URL handling only; no CSS/class/style/layout/button/card/modal changes.
+- `src/server/routes/payments.ts` and payment service/tests: backend-only.
+
+Verification:
+
+- `npm test -- src/admin-single-owner-contract.test.ts`: PASS, 3/3.
+- `npm run lint`: PASS.
+- `npm test`: PASS, 28 files / 126 tests.
+- `npm run build`: PASS.
+- `npm run scan:public`: PASS, 0 hits.
+- `node scripts/scan-secrets.mjs`: PASS, 227 scanned / 0 hits.
+- `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`: PASS, 10/10.
+- `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`: PASS for safe public/backend checks.
+
+Visual diff notes:
+
+- No CSS files, design tokens, colors, typography, spacing, layout, responsive breakpoints, card/button/modal styles or visual hierarchy changed.
+- The frontend patch only maps `/dashboard` to the existing account area and removes OAuth token query parameters after storing them.
+- Provider callback hardening is backend-only and has no visual impact.

@@ -203,3 +203,23 @@ Operasyon tarihi: 2026-05-26
 - Sonuç: Shopier/Cryptomus methods disabled, init `503`, zero payment rows; IBAN init `200` and rounded quote correct; payment contract tests 32/32; secret scan 0 hits.
 - Durum: Safe-disabled PASS; Shopier/Cryptomus provider E2E `BLOCKED_BY_MISSING_ROTATED_PROVIDER_ENV`.
 - Sonuç: FIXED LIVE FOR DEPLOY OBSERVABILITY / RELEASE STILL BLOCKED BY PROVIDER BILLING AND SHOPIER-CRYPTOMUS E2E.
+
+## PAYMENT-PROVIDER-AMOUNT-GUARD-001
+
+- Problem: Shopier/Cryptomus provider callback/webhook safety reports required explicit amount/currency mismatch protection before crediting balance.
+- Kök neden: Signature/idempotency contracts existed, but route-level signed amount/currency matching needed stronger source/test evidence.
+- Karar: DEC-FIX-PAYMENT-PROVIDER-AMOUNT-001, 3/3 APPROVED.
+- Yapılan değişiklik: Shopier callback verification now exposes signed paid TL and currency; payment route rejects mismatch before credit. Cryptomus webhook route now requires signed amount/currency/to_currency to match the stored USD/USDT invoice expectation before credit.
+- Test: `npm run lint`; `npm test`; `npm run build`; `npm run scan:public`; `node scripts/scan-secrets.mjs`.
+- Retest: Full regression PASS 28 files / 126 tests; public scan 0 hit; secret scan 227 scanned / 0 hit.
+- Sonuç: FIXED LOCALLY. Shopier/Cryptomus live/sandbox provider E2E remains blocked until rotated env is installed.
+
+## OAUTH-RETURN-001
+
+- Problem: Standard Chrome live Google OAuth returned to `/dashboard?at=...&rt=...`, but frontend stayed anonymous and owner Admin did not appear.
+- Kök neden: Restored frontend did not consume `at`/`rt` query tokens from the backend callback, and `/dashboard` was not mapped to the authenticated account area.
+- Karar: DEC-FIX-OAUTH-RETURN-001, 3/3 APPROVED.
+- Yapılan değişiklik: `src/yapayzekalab/App.jsx` now stores OAuth return tokens with the existing token aliases and immediately removes them from the URL; `src/App.tsx` maps `/dashboard` to the existing account tab. No visual styling changed.
+- Test: `npm test -- src/admin-single-owner-contract.test.ts`; `npm run lint`; `npm test`; `npm run build`; `npm run scan:public`; `node scripts/scan-secrets.mjs`.
+- Retest: Targeted contract PASS 3/3; full regression PASS 28 files / 126 tests; build/scans PASS; live safe smoke/UAT still PASS.
+- Sonuç: FIXED LOCALLY / LIVE DEPLOY AND CHROME OWNER RETEST REQUIRED.

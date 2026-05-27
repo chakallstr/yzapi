@@ -56,3 +56,25 @@ Agent 3 vote: APPROVE
 Agent 3 reason: Visual lock remains preserved; no style/theme edits.
 Approval count: 3/3
 Final decision: DESIGN PRESERVED FOR PAYMENT UI PHASE
+
+---
+
+## 2026-05-27 OAuth Return / Payment Guard Check
+
+Result: PASS locally.
+
+- `src/App.tsx` changed only route mapping for `/dashboard`.
+- `src/yapayzekalab/App.jsx` changed only auth-token state handling and URL cleanup.
+- Payment provider hardening is backend-only.
+- No CSS, class names, inline styles, layout structure, colors, card/button/modal styles, typography, spacing, icons, animations or responsive rules changed.
+- `npm run build` and public bundle scan passed after the change.
+
+DEC-DESIGN-OAUTH-PAYMENT-GUARD-001:
+Agent 1 vote: APPROVE
+Agent 1 reason: User-facing behavior is repaired without visual restructuring.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend/payment hardening has no template impact and OAuth route handling does not affect billing UI.
+Agent 3 vote: APPROVE
+Agent 3 reason: Visual lock remains preserved; token cleanup improves security.
+Approval count: 3/3
+Final decision: DESIGN PRESERVED FOR OAUTH/PAYMENT GUARD PHASE

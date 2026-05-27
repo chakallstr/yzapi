@@ -40,6 +40,8 @@ export interface ShopierCallbackVerifyResult {
   valid: boolean;
   platformOrderId?: string;
   status?: string;
+  paidTL?: number;
+  currency?: string;
 }
 
 const SHOPIER_ACTION_URL = "https://www.shopier.com/ShowProduct/api_pay4.php";
@@ -117,17 +119,32 @@ export function verifyCallback(body: Record<string, string>): ShopierCallbackVer
   const secret = env.SHOPIER_API_SECRET;
   if (!secret) return { valid: false };
 
-  const { random_nr, platform_order_id, signature, status } = body;
+  const { random_nr, platform_order_id, signature, status, total_order_value, currency } = body;
   if (!random_nr || !platform_order_id || !signature) return { valid: false };
 
-  const data = `${random_nr}${platform_order_id}`;
+  let paidTL: number | undefined;
+  const hasAmountFields = total_order_value !== undefined && currency !== undefined;
+  if (hasAmountFields) {
+    paidTL = Number(total_order_value);
+    if (!Number.isFinite(paidTL) || paidTL <= 0) return { valid: false };
+  }
+
+  const data = hasAmountFields
+    ? `${random_nr}${platform_order_id}${total_order_value}${currency}`
+    : `${random_nr}${platform_order_id}`;
   const expected = createHmac("sha256", secret).update(data).digest("base64");
 
   try {
     const a = Buffer.from(expected, "utf8");
     const b = Buffer.from(signature, "utf8");
     const valid = a.length === b.length && timingSafeEqual(a, b);
-    return { valid, platformOrderId: platform_order_id, status };
+    return {
+      valid,
+      platformOrderId: platform_order_id,
+      status,
+      paidTL,
+      currency,
+    };
   } catch {
     return { valid: false };
   }

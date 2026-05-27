@@ -251,6 +251,39 @@ router.post(
       }
 
       const payment = paymentRows[0];
+      if (result.currency !== undefined && result.currency !== "0") {
+        logger.warn({
+          paymentId,
+          currency: result.currency,
+        }, "Shopier callback currency mismatch");
+        adminPaymentNotificationEmail({
+          title: "Shopier ödeme para birimi uyuşmadı",
+          method: "shopier",
+          reference: paymentId,
+          status: "currency_mismatch",
+        }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
+        res.redirect(`${env.APP_BASE_URL}/?payment=fail`);
+        return;
+      }
+
+      const expectedPaidTL = Number(payment.payableTL ?? payment.miktarTL);
+      if (result.paidTL !== undefined && Math.abs(result.paidTL - expectedPaidTL) > 0.01) {
+        logger.warn({
+          paymentId,
+          paidTL: result.paidTL,
+          expectedPaidTL,
+        }, "Shopier callback amount mismatch");
+        adminPaymentNotificationEmail({
+          title: "Shopier ödeme tutarı uyuşmadı",
+          method: "shopier",
+          reference: paymentId,
+          status: "amount_mismatch",
+          payableTL: expectedPaidTL,
+        }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
+        res.redirect(`${env.APP_BASE_URL}/?payment=fail`);
+        return;
+      }
+
       const creditTL = Number(payment.creditTL ?? payment.miktarTL);
       const credit = await creditUserBalance(
         payment.userId,
@@ -439,6 +472,39 @@ router.post(
       }
 
       const payment = paymentRows[0];
+      const expectedAmountUsd = Number(payment.amountUsd ?? payment.miktarTL);
+      const paidAmountUsd = Number((body as { amount?: unknown }).amount);
+      const paidCurrency = String((body as { currency?: unknown }).currency ?? "");
+      const paidToCurrency = String((body as { to_currency?: unknown }).to_currency ?? "");
+      if (paidCurrency && paidCurrency !== "USD") {
+        logger.warn({
+          uuid,
+          order_id,
+          paidCurrency,
+        }, "Cryptomus webhook currency mismatch");
+        res.json({ ok: true });
+        return;
+      }
+      if (paidToCurrency && paidToCurrency !== "USDT") {
+        logger.warn({
+          uuid,
+          order_id,
+          paidToCurrency,
+        }, "Cryptomus webhook target currency mismatch");
+        res.json({ ok: true });
+        return;
+      }
+      if (Number.isFinite(paidAmountUsd) && Math.abs(paidAmountUsd - expectedAmountUsd) > 0.01) {
+        logger.warn({
+          uuid,
+          order_id,
+          paidAmountUsd,
+          expectedAmountUsd,
+        }, "Cryptomus webhook amount mismatch");
+        res.json({ ok: true });
+        return;
+      }
+
       const creditTL = Number(payment.creditTL ?? payment.miktarTL);
       const credit = await creditUserBalance(
         payment.userId,

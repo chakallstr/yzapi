@@ -12,7 +12,8 @@ const routeToInitialTab = (path: string): LegacyTab => {
     path.startsWith("/keys") ||
     path.startsWith("/api-keys") ||
     path.startsWith("/balance") ||
-    path.startsWith("/user-dashboard")
+    path.startsWith("/user-dashboard") ||
+    path.startsWith("/dashboard")
   ) {
     return "account";
   }

@@ -41,6 +41,77 @@ describe("verifyCallback — Shopier HMAC", () => {
     expect(verifyCallback({ random_nr: "123", status: "success" }).valid).toBe(false);
   });
 
+  it("accepts callback signatures that include paid amount and currency", async () => {
+    const { verifyCallback } = await import("./shopier-service.js");
+    const secret = "test-shopier-secret";
+    const random_nr = "123456";
+    const platform_order_id = "payment-uuid-abc";
+    const total_order_value = "473";
+    const currency = "0";
+    const data = `${random_nr}${platform_order_id}${total_order_value}${currency}`;
+    const signature = createHmac("sha256", secret).update(data).digest("base64");
+
+    const result = verifyCallback({
+      random_nr,
+      platform_order_id,
+      total_order_value,
+      currency,
+      signature,
+      status: "success",
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.platformOrderId).toBe(platform_order_id);
+    expect(result.paidTL).toBe(473);
+    expect(result.currency).toBe("0");
+  });
+
+  it("rejects callbacks when paid amount fields are signed with a different amount", async () => {
+    const { verifyCallback } = await import("./shopier-service.js");
+    const secret = "test-shopier-secret";
+    const random_nr = "123456";
+    const platform_order_id = "payment-uuid-abc";
+    const currency = "0";
+    const signature = createHmac("sha256", secret)
+      .update(`${random_nr}${platform_order_id}473${currency}`)
+      .digest("base64");
+
+    const result = verifyCallback({
+      random_nr,
+      platform_order_id,
+      total_order_value: "1",
+      currency,
+      signature,
+      status: "success",
+    });
+
+    expect(result.valid).toBe(false);
+  });
+
+  it("exposes callback currency so the route can enforce TRY payments", async () => {
+    const { verifyCallback } = await import("./shopier-service.js");
+    const secret = "test-shopier-secret";
+    const random_nr = "123456";
+    const platform_order_id = "payment-uuid-abc";
+    const total_order_value = "473";
+    const currency = "1";
+    const signature = createHmac("sha256", secret)
+      .update(`${random_nr}${platform_order_id}${total_order_value}${currency}`)
+      .digest("base64");
+
+    const result = verifyCallback({
+      random_nr,
+      platform_order_id,
+      total_order_value,
+      currency,
+      signature,
+      status: "success",
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.currency).toBe("1");
+  });
+
   it("signature roundtrip matches buildCheckoutForm output", async () => {
     const { buildCheckoutForm, verifyCallback } = await import("./shopier-service.js");
     const result = buildCheckoutForm({

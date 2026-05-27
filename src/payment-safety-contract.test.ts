@@ -61,4 +61,19 @@ describe("payment safety contract", () => {
     expect(paymentsRoute).not.toContain('logger.info({ body }, "Shopier callback received")');
     expect(paymentsRoute).not.toContain('logger.warn({ body }, "Shopier callback signature invalid")');
   });
+
+  it("verifies provider-paid amounts before crediting Shopier and Cryptomus payments", () => {
+    const paymentsRoute = source("./server/routes/payments.ts");
+    const shopierService = source("./server/services/shopier-service.ts");
+
+    expect(shopierService).toContain("total_order_value");
+    expect(shopierService).toContain("paidTL");
+    expect(paymentsRoute).toContain("Shopier callback amount mismatch");
+    expect(paymentsRoute).toContain("Shopier callback currency mismatch");
+    expect(paymentsRoute).toContain("Cryptomus webhook amount mismatch");
+    expect(paymentsRoute).toContain("Cryptomus webhook currency mismatch");
+    expect(paymentsRoute).toContain("Cryptomus webhook target currency mismatch");
+    expect(paymentsRoute).toMatch(/result\.paidTL[\s\S]{0,260}expectedPaidTL/);
+    expect(paymentsRoute).toMatch(/paidAmountUsd[\s\S]{0,320}expectedAmountUsd/);
+  });
 });

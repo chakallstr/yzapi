@@ -30,6 +30,8 @@ NOT READY — PAYMENT SECURITY BLOCKERS
 - Legacy live `ADMIN_PASSWORD` env line was removed and stale env backup artefact was moved out of the regular deploy backup directory into root-only secure storage.
 - Temporary OmniRoute GPT gateway billing is live-verified: funded `yzk_live_*` text call returned `200`, billing headers were present, balance decreased, `usage_records.status=success`, and temporary data was cleaned.
 - Shopier/Cryptomus disabled-state handling is live-verified: when provider env is unset, methods are disabled, init endpoints return `503`, and no payment rows are created.
+- Local Shopier/Cryptomus callback hardening now validates signed amount/currency before crediting; full local regression, build, public scan and secret scan pass.
+- Local Google OAuth return fix now stores backend `at/rt` callback tokens, removes them from the URL, and maps `/dashboard` to the existing account/API area without visual changes.
 
 ## Must-Fix Before Launch
 
@@ -37,7 +39,7 @@ NOT READY — PAYMENT SECURITY BLOCKERS
 - Install rotated Cryptomus merchant credentials into the live server env and complete init plus valid/invalid/non-credit/duplicate webhook E2E without real money.
 - Decide whether temporary OmniRoute should remain the production provider while CloseRouter inference is unhealthy; if yes, keep usage monitoring active because one direct OmniRoute Claude route previously reported unexpectedly high token usage.
 - Complete admin destructive/action tab UAT and audit coverage without mutating real customer data.
-- Re-run Google OAuth/admin session in the user's standard Chrome profile when Chrome automation is available; anonymous admin exposure is verified live.
+- Deploy the local Google OAuth return fix, then re-run Google OAuth/admin owner session in the user's standard Chrome profile; anonymous admin exposure is verified live, but owner login must be rechecked after deploy.
 
 ## Should-Fix Soon
 
@@ -65,6 +67,8 @@ NOT READY — PAYMENT SECURITY BLOCKERS
 - Live OmniRoute gateway billing retest `2026-05-27 19:28 TRT`: temporary funded `yzk_live_*` key call to `/v1/chat/completions` with `openai/gpt-5.4-mini` and `max_tokens=4` returned `200`; `X-YZ-Cost-TL=0.0329`, `X-YZ-Remaining-TL=49.97`, request id present; DB balance `49.9671`, spend `0.0329`, requests `1`, `usage_records.status=success`; cleanup leftovers `0`.
 - Live payment provider env retest `2026-05-27 19:28 TRT`: Shopier API key/secret and Cryptomus API key/merchant ID are unset in live env; `/api/payments/methods` correctly disables Shopier/Cryptomus and keeps IBAN enabled; Shopier/Cryptomus init return `503` with no payment rows; IBAN init still returns `payableTL=473`, `creditTL=472.7961`, `roundingTL=0.2039`.
 - Local payment contract retest: Shopier/Cryptomus/payment guard/common/pricing tests PASS, 6 files / 32 tests; secret scan PASS, 227 scanned / 0 hits.
+- Latest local OAuth/payment hardening regression `2026-05-27 20:52 TRT`: `npm test -- src/admin-single-owner-contract.test.ts` PASS 3/3; `npm run lint` PASS; `npm test` PASS 28 files / 126 tests; `npm run build` PASS; public scan PASS 0 hits; secret scan PASS 227 scanned / 0 hits.
+- Latest live safe smoke after local fix build: `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T17-51-32-980Z/uat-smoke-report.md`; `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` PASS for health/status/models/authless/JSON-404 checks, funded/low-balance keys skipped because safe env keys were absent.
 - Standard Chrome automation was unavailable to this Codex session, so post-deploy logged-in Google admin click-through was not rerun in the user's existing Chrome profile.
 - Previous billing failure-path evidence exists; successful funded text billing is now approved for the temporary OmniRoute GPT path. Shopier/Cryptomus provider E2E is still not approved because live rotated provider env is missing. IBAN payment E2E is approved.
 

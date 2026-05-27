@@ -203,3 +203,25 @@ CloseRouter inference remained unavailable. The live YapayZekaLab service was al
 ## Updated API Verdict
 
 API text billing through the temporary OmniRoute GPT path is now accepted for the bounded funded-key happy path. CloseRouter itself is still unhealthy, so the launch dependency is now provider-routing/operations rather than YapayZekaLab gateway billing code. Continue monitoring OmniRoute usage because earlier direct OmniRoute tests showed unexpectedly large reported token counts on one Claude route; the live GPT route billed a small amount but still used estimated/provider usage fallback.
+
+---
+
+# Safe API Smoke Recheck — 2026-05-27 20:52 TRT
+
+## Commands
+
+- `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`
+- `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`
+
+## Result
+
+- Live UAT smoke: PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T17-51-32-980Z/uat-smoke-report.md`.
+- Live backend smoke: PASS for `/health`, `/status`, `/api/models`, authless `/v1/chat/completions` `401`, unknown `/api/*` JSON `404`, and unknown `/v1/*` JSON `404`.
+- Funded and low-balance gateway smoke were skipped because no safe `SMOKE_API_KEY` / `SMOKE_LOW_BALANCE_API_KEY` was present in the local env for this run.
+- No image/video generation was run.
+- No real payment flow was touched.
+- No secret values were printed.
+
+## Current API Verdict
+
+Temporary OmniRoute happy-path text billing remains previously accepted from the live funded-key retest. This recheck did not rerun funded billing because safe key env was absent; it only confirms public/system/authless API smoke remains healthy while local OAuth/payment guard fixes await deploy.

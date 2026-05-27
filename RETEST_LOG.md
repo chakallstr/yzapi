@@ -524,3 +524,63 @@ Agent 2 retest vote: NEEDS_MORE_EVIDENCE
 Agent 3 retest vote: REJECT_FOR_PROVIDER_LAUNCH
 Approval count: 0/3
 Final retest status: SHOPIER_CRYPTOMUS_PROVIDER_E2E_BLOCKED_BY_MISSING_ROTATED_ENV
+
+## LOCAL-PAYMENT-AMOUNT-CURRENCY-GUARDS-001 Provider Amount/Currency Guard Retest
+
+Bug ID: R-BUG-007, PAYMENT-PROVIDER-E2E-001
+Fix decision ID: DEC-FIX-PAYMENT-PROVIDER-AMOUNT-001
+Retest decision ID: DEC-RETEST-PAYMENT-PROVIDER-AMOUNT-001
+Command or manual flow:
+- Added local source/service coverage for Shopier signed callback amount and currency fields.
+- Added local route-level guards so Shopier callbacks cannot credit if signed paid TL or currency does not match the stored payment quote.
+- Added local route-level guards so Cryptomus webhooks cannot credit if signed amount/currency/to_currency does not match the stored USD/USDT invoice expectation.
+- Ran targeted and full non-provider tests without real payment calls.
+Expected:
+- Signed provider callbacks/webhooks must match amount and currency before crediting.
+- Invalid amount/currency must be treated as non-crediting suspicious/failure state.
+- No secrets are logged or committed.
+Actual:
+- `npm test -- src/admin-single-owner-contract.test.ts`: PASS, 3/3.
+- `npm run lint`: PASS.
+- `npm test`: PASS, 28 files / 126 tests.
+- `npm run build`: PASS.
+- `npm run scan:public`: PASS, 0 hits.
+- `node scripts/scan-secrets.mjs`: PASS, 227 scanned / 0 hits.
+Passed/Failed: Passed locally for static/service/route guard coverage; live provider E2E still blocked by missing rotated Shopier/Cryptomus env.
+Evidence: Current repair session command output; no provider token, Authorization header, callback secret, or raw webhook payload printed.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: LOCAL_PAYMENT_AMOUNT_CURRENCY_GUARDS_ACCEPTED_PROVIDER_E2E_STILL_BLOCKED
+
+## LOCAL-OAUTH-RETURN-001 Google OAuth Return Token Handling Retest
+
+Bug ID: R-BUG-003, AUTH-OAUTH-RETURN-001
+Fix decision ID: DEC-FIX-OAUTH-RETURN-001
+Retest decision ID: DEC-RETEST-OAUTH-RETURN-001
+Command or manual flow:
+- Standard Chrome live UAT proved Google returned to `/dashboard?at=...&rt=...` but the live frontend stayed anonymous.
+- Added a non-visual frontend effect that stores returned `at/rt` tokens using existing token aliases and removes them from the address bar with `history.replaceState`.
+- Mapped `/dashboard` to the existing account/API area.
+- Ran targeted and full local verification.
+Expected:
+- After Google OAuth callback returns tokens, the frontend becomes authenticated without exposing tokens in the URL.
+- `/dashboard` opens the existing account/API area.
+- The visual shell, CSS, classes, colors, layout and template remain unchanged.
+Actual:
+- `npm test -- src/admin-single-owner-contract.test.ts`: PASS, 3/3.
+- `npm run lint`: PASS.
+- `npm test`: PASS, 28 files / 126 tests.
+- `npm run build`: PASS.
+- `npm run scan:public`: PASS, 0 hits.
+- `node scripts/scan-secrets.mjs`: PASS, 227 scanned / 0 hits.
+- `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`: PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T17-51-32-980Z/uat-smoke-report.md`.
+- `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`: PASS for health/status/models/authless/JSON-404 checks; funded/low-balance keys skipped because safe env keys were absent.
+Passed/Failed: Passed locally. Live Google OAuth/admin owner UAT still requires deployment of this frontend fix and a post-deploy Chrome retest.
+Evidence: Current repair session command output and previous standard Chrome live OAuth reproduction; token values were not recorded.
+Agent 1 retest vote: APPROVE_FOR_LOCAL_FIX
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE_WITH_DEPLOY_RETEST_REQUIRED
+Approval count: 3/3
+Final retest status: LOCAL_OAUTH_RETURN_FIX_ACCEPTED_PENDING_LIVE_DEPLOY_RETEST

@@ -111,10 +111,18 @@ Key QA inputs included `QA_FINAL_REPORT.md`, `QA_REPORT.md`, `60_MINUTE_SITE_TES
 - `DESIGN_PRESERVATION_FINAL_CHECK.md`
 - `REPAIR_FINAL_REPORT.md`
 - `LAUNCH_READINESS_AFTER_REPAIR.md`
+- `src/server/services/shopier-service.ts`
+- `src/server/services/shopier-service.test.ts`
+- `src/server/routes/payments.ts`
+- `src/payment-safety-contract.test.ts`
+- `PAYMENT_BILLING_REPORT.md`
+- `API_TEST_REPORT.md`
 
 ## Tests Passed
 
 Local targeted and full regression passed. Public/source secret scans passed. Local UAT passed 10/10. Latest full test suite passed 28 files / 118 tests after deploy target docs/script guard.
+
+Latest OAuth/payment hardening regression also passed: `npm test -- src/admin-single-owner-contract.test.ts` PASS 3/3; `npm run lint` PASS; `npm test` PASS 28 files / 126 tests; `npm run build` PASS; public scan PASS 0 hits; secret scan PASS 227 scanned / 0 hits; live safe UAT PASS 10/10; live safe smoke PASS for public/authless checks.
 
 ## Tests Failed
 
@@ -124,20 +132,22 @@ No final local command failed after the latest fixes. Earlier targeted tests fai
 
 `R-BUG-001`, `R-BUG-004`, `R-BUG-005`, `R-BUG-009`, `DESIGN-REGRESSION-001`, `UX-FAKE-LIVE-001`, `PUBLIC-CONFIG-001`, `STATIC-FAVICON-001`, `DESIGN-CSS-001`, `SECURITY-DEPS-001`, `LIVE-DEPLOY-RESTORED-THEME-001`, `PAYMENT-LIVE-001`, `PAYMENT-UI-001`, `DEPLOY-TARGET-METADATA-001` and `LIVE-LEGACY-ADMINPASSWORD-ENV-001` are fixed and retested locally/live where applicable.
 
+`PAYMENT-PROVIDER-AMOUNT-GUARD-001` and `OAUTH-RETURN-001` are fixed and retested locally. They still require live deploy and, for OAuth, post-deploy standard Chrome owner retest.
+
 ## Design Preservation Result
 
 PASS locally and live: old visual shell restored; latest changes were text/data/backend/guard only. No CSS/class/layout/theme/button/card/modal styling was changed. Live browser and bundle scans show the rejected template is absent. Payment UI alignment changed only existing labels/calculated values inside the existing account card/table.
 
 ## Remaining Risks
 
-The product is still not launch-ready because successful funded API billing and Shopier/Cryptomus provider E2E remain unproven. IBAN is now live-proven. Latest provider diagnostics show CloseRouter account/catalog/balance are reachable, but inference returns provider `502` for current catalog chat models and Anthropic `/messages`. Standard Chrome automation was unavailable in this Codex session, so post-deploy admin/OAuth was not re-run in the user's existing Chrome profile during this pass; anonymous admin exposure was verified live.
+The product is still not launch-ready because Shopier/Cryptomus provider E2E remains unproven and the local OAuth return fix has not yet been deployed/retested live. IBAN is live-proven. Temporary OmniRoute funded text billing is live-proven. Latest provider diagnostics show CloseRouter account/catalog/balance are reachable, but inference returns provider `502` for current catalog chat models and Anthropic `/messages`.
 
 General `npm audit` still reports 4 moderate dev-only advisories under `drizzle-kit`/nested esbuild. Production runtime audit is clean, so this is not the current launch-blocking high advisory, but it should stay tracked.
 
 ## Recommended Next Steps
 
 1. Escalate CloseRouter provider `502` with request ids `c2c53a5e-1cd3-474d-8136-17da70c0d922` and `98a159de-f6df-4a97-a7e6-78516f90bf65`, then retry one tiny direct inference only after provider route is fixed.
-2. Complete funded key billing and low-balance tests with safe `SMOKE_API_KEY` / `SMOKE_LOW_BALANCE_API_KEY` after direct inference succeeds.
+2. Deploy the local OAuth/payment hardening patch with rollbackable Git backup, then rerun Google OAuth/admin owner UAT in the user's standard Chrome profile.
 3. Complete Shopier/Cryptomus sandbox E2E with rotated credentials and duplicate/invalid callback checks.
-4. Re-run Google OAuth/admin browser UAT in the user's standard Chrome profile when Chrome automation is available.
-5. Keep deploy rollback `manual-20260527T071659Z-ddee303` available until billing/payment gates pass.
+4. Complete low-balance live smoke with safe `SMOKE_LOW_BALANCE_API_KEY` if a disposable key is provided or seeded.
+5. Keep deploy rollback `manual-20260527T071659Z-ddee303` available until the next deploy replaces it with a newer verified rollback.

@@ -629,6 +629,28 @@ const App = ({ initialTab = 'home' }) => {
   const isAdmin = String(profile?.email || '').trim().toLowerCase() === ADMIN_EMAIL;
 
   useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const accessToken = query.get('at');
+    const refreshToken = query.get('rt');
+
+    if (!accessToken && !refreshToken) return;
+
+    const tokens = { accessToken, refreshToken };
+    storeAuthTokens(tokens);
+    query.delete('at');
+    query.delete('rt');
+
+    const cleanQuery = query.toString();
+    const cleanUrl = `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ''}${window.location.hash || ''}`;
+    window.history.replaceState(window.history.state, document.title, cleanUrl);
+
+    setIsAuthenticated(true);
+    setShowLogin(false);
+    setTab(pendingTab || (PROTECTED_TABS.has(initialTab) ? initialTab : 'account'));
+    setPendingTab(null);
+  }, [initialTab, pendingTab]);
+
+  useEffect(() => {
     document.documentElement.dataset.theme = t.theme;
     document.documentElement.dataset.accent = ACCENT_MAP[t.accentHex] || 'blue';
     document.documentElement.style.setProperty('--speed', String(t.animSpeed));

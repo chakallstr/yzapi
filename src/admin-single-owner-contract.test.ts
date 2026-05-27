@@ -19,6 +19,9 @@ describe("single owner admin contract", () => {
 
     expect(app).toContain("cix.crazy666@gmail.com");
     expect(app).toContain("isAdmin");
+    expect(app).toContain("URLSearchParams(window.location.search)");
+    expect(app).toContain("storeAuthTokens(tokens)");
+    expect(app).toContain("history.replaceState");
     expect(app).not.toContain("adminLoginPw");
     expect(app).not.toContain("adminToken");
     expect(app).not.toContain("yz_admin_token");
@@ -38,5 +41,12 @@ describe("single owner admin contract", () => {
     expect(adminAuthRoute).not.toContain("Invalid password");
     expect(adminAuthRoute).toContain('router.post("/login"');
     expect(adminAuthRoute).toContain("res.status(410)");
+  });
+
+  it("maps the Google OAuth return dashboard route into the authenticated account area", () => {
+    const app = source("src/App.tsx");
+
+    expect(app).toContain('path.startsWith("/dashboard")');
+    expect(app).toContain('return "account"');
   });
 });

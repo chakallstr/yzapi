@@ -178,3 +178,23 @@ Gerçek provider E2E hâlâ tamamlanmış sayılmaz, çünkü canlı env’de Sh
 ## Güncel Billing/Payment Verdict
 
 API usage deduction artık temporary OmniRoute GPT path ile canlıda PASS. IBAN ödeme akışı PASS. Shopier/Cryptomus live provider E2E ise `BLOCKED_BY_MISSING_ROTATED_PROVIDER_ENV`; bu iki yöntem launch için zorunluysa final release hâlâ onaylanamaz.
+
+---
+
+# Local Provider Callback Hardening — 2026-05-27 20:52 TRT
+
+## Eklenen Güvenlik Korumaları
+
+| Alan | Sonuç | Kanıt |
+|---|---|---|
+| Shopier callback amount guard | PASS LOCAL | Signed callback `total_order_value` payment quote ile eşleşmezse credit yok |
+| Shopier callback currency guard | PASS LOCAL | Signed callback currency `0`/TRY değilse credit yok |
+| Shopier signature compatibility | PASS LOCAL | Yeni full-field signature ve eski fallback signature testleri geçiyor |
+| Cryptomus amount guard | PASS LOCAL | Webhook `amount` stored USD invoice ile eşleşmezse credit yok |
+| Cryptomus currency guard | PASS LOCAL | Webhook `currency=USD` ve `to_currency=USDT` değilse credit yok |
+| Regression | PASS LOCAL | `npm test` 28 files / 126 tests, `npm run build` PASS |
+| Secret/public scan | PASS LOCAL | Public scan 0 hit, secret scan 227 scanned / 0 hit |
+
+## Kalan Provider E2E Blokeri
+
+Shopier/Cryptomus için canlı/sandbox valid, invalid, failed ve duplicate callback/webhook E2E hâlâ kabul edilmiş sayılmaz. Bunun nedeni canlı provider env değerlerinin unset olması ve önceki paylaşılan tokenların sızmış kabul edilmesidir. Rotated yeni provider credential server env’e güvenli şekilde girildikten sonra gerçek provider callback/webhook kanıtı toplanmalı.
