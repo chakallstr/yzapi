@@ -42,10 +42,9 @@ NOT READY — PAYMENT SECURITY BLOCKERS
 - Install rotated Cryptomus merchant credentials into the live server env and complete init plus valid/invalid/non-credit/duplicate webhook E2E without real money.
 - Decide whether temporary OmniRoute should remain the production provider while CloseRouter inference is unhealthy; if yes, keep usage monitoring active because one direct OmniRoute Claude route previously reported unexpectedly high token usage.
 - Complete admin destructive/action tab UAT and audit coverage without mutating real customer data.
-- Deploy the local Google OAuth return fix, then re-run Google OAuth/admin owner session in the user's standard Chrome profile; anonymous admin exposure is verified live, but owner login must be rechecked after deploy.
+- Re-run a fresh Google OAuth/admin owner session in the user's standard Chrome profile after the latest deploy; anonymous admin exposure is verified live, but a full logout-to-login owner sweep is still pending.
 - Deploy the local restart-safe OAuth state fix only after the required four-agent deploy gate is available or explicitly overridden.
-- Deploy the manual payment settings migration (`0006_manual_payment_settings.sql`) before starting the new server build, then configure WhatsApp/crypto wallet values in Admin and re-run real Chrome IBAN/manual crypto UAT.
-- Deploy the local auth-refresh patch, then re-run the exact standard Chrome payment button flow that previously returned `Invalid or expired token`.
+- Complete Shopier/Cryptomus provider setup with rotated credentials if card/automatic crypto must be launch-ready; manual IBAN and manual USDT TRC20 instructions are now live-verified.
 
 ## Should-Fix Soon
 
@@ -82,6 +81,9 @@ NOT READY — PAYMENT SECURITY BLOCKERS
 - Latest live safe smoke after local fix build: `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T17-51-32-980Z/uat-smoke-report.md`; `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` PASS for health/status/models/authless/JSON-404 checks, funded/low-balance keys skipped because safe env keys were absent.
 - Standard Chrome automation was unavailable to this Codex session, so post-deploy logged-in Google admin click-through was not rerun in the user's existing Chrome profile.
 - Previous billing failure-path evidence exists; successful funded text billing is now approved for the temporary OmniRoute GPT path. Shopier/Cryptomus provider E2E is still not approved because live rotated provider env is missing. IBAN payment E2E is approved.
+- Latest live auth/payment deployment retest: auth-refresh/payment instruction build is deployed under `manual-20260527T201117Z-6cdcb89`; live smoke PASS and live UAT PASS 10/10.
+- Latest live manual payment config retest: production IBAN display, WhatsApp notification, and manual USDT TRC20 wallet config were applied with backup; safe backend E2E asserted correct reference/method/WhatsApp mapping and cleaned temporary records; Chrome showed manual USDT TRC20 instruction and WhatsApp button.
+- BEP20 remains intentionally not enabled because the supplied wallet address is TRON-format; a separate BEP20 `0x...` address is required before BEP20 can be safely displayed.
 
 ## Final 3-Agent Vote
 

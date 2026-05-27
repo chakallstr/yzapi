@@ -208,3 +208,25 @@ Visual diff notes:
 - No CSS files, theme tokens, colors, gradients, fonts, font sizes, spacing, layout structure, card/button/modal styles, responsive breakpoints, icons, illustrations or page order changed.
 - The change only centralizes existing token aliases and protected fetch retry behavior.
 - Default local `npm run qa:uat` failed because `127.0.0.1:4567` was not listening; this is recorded as environment setup, not a visual regression.
+
+---
+
+## 2026-05-27 Live Manual Payment Configuration
+
+Files checked for visual/template risk:
+
+- No frontend source files changed in this step.
+- Remote `.env.production` display fields and `system_config` manual payment values changed only.
+
+Verification:
+
+- `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`: PASS.
+- `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`: PASS, 10/10.
+- Safe live backend E2E for IBAN and manual USDT TRC20 init: PASS with temporary record cleanup.
+- Standard Chrome showed the existing account card/payment instruction UI, with manual USDT TRC20 wallet information and WhatsApp notification button visible.
+
+Visual diff notes:
+
+- No CSS, theme token, color, font, spacing, layout, card, button, modal, icon, animation, route or template code changed.
+- Existing payment instruction component was populated by live config only.
+- BEP20 was not displayed as an enabled payment network because the supplied wallet address is TRON-format.

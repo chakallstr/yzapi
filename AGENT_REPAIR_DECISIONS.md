@@ -34,6 +34,62 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-LIVE-PAYMENT-CONFIG-001
+Decision title: Apply live IBAN, WhatsApp and manual USDT TRC20 payment instructions
+Decision type: Live configuration change / payment UAT gate
+Related bug IDs: PAYMENT-INSTRUCTIONS-001
+Evidence from reports: Live Chrome payment UAT showed IBAN instruction panel opens after auth-refresh deploy, but production config still displays placeholder IBAN and no WhatsApp notification number. User supplied the real IBAN recipient, bank, IBAN, phone and USDT wallet details in the current thread.
+Files likely affected: Remote `/opt/turkapiprojesi/.env.production`, remote `system_config` row, report files.
+Risk level: Medium
+Design/template impact: None; no frontend source, CSS, layout, color, spacing, card, button or modal style changes.
+Security impact: Do not print full env contents or secrets. Payment display data is intentionally user-facing; provider secrets remain untouched. Use TRC20 only because the supplied wallet address is TRON-format and using it for BEP20 could cause loss of funds.
+Backend/API/billing impact: Low to medium; enables manual payment instructions and WhatsApp link. It does not auto-credit balance, does not call Shopier/Cryptomus, and does not mutate customer balances.
+Proposed action: Update live env for IBAN display, update `system_config` for WhatsApp and manual USDT TRC20 wallet, restart the service to load env changes, then run live smoke and Chrome UAT for IBAN/crypto instruction visibility.
+Agent 1 vote: APPROVE
+Agent 1 reason: This directly fixes the reproduced user-facing payment instruction blocker without changing the visual template.
+Agent 2 vote: APPROVE
+Agent 2 reason: Manual IBAN/crypto remains pending/admin-reviewed; no automatic crediting or provider payment mutation is introduced.
+Agent 3 vote: APPROVE
+Agent 3 reason: Approved with TRC20-only guard, no secret printing, and post-change live smoke/UAT.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Apply the live configuration change, restart service, run live smoke and browser UAT, then record retest.
+Status: COMPLETED
+
+Agent 4 integrity guard:
+Vote: APPROVE
+Reason: The change is configuration-only, preserves the restored site design, and reduces payment-loss risk by not advertising BEP20 without a BEP20 address.
+
+---
+
+Decision ID: DEC-RETEST-LIVE-PAYMENT-CONFIG-001
+Decision title: Accept live IBAN, WhatsApp and manual USDT TRC20 payment instruction retest
+Decision type: Retest acceptance / payment UAT
+Related bug IDs: PAYMENT-INSTRUCTIONS-001
+Evidence from reports: Live service restarted active after config update. `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` passed health/status/models/authless/JSON-404 checks. `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` passed 10/10. Safe live backend E2E created temporary IBAN and manual crypto init records with a test admin JWT, asserted current method/reference/WhatsApp data, and deleted those temporary records. Standard Chrome showed manual USDT TRC20 wallet instructions and WhatsApp button without visual template changes.
+Files likely affected: Remote config only; report files.
+Risk level: Low after retest
+Design/template impact: None; no source style or layout changed.
+Security impact: PASS. No provider secrets printed or changed. Test records were cleaned. BEP20 remains guarded by a warning rather than advertised as enabled without a BEP20 address.
+Backend/API/billing impact: PASS for manual payment instructions. No automatic credit occurred; manual payments remain pending/admin-reviewed.
+Proposed action: Mark live manual payment configuration accepted. Keep Shopier/Cryptomus provider E2E launch blocker open until rotated provider credentials are installed and valid/invalid/duplicate callback/webhook tests pass.
+Agent 1 vote: APPROVE
+Agent 1 reason: User-facing payment instruction blocker is resolved for IBAN/manual crypto and live UAT stays green.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend assertions proved the correct reference/message mapping and cleanup; no balance mutation was introduced.
+Agent 3 vote: APPROVE
+Agent 3 reason: Visual lock held and payment-loss risk was reduced by TRC20-only display.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Update final reports, run local secret scan, and continue Shopier/Cryptomus provider E2E setup separately.
+Status: COMPLETED
+
+Agent 4 integrity guard:
+Vote: APPROVE
+Reason: The live manual payment change is isolated configuration, does not disturb the restored site design, and does not weaken provider/payment security gates.
+
+---
+
 Decision ID: DEC-FIX-AUTH-REFRESH-PROTECTED-POST-001
 Decision title: Refresh expired user access token before protected payment/account requests
 Decision type: Code/edit approval

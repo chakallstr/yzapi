@@ -136,7 +136,9 @@ No final local command failed after the latest fixes. Earlier targeted tests fai
 
 `OAUTH-STATE-RESTART-001` is fixed and retested locally. It requires live deploy before the production login flow is fully protected from deploy/restart state loss.
 
-`AUTH-SESSION-REFRESH-001` is fixed and retested locally. It addresses the live stale access-token symptom that blocked IBAN payment instructions with `Invalid or expired token`. It requires live deploy and standard Chrome retest before it is accepted as fixed in production.
+`AUTH-SESSION-REFRESH-001` is fixed, deployed and live-retested for the payment instruction path. It addresses the live stale access-token symptom that blocked IBAN payment instructions with `Invalid or expired token`.
+
+`LIVE-PAYMENT-CONFIG-001` is fixed and live-retested. Production IBAN display, WhatsApp payment notification and manual USDT TRC20 wallet instructions are configured; BEP20 remains intentionally guarded until a separate BEP20 address is provided.
 
 ## Design Preservation Result
 
@@ -144,16 +146,18 @@ PASS locally and live: old visual shell restored; latest changes were text/data/
 
 ## Remaining Risks
 
-The product is still not launch-ready because Shopier/Cryptomus provider E2E remains unproven and the local OAuth return/restart-safety fixes have not yet been deployed/retested live under the required four-agent gate. IBAN is live-proven. Temporary OmniRoute funded text billing is live-proven. Latest provider diagnostics show CloseRouter account/catalog/balance are reachable, but inference returns provider `502` for current catalog chat models and Anthropic `/messages`.
+The product is still not launch-ready because Shopier/Cryptomus provider E2E remains unproven and a fresh logout-to-login Google OAuth/admin owner browser sweep remains pending. The OAuth/auth-refresh/payment-instruction build has been deployed and live smoke/UAT passed. IBAN and manual USDT TRC20 instructions are live-proven. Temporary OmniRoute funded text billing is live-proven. Latest provider diagnostics show CloseRouter account/catalog/balance are reachable, but inference returns provider `502` for current catalog chat models and Anthropic `/messages`.
 
 Latest local auth-refresh regression passed: `npm test -- src/auth-client-refresh.test.ts` PASS 2/2, targeted auth/payment/admin tests PASS 4 files / 15 tests, full `npm test` PASS 30 files / 134 tests, lint/build/public scan/secret scan PASS. Default local UAT failed only because no server was listening on `127.0.0.1:4567`; live safe UAT against `https://yapayzekalab.org` passed 10/10.
+
+Latest live payment config retest passed: live env/config backup created, IBAN/WhatsApp/manual USDT TRC20 config applied, service restarted active, live smoke PASS, live UAT PASS 10/10, safe backend E2E asserted correct method/reference/WhatsApp mapping and cleaned temporary records. Standard Chrome showed manual USDT TRC20 instruction and WhatsApp button in the existing account card.
 
 General `npm audit` still reports 4 moderate dev-only advisories under `drizzle-kit`/nested esbuild. Production runtime audit is clean, so this is not the current launch-blocking high advisory, but it should stay tracked.
 
 ## Recommended Next Steps
 
 1. Escalate CloseRouter provider `502` with request ids `c2c53a5e-1cd3-474d-8136-17da70c0d922` and `98a159de-f6df-4a97-a7e6-78516f90bf65`, then retry one tiny direct inference only after provider route is fixed.
-2. Deploy the local OAuth/payment hardening patch with rollbackable Git backup, then rerun Google OAuth/admin owner UAT in the user's standard Chrome profile.
+2. Rerun Google OAuth/admin owner UAT from logout to dashboard/admin in the user's standard Chrome profile.
 3. Complete Shopier/Cryptomus sandbox E2E with rotated credentials and duplicate/invalid callback checks.
 4. Complete low-balance live smoke with safe `SMOKE_LOW_BALANCE_API_KEY` if a disposable key is provided or seeded.
-5. Keep deploy rollback `manual-20260527T071659Z-ddee303` available until the next deploy replaces it with a newer verified rollback.
+5. Keep deploy rollback `manual-20260527T201117Z-6cdcb89` available until the next deploy replaces it with a newer verified rollback.

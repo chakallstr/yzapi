@@ -181,6 +181,33 @@ API usage deduction artık temporary OmniRoute GPT path ile canlıda PASS. IBAN 
 
 ---
 
+# Live Manual Payment Config Retest — 2026-05-27 23:25 TRT
+
+## Güncellenen Canlı Ödeme Bilgileri
+
+| Alan | Sonuç | Kanıt |
+|---|---|---|
+| IBAN display config | PASS LIVE | Canlı env güncellendi; safe backend E2E bank/alıcı/IBAN alanlarını doğruladı |
+| WhatsApp payment notification | PASS LIVE | `system_config.payment_whatsapp_number` güncellendi; IBAN ve manual crypto init mesajları doğru referansı içerdi |
+| Manual USDT wallet | PASS LIVE | Manual crypto `USDT/TRC20` aktif; Chrome’da cüzdan talimatı ve WhatsApp butonu göründü |
+| BEP20 guard | PASS SAFE | Verilen adres TRON-format olduğu için BEP20 aktif gösterilmedi; memo uyarısı eklendi |
+| Automatic credit | PASS SAFE | IBAN/manual crypto otomatik bakiye eklemiyor; admin review/onay modeli korunuyor |
+| Temporary test cleanup | PASS LIVE | Backend E2E sırasında oluşturulan geçici payment/pending rows temizlendi |
+| Live smoke | PASS LIVE | `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` |
+| Live UAT | PASS LIVE | `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` 10/10 |
+
+## Güncel Shopier / Cryptomus Durumu
+
+- Shopier provider hâlâ canlıda kapalıdır; rotated production/sandbox credential kurulmadan valid/invalid/fail/duplicate callback E2E yapılamaz.
+- Cryptomus provider credential hâlâ canlıda kapalıdır; manuel USDT TRC20 talimatı aktif edildi, fakat Cryptomus webhook E2E hâlâ eksiktir.
+- Bu canlı config düzeltmesi gerçek para almadı, provider çağırmadı ve bakiye artırmadı.
+
+## Güncel Billing/Payment Verdict
+
+Manual IBAN ve manual USDT TRC20 ödeme talimatları canlıda PASS. Temporary OmniRoute API usage deduction daha önce canlıda PASS. Final payment launch gate yine de Shopier ve Cryptomus provider E2E tamamlanana kadar `BLOCKED_BY_MISSING_ROTATED_PROVIDER_ENV` kalır.
+
+---
+
 # Local Provider Callback Hardening — 2026-05-27 20:52 TRT
 
 ## Eklenen Güvenlik Korumaları

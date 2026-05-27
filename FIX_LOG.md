@@ -290,3 +290,21 @@ Operasyon tarihi: 2026-05-26
   - Full: `npm run lint` PASS; `npm test` PASS 30 files / 134 tests; `npm run build` PASS; `npm run scan:public` PASS 0 hits; `node scripts/scan-secrets.mjs` PASS 232 scanned / 0 hits.
   - UAT: local default `127.0.0.1:4567` smoke failed only because no local smoke server was listening; live `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` PASS 10/10.
 - Sonuç: FIXED LOCALLY. LIVE AUTH/PAYMENT BUTTON RETEST REQUIRES DEPLOY OF THIS COMMIT.
+
+## LIVE-PAYMENT-CONFIG-001 — Live IBAN, WhatsApp and manual USDT TRC20 configuration
+
+- Problem: Canlı ödeme panelinde IBAN talimat paneli açılıyordu, ancak canlı config placeholder banka/alıcı/IBAN gösteriyor ve WhatsApp ödeme bildirimi numarası boş kalıyordu. Manuel kripto cüzdanı da canlıda kapalıydı.
+- Kök neden: Kod/migration canlıya deploy edilmişti, fakat production `.env.production` ve `system_config` gerçek ödeme görüntüleme değerleriyle doldurulmamıştı.
+- Karar: `DEC-LIVE-PAYMENT-CONFIG-001`, 3/3 APPROVED + Agent 4 integrity guard APPROVE.
+- Yapılan değişiklik:
+  - Canlı `.env.production` üzerinde yalnız user-facing IBAN display alanları güncellendi.
+  - Canlı `system_config` üzerinde WhatsApp ödeme bildirimi ve manual `USDT/TRC20` cüzdan bilgisi aktif edildi.
+  - BEP20 gösterimi bilinçli olarak aktif edilmedi; verilen adres TRON-format olduğu için BEP20 ancak ayrı `0x...` adres verilirse açılmalı.
+  - Shopier/Cryptomus provider secretlarına dokunulmadı; gerçek ödeme/provider çağrısı yapılmadı.
+- Backup/rollback: Canlı env ve system_config önce `/opt/turkapiprojesi/.deploy/config-backups/` altına yedeklendi; servis restart sonrası aktif kaldı.
+- Test:
+  - `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` PASS.
+  - `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T20-24-23-736Z/uat-smoke-report.md`.
+  - Güvenli canlı backend E2E: geçici IBAN ve manual crypto init kayıtları oluşturuldu, metod/referans/WhatsApp eşleşmesi assert edildi, test kayıtları temizlendi.
+  - Standard Chrome: manual USDT TRC20 cüzdan talimatı ve WhatsApp ödeme bildirimi butonu görünür hale geldi.
+- Sonuç: LIVE MANUAL PAYMENT CONFIG FIXED. Shopier/Cryptomus provider valid/invalid/duplicate E2E hâlâ rotated provider env olmadan launch PASS sayılmaz.

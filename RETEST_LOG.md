@@ -725,3 +725,34 @@ Agent 2 retest vote: APPROVE
 Agent 3 retest vote: APPROVE
 Approval count: 3/3
 Final retest status: ACCEPTED_LOCALLY_DEPLOY_AND_LIVE_PAYMENT_RETEST_REQUIRED
+
+## LIVE-PAYMENT-CONFIG-001 Live Manual Payment Instruction Retest
+
+Bug ID: PAYMENT-INSTRUCTIONS-001
+Fix decision ID: DEC-LIVE-PAYMENT-CONFIG-001
+Retest decision ID: DEC-RETEST-LIVE-PAYMENT-CONFIG-001
+Command or manual flow:
+- Backed up live payment config, updated only live IBAN display env and non-secret manual payment DB config, then restarted `turkapiprojesi.service`.
+- Ran live smoke and live UAT against `https://yapayzekalab.org`.
+- Ran safe live backend E2E using a temporary short-lived user token: `POST /api/payments/iban/init` and `POST /api/payments/crypto/init` with `$2`, asserted current method/reference/WhatsApp mapping, then deleted the temporary payment rows.
+- Used the existing standard Chrome YapayZekaLab tab to verify manual USDT TRC20 wallet instructions and WhatsApp button are visible. No new Chrome tab was created for this check.
+Expected:
+- IBAN instruction response contains the configured bank, recipient, IBAN, matching reference and WhatsApp notification message.
+- Manual crypto response is enabled as USDT TRC20, contains the configured wallet, matching reference and WhatsApp notification message.
+- BEP20 is not advertised as enabled without a separate BEP20 address.
+- No balance is credited automatically; manual records remain pending/admin-reviewed unless explicitly approved.
+- No visual/template/layout/style change.
+Actual:
+- Live smoke PASS: `/health`, `/status`, `/api/models`, authless `/v1/chat/completions=401`, unknown `/api/*` and `/v1/*` JSON 404.
+- Live UAT PASS 10/10: `qa-artifacts/uat-smoke-2026-05-27T20-24-23-736Z/uat-smoke-report.md`.
+- Safe backend E2E PASS: IBAN and crypto assertions passed and cleanup passed.
+- Chrome visual UAT PASS for manual USDT TRC20 instruction visibility and WhatsApp payment notification button. IBAN placeholder issue is fixed at backend/config level; further Chrome clicking was stopped because user focus moved to another tab.
+Passed/Failed: Passed for live manual payment config.
+Evidence: Current session command output and standard Chrome screenshot/state. No real money, no provider payment, no customer balance mutation.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: ACCEPTED_LIVE_MANUAL_PAYMENT_CONFIG
+
+Agent 4 integrity guard: APPROVE
