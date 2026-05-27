@@ -58,6 +58,7 @@ NOT READY — API/BILLING/BALANCE BLOCKERS
 - Latest deploy metadata/security hygiene retest: `/status.deploy.id=manual-20260527T071659Z-ddee303`, live smoke PASS, legacy admin password line absent, env backup artefact secured outside regular backup dir.
 - Latest direct CloseRouter recheck: `/credits` and `/models/count` still 200, but tiny inference timed out across tested Anthropic/OpenAI/DeepSeek/Google/Moonshot/Qwen models.
 - Latest direct CloseRouter diagnostic: live catalog returns 18 text/chat models, but current low-cost chat candidates and `anthropic/claude-haiku-4.5` `/messages` still return provider `502` with request ids `c2c53a5e-1cd3-474d-8136-17da70c0d922` and `98a159de-f6df-4a97-a7e6-78516f90bf65`.
+- Heartbeat recheck `2026-05-27 11:01 TRT`: live smoke still PASS; live VPS CloseRouter `/credits`, `/models/count`, and text catalog still 200; exactly one tiny `deepseek/deepseek-v4-pro` chat inference with `max_tokens=4` returned `502 upstream_error`, request id `b00967ca-09ae-4ffa-8a64-7d78f14d9cb5`. Funded gateway billing was not run because the direct provider gate failed.
 - Standard Chrome automation was unavailable to this Codex session, so post-deploy logged-in Google admin click-through was not rerun in the user's existing Chrome profile.
 - Previous billing failure-path evidence exists; successful funded text billing and Shopier/Cryptomus provider E2E are still not approved. IBAN payment E2E is approved.
 

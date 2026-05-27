@@ -178,6 +178,54 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-CMD-LIVE-CLOSEROUTER-HEARTBEAT-001
+Decision title: Heartbeat live CloseRouter recheck with at most one tiny inference
+Decision type: Command/test approval
+Related bug IDs: R-BUG-006
+Evidence from reports: Prior launch readiness and API reports show CloseRouter account/catalog are reachable but inference returns provider `502`, blocking successful funded API billing.
+Files likely affected: Report files only after command.
+Risk level: Medium
+Design/template impact: None.
+Security impact: Must not print live env, Authorization values, raw API keys, cookies, or payment credentials. Only status codes, model ids, non-secret error codes and provider request ids may be recorded.
+Backend/API/billing impact: Direct provider call may spend a negligible amount only if successful; output capped at `max_tokens=4`. No image/video, no payments, no customer data mutation.
+Proposed action: Verify git/live smoke, then from live VPS env check CloseRouter `/credits`, `/models/count`, text catalog, and run exactly one tiny `/chat/completions` inference. Run funded gateway billing only if direct inference succeeds and a safe test key is already present.
+Agent 1 vote: APPROVE
+Agent 1 reason: This safely retests the remaining first API request blocker with minimal spend.
+Agent 2 vote: APPROVE
+Agent 2 reason: It separates upstream inference health from YapayZekaLab billing and avoids DB mutation unless the provider gate passes.
+Agent 3 vote: APPROVE
+Agent 3 reason: Approved because it preserves the visual theme, avoids secret output, and blocks launch if provider inference still fails.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Run safe live smoke and one bounded direct provider inference from the VPS environment.
+Status: COMPLETED
+
+---
+
+Decision ID: DEC-RETEST-LIVE-CLOSEROUTER-HEARTBEAT-001
+Decision title: Did the heartbeat recheck unblock successful funded API billing?
+Decision type: Retest acceptance
+Related bug IDs: R-BUG-006
+Evidence from reports: Live smoke passed; live VPS CloseRouter `/credits` returned 200 with `total_credits=1.99998845`, `/models/count` returned 34, and text catalog returned 18 models. The only direct tiny `/chat/completions` attempt used `deepseek/deepseek-v4-pro` with `max_tokens=4` and returned `502 upstream_error`, request id `b00967ca-09ae-4ffa-8a64-7d78f14d9cb5`.
+Files likely affected: `API_TEST_REPORT.md`, `RETEST_LOG.md`, `LAUNCH_READINESS_AFTER_REPAIR.md`, `AGENT_REPAIR_DECISIONS.md`.
+Risk level: High for release, Low for code.
+Design/template impact: None.
+Security impact: No secrets printed; no image/video/payment/provider mutation beyond one tiny text attempt.
+Backend/API/billing impact: Successful billing remains blocked; funded gateway billing was correctly skipped because direct provider inference failed.
+Proposed action: Keep final launch verdict blocked by API/billing/balance; continue periodic provider rechecks or escalate request id to CloseRouter.
+Agent 1 vote: REJECT
+Agent 1 reason: First customer text API request still cannot be accepted as working.
+Agent 2 vote: REJECT
+Agent 2 reason: Positive billing headers, balance deduction, transaction and success usage record cannot be proven.
+Agent 3 vote: REJECT
+Agent 3 reason: Release remains unsafe while the core paid API route depends on an upstream path returning 502.
+Approval count: 0/3
+Final decision: REJECTED
+Allowed next action: Do not run larger token tests; keep launch blocked and recheck later or escalate provider evidence.
+Status: COMPLETED
+
+---
+
 Decision ID: DEC-CMD-LIVE-CLOSEROUTER-MESSAGES-001
 Decision title: Test one bounded Anthropic-style CloseRouter messages route
 Decision type: Command/test approval

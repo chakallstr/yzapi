@@ -118,3 +118,26 @@ The account/catalog/balance side of CloseRouter is reachable, but inference rema
 ## Updated Root Cause Assessment
 
 The failure is not caused by YapayZekaLab using stale model IDs. Live catalog and credits are reachable, but CloseRouter's inference route returns provider-level `502` for both OpenAI-style chat and Anthropic-style messages. Successful funded YapayZekaLab billing remains blocked until CloseRouter inference returns at least one successful text response.
+
+---
+
+# Heartbeat Live API/Billing Recheck — 2026-05-27 11:01 TRT
+
+## Safe Live Smoke
+
+- `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`: PASS for `/health`, `/status`, `/api/models`, authless `/v1/chat/completions` `401`, unknown `/api/*` JSON `404`, and unknown `/v1/*` JSON `404`.
+- Successful gateway chat and low-balance gateway smoke were skipped because no safe `SMOKE_API_KEY` / `SMOKE_LOW_BALANCE_API_KEY` was present in the local env.
+
+## Direct CloseRouter VPS Evidence
+
+- Source: live VPS app environment under `/opt/turkapiprojesi`; provider key presence/prefix checked without printing the key.
+- `/credits`: `200`, `total_credits=1.99998845`, `total_usage=0.00001155`.
+- `/models/count`: `200`, `count=34`.
+- `/models?output_modalities=text`: `200`, `18` text models; chat-capable candidates included `anthropic/claude-haiku-4.5`, `anthropic/claude-opus-4.6`, `anthropic/claude-opus-4.7`, `anthropic/claude-sonnet-4.6`, `deepseek/deepseek-v4-pro`, `google/gemini-2.5-pro`, `google/gemini-3.1-flash-lite-preview`, `google/gemini-3.1-pro-preview`.
+- Exactly one tiny text inference was attempted: `POST /chat/completions` with `model=deepseek/deepseek-v4-pro`, `max_tokens=4`.
+- Result: `502`, `upstream_error`, request id `b00967ca-09ae-4ffa-8a64-7d78f14d9cb5`, elapsed about `21.6s`, no usage returned.
+- No image/video generation was run. No payment flow was touched. No secret values were printed.
+
+## Updated API Verdict
+
+Direct provider inference is still not resolved. Because the direct tiny inference failed, the funded YapayZekaLab gateway billing verification was not run. Successful API billing remains blocked until a direct text inference succeeds, then a safe funded `yzk_live_*` gateway key can prove billing headers, balance decrement, transaction ledger and success `usage_records`.

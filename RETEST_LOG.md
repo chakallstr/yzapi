@@ -78,6 +78,33 @@ Agent 3 retest vote: REJECT_FULL_RELEASE
 Approval count: 0/3
 Final retest status: FAILURE_PATH_PASS_SUCCESS_BILLING_BLOCKED_BY_UPSTREAM_502
 
+## LIVE-CLOSEROUTER-HEARTBEAT-001 Safe Provider Recheck
+
+Bug ID: R-BUG-006
+Fix decision ID: DEC-CMD-LIVE-CLOSEROUTER-HEARTBEAT-001
+Retest decision ID: DEC-RETEST-LIVE-CLOSEROUTER-HEARTBEAT-001
+Command or manual flow:
+- `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`
+- Live VPS env read without printing secrets.
+- Direct CloseRouter `/credits`, `/models/count`, `/models?output_modalities=text`.
+- One direct tiny `/chat/completions` request with `max_tokens=4`.
+Expected:
+- Live public smoke stays PASS.
+- CloseRouter account/catalog endpoints stay reachable.
+- If direct tiny text inference succeeds, proceed to smallest funded gateway billing verification only if a safe test key exists.
+Actual:
+- Live smoke PASS for health/status/models/authless/JSON-404 checks; successful and low-balance gateway key checks skipped because safe key env was absent.
+- `/credits` `200`, `/models/count` `200`, text catalog `200`.
+- Direct tiny `deepseek/deepseek-v4-pro` chat inference returned `502 upstream_error`, request id `b00967ca-09ae-4ffa-8a64-7d78f14d9cb5`.
+- Funded YapayZekaLab gateway billing verification was not run because the direct provider gate failed.
+Passed/Failed: Failed for successful inference; passed for safe smoke/account/catalog checks.
+Evidence: `API_TEST_REPORT.md` heartbeat section dated `2026-05-27 11:01 TRT`.
+Agent 1 retest vote: REJECT
+Agent 2 retest vote: REJECT
+Agent 3 retest vote: REJECT
+Approval count: 0/3
+Final retest status: SUCCESS_BILLING_STILL_BLOCKED_BY_UPSTREAM_502
+
 ## DESIGN-REGRESSION-001 Template Removal Retest
 
 Bug ID: DESIGN-REGRESSION-001
