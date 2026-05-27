@@ -25,12 +25,106 @@ export interface TextRequest {
   [key: string]: unknown;
 }
 
+const OMNIROUTE_MODEL_MAP: Record<string, string> = {
+  "openai/gpt-5.4-mini": "cx/gpt-5.4-mini",
+};
+
 function extractTokenUsage(json: Record<string, unknown>): ChatUsage {
   const u = (json.usage ?? {}) as Record<string, number>;
   return {
     promptTokens: u.prompt_tokens ?? u.input_tokens ?? 0,
     completionTokens: u.completion_tokens ?? u.output_tokens ?? 0,
   };
+}
+
+function estimateTextTokens(value: unknown): number {
+  if (value === null || value === undefined) return 0;
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  return Math.max(1, Math.ceil(text.length / 4));
+}
+
+function estimateUsageFromPayload(body: Record<string, unknown>, json: Record<string, unknown>): ChatUsage {
+  const usage = extractTokenUsage(json);
+  if (usage.promptTokens > 0 || usage.completionTokens > 0) return usage;
+
+  const choices = json.choices as Array<Record<string, unknown>> | undefined;
+  const output = choices
+    ?.map((choice) => {
+      const message = choice.message as Record<string, unknown> | undefined;
+      return message?.content ?? "";
+    })
+    .join("") ?? "";
+
+  return {
+    promptTokens: estimateTextTokens(body.messages ?? body.input ?? body.prompt ?? ""),
+    completionTokens: estimateTextTokens(output),
+  };
+}
+
+function isOmniRouteBase(baseUrl: string): boolean {
+  return baseUrl.includes("127.0.0.1:20128") || baseUrl.includes("api.seslab.tr");
+}
+
+export function mapModelForProvider(model: string, baseUrl = env.CLOSEROUTER_BASE_URL): string {
+  if (!isOmniRouteBase(baseUrl)) return model;
+  return OMNIROUTE_MODEL_MAP[model] ?? model;
+}
+
+function mapRequestBodyForProvider<T extends Record<string, unknown>>(body: T): T {
+  if (typeof body.model !== "string") return body;
+  const mapped = mapModelForProvider(body.model);
+  if (mapped === body.model) return body;
+  return { ...body, model: mapped };
+}
+
+export function parseSseCompletion(text: string): Record<string, unknown> {
+  const chunks: Array<Record<string, unknown>> = [];
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.startsWith("data: ")) continue;
+    const payload = line.slice(6).trim();
+    if (!payload || payload === "[DONE]") continue;
+    try {
+      chunks.push(JSON.parse(payload) as Record<string, unknown>);
+    } catch {
+      // Ignore malformed event fragments; upstream error handling still catches non-200 responses.
+    }
+  }
+
+  const first = chunks[0] ?? {};
+  const content = chunks
+    .map((chunk) => {
+      const choice = (chunk.choices as Array<Record<string, unknown>> | undefined)?.[0];
+      const delta = choice?.delta as Record<string, unknown> | undefined;
+      const message = choice?.message as Record<string, unknown> | undefined;
+      return delta?.content ?? message?.content ?? "";
+    })
+    .join("");
+  const finalChoice = [...chunks].reverse()
+    .map((chunk) => (chunk.choices as Array<Record<string, unknown>> | undefined)?.[0])
+    .find(Boolean);
+  const usage = [...chunks].reverse().find((chunk) => chunk.usage)?.usage;
+
+  return {
+    id: first.id ?? "chatcmpl_omniroute",
+    object: "chat.completion",
+    created: first.created,
+    model: first.model,
+    choices: [{
+      index: 0,
+      message: { role: "assistant", content },
+      finish_reason: finalChoice?.finish_reason ?? "stop",
+    }],
+    ...(usage ? { usage } : {}),
+  };
+}
+
+async function readProviderJson(res: globalThis.Response): Promise<Record<string, unknown>> {
+  const contentType = res.headers.get("content-type") ?? "";
+  const text = await res.text();
+  if (contentType.includes("text/event-stream") || text.trimStart().startsWith("data: ")) {
+    return parseSseCompletion(text);
+  }
+  return JSON.parse(text) as Record<string, unknown>;
 }
 
 function baseHeaders(): Record<string, string> {
@@ -46,15 +140,16 @@ export async function forwardChat(
 ): Promise<{ raw: unknown; usage: ChatUsage }> {
   const start = Date.now();
   const url = `${env.CLOSEROUTER_BASE_URL}/chat/completions`;
+  const providerBody = mapRequestBodyForProvider({ ...body, stream: false });
 
   const res = await fetch(url, {
     method: "POST",
     headers: baseHeaders(),
-    body: JSON.stringify({ ...body, stream: false }),
+    body: JSON.stringify(providerBody),
   });
 
   const responseMs = Date.now() - start;
-  const json = await res.json() as Record<string, unknown>;
+  const json = await readProviderJson(res);
 
   logger.debug({ model: body.model, status: res.status, responseMs }, "closerouter chat");
 
@@ -67,7 +162,7 @@ export async function forwardChat(
 
   return {
     raw: json,
-    usage: extractTokenUsage(json),
+    usage: estimateUsageFromPayload(providerBody, json),
   };
 }
 
@@ -77,15 +172,16 @@ export async function forwardTextEndpoint(
 ): Promise<{ raw: unknown; usage: ChatUsage }> {
   const start = Date.now();
   const url = `${env.CLOSEROUTER_BASE_URL}/${endpoint}`;
+  const providerBody = mapRequestBodyForProvider({ ...body, stream: false });
 
   const res = await fetch(url, {
     method: "POST",
     headers: baseHeaders(),
-    body: JSON.stringify({ ...body, stream: false }),
+    body: JSON.stringify(providerBody),
   });
 
   const responseMs = Date.now() - start;
-  const json = await res.json() as Record<string, unknown>;
+  const json = await readProviderJson(res);
 
   logger.debug({ model: body.model, endpoint, status: res.status, responseMs }, "closerouter text endpoint");
 
@@ -96,7 +192,7 @@ export async function forwardTextEndpoint(
     throw err;
   }
 
-  return { raw: json, usage: extractTokenUsage(json) };
+  return { raw: json, usage: estimateUsageFromPayload(providerBody, json) };
 }
 
 export async function forwardChatStream(
