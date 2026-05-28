@@ -74,6 +74,48 @@ const ACCENT_MAP = {
 const ADMIN_EMAIL = 'cix.crazy666@gmail.com';
 const FALLBACK_USD_TRY = 47.084289;
 const PROTECTED_TABS = new Set(['activity', 'account', 'admin']);
+const LEGAL_DOCS = {
+  kvkk: {
+    title: 'KVKK Aydınlatma Metni',
+    body: [
+      'YapayZekaLab kapsamında paylaşılan ad, soyad, e-posta, telefon, ödeme ve kullanım kayıtları hizmetin sunulması, hesap güvenliği, ödeme doğrulaması, destek süreçleri ve yasal yükümlülüklerin yerine getirilmesi amacıyla işlenir.',
+      'Veriler yalnızca hizmetin işletilmesi için gerekli ölçüde saklanır. API kullanım kayıtları, bakiye hareketleri, güvenlik logları ve duyuru teslim kayıtları operasyonel gereklilik kapsamında tutulabilir.',
+      'Kullanıcı verileri hizmet altyapısında ve zorunlu entegrasyonlarda işlenebilir. Ödeme, kimlik doğrulama ve mesajlaşma süreçlerinde ilgili teknik sağlayıcılara sınırlı veri aktarımı yapılabilir.',
+      'Veri sorumlusu iletişim bilgileri: YapayZekaLab, e-posta: admin@seslab.com.tr, telefon: 0531 931 07 81. Fiziksel adres, vergi numarası ve MERSİS bilgisi şu an paylaşılmamaktadır.',
+      'Kullanıcı, KVKK kapsamındaki başvurularını admin@seslab.com.tr adresine iletebilir. Talepler yürürlükteki mevzuat çerçevesinde değerlendirilir.',
+    ],
+  },
+  sozlesme: {
+    title: 'Kullanıcı Sözleşmesi',
+    body: [
+      'YapayZekaLab hesabını kullanan herkes, hizmeti yalnızca hukuka uygun amaçlarla kullanacağını kabul eder. Kullanıcı, API anahtarını üçüncü kişilerle izinsiz paylaşmamakla ve hesabındaki işlemlerden sorumlu olmakla yükümlüdür.',
+      'Hizmet bakiyeli kullanım modeliyle çalışır. Kullanıcı yalnızca hesabındaki bakiye kadar kullanım yapabilir. Sistem, yetersiz bakiye durumunda isteği durdurabilir veya reddedebilir.',
+      'YapayZekaLab, kötüye kullanım, güvenlik riski, ters ibraz, sahte ödeme bildirimi, saldırı, spam veya hizmeti istismar eden davranışlarda hesabı askıya alma, API erişimini kesme veya işlemleri iptal etme hakkını saklı tutar.',
+      'Kullanıcı, üçüncü taraf yapay zeka sağlayıcılarının yanıtlarından doğan içerik sonuçlarının kendi sorumluluğunda olduğunu kabul eder. YapayZekaLab çıktıların doğruluğu, kesintisizliği veya belirli bir amaca uygunluğu konusunda garanti vermez.',
+      'Destek ve resmi bildirim kanalı admin@seslab.com.tr adresidir. Gerektiğinde 0531 931 07 81 numarası üzerinden iletişim kurulabilir.',
+    ],
+  },
+  gizlilik: {
+    title: 'Gizlilik Politikası',
+    body: [
+      'YapayZekaLab, kullanıcıya ait hesap, bakiye, ödeme ve kullanım verilerini hizmeti işletmek için gerekli olduğu sürece korur. Yetkisiz erişime karşı makul teknik ve idari önlemler uygulanır.',
+      'API anahtarları, doğrulama belirteçleri ve benzeri hassas bilgiler son kullanıcıya sadece gerekli anlarda gösterilir; sistem içinde korunur ve herkese açık yüzeylerde paylaşılmaz.',
+      'Kullanıcı içerikleri ve istek kayıtları güvenlik, faturalama, hata ayıklama ve suistimal önleme amaçlarıyla sınırlı olarak işlenebilir. Yasal zorunluluk olmadıkça üçüncü kişilerle pazarlama amacıyla paylaşılmaz.',
+      'WhatsApp, Google oturumu, ödeme ve diğer entegrasyonlarda ilgili sağlayıcının teknik gerektirdiği kadar veri iletimi olabilir. Kullanıcı bu entegrasyonların kendi politikalarına da tabi olduğunu kabul eder.',
+      'Gizlilik talepleri ve veri soruları için admin@seslab.com.tr adresi kullanılmalıdır.',
+    ],
+  },
+  mesafeli: {
+    title: 'Mesafeli Satış Bilgilendirmesi',
+    body: [
+      'YapayZekaLab üzerinde yapılan bakiye yüklemeleri dijital hizmet kullanımına yöneliktir. Kullanıcı, satın aldığı bakiyeyi API ve panel içindeki dijital işlemlerde kullanır.',
+      'Bakiye yükleme işlemleri banka havalesi, kart, kripto veya aktif edilen diğer yöntemlerle alınabilir. Ödeme onayı tamamlanmadan bakiye tanımlanmaz.',
+      'Dijital hizmetlerde bakiye tanımlandıktan ve kullanım başladıktan sonra iade değerlendirmesi, ilgili mevzuat, ödeme kaydı ve kötüye kullanım incelemesine göre yapılır. Sahte bildirim veya ters ibraz durumlarında hesap askıya alınabilir.',
+      'Satıcı/hizmet sağlayıcı bilgileri: YapayZekaLab, e-posta admin@seslab.com.tr, telefon 0531 931 07 81. Fiziksel adres, vergi numarası ve MERSİS bilgisi şu an paylaşılmamaktadır.',
+      'Kullanıcı, ödeme yaparak dijital hizmete ilişkin ön bilgilendirmeyi okuduğunu ve elektronik ortamda onay verdiğini kabul eder.',
+    ],
+  },
+};
 
 const initialsFor = (value) => {
   const clean = String(value || '').trim();
@@ -244,6 +286,7 @@ const Logo = () => (
 
 // === LoginScreen — çıkış yapıldığında gösterilir ===================
 const LoginScreen = () => {
+  const [legalOpen, setLegalOpen] = useState('');
   const startGoogleAuth = () => {
     window.location.assign('/api/auth/google');
   };
@@ -289,6 +332,25 @@ const LoginScreen = () => {
         <div style={{ textAlign: 'center', marginTop: 18, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.55 }}>
           Hesap oluşturma ve giriş aynı Google akışıyla tamamlanır.
         </div>
+        <div style={{
+          marginTop: 16,
+          padding: '14px 16px',
+          borderRadius: 12,
+          background: 'rgba(59,130,246,0.08)',
+          border: '1px solid rgba(59,130,246,0.18)',
+          textAlign: 'center',
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.55 }}>
+            Giriş yaparak KVKK Aydınlatma Metni, Gizlilik Politikası, Kullanıcı Sözleşmesi ve Mesafeli Satış koşullarını kabul etmiş sayılırsınız.
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 10, marginTop: 10, fontSize: 11.5 }}>
+            <button type="button" onClick={() => setLegalOpen('kvkk')} style={{ color: 'var(--accent-ink)', textDecoration: 'underline' }}>KVKK</button>
+            <button type="button" onClick={() => setLegalOpen('gizlilik')} style={{ color: 'var(--accent-ink)', textDecoration: 'underline' }}>Gizlilik</button>
+            <button type="button" onClick={() => setLegalOpen('sozlesme')} style={{ color: 'var(--accent-ink)', textDecoration: 'underline' }}>Kullanıcı Sözleşmesi</button>
+            <button type="button" onClick={() => setLegalOpen('mesafeli')} style={{ color: 'var(--accent-ink)', textDecoration: 'underline' }}>Mesafeli Satış</button>
+          </div>
+        </div>
+        {legalOpen && <LegalModal docKey={legalOpen} onClose={() => setLegalOpen('')} />}
       </div>
     </div>
   );
@@ -769,9 +831,46 @@ const PublicStatusModal = ({ onClose }) => {
   );
 };
 
+const LegalModal = ({ docKey, onClose }) => {
+  const doc = LEGAL_DOCS[docKey];
+  if (!doc) return null;
+  return (
+    <div onClick={onClose} className="fade-in" style={{
+      position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(6px)',
+      zIndex: 95, display: 'grid', placeItems: 'center', padding: 24,
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: 'var(--surface)', borderRadius: 18, width: '100%', maxWidth: 760,
+        boxShadow: 'var(--sh-3)', overflow: 'hidden',
+      }}>
+        <div style={{
+          padding: '18px 22px', borderBottom: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div>
+            <Caption>Yasal metin</Caption>
+            <div style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>{doc.title}</div>
+          </div>
+          <button onClick={onClose} style={{ color: 'var(--ink-3)', padding: 6 }}>
+            <I.Close size={16} stroke="var(--ink-3)" />
+          </button>
+        </div>
+        <div style={{ padding: 22, maxHeight: '70vh', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {doc.body.map((paragraph, index) => (
+            <p key={index} style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.7 }}>
+              {paragraph}
+            </p>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // === Footer with public status link =================================
 const SiteFooter = () => {
   const [statusOpen, setStatusOpen] = useState(false);
+  const [legalOpen, setLegalOpen] = useState('');
   const okCount = mockProviderStatus.filter(x => x.durum === 'aktif').length;
   const allOk = okCount === mockProviderStatus.length;
   return (
@@ -793,13 +892,14 @@ const SiteFooter = () => {
             {allOk ? 'Tüm servisler çevrimiçi' : `${okCount}/${mockProviderStatus.length} sağlayıcı`}
           </button>
           <span style={{ color: 'var(--ink-4)' }}>·</span>
-          <a href="#kvkk" style={{ color: 'inherit', textDecoration: 'none' }}>KVKK</a>
-          <a href="#sozlesme" style={{ color: 'inherit', textDecoration: 'none' }}>Kullanıcı Sözleşmesi</a>
-          <a href="#gizlilik" style={{ color: 'inherit', textDecoration: 'none' }}>Gizlilik</a>
-          <a href="#mesafeli" style={{ color: 'inherit', textDecoration: 'none' }}>Mesafeli Satış</a>
+          <button onClick={() => setLegalOpen('kvkk')} style={{ color: 'inherit', textDecoration: 'none' }}>KVKK</button>
+          <button onClick={() => setLegalOpen('sozlesme')} style={{ color: 'inherit', textDecoration: 'none' }}>Kullanıcı Sözleşmesi</button>
+          <button onClick={() => setLegalOpen('gizlilik')} style={{ color: 'inherit', textDecoration: 'none' }}>Gizlilik</button>
+          <button onClick={() => setLegalOpen('mesafeli')} style={{ color: 'inherit', textDecoration: 'none' }}>Mesafeli Satış</button>
         </div>
       </footer>
       {statusOpen && <PublicStatusModal onClose={() => setStatusOpen(false)} />}
+      {legalOpen && <LegalModal docKey={legalOpen} onClose={() => setLegalOpen('')} />}
     </>
   );
 };
@@ -1031,18 +1131,7 @@ const App = ({ initialTab = 'home' }) => {
       <footer style={{ display: 'none' }} />
       <SiteFooter />
 
-      {showLogin && (
-        <LoginScreen
-          onLogin={() => {
-            setIsAuthenticated(true);
-            setShowLogin(false);
-            if (pendingTab) {
-              setTab(pendingTab);
-              setPendingTab(null);
-            }
-          }}
-        />
-      )}
+      {showLogin && <LoginScreen />}
 
       {whatsappPendingToken && (
         <WhatsAppOtpScreen
