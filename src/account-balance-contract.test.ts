@@ -15,8 +15,18 @@ describe("account balance real-source contract", () => {
     expect(accountSource).toContain("const fallbackBalanceUSD = 0;");
   });
 
-  it("returns bakiyeUsd from backend me route", () => {
+  it("returns bakiyeUsd and a stable userCode from backend me route", () => {
     expect(userRouteSource).toContain("const bakiyeUsd =");
-    expect(userRouteSource).toContain("res.json({ ...safe, bakiyeUsd, ...whatsapp });");
+    expect(userRouteSource).toContain('const userCode = safe.id ? `u-${String(safe.id).replace(/-/g, "").slice(0, 8)}` : null;');
+    expect(userRouteSource).toContain("res.json({ ...safe, bakiyeUsd, userCode, ...whatsapp });");
+  });
+
+  it("routes profile menu items to real account sections", () => {
+    expect(appSource).toContain("label: 'API anahtarları'");
+    expect(appSource).toContain("section: 'keys'");
+    expect(appSource).toContain("label: 'Hesap ayarları'");
+    expect(appSource).toContain("section: 'settings'");
+    expect(accountSource).toContain('id="account-keys"');
+    expect(accountSource).toContain('id="account-settings"');
   });
 });

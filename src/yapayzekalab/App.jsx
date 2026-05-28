@@ -513,14 +513,14 @@ const UserMenu = ({ onAction, profile, balanceUSD }) => {
   const email = profile?.email || 'oturum aktif';
   const status = profile?.durum || 'aktif';
   const plan = profile?.planAd || profile?.plan || 'hesap';
-  const userCode = profile?.id ? `u-${String(profile.id).slice(0, 4)}` : 'profil';
+  const userCode = profile?.userCode || (profile?.id ? `u-${String(profile.id).replace(/-/g, '').slice(0, 8)}` : 'profil');
   const balanceHint = `$${Number(balanceUSD ?? profile?.bakiyeUsd ?? 0).toFixed(2)}`;
 
   const items = [
     { Ico: I.Wallet,   label: 'Hesabım & bakiye',     hint: balanceHint,          section: 'balance' },
     { Ico: I.Key,      label: 'API anahtarları',       hint: 'gerçek liste',       section: 'keys' },
     { Ico: I.Activity, label: 'Kullanım geçmişi',      hint: 'son istekler',       section: 'usage' },
-    { Ico: I.Settings, label: 'Hesap ayarları',        hint: 'profil, email',     section: 'profile' },
+    { Ico: I.Settings, label: 'Hesap ayarları',        hint: 'profil, email',     section: 'settings' },
   ];
 
   return (
@@ -1055,7 +1055,8 @@ const App = ({ initialTab = 'home' }) => {
     }
     if (action.tab) {
       setTab(action.tab);
-      setGoto(action.section || null);
+      setGoto(null);
+      requestAnimationFrame(() => setGoto(action.section || null));
     }
   };
 

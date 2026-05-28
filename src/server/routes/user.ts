@@ -23,8 +23,9 @@ router.get("/me", async (req, res, next) => {
     const kur = Number(configRows[0]?.kur ?? 0);
     const bakiyeTL = Number(safe.bakiyeTL ?? 0);
     const bakiyeUsd = kur > 0 ? bakiyeTL / kur : 0;
+    const userCode = safe.id ? `u-${String(safe.id).replace(/-/g, "").slice(0, 8)}` : null;
     const whatsapp = await getWhatsappVerificationSummary(req.user!.id);
-    res.json({ ...safe, bakiyeUsd, ...whatsapp });
+    res.json({ ...safe, bakiyeUsd, userCode, ...whatsapp });
   } catch (e) { next(e); }
 });
 

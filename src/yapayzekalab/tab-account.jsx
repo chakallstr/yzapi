@@ -448,6 +448,7 @@ const AccountTab = ({ ctx }) => {
   const [monthlyReport, setMonthlyReport] = useState(null);
 
   const balanceUSD = asNumber(me?.bakiyeUsd, fallbackBalanceUSD);
+  const userCode = me?.userCode || (me?.id ? `u-${String(me.id).replace(/-/g, '').slice(0, 8)}` : 'profil');
   const monthCostUsd = asNumber(monthlyReport?.summary?.costUsd, usageRows.reduce((sum, row) => sum + asNumber(row.costUsd, asNumber(row.costTL, 0) / tlRate), 0));
   const monthRequests = asNumber(monthlyReport?.summary?.requestCount, usageRows.length);
 
@@ -1034,6 +1035,30 @@ const AccountTab = ({ ctx }) => {
             </div>
           );
         })}
+      </Card>
+
+      {/* Account settings */}
+      <Card pad={0} id="account-settings" style={{ overflow: 'hidden', scrollMarginTop: 80 }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>Hesap ayarları</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>Profil, iletişim ve benzersiz hesap kodu</div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px 110px', gap: 10, padding: '12px 20px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
+          {['Ad soyad','E-posta','Hesap kodu','Durum'].map(h => (
+            <Caption key={h} style={{ fontSize: 9 }}>{h}</Caption>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px 110px', gap: 10, padding: '14px 20px', alignItems: 'center', fontSize: 12 }}>
+          <span style={{ fontWeight: 500 }}>{me?.adSoyad || '—'}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{me?.email || '—'}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Chip tone="neutral" style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)' }}>{userCode}</Chip>
+            <button onClick={() => navigator.clipboard?.writeText(userCode)} style={{ color: 'var(--ink-3)', padding: 2 }} title="Kod kopyala">
+              <I.Copy size={11} stroke="var(--ink-3)" />
+            </button>
+          </div>
+          <Chip tone={me?.durum === 'aktif' ? 'ok' : 'neutral'} style={{ fontSize: 9.5, justifySelf: 'start' }}>{me?.durum || 'aktif'}</Chip>
+        </div>
       </Card>
 
       {/* Payment history (USD primary) */}
