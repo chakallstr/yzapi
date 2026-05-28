@@ -11,7 +11,7 @@ describe("forwardTextEndpoint", () => {
     nock("https://api.closerouter.dev", {
       reqheaders: { authorization: "Bearer closerouter_test_key" },
     })
-      .post("/v1/responses", (body) => body.model === "openai/gpt-5.4-mini" && body.stream === false)
+      .post("/v1/responses", (body) => body.model === "gpt-5.4-mini" && body.stream === false)
       .reply(200, {
         id: "resp_123",
         usage: { input_tokens: 100, output_tokens: 25 },
@@ -30,7 +30,7 @@ describe("forwardTextEndpoint", () => {
     nock("https://api.closerouter.dev", {
       reqheaders: { authorization: "Bearer closerouter_test_key" },
     })
-      .post("/v1/messages", (body) => body.model === "anthropic/claude-haiku-4.5" && body.stream === false)
+      .post("/v1/messages", (body) => body.model === "claude-haiku-4-5-20251001" && body.stream === false)
       .reply(200, {
         id: "msg_123",
         usage: { prompt_tokens: 60, completion_tokens: 15 },
@@ -45,7 +45,7 @@ describe("forwardTextEndpoint", () => {
     expect(result.usage).toEqual({ promptTokens: 60, completionTokens: 15 });
   });
 
-  it("throws upstream status and body when CloseRouter returns an error", async () => {
+  it("throws upstream status and body when the AI provider returns an error", async () => {
     nock("https://api.closerouter.dev", {
       reqheaders: { authorization: "Bearer closerouter_test_key" },
     })
@@ -74,7 +74,7 @@ describe("OmniRoute compatibility", () => {
   it("maps public OpenAI model id to the temporary OmniRoute GPT id", () => {
     expect(mapModelForProvider("openai/gpt-5.4-mini", "http://127.0.0.1:20128/v1")).toBe("cx/gpt-5.4-mini");
     expect(mapModelForProvider("openai/gpt-5.4-mini", "https://api.seslab.tr/v1")).toBe("cx/gpt-5.4-mini");
-    expect(mapModelForProvider("openai/gpt-5.4-mini", "https://api.closerouter.dev/v1")).toBe("openai/gpt-5.4-mini");
+    expect(mapModelForProvider("openai/gpt-5.4-mini", "https://api.claude-popusk.shop/v1")).toBe("gpt-5.4-mini");
   });
 
   it("parses non-stream SSE chat chunks into an OpenAI-compatible JSON response", () => {
@@ -95,7 +95,7 @@ describe("OmniRoute compatibility", () => {
     nock("https://api.closerouter.dev", {
       reqheaders: { authorization: "Bearer closerouter_test_key" },
     })
-      .post("/v1/chat/completions", (body) => body.model === "openai/gpt-5.4-mini" && body.stream === false)
+      .post("/v1/chat/completions", (body) => body.model === "gpt-5.4-mini" && body.stream === false)
       .reply(200, [
         'data: {"id":"chatcmpl_2","object":"chat.completion.chunk","model":"gpt-5.4-mini","choices":[{"index":0,"delta":{"content":"ok"},"finish_reason":"stop"}]}',
         "data: [DONE]",

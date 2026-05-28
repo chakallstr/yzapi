@@ -15,23 +15,25 @@ const accountSource = readFileSync("src/yapayzekalab/tab-account.jsx", "utf8");
 describe("API docs content contract", () => {
   it("uses the production YapayZekaLab v1 base URL and live key prefix in examples", () => {
     expect(appSource).not.toContain("https://api.yapayzekalab.com/v1");
+    expect(appSource).not.toContain("https://api.yapayzekalab.org/v1");
     expect(appSource).not.toContain("Bearer YOUR_API_KEY");
-    expect(appSource).toContain("https://api.yapayzekalab.org/v1/chat/completions");
+    expect(appSource).toContain("https://yapayzekalab.org/v1/chat/completions");
     expect(appSource).toContain("Bearer yzk_live_YOUR_KEY");
+    expect(appSource).toContain("claude-haiku-4-5-20251001");
   });
 
   it("documents the adapted public v1 endpoint surface", () => {
     expect(appSource).toContain("/v1/chat/completions");
     expect(appSource).toContain("/v1/responses");
     expect(appSource).toContain("/v1/messages");
-    expect(appSource).toContain("/v1/images/generations");
-    expect(appSource).toContain("/v1/images/edits");
+    expect(appSource).toMatch(/\/v1\/responses[\s\S]{0,120}JSON hata döner ve ücret yazmaz/i);
+    expect(appSource).toMatch(/Görsel ve video endpointleri[\s\S]{0,120}501 JSON hata/i);
   });
 
-  it("explains that video endpoints are beta or limited instead of fully production-ready", () => {
-    expect(appSource).toMatch(/Video[\s\S]{0,160}(beta|sınırlı|501)/i);
-    expect(appSource).toMatch(/video API endpointleri aktif değilse 501 dönebilir/i);
-    expect(modelsSource).toMatch(/Video[\s\S]{0,220}(beta|sınırlı|501)/i);
+  it("explains that image and video endpoints are disabled during provider migration", () => {
+    expect(appSource).toMatch(/aktif katalog yalnızca metin modelleridir/i);
+    expect(appSource).toMatch(/görsel\/video endpointleri 501 döner/i);
+    expect(modelsSource).toMatch(/Görsel\/video endpointleri[\s\S]{0,120}501 JSON hata/i);
   });
 
   it("does not expose internal multiplier formulas as public sales copy", () => {

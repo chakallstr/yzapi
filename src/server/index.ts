@@ -1,9 +1,9 @@
-import express from "express";
+import express, { Request } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { execSync } from "child_process";
 import { createServer as createViteServer } from "vite";
-import { env } from "./lib/env.js";
+import { aiProviderApiKey, aiProviderBaseUrl, env } from "./lib/env.js";
 import { logger, httpLogger } from "./lib/logger.js";
 import { requestId } from "./middleware/request-id.js";
 import { errorHandler } from "./middleware/error-handler.js";
@@ -22,6 +22,7 @@ import filesRouter from "./routes/files.js";
 import legacyRouter from "./routes/legacy.js";
 import proxyRouter from "./routes/proxy.js";
 import paymentsRouter from "./routes/payments.js";
+import telegramRouter from "./routes/telegram.js";
 import v1CatalogRouter from "./routes/v1-catalog.js";
 import { apiKeyAuth } from "./middleware/api-key-auth.js";
 import { getStatusSnapshot } from "./services/status-service.js";
@@ -47,7 +48,12 @@ function formatUptime(seconds: number): string {
 const app = express();
 const startedAt = Date.now();
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({
+  limit: "10mb",
+  verify: (req, _res, buf) => {
+    (req as Request & { rawBody?: string }).rawBody = buf.toString("utf8");
+  },
+}));
 app.use(requestId);
 app.use(httpLogger);
 
@@ -79,22 +85,22 @@ app.get("/health", async (_req, res) => {
     checks.kurAge = "unknown";
   }
 
-  // CloseRouter check
-  if (env.CLOSEROUTER_API_KEY) {
+  // AI provider check
+  if (aiProviderApiKey()) {
     try {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 2000);
-      const r = await fetch(`${env.CLOSEROUTER_BASE_URL}/models`, {
-        headers: { Authorization: `Bearer ${env.CLOSEROUTER_API_KEY}` },
+      const r = await fetch(`${aiProviderBaseUrl()}/models`, {
+        headers: { Authorization: `Bearer ${aiProviderApiKey()}` },
         signal: ctrl.signal,
       });
       clearTimeout(timer);
-      checks.closerouter = r.ok ? "ok" : "fail";
+      checks.aiProvider = r.ok ? "ok" : "fail";
     } catch {
-      checks.closerouter = "fail";
+      checks.aiProvider = "fail";
     }
   } else {
-    checks.closerouter = "unknown";
+    checks.aiProvider = "unknown";
   }
 
   checks.uptime = formatUptime((Date.now() - startedAt) / 1000);
@@ -135,6 +141,8 @@ app.use("/api", legacyRouter);
 
 // Payment routes — mixed auth (user-auth + public webhooks + admin)
 app.use("/api/payments", paymentsRouter);
+// Telegram bot + Crypto Pay routes — mixed auth, public webhooks, admin monitor
+app.use("/api/telegram", telegramRouter);
 
 // Proxy routes — require yzk_* API key, mounted at /v1 before Vite catch-all
 app.use("/v1", v1CatalogRouter);

@@ -24,9 +24,12 @@ const schema = z.object({
   APP_BASE_URL: z.string().default("http://localhost:4567"),
   FRONTEND_AUTH_RETURN: z.string().default("/"),
 
-  // CloseRouter proxy
+  // AI provider proxy
+  AI_PROVIDER_API_KEY: z.string().optional(),
+  AI_PROVIDER_BASE_URL: z.string().optional(),
+  // Backward-compatible legacy names.
   CLOSEROUTER_API_KEY: z.string().optional(),
-  CLOSEROUTER_BASE_URL: z.string().default("https://api.closerouter.dev/v1"),
+  CLOSEROUTER_BASE_URL: z.string().optional(),
   RATE_LIMIT_PER_KEY_PER_MIN: z.coerce.number().default(60),
 
   // Shopier payment (optional — returns 503 when unset)
@@ -40,6 +43,17 @@ const schema = z.object({
   CRYPTOMUS_API_KEY: z.string().optional(),
   CRYPTOMUS_RETURN_URL: z.string().optional(),
   CRYPTOMUS_WEBHOOK_URL: z.string().optional(),
+
+  // Telegram + Crypto Pay bot channel (optional — endpoints return 503 when unset)
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
+  TELEGRAM_SUPPORT_URL: z.string().default(""),
+  CRYPTO_PAY_API_TOKEN: z.string().optional(),
+  CRYPTO_PAY_API_BASE_URL: z.string().optional(),
+  CRYPTO_PAY_WEBHOOK_SECRET: z.string().optional(),
+  CRYPTO_PAY_RETURN_URL: z.string().optional(),
+  CRYPTO_PAY_ACCEPTED_ASSETS: z.string().optional(),
+  CRYPTO_PAY_INVOICE_EXPIRES_SEC: z.coerce.number().default(60 * 60),
 
   // IBAN info (display only)
   IBAN_BANK_NAME: z.string().default(""),
@@ -70,3 +84,11 @@ const schema = z.object({
 });
 
 export const env = schema.parse(process.env);
+
+export function aiProviderApiKey(): string | undefined {
+  return env.AI_PROVIDER_API_KEY || env.CLOSEROUTER_API_KEY;
+}
+
+export function aiProviderBaseUrl(): string {
+  return env.AI_PROVIDER_BASE_URL || env.CLOSEROUTER_BASE_URL || "https://api.claude-popusk.shop/v1";
+}

@@ -16,7 +16,7 @@ import {
    ============================================ */
 
 // === RouteFlow — canlı sağlayıcı routing animasyonu ================
-// 4 farklı sağlayıcıdan model: Anthropic, OpenAI, Google×2.
+// 4 farklı metin modeli: Anthropic, OpenAI, Google×2.
 const RouteFlow = ({ tweaks }) => {
   const dotCount = tweaks?.routeDotCount ?? 4;
   const dur = tweaks?.routeDur ?? 3.6;
@@ -25,16 +25,16 @@ const RouteFlow = ({ tweaks }) => {
   const pulse = tweaks?.routePulse ?? true;
 
   const paths = {
-    'anthropic/claude-opus-4.7': "M70,130 L98,130 L178,130 C190,130 192,75 200,40",
-    'openai/gpt-4o': "M70,130 L98,130 L178,130 C190,130 192,108 200,90",
-    'google/gemini-2.5-pro': "M70,130 L98,130 L178,130 C190,130 192,152 200,170",
-    'google/gemini-2.5-flash': "M70,130 L98,130 L178,130 C190,130 192,205 200,220"
+    'claude-opus-4-7': "M70,130 L98,130 L178,130 C190,130 192,75 200,40",
+    'gpt-5.4': "M70,130 L98,130 L178,130 C190,130 192,108 200,90",
+    'gemini-3.1-pro-preview': "M70,130 L98,130 L178,130 C190,130 192,152 200,170",
+    'gemini-3-flash-preview': "M70,130 L98,130 L178,130 C190,130 192,205 200,220"
   };
   const dests = [
-  { key: 'anthropic/claude-opus-4.7', y: 26 },
-  { key: 'openai/gpt-4o', y: 76 },
-  { key: 'google/gemini-2.5-pro', y: 156 },
-  { key: 'google/gemini-2.5-flash', y: 206 }];
+  { key: 'claude-opus-4-7', y: 26 },
+  { key: 'gpt-5.4', y: 76 },
+  { key: 'gemini-3.1-pro-preview', y: 156 },
+  { key: 'gemini-3-flash-preview', y: 206 }];
 
   const staggers = Array.from({ length: dotCount }, (_, i) => i * dur / dotCount);
 
@@ -127,7 +127,7 @@ const ValueBanner = ({ tweaks }) => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr 1fr', gap: 0, alignItems: 'stretch' }}>
 
-        {/* ===== LEFT: 33+ model ===== */}
+        {/* ===== LEFT: model catalog ===== */}
         <div style={{ padding: '26px 28px', borderRight: '1px solid var(--border)' }}>
           <Chip tone="ink" style={{ fontSize: 9.5, fontFamily: 'var(--font-mono)', letterSpacing: 1, marginBottom: 14 }}>
             <I.Layers size={10} stroke="var(--surface)" /> ÇOKLU SAĞLAYICI
@@ -140,10 +140,10 @@ const ValueBanner = ({ tweaks }) => {
               background: 'linear-gradient(135deg, var(--ink) 0%, var(--accent) 100%)',
               WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
               backgroundClip: 'text'
-            }} className="tnum">33+</div>
+            }} className="tnum">{MODELS.length}</div>
             <div style={{ fontSize: 14, lineHeight: 1.35, color: 'var(--ink-2)' }}>
               <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, fontSize: 18, color: 'var(--ink)' }}>model</span><br />
-              11 sağlayıcıdan<br />
+              3 sağlayıcıdan<br />
               tek API key ile
             </div>
           </div>
@@ -217,7 +217,7 @@ const ValueBanner = ({ tweaks }) => {
 
           <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
             <div style={{ fontSize: 11.5, color: 'var(--ink-2)', lineHeight: 1.5, marginBottom: 10 }}>
-              Anthropic, OpenAI, Google, ByteDance, DeepSeek, Kwaivgi, Qwen ve daha fazlası — hepsi tek noktadan.
+              Anthropic, OpenAI ve Google metin modelleri — hepsi tek noktadan.
             </div>
             <button style={{
               background: 'var(--accent)', color: '#fff',
@@ -272,34 +272,34 @@ const FeedRow = ({ log, isNew, animateIn = true }) => {
 
 // === Code snippet generator + syntax highlight =====================
 const codeSnippets = {
-  curl: () => `curl -X POST https://api.yapayzekalab.org/v1/chat/completions \\
+  curl: () => `curl -X POST https://yapayzekalab.org/v1/chat/completions \\
   -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "anthropic/claude-haiku-4.5",
+    "model": "claude-haiku-4-5-20251001",
     "messages": [{"role": "user", "content": "Merhaba"}]
   }'`,
   python: () => `from openai import OpenAI
 
 client = OpenAI(
-    base_url="https://api.yapayzekalab.org/v1",
+    base_url="https://yapayzekalab.org/v1",
     api_key="yzk_live_YOUR_KEY"
 )
 
 response = client.chat.completions.create(
-    model="anthropic/claude-haiku-4.5",
+    model="claude-haiku-4-5-20251001",
     messages=[{"role": "user", "content": "Merhaba"}]
 )
 print(response.choices[0].message.content)`,
   nodejs: () => `import OpenAI from 'openai';
 
 const client = new OpenAI({
-  baseURL: 'https://api.yapayzekalab.org/v1',
+  baseURL: 'https://yapayzekalab.org/v1',
   apiKey: 'yzk_live_YOUR_KEY'
 });
 
 const response = await client.chat.completions.create({
-  model: 'anthropic/claude-haiku-4.5',
+  model: 'claude-haiku-4-5-20251001',
   messages: [{ role: 'user', content: 'Merhaba' }]
 });
 console.log(response.choices[0].message.content);`
@@ -351,7 +351,7 @@ const Quickstart = () => {
       setThinking(false);
       const fullText = 'Tamam — kısa ve net çeviri yapıldı. 240 token kullanıldı; bakiyenden $0.000098 USD düşüldü (≈ ₺0.0034 bilgi amaçlı).';
       setResult({
-        model: 'anthropic/claude-haiku-4.5',
+        model: 'claude-haiku-4-5-20251001',
         ms: 540 + Math.round(Math.random() * 220),
         cost: 0.00098 + Math.random() * 0.0004,
         text: fullText
@@ -524,7 +524,7 @@ const HowItWorks = () =>
     { n: '01', title: 'Kayıt Ol', desc: 'Email veya Google ile 30 saniyede hesap aç' },
     { n: '02', title: 'Bakiye Yükle', desc: 'IBAN havale, Shopier kart veya USDT' },
     { n: '03', title: 'API Key Oluştur', desc: 'Dashboard\'dan yzk_live_… formatında key üret' },
-    { n: '04', title: 'İstek Gönder', desc: 'base_url: api.yapayzekalab.org/v1 yeterli' }].
+    { n: '04', title: 'İstek Gönder', desc: 'base_url: yapayzekalab.org/v1 yeterli' }].
     map((s, i) =>
     <div key={i} style={{ position: 'relative', padding: '0 12px', textAlign: 'left' }}>
           <div style={{
@@ -572,13 +572,13 @@ const FAQItem = ({ q, a, open, onToggle }) =>
 const FAQ = () => {
   const [openIdx, setOpenIdx] = useState(0);
   const items = [
-  { q: 'OpenAI SDK ile kullanabilir miyim?', a: 'Evet. base_url\'i https://api.yapayzekalab.org/v1 olarak ayarla, API key\'ini yaz, hazır. Model adları aynı kalır.' },
-  { q: 'Hangi API endpointleri destekleniyor?', a: 'Chat için /v1/chat/completions, OpenAI Responses için /v1/responses, Anthropic uyumlu kullanım için /v1/messages kullanılır. Görsel endpointleri /v1/images/generations ve /v1/images/edits; video endpointleri beta/sınırlı durumdadır.' },
+  { q: 'OpenAI SDK ile kullanabilir miyim?', a: 'Evet. base_url\'i https://yapayzekalab.org/v1 olarak ayarla, API key\'ini yaz, hazır. Model adları katalogdaki canonical ID ile kullanılır.' },
+  { q: 'Hangi API endpointleri destekleniyor?', a: 'Ana canlı endpoint /v1/chat/completions. Anthropic uyumlu kullanım için /v1/messages desteklenir. /v1/responses bu sağlayıcıda aktif değilse JSON hata döner ve ücret yazmaz. Görsel ve video endpointleri sağlayıcı geçişi boyunca 501 JSON hata döndürür ve ücret yazmaz.' },
   { q: 'Bakiye kredi mi, istek mi?', a: 'Bakiye istek değildir. Para yüklersin, API kullandıkça modelin gerçek input/output maliyeti bakiyenden düşer. Aylık abonelik yoktur.' },
   { q: 'Ücretlendirme USD mi yoksa TL mi?', a: 'Ücretlendirme USD bazındadır. Her API çağrısı USD olarak hesaplanıp bakiyenden USD olarak düşer. TL gösterimleri yalnızca bilgi amaçlıdır.' },
   { q: 'Minimum bakiye ne kadar?', a: 'Minimum yükleme 2 USD. Üst limit yok. Bakiye USD bazında tutulur.' },
   { q: 'Hangi ödeme yöntemleri var?', a: 'IBAN banka havalesi (komisyonsuz), Shopier ile kredi/banka kartı, Cryptomus ile USDT (TRC20). Yatırılan TL anlık kurdan USD\'ye çevrilip bakiyene eklenir.' },
-  { q: 'Video API aktif mi?', a: 'Video modelleri beta/sınırlı durumdadır; video API endpointleri aktif değilse 501 dönebilir.' },
+  { q: 'Görsel ve video API aktif mi?', a: 'Hayır. Bu geçişte aktif katalog yalnızca metin modelleridir; görsel/video endpointleri 501 döner ve ücretlendirilmez.' },
   { q: 'Veri gizliliği nasıl sağlanıyor?', a: 'İstekler yalnızca ilgili sağlayıcıya iletilir ve loglanmaz. KVKK kapsamında kişisel veriler Türkiye\'de barındırılır.' }];
 
   return (
@@ -601,7 +601,7 @@ const FAQ = () => {
 
 // === CostCalculator — "ben şu kadar token kullansam ne öderim" ====
 const CostCalculator = ({ tweaks }) => {
-  const [modelId, setModelId] = useState('anthropic/claude-opus-4.7');
+  const [modelId, setModelId] = useState('claude-opus-4-7');
   const [monthlyM, setMonthlyM] = useState(10); // million tokens/ay
   const m = modelMeta(modelId);
   const textMul  = tweaks?.textMultiplier ?? 3.0;
@@ -609,15 +609,15 @@ const CostCalculator = ({ tweaks }) => {
   const rate     = tweaks?.tlRate ?? 47.084289;
 
   const calculatorPriceOverrides = {
-    'anthropic/claude-opus-4.7': {
+    'claude-opus-4-7': {
       directPerM: 30,
       ourPerM: 1,
-      directLabel: 'Claude orijinal',
+      directLabel: 'Claude liste fiyatı',
       ourLabel: 'YAPAYZEKALAB',
     },
   };
 
-  // Yalnızca metin modelleri (görsel/video kalkülatöre dahil değil)
+  // Yalnızca metin modelleri kalkülatöre dahil.
   const textModels = MODELS.filter(x => x.type === 'text');
   // Ortalama input+output (basit kalkülatör)
   const avgProvider = m.type === 'text' ? (m.input + m.output) / 2 : 0.15;
@@ -628,7 +628,7 @@ const CostCalculator = ({ tweaks }) => {
   const monthlyDirect = directPerM * monthlyM;
   const savedPct = directPerM > 0 ? ((directPerM - ourPerM) / directPerM) * 100 : 0;
   const moreExpensivePct = ourPerM > directPerM ? ((ourPerM - directPerM) / directPerM) * 100 : 0;
-  const directLabel = priceOverride?.directLabel ?? 'Sağlayıcı orijinal';
+  const directLabel = priceOverride?.directLabel ?? 'Piyasa referansı';
   const ourLabel = priceOverride?.ourLabel ?? 'YAPAYZEKALAB';
 
   return (
@@ -712,7 +712,7 @@ const CostCalculator = ({ tweaks }) => {
             </div>
           </div>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6, fontFamily: 'var(--font-mono)' }}>
-            ${directPerM.toFixed(4)} / 1M token · orijinal sağlayıcı fiyatı
+            ${directPerM.toFixed(4)} / 1M token · piyasa liste fiyatı
           </div>
 
           <div style={{ marginTop: 18, padding: '12px 0', borderTop: '1px solid var(--border)' }}>
@@ -851,9 +851,9 @@ const OnboardingWizard = ({ onClose, onTab }) => {
                 Aşağıdaki komut gerçek endpointi gösterir; çalıştırmak için kendi API anahtarın ve bakiye gerekir.
               </p>
               <pre style={{ background: '#0f172a', color: '#e2e8f0', padding: 14, borderRadius: 10, fontSize: 11, fontFamily: 'var(--font-mono)', overflow: 'auto', margin: '0 0 14px' }}>
-{`curl -X POST https://api.yapayzekalab.org/v1/chat/completions \\
+{`curl -X POST https://yapayzekalab.org/v1/chat/completions \\
   -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
-  -d '{"model":"anthropic/claude-haiku-4.5","messages":[{"role":"user","content":"Selam"}]}'`}
+  -d '{"model":"claude-haiku-4-5-20251001","messages":[{"role":"user","content":"Selam"}]}'`}
               </pre>
               {response && (
                 <div className="fade-in" style={{ padding: 12, borderRadius: 9, background: 'var(--ok-bg)', border: '1px solid #a7f3d0', marginBottom: 14, fontSize: 12.5, color: '#047857' }}>
@@ -917,10 +917,10 @@ const CLIShowcase = () => (
       <div style={{ marginTop: 14, color: '#94a3b8' }}># Hızlı işlemler</div>
       <div><span style={{ color: '#f59e0b' }}>$</span> yzlab balance        <span style={{ color: '#64748b' }}># $15.20 USD · ≈ ₺524</span></div>
       <div><span style={{ color: '#f59e0b' }}>$</span> yzlab keys list      <span style={{ color: '#64748b' }}># 3 aktif anahtar</span></div>
-      <div><span style={{ color: '#f59e0b' }}>$</span> yzlab models         <span style={{ color: '#64748b' }}># 33 model, fiyat tablosu</span></div>
+      <div><span style={{ color: '#f59e0b' }}>$</span> yzlab models         <span style={{ color: '#64748b' }}># {MODELS.length} model, fiyat tablosu</span></div>
       <div><span style={{ color: '#f59e0b' }}>$</span> yzlab chat <span style={{ color: '#10b981' }}>"Hangi modelin daha hızlı?"</span></div>
       <div style={{ marginTop: 14, color: '#94a3b8' }}># Otomasyon için stream</div>
-      <div><span style={{ color: '#f59e0b' }}>$</span> yzlab chat --model openai/o3 --stream <span style={{ color: '#10b981' }}>&lt; prompt.txt</span></div>
+      <div><span style={{ color: '#f59e0b' }}>$</span> yzlab chat --model o3 --stream <span style={{ color: '#10b981' }}>&lt; prompt.txt</span></div>
     </div>
   </Card>
 );
@@ -942,7 +942,7 @@ const HomeTab = ({ ctx, onTab }) => {
             <div style={{ position: 'relative', minWidth: 0 }}>
               <Chip tone="accent" style={{ fontSize: 9.5, fontFamily: 'var(--font-mono)', letterSpacing: 0.8 }}>
                 <I.Sparkle size={11} stroke="var(--accent)" className={tweaks.sparkleSpin === false ? '' : 'spin-slow'} />
-                api.yapayzekalab.org
+                yapayzekalab.org/v1
               </Chip>
               <h1 className="balance" style={{
                 fontSize: 34, lineHeight: 1.08, letterSpacing: -1.3,
@@ -956,7 +956,7 @@ const HomeTab = ({ ctx, onTab }) => {
               <p className="pretty" style={{
                 fontSize: 13, lineHeight: 1.6, color: 'var(--ink-2)', margin: 0
               }}>
-                Anthropic, OpenAI, Google, ByteDance ve daha fazlası — hepsi <strong>tek API key</strong> ile. Bakiye yükle, kullandığın kadar öde.
+                Anthropic, OpenAI ve Google metin modelleri — hepsi <strong>tek API key</strong> ile. Bakiye yükle, kullandığın kadar öde.
               </p>
               <div style={{ display: 'flex', gap: 8, marginTop: 18, flexWrap: 'wrap' }}>
                 <button onClick={() => onTab('account')} style={{
@@ -1005,8 +1005,8 @@ const HomeTab = ({ ctx, onTab }) => {
 
       {/* ===== 3 FEATURE CARDS ===== */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-        <FeatureCard tone="teal" Ico={I.Layers} title="33+ Model"
-        body="Claude Opus & Sonnet & Haiku, GPT-4o & o3, Gemini 2.0 & 2.5, DeepSeek V4 Pro, Seedance 2.0 video, Imagen 3, DALL-E 3 ve daha fazlası. Tek API key, tek bakiye, sıfır karmaşıklık." />
+        <FeatureCard tone="teal" Ico={I.Layers} title={`${MODELS.length} Text Model`}
+        body="Claude Opus & Sonnet & Haiku, GPT 5.x & o-serisi, Gemini 3.x metin modelleri. Tek API key, tek bakiye, sıfır karmaşıklık." />
         <FeatureCard tone="indigo" Ico={I.Wallet} title="Saydam Fiyatlama"
         body="Katalogda görünen satış fiyatı kullanılır. Tüm ücretlendirme USD bazındadır — TL karşılığı yalnızca bilgi amaçlı gösterilir." />
         <FeatureCard tone="purple" Ico={I.Zap} title="5 Dakikada Başla"

@@ -212,8 +212,8 @@ const OptimizationInsight = () => {
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   // Demo öneri: Opus → Sonnet downgrade
-  const opus = modelMeta('anthropic/claude-opus-4.7');
-  const sonnet = modelMeta('anthropic/claude-sonnet-4.6');
+  const opus = modelMeta('claude-opus-4-7');
+  const sonnet = modelMeta('claude-sonnet-4-6');
   const currentMonthlyUsd = 84.42;
   const projectedMonthlyUsd = 48.92;
   const savingsUsd = currentMonthlyUsd - projectedMonthlyUsd;

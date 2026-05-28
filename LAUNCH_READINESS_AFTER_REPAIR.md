@@ -119,3 +119,95 @@ Reasons:
 - Valid/invalid/failed/duplicate provider E2E for Shopier and Cryptomus is still not proven.
 - The local Shopier OSB non-success relay fix is verified but not deployed under the required four-agent gate.
 - The fourth integrity guard could not be spawned because the agent thread limit was reached, so the user's deployment governance rule blocks deploy/launch approval.
+
+## 2026-05-28 14:34 TRT Claude Popusk Migration Update
+
+Local migration to the Claude Popusk text-only catalog is complete and locally verified:
+
+- `npm test` PASS: 31 files / 141 tests.
+- `npm run lint` PASS.
+- `npm run build` PASS.
+- `npm run scan:public` PASS, 0 hits.
+- `node scripts/scan-secrets.mjs` PASS, 0 hits.
+
+Release status does not move to ready yet:
+
+- The migration is not deployed.
+- Live funded Claude Popusk gateway billing has not been verified.
+- Shopier automatic checkout remains blocked until valid checkout credentials and provider E2E are completed.
+- Cryptomus automatic provider E2E remains blocked until valid provider env and webhook tests are completed.
+- Required fourth integrity guard could not be spawned in this session because the agent thread limit was reached.
+
+Updated verdict: NOT READY — PAYMENT SECURITY BLOCKERS
+
+## 2026-05-28 14:40 TRT Direct Claude Popusk Key Evidence
+
+- Direct provider key works for text catalog and inference.
+- `/models` returned `200` with `42` models.
+- Tiny `gpt-5.4-mini` `/chat/completions` returned `200`, answer `ok`, usage `9` total tokens.
+- Tiny `claude-haiku-4-5-20251001` `/messages` returned `200`, answer `ok`.
+- `/responses` is not supported by the provider path (`404 not_found`), so local catalog/docs were adjusted to avoid advertising it as active.
+- Local regression after the adjustment passed: tests, lint, build, public scan, secret scan.
+
+Launch verdict remains unchanged until live env deploy and gateway-funded billing retest prove YapayZekaLab balance headers, balance decrement and `usage_records` with this provider key.
+
+## 2026-05-28 14:53 TRT Price/Ordering Update
+
+- Approved public prices were applied locally:
+  - Basic text models: `$0.62/M`.
+  - Standard GPT/o-series text models: `$1.00/M`.
+  - Premium Claude Opus 4.7 and GPT 5.5 models: `$1.20/M`.
+- Backend `/v1/models` catalog order and frontend Models tab data order are contract-tested to match.
+- Human-readable price table added: `CLAUDE_POPUSK_PRICE_TABLE.md`.
+- Local regression passed: tests 143/143, lint, build, public scan and secret scan.
+
+Launch verdict remains unchanged: NOT READY — PAYMENT SECURITY BLOCKERS.
+
+Reason: this fixes local catalog/pricing presentation, but it does not deploy, does not prove live funded gateway billing, and does not complete Shopier/Cryptomus provider E2E.
+
+## 2026-05-28 15:01 TRT Remaining Test Update With Provider Payment E2E Excluded
+
+User scope update: Shopier/Cryptomus provider E2E will not be performed. It is no longer treated as a required test failure for this pass.
+
+Completed safe tests:
+
+- `npm test` PASS: 31 files / 143 tests.
+- `npm run lint` PASS.
+- `npm run build` PASS.
+- `npm run scan:public` PASS: 0 hits.
+- `node scripts/scan-secrets.mjs` PASS: 235 scanned / 0 hits.
+- `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` PASS for live health/status/models/authless gateway/JSON 404 checks.
+- `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` PASS: 10/10.
+
+Still not ready:
+
+- Live `/api/models` returns 33 models, while local Claude Popusk catalog/pricing has 42 models. Local changes are not deployed.
+- Live funded gateway billing was skipped because `SMOKE_API_KEY` is absent.
+- Low-balance gateway behavior was skipped because `SMOKE_LOW_BALANCE_API_KEY` is absent.
+
+Updated verdict: NOT READY — API/BILLING/BALANCE BLOCKERS
+
+Reason: provider payment E2E is excluded by user decision, but live deploy parity and safe funded API billing evidence are still missing.
+
+## 2026-05-28 15:12 TRT Full E2E Update
+
+Full safe E2E was run.
+
+Passed:
+
+- Local production smoke with DB: 42 models, health/status ok.
+- Local UAT smoke: 10/10.
+- Live smoke: public checks pass.
+- Live UAT smoke: 10/10.
+- API negative safety: no auth, invalid key, revoked key, low balance, unknown model, messages no-auth, image no-auth.
+- Malformed JSON bug fixed locally: now 400 JSON instead of 500.
+- Full regression after fix: 144 tests pass, lint/build/scans pass.
+
+Still blocking launch:
+
+- Live still serves 33 models; local target catalog is 42.
+- Live preflight with `EXPECTED_MODELS=42` fails.
+- Successful funded gateway call was not completed because safe smoke/funded key is absent.
+- Billing headers, balance decrement and `usage_records` for a successful live provider call remain unproven after the latest local changes.
+
+Final verdict remains: NOT READY — API/BILLING/BALANCE BLOCKERS

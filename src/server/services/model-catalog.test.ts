@@ -1,105 +1,87 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { MASTER_MODELS } from "../../master-models.js";
+import { MASTER_MODELS, canonicalizeModelId } from "../../master-models.js";
 
-interface CloseRouterEndpoint {
-  type: string;
-  supports_streaming: boolean;
-  supported_parameters: string[];
-}
-
-interface CloseRouterModel {
-  id: string;
-  aliases?: string[];
-  name: string;
-  context_length: number | null;
-  max_output_tokens: number | null;
-  pricing: {
-    prompt?: string;
-    completion?: string;
-    second?: string;
-    second_by_resolution?: Record<string, string>;
-    unit: "usd_per_million_tokens" | "usd_per_second";
-  };
-  supported_parameters?: string[];
-  endpoints?: string[];
-  architecture?: {
-    input_modalities?: string[];
-    output_modalities?: string[];
-  };
-}
-
-interface CloseRouterScan {
-  models: CloseRouterModel[];
-  endpointDetails: Record<string, {
-    data: {
-      provider: { slug: string; name: string };
-      endpoints: CloseRouterEndpoint[];
-    };
-  }>;
-}
-
-function loadScan(): CloseRouterScan {
-  const path = join(process.cwd(), "pricing/closerouter-scan/models-full-2026-05-24.json");
-  return JSON.parse(readFileSync(path, "utf8")) as CloseRouterScan;
-}
-
-describe("MASTER_MODELS — CloseRouter catalog snapshot coverage", () => {
-  const scan = loadScan();
-  const localById = new Map(MASTER_MODELS.map((model) => [model.id, model]));
-
-  it("contains exactly the scanned CloseRouter model ids", () => {
-    expect([...localById.keys()].sort()).toEqual(scan.models.map((model) => model.id).sort());
+describe("MASTER_MODELS — Claude Popusk text catalog", () => {
+  it("contains only customer-facing text models", () => {
+    expect(MASTER_MODELS).toHaveLength(42);
+    expect(MASTER_MODELS.every((model) => model.type === "Metin")).toBe(true);
+    expect(MASTER_MODELS.every((model) => model.pricingUnit === "usd_per_million_tokens")).toBe(true);
+    expect(MASTER_MODELS.every((model) => model.inputModalities?.includes("text"))).toBe(true);
+    expect(MASTER_MODELS.every((model) => model.outputModalities?.includes("text"))).toBe(true);
+    expect(MASTER_MODELS.every((model) => model.endpoints.includes("chat"))).toBe(true);
   });
 
-  it("matches live snapshot pricing for every model", () => {
-    for (const remote of scan.models) {
-      const local = localById.get(remote.id);
-      expect(local, remote.id).toBeTruthy();
-
-      if (remote.pricing.unit === "usd_per_million_tokens") {
-        const localInput = local!.type === "Görsel" ? local!.providerImageInputUsd : local!.providerInputUsd;
-        const localOutput = local!.type === "Görsel" ? local!.providerImageOutputUsd : local!.providerOutputUsd;
-        expect(localInput, `${remote.id} input`).toBe(Number(remote.pricing.prompt));
-        expect(localOutput, `${remote.id} output`).toBe(Number(remote.pricing.completion));
-      }
-
-      if (remote.pricing.unit === "usd_per_second") {
-        if (remote.pricing.second_by_resolution) {
-          for (const [resolution, value] of Object.entries(remote.pricing.second_by_resolution)) {
-            expect(local!.providerPerSecond?.[resolution as "480p" | "720p" | "1080p"], `${remote.id} ${resolution}`).toBe(Number(value));
-          }
-        } else {
-          expect(local!.providerPerSecond?.default, `${remote.id} default seconds`).toBe(Number(remote.pricing.second));
-        }
-      }
-    }
+  it("keeps canonical public ids unprefixed while accepting legacy aliases", () => {
+    expect(MASTER_MODELS.map((model) => model.id).join("\n")).not.toMatch(/\//);
+    expect(canonicalizeModelId("anthropic/claude-opus-4.7")).toBe("claude-opus-4-7");
+    expect(canonicalizeModelId("openai/gpt-5.4-mini")).toBe("gpt-5.4-mini");
+    expect(canonicalizeModelId("google/gemini-3.1-pro-preview")).toBe("gemini-3.1-pro-preview");
   });
 
-  it("keeps exact metadata fields from the CloseRouter snapshot", () => {
-    for (const remote of scan.models) {
-      const local = localById.get(remote.id)!;
-      const detail = scan.endpointDetails[remote.id].data;
+  it("uses the approved customer-facing price tiers", () => {
+    const byId = new Map(MASTER_MODELS.map((model) => [model.id, model]));
 
-      expect(local.name, `${remote.id} name`).toBe(remote.name);
-      expect(local.provider, `${remote.id} provider`).toBe(detail.provider.name);
-      expect(local.providerSlug, `${remote.id} provider slug`).toBe(detail.provider.slug);
-      expect(local.contextTokens, `${remote.id} context`).toBe(remote.context_length);
-      expect(local.maxOutputTokens, `${remote.id} max output`).toBe(remote.max_output_tokens);
-      expect(local.aliases ?? [], `${remote.id} aliases`).toEqual(remote.aliases ?? []);
-      expect(local.inputModalities ?? [], `${remote.id} input modalities`).toEqual(remote.architecture?.input_modalities ?? []);
-      expect(local.outputModalities ?? [], `${remote.id} output modalities`).toEqual(remote.architecture?.output_modalities ?? []);
-      expect(local.endpoints, `${remote.id} endpoints`).toEqual(remote.endpoints ?? []);
-      expect(local.supportedParameters ?? [], `${remote.id} supported params`).toEqual(remote.supported_parameters ?? []);
-      expect(local.pricingUnit, `${remote.id} pricing unit`).toBe(remote.pricing.unit);
-      expect(local.endpointDetails ?? [], `${remote.id} endpoint details`).toEqual(
-        detail.endpoints.map((endpoint) => ({
-          type: endpoint.type,
-          supportsStreaming: endpoint.supports_streaming,
-          supportedParameters: endpoint.supported_parameters,
-        }))
-      );
-    }
+    expect(byId.get("claude-haiku-4-5-20251001")?.customerInputUsd).toBe(0.62);
+    expect(byId.get("gemini-3-flash-preview")?.customerInputUsd).toBe(0.62);
+    expect(byId.get("gpt-5.4")?.customerInputUsd).toBe(1);
+    expect(byId.get("gpt-5.4-mini")?.customerInputUsd).toBe(1);
+    expect(byId.get("claude-opus-4-7")?.customerInputUsd).toBe(1.2);
+    expect(byId.get("gpt-5.5")?.customerInputUsd).toBe(1.2);
+  });
+
+  it("orders the public catalog by cheapest tier first, then older/cheaper model families", () => {
+    expect(MASTER_MODELS.map((model) => model.id)).toEqual([
+      "claude-sonnet-4-20250514",
+      "claude-opus-4-1-20250805",
+      "claude-sonnet-4-5-20250929",
+      "claude-haiku-4-5-20251001",
+      "claude-opus-4-5-20251101",
+      "claude-opus-4-6",
+      "claude-sonnet-4-6",
+      "gemini-3-flash-preview",
+      "gemini-3-pro-preview",
+      "gemini-3.1-pro-preview",
+      "gemini-3.1-pro-preview-customtools",
+      "o3-mini-2025-01-31",
+      "o3-mini",
+      "o3-2025-04-16",
+      "o3",
+      "o4-mini-2025-04-16",
+      "o4-mini",
+      "gpt-5-2025-08-07",
+      "gpt-5",
+      "gpt-5-mini-2025-08-07",
+      "gpt-5-mini",
+      "gpt-5-nano-2025-08-07",
+      "gpt-5-nano",
+      "gpt-5-search-api-2025-10-14",
+      "gpt-5-search-api",
+      "gpt-5-chat-latest",
+      "gpt-5.1-2025-11-13",
+      "gpt-5.1",
+      "gpt-5.1-chat-latest",
+      "gpt-5.2-2025-12-11",
+      "gpt-5.2",
+      "gpt-5.2-chat-latest",
+      "gpt-5.3-chat-latest",
+      "gpt-5.4-2026-03-05",
+      "gpt-5.4",
+      "gpt-5.4-mini-2026-03-17",
+      "gpt-5.4-mini",
+      "gpt-5.4-nano-2026-03-17",
+      "gpt-5.4-nano",
+      "claude-opus-4-7",
+      "gpt-5.5",
+      "gpt-5.5-2026-04-23",
+    ]);
+
+    const prices = MASTER_MODELS.map((model) => model.customerInputUsd ?? 0);
+    expect(prices).toEqual([...prices].sort((a, b) => a - b));
+  });
+
+  it("does not keep active image or video models in the public catalog", () => {
+    const serializedIds = MASTER_MODELS.map((model) => `${model.id} ${model.name} ${model.type}`).join("\n");
+
+    expect(serializedIds).not.toMatch(/dall|imagen|seedance|veo|kling|image|video|görsel/i);
   });
 });

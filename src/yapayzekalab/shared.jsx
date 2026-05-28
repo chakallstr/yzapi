@@ -61,67 +61,103 @@ const PROVIDERS = {
   anthropic:  { label: 'Anthropic',  short: 'Anthropic',  color: '#c2693a', bg: '#fef3ec', ink: '#7a3a18' },
   openai:     { label: 'OpenAI',     short: 'OpenAI',     color: '#10a37f', bg: '#ecfdf5', ink: '#047857' },
   google:     { label: 'Google',     short: 'Google',     color: '#4285f4', bg: '#eff6ff', ink: '#1d4ed8' },
-  bytedance:  { label: 'ByteDance',  short: 'ByteDance',  color: '#e8484a', bg: '#fef2f2', ink: '#991b1b' },
-  deepseek:   { label: 'DeepSeek',   short: 'DeepSeek',   color: '#7a5af0', bg: '#f3eefe', ink: '#4a3873' },
-  kwaivgi:    { label: 'Kwaivgi',    short: 'Kwaivgi',    color: '#d97706', bg: '#fffbeb', ink: '#92400e' },
-  mimo:       { label: 'MiMo',       short: 'MiMo',       color: '#0891b2', bg: '#ecfeff', ink: '#155e75' },
-  minimax:    { label: 'MiniMax',    short: 'MiniMax',    color: '#475569', bg: '#f1f5f9', ink: '#1e293b' },
-  moonshotai: { label: 'MoonshotAI', short: 'Moonshot',   color: '#1d4ed8', bg: '#dbeafe', ink: '#1e3a8a' },
-  qwen:       { label: 'Qwen',       short: 'Qwen',       color: '#b45309', bg: '#fef3c7', ink: '#78350f' },
-  'z.ai':     { label: 'Z.ai',       short: 'Z.ai',       color: '#0f172a', bg: '#e2e8f0', ink: '#0f172a' },
 };
 
 // --- Models catalog -----------------------------------------------
 // USD prices: per 1M tokens (input/output). Video: per second (480p/720p/1080p).
 // ctx: human-readable context window.
-const MODELS = [
-  // ── Anthropic ──
-  { id: 'anthropic/claude-haiku-4.5',     label: 'Claude Haiku 4.5',     provider: 'anthropic',  type: 'text',  input: 0.15,  output: 0.15,  ctx: '200K' },
-  { id: 'anthropic/claude-sonnet-4.6',    label: 'Claude Sonnet 4.6',    provider: 'anthropic',  type: 'text',  input: 0.255, output: 0.255, ctx: '200K' },
-  { id: 'anthropic/claude-opus-4.6',      label: 'Claude Opus 4.6',      provider: 'anthropic',  type: 'text',  input: 0.30,  output: 0.30,  ctx: '200K' },
-  { id: 'anthropic/claude-opus-4.7',      label: 'Claude Opus 4.7',      provider: 'anthropic',  type: 'text',  input: 0.30,  output: 0.30,  ctx: '200K' },
-
-  // ── OpenAI ──
-  { id: 'openai/gpt-4o',                  label: 'GPT-4o',               provider: 'openai',     type: 'text',  input: 0.15,  output: 0.15,  ctx: '128K' },
-  { id: 'openai/gpt-4o-mini',             label: 'GPT-4o mini',          provider: 'openai',     type: 'text',  input: 0.10,  output: 0.10,  ctx: '128K' },
-  { id: 'openai/o3',                      label: 'o3',                   provider: 'openai',     type: 'text',  input: 0.13,  output: 0.13,  ctx: '200K' },
-  { id: 'openai/o4-mini',                 label: 'o4-mini',              provider: 'openai',     type: 'text',  input: 0.20,  output: 0.20,  ctx: '128K' },
-
-  // ── Google ──
-  { id: 'google/gemini-2.0-flash',        label: 'Gemini 2.0 Flash',     provider: 'google',     type: 'text',  input: 0.10,  output: 0.10,  ctx: '1M' },
-  { id: 'google/gemini-2.5-flash',        label: 'Gemini 2.5 Flash',     provider: 'google',     type: 'text',  input: 0.11,  output: 0.11,  ctx: '1M' },
-  { id: 'google/gemini-2.5-pro',          label: 'Gemini 2.5 Pro',       provider: 'google',     type: 'text',  input: 0.13,  output: 0.13,  ctx: '2M' },
-
-  // ── DeepSeek ──
-  { id: 'deepseek/deepseek-v4-pro',       label: 'DeepSeek V4 Pro',      provider: 'deepseek',   type: 'text',  input: 0.10,  output: 0.10,  ctx: '128K' },
-
-  // ── Diğer metin modelleri ──
-  { id: 'mimo/mimo-vl-7b',                label: 'MiMo VL 7B',           provider: 'mimo',       type: 'text',  input: 0.10,  output: 0.10,  ctx: '32K' },
-  { id: 'minimax/minimax-m1',             label: 'MiniMax M1',           provider: 'minimax',    type: 'text',  input: 0.10,  output: 0.10,  ctx: '1M' },
-  { id: 'moonshotai/kimi-k2',             label: 'Kimi K2',              provider: 'moonshotai', type: 'text',  input: 0.08,  output: 0.38,  ctx: '128K' },
-  { id: 'qwen/qwen3-235b',                label: 'Qwen3 235B',           provider: 'qwen',       type: 'text',  input: 0.10,  output: 0.10,  ctx: '32K' },
-  { id: 'z.ai/glm-4-32b',                 label: 'GLM-4 32B',            provider: 'z.ai',       type: 'text',  input: 0.10,  output: 0.10,  ctx: '128K' },
-
-  // ── Görsel ──
-  { id: 'openai/dall-e-3',                label: 'DALL-E 3',             provider: 'openai',     type: 'image', perImage: 0.04 },
-  { id: 'openai/dall-e-2',                label: 'DALL-E 2',             provider: 'openai',     type: 'image', perImage: 0.02 },
-  { id: 'google/imagen-3.0-generate',     label: 'Imagen 3',             provider: 'google',     type: 'image', perImage: 0.04 },
-  { id: 'google/imagen-3.0-fast-generate',label: 'Imagen 3 Fast',        provider: 'google',     type: 'image', perImage: 0.02 },
-  { id: 'google/imagen-4-generate',       label: 'Imagen 4',             provider: 'google',     type: 'image', perImage: 0.05 },
-  { id: 'google/imagen-4-ultra-generate', label: 'Imagen 4 Ultra',       provider: 'google',     type: 'image', perImage: 0.08 },
-
-  // ── Video ──
-  { id: 'bytedance/seedance-2.0',         label: 'Seedance 2.0',         provider: 'bytedance',  type: 'video', perSec480: 0.0168, perSec720: 0.0378, perSec1080: 0.0851 },
-  { id: 'bytedance/seedance-2.0-edit',    label: 'Seedance 2.0 Edit',    provider: 'bytedance',  type: 'video', perSec480: 0.0168, perSec720: 0.0378, perSec1080: 0.0851 },
-  { id: 'bytedance/seedance-2.0-extend',  label: 'Seedance 2.0 Extend',  provider: 'bytedance',  type: 'video', perSec480: 0.0168, perSec720: 0.0378, perSec1080: 0.0851 },
-  { id: 'bytedance/seedance-2.0-i2v',     label: 'Seedance 2.0 i2v',     provider: 'bytedance',  type: 'video', perSec480: 0.0168, perSec720: 0.0378, perSec1080: 0.0851 },
-  { id: 'google/veo-3',                   label: 'Veo 3',                provider: 'google',     type: 'video', perSec480: 0.03,   perSec720: 0.03,   perSec1080: 0.03 },
-  { id: 'google/veo-3-i2v',               label: 'Veo 3 i2v',            provider: 'google',     type: 'video', perSec480: 0.03,   perSec720: 0.03,   perSec1080: 0.03 },
-  { id: 'google/veo-3-extend',            label: 'Veo 3 Extend',         provider: 'google',     type: 'video', perSec480: 0.03,   perSec720: 0.03,   perSec1080: 0.03 },
-  { id: 'kwaivgi/kling-v2.1',             label: 'Kling v2.1',           provider: 'kwaivgi',    type: 'video', perSec480: 0.03,   perSec720: 0.03,   perSec1080: 0.03 },
-  { id: 'kwaivgi/kling-v2.1-i2v',         label: 'Kling v2.1 i2v',       provider: 'kwaivgi',    type: 'video', perSec480: 0.03,   perSec720: 0.03,   perSec1080: 0.03 },
-  { id: 'kwaivgi/kling-v2.1-effects',     label: 'Kling v2.1 Effects',   provider: 'kwaivgi',    type: 'video', perSec480: 0.03,   perSec720: 0.03,   perSec1080: 0.03 },
+const MODEL_DISPLAY_ORDER = [
+  'claude-sonnet-4-20250514',
+  'claude-opus-4-1-20250805',
+  'claude-sonnet-4-5-20250929',
+  'claude-haiku-4-5-20251001',
+  'claude-opus-4-5-20251101',
+  'claude-opus-4-6',
+  'claude-sonnet-4-6',
+  'gemini-3-flash-preview',
+  'gemini-3-pro-preview',
+  'gemini-3.1-pro-preview',
+  'gemini-3.1-pro-preview-customtools',
+  'o3-mini-2025-01-31',
+  'o3-mini',
+  'o3-2025-04-16',
+  'o3',
+  'o4-mini-2025-04-16',
+  'o4-mini',
+  'gpt-5-2025-08-07',
+  'gpt-5',
+  'gpt-5-mini-2025-08-07',
+  'gpt-5-mini',
+  'gpt-5-nano-2025-08-07',
+  'gpt-5-nano',
+  'gpt-5-search-api-2025-10-14',
+  'gpt-5-search-api',
+  'gpt-5-chat-latest',
+  'gpt-5.1-2025-11-13',
+  'gpt-5.1',
+  'gpt-5.1-chat-latest',
+  'gpt-5.2-2025-12-11',
+  'gpt-5.2',
+  'gpt-5.2-chat-latest',
+  'gpt-5.3-chat-latest',
+  'gpt-5.4-2026-03-05',
+  'gpt-5.4',
+  'gpt-5.4-mini-2026-03-17',
+  'gpt-5.4-mini',
+  'gpt-5.4-nano-2026-03-17',
+  'gpt-5.4-nano',
+  'claude-opus-4-7',
+  'gpt-5.5',
+  'gpt-5.5-2026-04-23',
 ];
+const MODEL_DISPLAY_INDEX = Object.fromEntries(MODEL_DISPLAY_ORDER.map((id, index) => [id, index]));
+
+const MODELS = [
+  { id: 'claude-opus-4-7', label: 'Claude Opus 4.7', provider: 'anthropic', type: 'text', input: 1.2, output: 1.2, ctx: '1M' },
+  { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic', type: 'text', input: 0.62, output: 0.62, ctx: '1M' },
+  { id: 'claude-opus-4-5-20251101', label: 'Claude Opus 4.5', provider: 'anthropic', type: 'text', input: 0.62, output: 0.62, ctx: '1M' },
+  { id: 'claude-opus-4-1-20250805', label: 'Claude Opus 4.1', provider: 'anthropic', type: 'text', input: 0.62, output: 0.62, ctx: '1M' },
+  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'anthropic', type: 'text', input: 0.62, output: 0.62, ctx: '1M' },
+  { id: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5', provider: 'anthropic', type: 'text', input: 0.62, output: 0.62, ctx: '1M' },
+  { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', provider: 'anthropic', type: 'text', input: 0.62, output: 0.62, ctx: '1M' },
+  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', provider: 'anthropic', type: 'text', input: 0.62, output: 0.62, ctx: '200K' },
+  { id: 'gpt-5.5', label: 'GPT-5.5', provider: 'openai', type: 'text', input: 1.2, output: 1.2, ctx: '1M' },
+  { id: 'gpt-5.5-2026-04-23', label: 'GPT-5.5 2026-04-23', provider: 'openai', type: 'text', input: 1.2, output: 1.2, ctx: '1M' },
+  { id: 'gpt-5.4', label: 'GPT-5.4', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5.4-2026-03-05', label: 'GPT-5.4 2026-03-05', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5.4-mini-2026-03-17', label: 'GPT-5.4 mini 2026-03-17', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5.4-nano', label: 'GPT-5.4 nano', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5.4-nano-2026-03-17', label: 'GPT-5.4 nano 2026-03-17', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5.3-chat-latest', label: 'GPT-5.3 Chat Latest', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5.2', label: 'GPT-5.2', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5.2-2025-12-11', label: 'GPT-5.2 2025-12-11', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5.2-chat-latest', label: 'GPT-5.2 Chat Latest', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5.1', label: 'GPT-5.1', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5.1-2025-11-13', label: 'GPT-5.1 2025-11-13', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5.1-chat-latest', label: 'GPT-5.1 Chat Latest', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5', label: 'GPT-5', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5-2025-08-07', label: 'GPT-5 2025-08-07', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5-chat-latest', label: 'GPT-5 Chat Latest', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5-mini', label: 'GPT-5 mini', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5-mini-2025-08-07', label: 'GPT-5 mini 2025-08-07', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5-nano', label: 'GPT-5 nano', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5-nano-2025-08-07', label: 'GPT-5 nano 2025-08-07', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5-search-api', label: 'GPT-5 Search API', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'gpt-5-search-api-2025-10-14', label: 'GPT-5 Search API 2025-10-14', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '1M' },
+  { id: 'o4-mini', label: 'o4-mini', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '200K' },
+  { id: 'o4-mini-2025-04-16', label: 'o4-mini 2025-04-16', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '200K' },
+  { id: 'o3', label: 'o3', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '200K' },
+  { id: 'o3-2025-04-16', label: 'o3 2025-04-16', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '200K' },
+  { id: 'o3-mini', label: 'o3-mini', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '200K' },
+  { id: 'o3-mini-2025-01-31', label: 'o3-mini 2025-01-31', provider: 'openai', type: 'text', input: 1, output: 1, ctx: '200K' },
+  { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview', provider: 'google', type: 'text', input: 0.62, output: 0.62, ctx: '1M' },
+  { id: 'gemini-3.1-pro-preview-customtools', label: 'Gemini 3.1 Pro Preview Custom Tools', provider: 'google', type: 'text', input: 0.62, output: 0.62, ctx: '1M' },
+  { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro Preview', provider: 'google', type: 'text', input: 0.62, output: 0.62, ctx: '1M' },
+  { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash Preview', provider: 'google', type: 'text', input: 0.62, output: 0.62, ctx: '1M' }
+];
+
+MODELS.sort((a, b) => (MODEL_DISPLAY_INDEX[a.id] ?? Number.MAX_SAFE_INTEGER) - (MODEL_DISPLAY_INDEX[b.id] ?? Number.MAX_SAFE_INTEGER));
 
 const MODELS_BY_ID = Object.fromEntries(MODELS.map(m => [m.id, m]));
 const MODEL_KEYS = MODELS.map(m => m.id);
@@ -146,15 +182,9 @@ const modelsByProvider = () => {
 const ctxFor = (id) => modelMeta(id).ctx || '128K';
 
 // --- Pricing math --------------------------------------------------
-// PARA BİRİMİ: USD birincil. TL sadece bilgi amaçlı gösterilir.
-// Hesap, bakiye ve ücretlendirme USD üzerinden yapılır.
-//   Metin:        sağlayıcı USD ÷ 0.9 × textMul = bizim USD
-//   Görsel/Video: sağlayıcı USD × mediaMul       = bizim USD
-// TL gösterimi:   bizim USD × kur                = bilgilendirme TL
+// MODELS içindeki USD değerleri müşteri satış fiyatıdır. TL yalnızca bilgi amaçlı gösterilir.
 const computeOurUsd = (usd, type, { textMul, mediaMul }) => {
-  const ratio = 0.9;
-  if (type === 'text') return (usd / ratio) * textMul;
-  return usd * mediaMul;
+  return usd;
 };
 const usdToTL = (usd, rate) => usd * rate;
 
@@ -176,30 +206,30 @@ const fmt = {
 
 // --- Streaming prompt pool ----------------------------------------
 const promptPool = [
-  { p: 'UV-vis spektrumdaki pikler için Lambert-Beer hesapla',     id: 'anthropic/claude-opus-4.7',  ms: 2090, cost: 0.00541, t: 1480 },
-  { p: 'Tablodaki eksik değerleri tahmin et',                       id: 'google/gemini-2.5-flash',    ms: 380,  cost: 0.00029, t: 210 },
-  { p: 'Reaksiyon mekanizmasını adım adım açıkla',                  id: 'openai/gpt-4o',              ms: 1740, cost: 0.00498, t: 1620 },
-  { p: 'JSON\'u CSV\'ye dönüştür',                                   id: 'openai/gpt-4o-mini',         ms: 240,  cost: 0.00018, t: 120 },
-  { p: 'Veri setini z-score ile normalize et',                      id: 'google/gemini-2.0-flash',    ms: 460,  cost: 0.00034, t: 250 },
-  { p: 'GC-MS pikleri için bileşik eşleştirme yap',                  id: 'anthropic/claude-sonnet-4.6',ms: 1280, cost: 0.00421, t: 1080 },
-  { p: 'Eğri uydurma için en iyi modeli seç',                       id: 'deepseek/deepseek-v4-pro',   ms: 980,  cost: 0.00198, t: 1340 },
-  { p: 'CSV başlıklarını snake_case\'e çevir',                       id: 'google/gemini-2.5-flash',    ms: 180,  cost: 0.00012, t: 80 },
-  { p: 'Yayın için literatür özeti çıkar',                           id: 'anthropic/claude-opus-4.6',  ms: 2410, cost: 0.00612, t: 1820 },
-  { p: 'Hata barlarıyla histogram yorumla',                         id: 'google/gemini-2.5-pro',      ms: 1640, cost: 0.00378, t: 1120 },
-  { p: 'Faz diyagramından soğuma yolunu çıkar',                      id: 'openai/o3',                  ms: 2280, cost: 0.00582, t: 1740 },
-  { p: 'Bibliografi DOI\'lerini doğrula',                            id: 'openai/o4-mini',             ms: 1280, cost: 0.00412, t: 980 },
-  { p: 'Müşteri yorumlarını duygu analizine sok',                    id: 'moonshotai/kimi-k2',         ms: 820,  cost: 0.00162, t: 580 },
-  { p: 'Hukuki sözleşmedeki riskli maddeleri bul',                   id: 'anthropic/claude-haiku-4.5', ms: 540,  cost: 0.00098, t: 720 },
-  { p: 'Türkçe ürün açıklamalarını İngilizce\'ye çevir',              id: 'qwen/qwen3-235b',            ms: 690,  cost: 0.00131, t: 880 },
+  { p: 'UV-vis spektrumdaki pikler için Lambert-Beer hesapla',     id: 'claude-opus-4-7',             ms: 2090, cost: 0.00541, t: 1480 },
+  { p: 'Tablodaki eksik değerleri tahmin et',                       id: 'gemini-3-flash-preview',      ms: 380,  cost: 0.00029, t: 210 },
+  { p: 'Reaksiyon mekanizmasını adım adım açıkla',                  id: 'gpt-5.4',                     ms: 1740, cost: 0.00498, t: 1620 },
+  { p: 'JSON\'u CSV\'ye dönüştür',                                   id: 'gpt-5.4-mini',                ms: 240,  cost: 0.00018, t: 120 },
+  { p: 'Veri setini z-score ile normalize et',                      id: 'gemini-3.1-pro-preview',      ms: 460,  cost: 0.00034, t: 250 },
+  { p: 'GC-MS pikleri için bileşik eşleştirme yap',                  id: 'claude-sonnet-4-6',           ms: 1280, cost: 0.00421, t: 1080 },
+  { p: 'Eğri uydurma için en iyi modeli seç',                       id: 'gpt-5.5',                     ms: 980,  cost: 0.00198, t: 1340 },
+  { p: 'CSV başlıklarını snake_case\'e çevir',                       id: 'gemini-3-flash-preview',      ms: 180,  cost: 0.00012, t: 80 },
+  { p: 'Yayın için literatür özeti çıkar',                           id: 'claude-opus-4-6',             ms: 2410, cost: 0.00612, t: 1820 },
+  { p: 'Hata barlarıyla histogram yorumla',                         id: 'gemini-3-pro-preview',        ms: 1640, cost: 0.00378, t: 1120 },
+  { p: 'Faz diyagramından soğuma yolunu çıkar',                      id: 'o3',                          ms: 2280, cost: 0.00582, t: 1740 },
+  { p: 'Bibliografi DOI\'lerini doğrula',                            id: 'o4-mini',                     ms: 1280, cost: 0.00412, t: 980 },
+  { p: 'Müşteri yorumlarını duygu analizine sok',                    id: 'gpt-5-mini',                  ms: 820,  cost: 0.00162, t: 580 },
+  { p: 'Hukuki sözleşmedeki riskli maddeleri bul',                   id: 'claude-haiku-4-5-20251001',   ms: 540,  cost: 0.00098, t: 720 },
+  { p: 'Türkçe ürün açıklamalarını İngilizce\'ye çevir',              id: 'gpt-5.4-nano',                ms: 690,  cost: 0.00131, t: 880 },
 ];
 
 // Initial seed for the activity feed — shown before stream kicks in
 const mockLogs = [
-  { id: 'r-001', prompt: '—', model: 'anthropic/claude-opus-4.7',  ms: 1840, cost: 0.00412, tokens: 4836, ctx: '200K', time: '14:32:01', status: 'ok' },
-  { id: 'r-002', prompt: '—', model: 'openai/gpt-4o',              ms: 904,  cost: 0.00298, tokens: 6306, ctx: '128K', time: '14:31:48', status: 'ok' },
-  { id: 'r-003', prompt: '—', model: 'google/gemini-2.5-pro',      ms: 589,  cost: 0.00138, tokens: 7271, ctx: '2M',   time: '14:31:30', status: 'ok' },
-  { id: 'r-004', prompt: '—', model: 'deepseek/deepseek-v4-pro',   ms: 740,  cost: 0.00198, tokens: 5420, ctx: '128K', time: '14:31:12', status: 'ok' },
-  { id: 'r-005', prompt: '—', model: 'anthropic/claude-haiku-4.5', ms: 410,  cost: 0.00088, tokens: 1660, ctx: '200K', time: '14:30:54', status: 'ok' },
+  { id: 'r-001', prompt: '—', model: 'claude-opus-4-7',           ms: 1840, cost: 0.00412, tokens: 4836, ctx: '1M',   time: '14:32:01', status: 'ok' },
+  { id: 'r-002', prompt: '—', model: 'gpt-5.4',                   ms: 904,  cost: 0.00298, tokens: 6306, ctx: '1M',   time: '14:31:48', status: 'ok' },
+  { id: 'r-003', prompt: '—', model: 'gemini-3.1-pro-preview',    ms: 589,  cost: 0.00138, tokens: 7271, ctx: '1M',   time: '14:31:30', status: 'ok' },
+  { id: 'r-004', prompt: '—', model: 'gpt-5.5',                   ms: 740,  cost: 0.00198, tokens: 5420, ctx: '1M',   time: '14:31:12', status: 'ok' },
+  { id: 'r-005', prompt: '—', model: 'claude-haiku-4-5-20251001', ms: 410,  cost: 0.00088, tokens: 1660, ctx: '200K', time: '14:30:54', status: 'ok' },
 ];
 
 // --- Hooks ----------------------------------------------------------
@@ -348,15 +378,15 @@ const mockUsers = [
 ];
 
 const mockUsageRecords = [
-  { id: 'req_9f3a8b', model: 'anthropic/claude-haiku-4.5', type: 'chat',     inTok: 1240, outTok:  840, costTL: 0.12, balanceAfterTL: 487.20, ms:  540, status: 'success', err: null,         time: '14:34:02' },
-  { id: 'req_9f3a89', model: 'google/gemini-2.5-pro',       type: 'chat',     inTok: 4620, outTok: 2310, costTL: 0.84, balanceAfterTL: 487.32, ms:  589, status: 'success', err: null,         time: '14:33:48' },
-  { id: 'req_9f3a88', model: 'openai/gpt-4o',                type: 'chat',     inTok: 3120, outTok: 1680, costTL: 0.68, balanceAfterTL: 488.16, ms:  904, status: 'success', err: null,         time: '14:33:24' },
-  { id: 'req_9f3a87', model: 'openai/dall-e-3',              type: 'images',   inTok:    0, outTok:    0, costTL: 2.40, balanceAfterTL: 488.84, ms: 4210, status: 'success', err: null,         time: '14:32:51' },
-  { id: 'req_9f3a86', model: 'anthropic/claude-opus-4.7',    type: 'messages', inTok: 5840, outTok: 1240, costTL: 2.42, balanceAfterTL: 491.24, ms: 2090, status: 'success', err: null,         time: '14:32:18' },
-  { id: 'req_9f3a85', model: 'google/gemini-2.5-flash',      type: 'chat',     inTok:  420, outTok:  240, costTL: 0.05, balanceAfterTL: 493.66, ms:  380, status: 'success', err: null,         time: '14:31:54' },
-  { id: 'req_9f3a84', model: 'deepseek/deepseek-v4-pro',     type: 'chat',     inTok: 1820, outTok:  920, costTL: 0.18, balanceAfterTL: 493.71, ms:  740, status: 'success', err: null,         time: '14:31:22' },
-  { id: 'req_9f3a83', model: 'anthropic/claude-sonnet-4.6',  type: 'messages', inTok: 2640, outTok: 1480, costTL: 0.94, balanceAfterTL: 493.89, ms: 1280, status: 'error',   err: 'rate_limit', time: '14:30:48' },
-  { id: 'req_9f3a82', model: 'moonshotai/kimi-k2',           type: 'chat',     inTok:  640, outTok:  320, costTL: 0.08, balanceAfterTL: 494.83, ms:  820, status: 'success', err: null,         time: '14:30:12' },
+  { id: 'req_9f3a8b', model: 'claude-haiku-4-5-20251001', type: 'chat',     inTok: 1240, outTok:  840, costTL: 0.12, balanceAfterTL: 487.20, ms:  540, status: 'success', err: null,         time: '14:34:02' },
+  { id: 'req_9f3a89', model: 'gemini-3.1-pro-preview',    type: 'chat',     inTok: 4620, outTok: 2310, costTL: 0.84, balanceAfterTL: 487.32, ms:  589, status: 'success', err: null,         time: '14:33:48' },
+  { id: 'req_9f3a88', model: 'gpt-5.4',                   type: 'chat',     inTok: 3120, outTok: 1680, costTL: 0.68, balanceAfterTL: 488.16, ms:  904, status: 'success', err: null,         time: '14:33:24' },
+  { id: 'req_9f3a87', model: 'gpt-5.4-mini',              type: 'responses',inTok:  960, outTok:  420, costTL: 0.16, balanceAfterTL: 488.84, ms:  410, status: 'success', err: null,         time: '14:32:51' },
+  { id: 'req_9f3a86', model: 'claude-opus-4-7',           type: 'messages', inTok: 5840, outTok: 1240, costTL: 2.42, balanceAfterTL: 491.24, ms: 2090, status: 'success', err: null,         time: '14:32:18' },
+  { id: 'req_9f3a85', model: 'gemini-3-flash-preview',    type: 'chat',     inTok:  420, outTok:  240, costTL: 0.05, balanceAfterTL: 493.66, ms:  380, status: 'success', err: null,         time: '14:31:54' },
+  { id: 'req_9f3a84', model: 'gpt-5.5',                   type: 'chat',     inTok: 1820, outTok:  920, costTL: 0.18, balanceAfterTL: 493.71, ms:  740, status: 'success', err: null,         time: '14:31:22' },
+  { id: 'req_9f3a83', model: 'claude-sonnet-4-6',         type: 'messages', inTok: 2640, outTok: 1480, costTL: 0.94, balanceAfterTL: 493.89, ms: 1280, status: 'error',   err: 'rate_limit', time: '14:30:48' },
+  { id: 'req_9f3a82', model: 'o3',                        type: 'chat',     inTok:  640, outTok:  320, costTL: 0.08, balanceAfterTL: 494.83, ms:  820, status: 'success', err: null,         time: '14:30:12' },
 ];
 
 const mockPayments = [
@@ -368,19 +398,19 @@ const mockPayments = [
 ];
 
 const mockAnnouncements = [
-  { id: 1, mesaj: 'Veo 3 video modeli aktif edildi · USD/sn $0.03 sabit',                tip: 'basari', aktif: true,  baslangic: '24 May 09:00', bitis: '—' },
+  { id: 1, mesaj: 'Claude Popusk uyumlu metin kataloğu aktif · görsel/video geçici kapalı', tip: 'basari', aktif: true,  baslangic: '24 May 09:00', bitis: '—' },
   { id: 2, mesaj: 'Anthropic planlı bakım: 25 Mayıs 02:00–04:00 arası kısa kesinti',     tip: 'uyari',  aktif: true,  baslangic: '24 May 14:00', bitis: '25 May 04:00' },
   { id: 3, mesaj: 'Cryptomus USDT onay süreleri normal seviyede',                          tip: 'bilgi',  aktif: true,  baslangic: '23 May 18:00', bitis: '—' },
-  { id: 4, mesaj: 'GPT-4o fiyatı %15 düştü — yeni kur ile fiyatlar güncellendi',          tip: 'basari', aktif: false, baslangic: '20 May 10:00', bitis: '22 May 10:00' },
+  { id: 4, mesaj: 'GPT katalog fiyatları güncellendi — yeni kur ile TL karşılığı yenilendi', tip: 'basari', aktif: false, baslangic: '20 May 10:00', bitis: '22 May 10:00' },
 ];
 
 const mockAuditLogs = [
   { id: 1, action: 'config_update',     hedef: 'system',                       ozet: 'kurBuffer 0.015 → 0.020',                  zaman: '14:34:18' },
   { id: 2, action: 'bakiye_update',     hedef: 'u-1248 / Mehmet Ay',           ozet: '+₺500.00 · IBAN onaylandı',                zaman: '14:32:04' },
-  { id: 3, action: 'model_override_upsert', hedef: 'anthropic/claude-opus-4.7',ozet: 'inputUsd 0.30 → 0.25 (geçici indirim)',    zaman: '14:18:50' },
+  { id: 3, action: 'model_override_upsert', hedef: 'claude-opus-4-7',          ozet: 'satış fiyatı geçici kampanya olarak güncellendi', zaman: '14:18:50' },
   { id: 4, action: 'user_update',       hedef: 'u-1244 / Deniz Yılmaz',        ozet: 'durum aktif → askida',                     zaman: '13:42:11' },
   { id: 5, action: 'announcement_create',hedef: 'duyuru #2',                   ozet: 'Anthropic bakım uyarısı yayınlandı',       zaman: '14:00:02' },
-  { id: 6, action: 'provider_update',   hedef: 'kwaivgi',                      ozet: 'durum aktif → yavaş · gecikme 4180ms',     zaman: '13:08:24' },
+  { id: 6, action: 'provider_update',   hedef: 'google',                       ozet: 'durum aktif → yavaş · gecikme 1180ms',     zaman: '13:08:24' },
   { id: 7, action: 'apikey_revoke',     hedef: 'u-1243 / k-0298',              ozet: 'kullanıcı talebi',                          zaman: '12:14:50' },
   { id: 8, action: 'plan_update',       hedef: 'pro plan',                     ozet: 'aylık limit ₺5.000 → ₺7.500',              zaman: '11:58:02' },
 ];
@@ -398,15 +428,8 @@ const mockKurHistory = [
 
 const mockProviderStatus = [
   { provider: 'anthropic',  durum: 'aktif',  gecikmeMs: 1820, sonKontrol: '14:34:00', not: '' },
-  { provider: 'openai',     durum: 'aktif',  gecikmeMs: 940,  sonKontrol: '14:33:58', not: '' },  { provider: 'google',     durum: 'aktif',  gecikmeMs: 560,  sonKontrol: '14:34:02', not: '' },
-  { provider: 'deepseek',   durum: 'aktif',  gecikmeMs: 740,  sonKontrol: '14:33:54', not: '' },
-  { provider: 'bytedance',  durum: 'aktif',  gecikmeMs: 3210, sonKontrol: '14:33:50', not: 'Video render kuyruğu yoğun' },
-  { provider: 'kwaivgi',    durum: 'yavaş',  gecikmeMs: 4180, sonKontrol: '14:33:48', not: 'Sağlayıcı geçici yavaşlık bildirdi' },
-  { provider: 'moonshotai', durum: 'aktif',  gecikmeMs: 820,  sonKontrol: '14:33:42', not: '' },
-  { provider: 'qwen',       durum: 'aktif',  gecikmeMs: 690,  sonKontrol: '14:33:40', not: '' },
-  { provider: 'z.ai',       durum: 'kapali', gecikmeMs: null, sonKontrol: '14:30:00', not: 'Sağlayıcı API key sorununu çözüyor' },
-  { provider: 'mimo',       durum: 'aktif',  gecikmeMs: 1020, sonKontrol: '14:33:34', not: '' },
-  { provider: 'minimax',    durum: 'aktif',  gecikmeMs: 880,  sonKontrol: '14:33:30', not: '' },
+  { provider: 'openai',     durum: 'aktif',  gecikmeMs: 940,  sonKontrol: '14:33:58', not: '' },
+  { provider: 'google',     durum: 'aktif',  gecikmeMs: 560,  sonKontrol: '14:34:02', not: '' },
 ];
 
 // Expose new mock data once it's all defined (avoid TDZ in the first Object.assign).

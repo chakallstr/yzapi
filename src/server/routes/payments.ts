@@ -545,7 +545,7 @@ router.post("/iban/init", userAuth, async (req, res, next) => {
         userEmail: userRows[0]?.email,
         settings,
       }),
-      aciklama: `Havale açıklamasına mutlaka referans kodunuzu yazın: ${referansKodu}`,
+      aciklama: `Ödeme bildirimi için referans kodunuz oluşturuldu: ${referansKodu}`,
     });
   } catch (e) { next(e); }
 });
@@ -611,7 +611,7 @@ router.post("/crypto/init", userAuth, async (req, res, next) => {
           userEmail: userRows[0]?.email,
           settings,
         }),
-        aciklama: `Transfer açıklaması/not alanı varsa referans kodunuzu yazın: ${manualReference}`,
+        aciklama: `Kripto ödeme bildirimi için referans kodunuz oluşturuldu: ${manualReference}`,
       });
       return;
     }

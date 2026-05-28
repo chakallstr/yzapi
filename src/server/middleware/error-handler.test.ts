@@ -42,11 +42,11 @@ describe("errorHandler", () => {
     const req = { id: "req-403" } as unknown as Request;
     const res = makeRes();
 
-    errorHandler(new ModelDisabledError("openai/gpt-5.4"), req, res, vi.fn());
+    errorHandler(new ModelDisabledError("gpt-5.4"), req, res, vi.fn());
 
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.json).toHaveBeenCalledWith({
-      error: "Model disabled: openai/gpt-5.4",
+      error: "Model disabled: gpt-5.4",
       code: 403,
       requestId: "req-403",
     });
@@ -65,6 +65,24 @@ describe("errorHandler", () => {
       code: 429,
       requestId: "req-429",
       retryAfter: 30,
+    });
+  });
+
+  it("maps malformed JSON parser errors to 400 JSON without leaking stack details", () => {
+    const req = { id: "req-json" } as unknown as Request;
+    const res = makeRes();
+    const err = Object.assign(new SyntaxError("Expected property name or '}' in JSON"), {
+      status: 400,
+      type: "entity.parse.failed",
+    });
+
+    errorHandler(err, req, res, vi.fn());
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "Invalid JSON body",
+      code: 400,
+      requestId: "req-json",
     });
   });
 });

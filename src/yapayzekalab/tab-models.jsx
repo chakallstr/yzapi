@@ -10,14 +10,12 @@ import {
 } from './shared.jsx';
 
 /* ============================================
-   ModelsTab — 33+ model fiyat listesi
+   ModelsTab — metin model fiyat listesi
    Sağlayıcıya göre gruplandırma · tür filtresi · canlı TL fiyat.
    ============================================ */
 
 const TYPE_META = {
   text:  { label: 'Metin', Ico: I.Text,  color: 'var(--accent)' },
-  image: { label: 'Görsel', Ico: I.Image, color: 'var(--t-purple)' },
-  video: { label: 'Video',  Ico: I.Video, color: 'var(--t-teal)' },
 };
 
 const ProviderBadge = ({ provider }) => {
@@ -39,8 +37,6 @@ const ModelRow = ({ m, tweaks, onToggleCompare, compareOn }) => {
   // USD birincil. TL sadece bilgi amaçlı.
   const inputUsd  = m.type === 'text'  ? computeOurUsd(m.input, 'text', { textMul, mediaMul }) : null;
   const outputUsd = m.type === 'text'  ? computeOurUsd(m.output,'text', { textMul, mediaMul }) : null;
-  const imageUsd  = m.type === 'image' ? computeOurUsd(m.perImage, 'image', { textMul, mediaMul }) : null;
-  const v720Usd   = m.type === 'video' ? computeOurUsd(m.perSec720,'video', { textMul, mediaMul }) : null;
 
   return (
     <div style={{
@@ -67,24 +63,12 @@ const ModelRow = ({ m, tweaks, onToggleCompare, compareOn }) => {
       </div>
       {/* Provider */}
       <div><ProviderBadge provider={m.provider} /></div>
-      {/* Provider USD price */}
+      {/* Catalog USD price */}
       <div style={{ textAlign: 'right' }}>
         {m.type === 'text'  && (
           <div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-2)' }} className="tnum">{fmt.usdPer(m.input)} · {fmt.usdPer(m.output)}</div>
             <div style={{ fontSize: 9.5, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)', marginTop: 2, letterSpacing: 0.3 }}>in / out · USD/1M</div>
-          </div>
-        )}
-        {m.type === 'image' && (
-          <div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-2)' }} className="tnum">{fmt.usdPer(m.perImage)}</div>
-            <div style={{ fontSize: 9.5, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)', marginTop: 2, letterSpacing: 0.3 }}>USD / görsel</div>
-          </div>
-        )}
-        {m.type === 'video' && (
-          <div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-2)' }} className="tnum">{fmt.usdPer(m.perSec480)} · {fmt.usdPer(m.perSec720)} · {fmt.usdPer(m.perSec1080)}</div>
-            <div style={{ fontSize: 9.5, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)', marginTop: 2, letterSpacing: 0.3 }}>480 / 720 / 1080 · USD/sn</div>
           </div>
         )}
       </div>
@@ -94,18 +78,6 @@ const ModelRow = ({ m, tweaks, onToggleCompare, compareOn }) => {
           <div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--accent-ink)' }} className="tnum">{fmt.usdPer(inputUsd)} · {fmt.usdPer(outputUsd)}</div>
             <div style={{ fontSize: 9.5, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)', marginTop: 2, letterSpacing: 0.3 }}>in / out · USD/1M · ≈ ₺{(inputUsd*rate).toFixed(2)} / ₺{(outputUsd*rate).toFixed(2)}</div>
-          </div>
-        )}
-        {m.type === 'image' && (
-          <div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--accent-ink)' }} className="tnum">{fmt.usdPer(imageUsd)}</div>
-            <div style={{ fontSize: 9.5, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)', marginTop: 2, letterSpacing: 0.3 }}>USD / görsel · ≈ ₺{(imageUsd*rate).toFixed(2)}</div>
-          </div>
-        )}
-        {m.type === 'video' && (
-          <div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--accent-ink)' }} className="tnum">{fmt.usdPer(v720Usd)}</div>
-            <div style={{ fontSize: 9.5, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)', marginTop: 2, letterSpacing: 0.3 }}>USD / sn (720p) · ≈ ₺{(v720Usd*rate).toFixed(2)}</div>
           </div>
         )}
       </div>
@@ -121,9 +93,9 @@ const CompareTray = ({ ids, onRemove, onClear, tweaks }) => {
 
   const rows = ids.map(id => {
     const m = modelMeta(id);
-    const avgProvider = m.type === 'text' ? (m.input + m.output) / 2 : (m.perImage ?? m.perSec720 ?? 0);
-    const ourPrice = computeOurUsd(avgProvider, m.type === 'text' ? 'text' : m.type, { textMul, mediaMul });
-    return { id, m, avgProvider, ourPrice };
+    const catalogPrice = (m.input + m.output) / 2;
+    const ourPrice = computeOurUsd(catalogPrice, 'text', { textMul, mediaMul });
+    return { id, m, catalogPrice, ourPrice };
   });
 
   return (
@@ -142,7 +114,7 @@ const CompareTray = ({ ids, onRemove, onClear, tweaks }) => {
         <button onClick={onClear} style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-mono)' }}>tümünü temizle</button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${rows.length}, 1fr)` }}>
-        {rows.map(({ id, m, avgProvider, ourPrice }) => (
+        {rows.map(({ id, m, catalogPrice, ourPrice }) => (
           <div key={id} style={{ padding: 16, borderRight: '1px solid var(--border)', position: 'relative' }}>
             <button onClick={() => onRemove(id)} style={{
               position: 'absolute', top: 8, right: 8, padding: 4,
@@ -154,7 +126,7 @@ const CompareTray = ({ ids, onRemove, onClear, tweaks }) => {
             </div>
             <ProviderBadge provider={m.provider} />
             <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11.5 }}>
-              <CompareRow label="Sağlayıcı USD" value={fmt.usdPer(avgProvider) + ' / 1M'} />
+              <CompareRow label="Katalog USD" value={fmt.usdPer(catalogPrice) + ' / 1M'} />
               <CompareRow label="YapayZekaLab" value={fmt.usdPer(ourPrice) + ' / 1M'} accent />
               <CompareRow label="Context" value={m.ctx || '—'} />
               <CompareRow label="Tip" value={m.type} />
@@ -195,8 +167,6 @@ const ModelsTab = ({ ctx }) => {
 
   const counts = useMemo(() => ({
     text:  MODELS.filter(m => m.type === 'text').length,
-    image: MODELS.filter(m => m.type === 'image').length,
-    video: MODELS.filter(m => m.type === 'video').length,
   }), []);
 
   const providersFor = useMemo(() => {
@@ -211,11 +181,11 @@ const ModelsTab = ({ ctx }) => {
         <div>
           <Caption>Modeller</Caption>
           <h2 style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.8, margin: '6px 0 6px' }}>
-            33+ model, <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: 'var(--ink-3)' }}>tek API geçidi</span>
+            {MODELS.length} metin modeli, <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: 'var(--ink-3)' }}>tek API geçidi</span>
           </h2>
           <p style={{ fontSize: 12.5, color: 'var(--ink-2)', margin: 0, maxWidth: 640, lineHeight: 1.55 }}>
             Tüm fiyatlar <strong>USD</strong> bazındadır. TL gösterimleri yalnızca bilgi amaçlıdır.
-            {' '}Video endpointleri beta/sınırlıdır; aktif değilse 501 dönebilir.
+            {' '}Bu geçişte aktif katalog yalnızca metin modelleridir.
           </p>
         </div>
 
@@ -241,7 +211,7 @@ const ModelsTab = ({ ctx }) => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20 }}>
           {[
             { label: 'Metin fiyatı',   value: 'katalog satış fiyatı',                                           mono: true },
-            { label: 'Görsel/Video',   value: 'modele göre satış fiyatı · video beta',                          mono: true },
+            { label: 'Aktif kapsam',   value: 'metin modelleri · görsel/video kapalı',                          mono: true },
             { label: 'Para birimi',   value: 'USD birincil · TL bilgi',                                           mono: false, accent: true },
             { label: 'Bilgi kuru',    value: '₺' + (tweaks.tlRate ?? 34.5).toFixed(2) + ' / USD',                  mono: false },
           ].map((row, i) => (
@@ -296,7 +266,7 @@ const ModelsTab = ({ ctx }) => {
           <Caption>≡</Caption>
           <Caption>Model</Caption>
           <Caption>Sağlayıcı</Caption>
-          <Caption style={{ textAlign: 'right' }}>Sağlayıcı fiyatı</Caption>
+          <Caption style={{ textAlign: 'right' }}>Katalog fiyatı</Caption>
           <Caption style={{ textAlign: 'right' }}>YapayZekaLab fiyatı (USD)</Caption>
         </div>
         {filtered.length === 0 ? (
@@ -311,7 +281,7 @@ const ModelsTab = ({ ctx }) => {
       </Card>
 
       <div style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'center', padding: '8px 0', fontFamily: 'var(--font-mono)' }}>
-        * Ücretlendirme USD bazındadır. TL karşılığı günlük TCMB kurundan hesaplanıp yalnızca bilgi olarak gösterilir. Video API beta/sınırlıdır; aktif değilse 501 dönebilir.
+        * Ücretlendirme USD bazındadır. TL karşılığı günlük TCMB kurundan hesaplanıp yalnızca bilgi olarak gösterilir. Görsel/video endpointleri bu geçişte kapalıdır ve 501 JSON hata döndürür.
       </div>
     </div>
   );

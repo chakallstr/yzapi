@@ -225,3 +225,152 @@ API text billing through the temporary OmniRoute GPT path is now accepted for th
 ## Current API Verdict
 
 Temporary OmniRoute happy-path text billing remains previously accepted from the live funded-key retest. This recheck did not rerun funded billing because safe key env was absent; it only confirms public/system/authless API smoke remains healthy while local OAuth/payment guard fixes await deploy.
+
+---
+
+# Local Claude Popusk Migration API Contract Retest — 2026-05-28 14:34 TRT
+
+## Scope
+
+- Local code migration only; no live deploy, no real payment, no image/video generation.
+- Main provider base abstraction now supports `AI_PROVIDER_BASE_URL` with Claude Popusk as default and legacy env fallback.
+- Active public model catalog is text-only and canonical.
+
+## Evidence
+
+- Targeted API/catalog/pricing/docs regression PASS: 8 files / 48 tests.
+- Full local regression PASS: 31 files / 141 tests.
+- `npm run lint` PASS.
+- `npm run build` PASS after updating the old-theme URL guard.
+- `npm run scan:public` PASS, 0 hits.
+- `node scripts/scan-secrets.mjs` PASS, 0 hits.
+
+---
+
+# Remaining Safe API/UAT Tests With Provider Payment E2E Excluded — 2026-05-28 15:01 TRT
+
+## Scope
+
+- User removed Shopier/Cryptomus provider E2E from required scope.
+- No real payment.
+- No image/video generation.
+- No paid provider inference.
+- No customer-data mutation.
+
+## Results
+
+- Local regression PASS: 31 files / 143 tests.
+- Lint PASS.
+- Build PASS.
+- Public bundle scan PASS: 0 hits.
+- Secret scan PASS: 235 scanned / 0 hits.
+- Live smoke PASS:
+  - `/health` ok, DB ok.
+  - `/status` ok.
+  - `/api/models` reachable.
+  - Authless `/v1/chat/completions` returns 401.
+  - Unknown `/api/*` and `/v1/*` return JSON 404.
+- Live UAT smoke PASS: 10/10, report `qa-artifacts/uat-smoke-2026-05-28T12-00-34-459Z/uat-smoke-report.md`.
+
+## Remaining API Gaps
+
+- Live smoke skipped successful funded chat because `SMOKE_API_KEY` was absent.
+- Live smoke skipped low-balance check because `SMOKE_LOW_BALANCE_API_KEY` was absent.
+- Live `/api/models` still reports 33 models; local Claude Popusk catalog has 42. The latest local catalog/pricing work is not deployed yet.
+
+---
+
+# Full E2E API Retest — 2026-05-28 15:12 TRT
+
+## Local Production API
+
+- Local DB started with Docker Postgres.
+- Migrations and seed completed.
+- Local production server started on `127.0.0.1:4567`.
+- Smoke PASS with expected 42 models.
+- Local UAT PASS 10/10.
+
+## API Negative/Balance Safety
+
+Temporary local API key rows were created and deleted.
+
+- No auth chat: 401 JSON.
+- Invalid key chat: 401 JSON.
+- Revoked key chat: 401 JSON.
+- Low balance chat: 402 JSON.
+- Unknown model: 404 JSON.
+- Malformed JSON: found 500, fixed, then PASS 400 JSON.
+- No auth messages: 401 JSON.
+- No auth image generation: 401 JSON.
+
+## Successful Funded Billing
+
+Not completed.
+
+Reason: no safe provider/live `SMOKE_API_KEY` is present in env, and no provider key is stored in the local env. This test still requires a safe funded test key and a configured provider env after deploy.
+
+## API Status
+
+- Local contracts cover `/v1/models`, `/v1/models/count`, `/v1/providers`, model canonicalization, no-auth gateway separation, text pricing and safe-disabled media endpoints.
+- Live funded Claude Popusk inference/billing was not run in this change.
+- Launch API verdict remains blocked until a live rollbackable deploy plus safe funded `yzk_live_*` billing retest verifies headers, balance decrement and `usage_records` on the selected upstream.
+
+---
+
+# Direct Claude Popusk Key Probe — 2026-05-28 14:40 TRT
+
+## Scope
+
+- User-provided provider key tested directly against `https://api.claude-popusk.shop/v1`.
+- Key was not printed, committed, or copied into reports.
+- No image/video generation and no payment actions.
+
+## Result
+
+- `GET /models`: PASS, `200`, `42` models.
+- `POST /chat/completions`: PASS, model `gpt-5.4-mini`, `200`, answer `ok`, usage `9` total tokens.
+- `POST /messages`: PASS, model `claude-haiku-4-5-20251001`, `200`, answer `ok`, usage `11` input / `1` output token.
+- `POST /responses`: FAIL/UNSUPPORTED, `404 not_found`.
+- Direct provider `/models/count`, `/providers`, `/credits`: unsupported on this provider path (`404`). YapayZekaLab local gateway still owns public `/v1/models/count` and `/v1/providers`.
+
+## Code Adjustment From Probe
+
+- Removed active `responses` support from model catalog endpoint metadata.
+- Public copy now says `/v1/responses` can return JSON error/no charge when this provider path does not support it.
+
+## Regression
+
+- Targeted tests PASS: 5 files / 26 tests.
+- Full tests PASS: 31 files / 141 tests.
+- `npm run lint` PASS.
+- `npm run build` PASS.
+- `npm run scan:public` PASS, 0 hits.
+- `node scripts/scan-secrets.mjs` PASS, 0 hits.
+
+---
+
+# Claude Popusk Public Pricing and Ordering Retest — 2026-05-28 14:53 TRT
+
+## Scope
+
+- Local catalog/UI data ordering only.
+- No provider call, no real payment, no image/video generation.
+- Public price table added at `CLAUDE_POPUSK_PRICE_TABLE.md`.
+
+## Result
+
+- Basic text tier: `$0.62/M`.
+- Standard GPT/o-series tier: `$1.00/M`.
+- Premium Claude Opus 4.7 / GPT 5.5 tier: `$1.20/M`.
+- Backend `MASTER_MODELS` and frontend model display order are aligned by explicit contract test.
+- Model list order is cheapest-first, with older/cheaper families before newer/premium entries.
+
+## Regression
+
+- RED order test first failed against the previous premium-first catalog.
+- Targeted tests PASS: 2 files / 10 tests.
+- Full tests PASS: 31 files / 143 tests.
+- `npm run lint` PASS.
+- `npm run build` PASS.
+- `npm run scan:public` PASS, 0 hits.
+- `node scripts/scan-secrets.mjs` PASS, 0 hits.

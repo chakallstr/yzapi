@@ -211,7 +211,7 @@ export const sessions = pgTable("sessions", {
 export const payments = pgTable("payments", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: uuid("user_id").notNull().references(() => users.id),
-  metod: text("metod").notNull(), // shopier | iban | cryptomus
+  metod: text("metod").notNull(), // shopier | iban | cryptomus | crypto_bot
   miktarTL: numeric("miktar_tl", { precision: 14, scale: 4 }).notNull(),
   kdvTL: numeric("kdv_tl", { precision: 14, scale: 4 }).notNull(),
   netTL: numeric("net_tl", { precision: 14, scale: 4 }).notNull(),
@@ -246,3 +246,64 @@ export const pendingIbanPayments = pgTable("pending_iban_payments", {
   onaylayan: text("onaylayan"), // admin id
   not: text("not"),
 });
+
+// ── telegram bot identity and delivery ────────────────────────────────────────
+export const telegramAccounts = pgTable(
+  "telegram_accounts",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    telegramId: text("telegram_id").notNull(),
+    username: text("username"),
+    firstName: text("first_name"),
+    lastName: text("last_name"),
+    linkedAt: timestamp("linked_at", { withTimezone: true }).notNull().default(sql`now()`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [
+    uniqueIndex("telegram_accounts_telegram_id_idx").on(t.telegramId),
+    index("telegram_accounts_user_id_idx").on(t.userId),
+  ],
+);
+
+export const telegramLinkCodes = pgTable(
+  "telegram_link_codes",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    codeHash: text("code_hash").notNull(),
+    telegramId: text("telegram_id"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [
+    uniqueIndex("telegram_link_codes_code_hash_idx").on(t.codeHash),
+    index("telegram_link_codes_user_id_idx").on(t.userId),
+  ],
+);
+
+export const telegramDeliveries = pgTable(
+  "telegram_deliveries",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    telegramAccountId: uuid("telegram_account_id").references(() => telegramAccounts.id, { onDelete: "set null" }),
+    paymentId: uuid("payment_id").references(() => payments.id, { onDelete: "set null" }),
+    deliveryType: text("delivery_type").notNull().default("api_key"),
+    status: text("status").notNull().default("pending"), // pending | delivered | failed
+    maskedKey: text("masked_key"),
+    messageId: text("message_id"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    lastError: text("last_error"),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [
+    uniqueIndex("telegram_deliveries_payment_type_idx").on(t.paymentId, t.deliveryType),
+    index("telegram_deliveries_user_id_idx").on(t.userId),
+    index("telegram_deliveries_status_idx").on(t.status),
+  ],
+);

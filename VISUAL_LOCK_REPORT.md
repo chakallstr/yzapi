@@ -254,3 +254,33 @@ Visual diff notes:
 - No frontend source file changed.
 - No CSS, theme token, color, font, spacing, layout, card, button, modal, icon, animation, route or template code changed.
 - The repair is backend-only Shopier callback routing plus a source contract test.
+
+## 2026-05-28 14:34 TRT Claude Popusk Migration Visual Lock
+
+- Frontend changes were limited to text/data/model/example values in the existing YapayZekaLab components.
+- No CSS variables, fonts, colors, spacing, border radius, shadows, animations, modal styles, button styles, card styles, responsive breakpoints, icons, or layout templates were intentionally changed.
+- `vite.config.ts` and `src/rejected-template-guard.test.ts` were updated only to recognize the new official public v1 URL fingerprint while keeping the old-theme guard active.
+- `npm run build` passed with the rejected-template guard enabled.
+- `npm run scan:public` passed with 0 hits.
+
+Visual decision: PRESERVED LOCALLY. Browser screenshot comparison was not rerun in this session; deploy/browser visual acceptance remains pending the fourth integrity guard.
+
+## 2026-05-28 14:53 TRT Claude Popusk Price/Order Visual Lock
+
+- Frontend change was limited to `MODEL_DISPLAY_ORDER` data and sorting existing model data before render.
+- No CSS variables, font settings, colors, gradients, shadows, spacing, border radius, layout structure, component hierarchy, button/card/modal styles, icons, animations, or responsive breakpoints changed.
+- `src/yapayzekalab/shared.jsx` still renders through the existing Models tab/card components; only the model order and public USD values are data-driven.
+- `npm run build` passed.
+- `npm run scan:public` passed with 0 hits.
+- `node scripts/scan-secrets.mjs` passed with 0 hits.
+
+Visual decision: PRESERVED LOCALLY. Browser screenshot comparison and deploy-surface approval remain pending the fourth integrity guard.
+
+## 2026-05-28 15:12 TRT Full E2E Visual Lock
+
+- Full E2E fix touched only backend error handling plus reports.
+- No frontend CSS, theme, color, typography, spacing, layout, card, button, modal, icon, animation or responsive code changed.
+- Local UAT smoke after fix passed 10/10.
+- Live UAT smoke passed 10/10 on the currently deployed bundle, but live bundle is still old catalog state with 33 models.
+
+Visual decision: PRESERVED LOCALLY. Deploy-surface parity remains pending.

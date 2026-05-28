@@ -29,8 +29,8 @@ export async function applyOverride(m: MasterModel): Promise<MasterModel> {
   const ovr = rows[0];
   const patched = { ...m };
   if (m.type === "Metin") {
-    if (ovr.inputUsdOverride !== null) patched.providerInputUsd = Number(ovr.inputUsdOverride);
-    if (ovr.outputUsdOverride !== null) patched.providerOutputUsd = Number(ovr.outputUsdOverride);
+    if (ovr.inputUsdOverride !== null) patched.customerInputUsd = Number(ovr.inputUsdOverride);
+    if (ovr.outputUsdOverride !== null) patched.customerOutputUsd = Number(ovr.outputUsdOverride);
   } else if (m.type === "Görsel") {
     if (ovr.inputUsdOverride !== null) patched.providerImageInputUsd = Number(ovr.inputUsdOverride);
     if (ovr.outputUsdOverride !== null) patched.providerImageOutputUsd = Number(ovr.outputUsdOverride);

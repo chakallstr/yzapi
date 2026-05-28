@@ -2,7 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { db, dbSql } from "../db/client.js";
 import { systemConfig } from "../db/schema.js";
-import { env } from "../lib/env.js";
+import { aiProviderApiKey, aiProviderBaseUrl } from "../lib/env.js";
 import { MASTER_MODELS } from "../../master-models.js";
 
 export interface StatusSnapshot {
@@ -15,7 +15,7 @@ export interface StatusSnapshot {
   checks: {
     api: "ok";
     db: "ok" | "fail";
-    closerouter: "ok" | "fail" | "unknown";
+    aiProvider: "ok" | "fail" | "unknown";
   };
   lastKurRefresh: string | null;
   deploy: {
@@ -39,13 +39,13 @@ async function checkDb(): Promise<"ok" | "fail"> {
   }
 }
 
-async function checkCloseRouter(): Promise<"ok" | "fail" | "unknown"> {
-  if (!env.CLOSEROUTER_API_KEY) return "unknown";
+async function checkAiProvider(): Promise<"ok" | "fail" | "unknown"> {
+  if (!aiProviderApiKey()) return "unknown";
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 2000);
-    const res = await fetch(`${env.CLOSEROUTER_BASE_URL}/models`, {
-      headers: { Authorization: `Bearer ${env.CLOSEROUTER_API_KEY}` },
+    const res = await fetch(`${aiProviderBaseUrl()}/models`, {
+      headers: { Authorization: `Bearer ${aiProviderApiKey()}` },
       signal: ctrl.signal,
     });
     clearTimeout(timer);
@@ -115,14 +115,14 @@ export async function getStatusSnapshot(opts: {
   startedAt: number;
   version: string;
 }): Promise<StatusSnapshot> {
-  const [dbStatus, closerouter, lastKurRefresh, deploy] = await Promise.all([
+  const [dbStatus, aiProvider, lastKurRefresh, deploy] = await Promise.all([
     checkDb(),
-    checkCloseRouter(),
+    checkAiProvider(),
     readLastKurRefresh(),
     readLatestDeployRecord(),
   ]);
 
-  const checks = { api: "ok" as const, db: dbStatus, closerouter };
+  const checks = { api: "ok" as const, db: dbStatus, aiProvider };
 
   return {
     status: deriveStatus(checks),

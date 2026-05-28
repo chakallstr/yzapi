@@ -62,7 +62,8 @@ describe("public /v1 catalog contract", () => {
     expect(serialized).not.toMatch(/api[_-]?key|secret|upstream|base_url|routing|weight/i);
     expect(serialized).not.toContain("providerInputUsd");
     expect(serialized).not.toContain("providerOutputUsd");
-    expect(serialized).not.toContain(String(MASTER_MODELS[0].providerInputUsd));
+    expect(serialized).not.toContain("customerInputUsd");
+    expect(serialized).not.toContain("customerOutputUsd");
     expect(serialized).not.toContain(MASTER_MODELS[1].id);
   });
 
@@ -137,7 +138,7 @@ describe("public /v1 catalog contract", () => {
       const chat = await fetch(`${baseUrl}/v1/chat/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "anthropic/claude-haiku-4.5", messages: [] }),
+        body: JSON.stringify({ model: "claude-haiku-4-5-20251001", messages: [] }),
       });
       expect(chat.status).toBe(401);
       expect(await chat.json()).toMatchObject({ code: "invalid_api_key" });

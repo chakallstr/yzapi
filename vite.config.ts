@@ -45,7 +45,7 @@ const approvedThemeNeedles = [
   "Ayda ne kadar",
   "ödersin?",
   phrase("Bakiye ", "kalkülatörü"),
-  "api.yapayzekalab.org",
+  "yapayzekalab.org/v1",
 ];
 
 function sourceFiles(root: string) {

@@ -34,11 +34,15 @@ function toTL(usd: number, cfg: PricingConfig): number {
 
 function computeTextPrice(m: MasterModel, cfg: PricingConfig): ComputedPrice {
   const result: ComputedPrice = { unit: "1M token" };
-  if (m.providerInputUsd !== undefined) {
+  if (m.customerInputUsd !== undefined) {
+    result.input = { usd: m.customerInputUsd, tl: toTL(m.customerInputUsd, cfg) };
+  } else if (m.providerInputUsd !== undefined) {
     const usd = (m.providerInputUsd / cfg.textBillingRatio) * cfg.textCarpan;
     result.input = { usd, tl: toTL(usd, cfg) };
   }
-  if (m.providerOutputUsd !== undefined) {
+  if (m.customerOutputUsd !== undefined) {
+    result.output = { usd: m.customerOutputUsd, tl: toTL(m.customerOutputUsd, cfg) };
+  } else if (m.providerOutputUsd !== undefined) {
     const usd = (m.providerOutputUsd / cfg.textBillingRatio) * cfg.textCarpan;
     result.output = { usd, tl: toTL(usd, cfg) };
   }

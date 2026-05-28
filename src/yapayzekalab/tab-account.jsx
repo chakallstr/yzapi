@@ -19,16 +19,15 @@ const PAY_METHODS = [
 ];
 
 const mockKeys = [
-  { id: 'k-1', name: 'Production',  prefix: 'yzk_live_DEMO_PROD', last: '24 May 14:32', requests: 12480, status: 'active', scopes: ['chat','messages','images'] },
-  { id: 'k-2', name: 'Geliştirme',  prefix: 'yzk_live_DEMO_DEV',  last: '23 May 09:14', requests: 1284,  status: 'active', scopes: ['chat','messages','images','video'] },
+  { id: 'k-1', name: 'Production',  prefix: 'yzk_live_DEMO_PROD', last: '24 May 14:32', requests: 12480, status: 'active', scopes: ['chat','messages','responses'] },
+  { id: 'k-2', name: 'Geliştirme',  prefix: 'yzk_live_DEMO_DEV',  last: '23 May 09:14', requests: 1284,  status: 'active', scopes: ['chat','messages','responses'] },
   { id: 'k-3', name: 'Test',        prefix: 'yzk_live_DEMO_TEST', last: '21 May 18:08', requests: 318,   status: 'paused', scopes: ['chat'] },
 ];
 
 const SCOPE_META = {
   chat:     { label: 'chat',     color: 'var(--accent-ink)', bg: 'var(--accent-bg)' },
   messages: { label: 'messages', color: 'var(--lav-ink)',    bg: 'var(--t-purple-bg)' },
-  images:   { label: 'images',   color: '#9a3412',            bg: '#fff7ed' },
-  video:    { label: 'video',    color: '#047857',            bg: 'var(--ok-bg)' },
+  responses:{ label: 'responses',color: '#9a3412',            bg: '#fff7ed' },
 };
 const ALL_SCOPES = Object.keys(SCOPE_META);
 const SANDBOX_TOKEN_LIMIT = 5000;
@@ -840,7 +839,7 @@ const AccountTab = ({ ctx }) => {
                   </a>
                 ) : (
                   <span style={{ fontSize: 10.5, color: 'var(--ink-3)', lineHeight: 1.5 }}>
-                    WhatsApp bildirim numarası henüz tanımlı değil; referans kodunu ödeme açıklamasına yazın.
+                    WhatsApp bildirim numarası henüz tanımlı değil; ödeme sonrası destek ekibiyle iletişime geçin.
                   </span>
                 )}
                 <button onClick={() => navigator.clipboard?.writeText(paymentInstruction.reference || '')} style={{ padding: '8px 10px', borderRadius: 9, border: '1px solid var(--border)', fontSize: 11.5 }}>

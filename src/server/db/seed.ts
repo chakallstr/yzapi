@@ -65,7 +65,7 @@ async function main() {
       ad: "Ücretsiz",
       gunlukLimitTL: "5",
       aylikLimitTL: "50",
-      izinliModeller: ["anthropic/claude-haiku-4.5", "openai/gpt-5.4-mini", "google/gemini-3.1-flash-lite-preview"],
+      izinliModeller: ["claude-haiku-4-5-20251001", "gpt-5.4-mini", "gemini-3.1-pro-preview"],
       aciklama: "Deneme ve düşük hacim için.",
     },
     {

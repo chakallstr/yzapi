@@ -1,7 +1,8 @@
 import { Response } from "express";
 import { pipeline } from "stream";
-import { env } from "../lib/env.js";
+import { aiProviderApiKey, aiProviderBaseUrl } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
+import { canonicalizeModelId } from "../../master-models.js";
 
 export interface ChatUsage {
   promptTokens: number;
@@ -26,6 +27,7 @@ export interface TextRequest {
 }
 
 const OMNIROUTE_MODEL_MAP: Record<string, string> = {
+  "gpt-5.4-mini": "cx/gpt-5.4-mini",
   "openai/gpt-5.4-mini": "cx/gpt-5.4-mini",
 };
 
@@ -65,9 +67,10 @@ function isOmniRouteBase(baseUrl: string): boolean {
   return baseUrl.includes("127.0.0.1:20128") || baseUrl.includes("api.seslab.tr");
 }
 
-export function mapModelForProvider(model: string, baseUrl = env.CLOSEROUTER_BASE_URL): string {
-  if (!isOmniRouteBase(baseUrl)) return model;
-  return OMNIROUTE_MODEL_MAP[model] ?? model;
+export function mapModelForProvider(model: string, baseUrl = aiProviderBaseUrl()): string {
+  const canonical = canonicalizeModelId(model) ?? model;
+  if (!isOmniRouteBase(baseUrl)) return canonical;
+  return OMNIROUTE_MODEL_MAP[canonical] ?? OMNIROUTE_MODEL_MAP[model] ?? canonical;
 }
 
 function mapRequestBodyForProvider<T extends Record<string, unknown>>(body: T): T {
@@ -129,7 +132,7 @@ async function readProviderJson(res: globalThis.Response): Promise<Record<string
 
 function baseHeaders(): Record<string, string> {
   return {
-    Authorization: `Bearer ${env.CLOSEROUTER_API_KEY}`,
+    Authorization: `Bearer ${aiProviderApiKey()}`,
     "Content-Type": "application/json",
     Accept: "application/json",
   };
@@ -139,7 +142,7 @@ export async function forwardChat(
   body: ChatRequest
 ): Promise<{ raw: unknown; usage: ChatUsage }> {
   const start = Date.now();
-  const url = `${env.CLOSEROUTER_BASE_URL}/chat/completions`;
+  const url = `${aiProviderBaseUrl()}/chat/completions`;
   const providerBody = mapRequestBodyForProvider({ ...body, stream: false });
 
   const res = await fetch(url, {
@@ -151,10 +154,10 @@ export async function forwardChat(
   const responseMs = Date.now() - start;
   const json = await readProviderJson(res);
 
-  logger.debug({ model: body.model, status: res.status, responseMs }, "closerouter chat");
+  logger.debug({ model: body.model, status: res.status, responseMs }, "ai provider chat");
 
   if (!res.ok) {
-    const err = new Error(`CloseRouter ${res.status}`) as Error & { status: number; body: unknown };
+    const err = new Error(`AI provider ${res.status}`) as Error & { status: number; body: unknown };
     err.status = res.status;
     err.body = json;
     throw err;
@@ -171,7 +174,7 @@ export async function forwardTextEndpoint(
   body: TextRequest
 ): Promise<{ raw: unknown; usage: ChatUsage }> {
   const start = Date.now();
-  const url = `${env.CLOSEROUTER_BASE_URL}/${endpoint}`;
+  const url = `${aiProviderBaseUrl()}/${endpoint}`;
   const providerBody = mapRequestBodyForProvider({ ...body, stream: false });
 
   const res = await fetch(url, {
@@ -183,10 +186,10 @@ export async function forwardTextEndpoint(
   const responseMs = Date.now() - start;
   const json = await readProviderJson(res);
 
-  logger.debug({ model: body.model, endpoint, status: res.status, responseMs }, "closerouter text endpoint");
+  logger.debug({ model: body.model, endpoint, status: res.status, responseMs }, "ai provider text endpoint");
 
   if (!res.ok) {
-    const err = new Error(`CloseRouter ${res.status}`) as Error & { status: number; body: unknown };
+    const err = new Error(`AI provider ${res.status}`) as Error & { status: number; body: unknown };
     err.status = res.status;
     err.body = json;
     throw err;
@@ -199,7 +202,7 @@ export async function forwardChatStream(
   body: ChatRequest,
   res: Response
 ): Promise<ChatUsage> {
-  const url = `${env.CLOSEROUTER_BASE_URL}/chat/completions`;
+  const url = `${aiProviderBaseUrl()}/chat/completions`;
 
   const upstream = await fetch(url, {
     method: "POST",
@@ -209,7 +212,7 @@ export async function forwardChatStream(
 
   if (!upstream.ok) {
     const errBody = await upstream.json().catch(() => ({}));
-    const err = new Error(`CloseRouter ${upstream.status}`) as Error & { status: number; body: unknown };
+    const err = new Error(`AI provider ${upstream.status}`) as Error & { status: number; body: unknown };
     err.status = upstream.status;
     err.body = errBody;
     throw err;
@@ -221,7 +224,7 @@ export async function forwardChatStream(
 
   return new Promise<ChatUsage>((resolve, reject) => {
     if (!upstream.body) {
-      reject(new Error("No response body from CloseRouter"));
+      reject(new Error("No response body from AI provider"));
       return;
     }
 
@@ -264,7 +267,7 @@ export async function forwardChatStream(
     });
 
     nodeStream.on("error", (err: Error) => {
-      logger.error({ err }, "closerouter stream error");
+      logger.error({ err }, "ai provider stream error");
       res.end();
       reject(err);
     });
@@ -281,7 +284,7 @@ export async function forwardImage(
   body: Record<string, unknown>
 ): Promise<{ raw: unknown; imageCount: number }> {
   const start = Date.now();
-  const url = `${env.CLOSEROUTER_BASE_URL}/images/${endpoint}`;
+  const url = `${aiProviderBaseUrl()}/images/${endpoint}`;
 
   const res = await fetch(url, {
     method: "POST",
@@ -291,10 +294,10 @@ export async function forwardImage(
 
   const responseMs = Date.now() - start;
   const json = await res.json() as Record<string, unknown>;
-  logger.debug({ endpoint, status: res.status, responseMs }, "closerouter image");
+  logger.debug({ endpoint, status: res.status, responseMs }, "ai provider image");
 
   if (!res.ok) {
-    const err = new Error(`CloseRouter ${res.status}`) as Error & { status: number; body: unknown };
+    const err = new Error(`AI provider ${res.status}`) as Error & { status: number; body: unknown };
     err.status = res.status;
     err.body = json;
     throw err;
@@ -308,7 +311,7 @@ export async function forwardImage(
 export async function submitVideo(
   body: Record<string, unknown>
 ): Promise<{ taskId: string }> {
-  const url = `${env.CLOSEROUTER_BASE_URL}/videos/submit`;
+  const url = `${aiProviderBaseUrl()}/videos/submit`;
 
   const res = await fetch(url, {
     method: "POST",
@@ -319,7 +322,7 @@ export async function submitVideo(
   const json = await res.json() as Record<string, unknown>;
 
   if (!res.ok) {
-    const err = new Error(`CloseRouter ${res.status}`) as Error & { status: number; body: unknown };
+    const err = new Error(`AI provider ${res.status}`) as Error & { status: number; body: unknown };
     err.status = res.status;
     err.body = json;
     throw err;
@@ -329,12 +332,12 @@ export async function submitVideo(
 }
 
 export async function getVideoTask(taskId: string): Promise<Record<string, unknown>> {
-  const url = `${env.CLOSEROUTER_BASE_URL}/videos/tasks/${taskId}`;
+  const url = `${aiProviderBaseUrl()}/videos/tasks/${taskId}`;
 
   const res = await fetch(url, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${env.CLOSEROUTER_API_KEY}`,
+      Authorization: `Bearer ${aiProviderApiKey()}`,
       Accept: "application/json",
     },
   });
@@ -342,7 +345,7 @@ export async function getVideoTask(taskId: string): Promise<Record<string, unkno
   const json = await res.json() as Record<string, unknown>;
 
   if (!res.ok) {
-    const err = new Error(`CloseRouter ${res.status}`) as Error & { status: number; body: unknown };
+    const err = new Error(`AI provider ${res.status}`) as Error & { status: number; body: unknown };
     err.status = res.status;
     err.body = json;
     throw err;

@@ -73,8 +73,8 @@ async function buildCatalogEntries(): Promise<V1CatalogEntry[]> {
     const patched = { ...model };
     if (override) {
       if (model.type === "Metin") {
-        if (override.inputUsdOverride !== null) patched.providerInputUsd = Number(override.inputUsdOverride);
-        if (override.outputUsdOverride !== null) patched.providerOutputUsd = Number(override.outputUsdOverride);
+        if (override.inputUsdOverride !== null) patched.customerInputUsd = Number(override.inputUsdOverride);
+        if (override.outputUsdOverride !== null) patched.customerOutputUsd = Number(override.outputUsdOverride);
       } else if (model.type === "Görsel") {
         if (override.inputUsdOverride !== null) patched.providerImageInputUsd = Number(override.inputUsdOverride);
         if (override.outputUsdOverride !== null) patched.providerImageOutputUsd = Number(override.outputUsdOverride);

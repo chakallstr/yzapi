@@ -552,7 +552,7 @@ const SiteFooter = () => {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24, flexWrap: 'wrap',
       }}>
         <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
-          © 2026 YapayZekaLab · api.yapayzekalab.org · support@yapayzekalab.org
+          © 2026 YapayZekaLab · yapayzekalab.org/v1 · support@yapayzekalab.org
         </div>
         <div style={{ display: 'flex', gap: 16, fontSize: 11, color: 'var(--ink-3)', alignItems: 'center' }}>
           <button onClick={() => setStatusOpen(true)} style={{

@@ -326,3 +326,55 @@ Operasyon tarihi: 2026-05-26
   - Full: `npm run lint` PASS; `npm test` PASS 30 files / 135 tests; `npm run build` PASS; `npm run scan:public` PASS 0 hits; `node scripts/scan-secrets.mjs` PASS 233 scanned / 0 hits.
   - Live current surface: `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` PASS; `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` PASS 10/10.
 - Sonuç: FIXED LOCALLY. LIVE DEPLOY BLOCKED UNTIL FOURTH INTEGRITY GUARD CAN RUN AND PROVIDER E2E GATE IS RESOLVED.
+
+## CLAUDE-POPUSK-MIGRATION-001 — Text-only Claude Popusk catalog and provider abstraction
+
+- Date: 2026-05-28 14:34 TRT.
+- Problem: Current code still had legacy CloseRouter/model catalog assumptions and frontend copy/examples that exposed old provider-prefixed IDs, extra non-text model families and active media messaging.
+- Decision: `DEC-FIX-CLAUDE-POPUSK-MIGRATION-001`, 3/3 APPROVED for local implementation only. Subagent spawn was attempted but the platform returned `agent thread limit reached`; deploy/release approval remains blocked without the fourth integrity guard.
+- Changes:
+  - `MASTER_MODELS` replaced with the Claude Popusk text model catalog and canonical public IDs.
+  - Legacy provider-prefixed IDs are accepted through `canonicalizeModelId`, while `/v1` public responses return canonical IDs.
+  - Added `AI_PROVIDER_API_KEY` / `AI_PROVIDER_BASE_URL` helpers with legacy env fallback; default provider base is Claude Popusk when no override exists.
+  - Text pricing now uses explicit customer-facing USD fields when present; old provider-cost fallback remains internal/backward compatible.
+  - `/v1/images/*` returns 501 after API auth and does not forward or charge during this provider migration; video remains 501.
+  - API examples now use `https://yapayzekalab.org/v1` and canonical model IDs.
+  - Frontend demo data, model list and docs copy were updated without changing CSS/layout/theme.
+- Result: Fixed locally. Not deployed.
+
+## E2E-BUG-001 — Malformed JSON returns 400 instead of 500
+
+- Date: 2026-05-28 15:12 TRT.
+- Problem: Full local E2E found malformed JSON sent to `/v1/chat/completions` returned 500 JSON.
+- Expected: malformed JSON should return 400 JSON without stack/internal leakage.
+- Decision: `DEC-E2E-FULL-001`, 3/3 APPROVED for local fix; launch still blocked by live parity/funded billing.
+- Change:
+  - `src/server/middleware/error-handler.ts` now maps Express JSON parser `entity.parse.failed` to `{ error: "Invalid JSON body", code: 400, requestId }`.
+  - `src/server/middleware/error-handler.test.ts` covers this behavior.
+- Verification:
+  - RED: targeted error-handler test failed at 500 before fix.
+  - GREEN: targeted error-handler test PASS 4/4.
+  - Full `npm test` PASS 31 files / 144 tests.
+  - Local API negative E2E confirms malformed JSON now returns 400 JSON.
+  - Lint/build/public scan/secret scan PASS.
+- Result: Fixed locally. Not deployed.
+
+## CLAUDE-POPUSK-PRICE-ORDER-001 — Approved public price tiers and cheapest-first model order
+
+- Date: 2026-05-28 14:53 TRT.
+- Problem: User requested the Claude Popusk customer-facing prices to be applied exactly and the site model list to be sorted by cheapest tier first, then older/cheaper model families.
+- Decision: `DEC-FIX-CLAUDE-POPUSK-PRICE-ORDER-001`, 3/3 APPROVED for local implementation only.
+- Changes:
+  - Backend `MASTER_MODELS` now has an explicit display order: `$0.62/M` basic text models first, `$1.00/M` standard GPT/o-series next, `$1.20/M` premium Claude Opus 4.7 / GPT 5.5 last.
+  - Frontend `MODELS` uses the same display order without changing any style/template code.
+  - Contract tests now verify catalog order, price tier values, sorted prices, and frontend/backend price parity.
+  - `CLAUDE_POPUSK_PRICE_TABLE.md` added as the human-readable public price table.
+- Verification:
+  - RED: `npm test -- src/server/services/model-catalog.test.ts` failed on the new order test before the fix.
+  - Targeted GREEN: `npm test -- src/server/services/model-catalog.test.ts src/claude-popusk-contract.test.ts` PASS 2 files / 10 tests.
+  - Full: `npm test` PASS 31 files / 143 tests.
+  - `npm run lint` PASS.
+  - `npm run build` PASS.
+  - `npm run scan:public` PASS 0 hits.
+  - `node scripts/scan-secrets.mjs` PASS 235 scanned / 0 hits.
+- Result: Fixed locally. Not deployed.

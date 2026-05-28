@@ -59,6 +59,18 @@ describe("computePrice — text model", () => {
   it("returns unit '1M token'", () => {
     expect(computePrice(model, baseCfg).unit).toBe("1M token");
   });
+
+  it("uses explicit customer-facing text prices when present", () => {
+    const customerModel: MasterModel = {
+      ...model,
+      customerInputUsd: 0.62,
+      customerOutputUsd: 0.62,
+    };
+
+    const result = computePrice(customerModel, baseCfg);
+    expect(result.input?.usd).toBeCloseTo(0.62, 6);
+    expect(result.output?.usd).toBeCloseTo(0.62, 6);
+  });
 });
 
 describe("computePrice — image model", () => {

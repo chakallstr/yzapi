@@ -8,7 +8,7 @@ import { buildPricingConfig } from "../services/pricing-service.js";
 
 const router = Router();
 
-// GET /api/models — all 33 models with computed pricing
+// GET /api/models — active text models with computed pricing
 router.get("/models", async (_req, res, next) => {
   try {
     const cfg = await buildPricingConfig();
@@ -21,8 +21,8 @@ router.get("/models", async (_req, res, next) => {
       const patched = { ...m };
       if (ovr) {
         if (m.type === "Metin") {
-          if (ovr.inputUsdOverride !== null) patched.providerInputUsd = Number(ovr.inputUsdOverride);
-          if (ovr.outputUsdOverride !== null) patched.providerOutputUsd = Number(ovr.outputUsdOverride);
+          if (ovr.inputUsdOverride !== null) patched.customerInputUsd = Number(ovr.inputUsdOverride);
+          if (ovr.outputUsdOverride !== null) patched.customerOutputUsd = Number(ovr.outputUsdOverride);
         } else if (m.type === "Görsel") {
           if (ovr.inputUsdOverride !== null) patched.providerImageInputUsd = Number(ovr.inputUsdOverride);
           if (ovr.outputUsdOverride !== null) patched.providerImageOutputUsd = Number(ovr.outputUsdOverride);

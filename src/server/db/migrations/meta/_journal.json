@@ -50,6 +50,13 @@
       "when": 1779906000000,
       "tag": "0006_manual_payment_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1779970800000,
+      "tag": "0007_telegram_crypto_bot",
+      "breakpoints": true
     }
   ]
 }

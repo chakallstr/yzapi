@@ -45,7 +45,7 @@ const approvedOldThemeFingerprints = [
   "Türkiye'nin",
   "Yapay Zekâ",
   "API Geçidi",
-  "api.yapayzekalab.org",
+  "yapayzekalab.org/v1",
   fromParts("Kota ", "yok. Gizli limit yok."),
   fromParts("Bakiye ", "kalkülatörü"),
   "Ayda ne kadar",

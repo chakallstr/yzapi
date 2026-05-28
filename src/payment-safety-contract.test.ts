@@ -55,10 +55,13 @@ describe("payment safety contract", () => {
     expect(account).toContain("Referans");
     expect(account).toContain("WhatsApp");
     expect(account).not.toContain("IBAN ödeme bildirimi oluşturuldu.");
+    expect(account).not.toMatch(/referans kodunu ödeme açıklamasına yaz/i);
 
     expect(paymentsRoute).toContain("buildPaymentNotification");
     expect(paymentsRoute).toContain("paymentWhatsappNumber");
     expect(paymentsRoute).toContain("cryptoWalletAddress");
+    expect(paymentsRoute).not.toMatch(/Havale açıklamasına.*referans/i);
+    expect(paymentsRoute).not.toMatch(/Transfer açıklaması.*referans/i);
   });
 
   it("lets admins configure manual payment notification and crypto wallet instructions without changing provider secrets", () => {

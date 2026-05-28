@@ -1,8 +1,8 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { env } from "../lib/env.js";
+import { aiProviderApiKey } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { BadRequestError, InsufficientBalanceError, ModelDisabledError, ModelNotFoundError, RateLimitError } from "../lib/errors.js";
-import { MASTER_MODELS, type MasterModel } from "../../master-models.js";
+import { MASTER_MODELS, canonicalizeModelId, type MasterModel } from "../../master-models.js";
 import { checkRateLimit } from "../services/rate-limit-service.js";
 import { chargeUsage } from "../services/billing-service.js";
 import { activeProviderAdapter } from "../services/provider-adapter.js";
@@ -12,22 +12,22 @@ import { eq } from "drizzle-orm";
 
 const router = Router();
 
-// Guard: requires CLOSEROUTER_API_KEY
+// Guard: requires upstream provider API key
 function requireProxy(req: Request, res: Response, next: NextFunction): void {
-  if (!env.CLOSEROUTER_API_KEY) {
+  if (!aiProviderApiKey()) {
     res.status(503).json({ error: "proxy not configured" });
     return;
   }
   next();
 }
 
-// Forward CloseRouter error bodies back to the client, preserving status code
+// Forward upstream error bodies back to the client, preserving status code
 function forwardUpstreamError(err: unknown, res: Response): boolean {
   const e = err as Error & { status?: number; body?: unknown };
   if (e.status) {
     if (e.status === 402) {
       res.status(402).json({
-        error: "Platform balance exhausted (CloseRouter upstream)",
+        error: "Platform balance exhausted (AI provider upstream)",
         code: "upstream_insufficient_balance",
         upstream: e.body,
       });
@@ -40,7 +40,8 @@ function forwardUpstreamError(err: unknown, res: Response): boolean {
 }
 
 async function resolveEnabledModel(modelId: string | undefined, endpoint: string): Promise<MasterModel> {
-  const masterModel = MASTER_MODELS.find((m) => m.id === modelId);
+  const canonicalModelId = canonicalizeModelId(modelId);
+  const masterModel = MASTER_MODELS.find((m) => m.id === canonicalModelId);
   if (!masterModel) {
     throw new ModelNotFoundError(modelId ?? "(none)");
   }
@@ -113,11 +114,12 @@ async function handleTextJsonEndpoint(
 
   try {
     masterModel = await enforceRequestGuards({ userId, apiKeyId, modelId: model, endpoint });
+    const providerBody = { ...req.body, model: masterModel.id };
     const forwarder = endpoint === "responses"
       ? activeProviderAdapter.forwardResponses.bind(activeProviderAdapter)
       : activeProviderAdapter.forwardMessages.bind(activeProviderAdapter);
 
-    const { raw, usage } = await forwarder(req.body);
+    const { raw, usage } = await forwarder(providerBody);
     const responseMs = Date.now() - start;
 
     const { costTL, remainingTL } = await chargeUsage({
@@ -176,7 +178,7 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       // We cannot set headers after stream starts, so set placeholders
       res.setHeader("X-YZ-Request-Id", requestId);
 
-      const usage = await activeProviderAdapter.forwardChatStream(req.body, res);
+      const usage = await activeProviderAdapter.forwardChatStream({ ...req.body, model: masterModel.id }, res);
       const responseMs = Date.now() - start;
 
       // Billing out-of-band after stream completes
@@ -199,7 +201,7 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
           logger.error({ err, requestId }, "stream billing failed (out-of-band)");
         });
     } else {
-      const { raw, usage } = await activeProviderAdapter.forwardChat(req.body);
+      const { raw, usage } = await activeProviderAdapter.forwardChat({ ...req.body, model: masterModel.id });
       const responseMs = Date.now() - start;
 
       const { costTL, remainingTL } = await chargeUsage({
@@ -262,107 +264,13 @@ router.post("/messages", requireProxy, (req: Request, res: Response, next: NextF
 });
 
 // POST /v1/images/generations
-router.post("/images/generations", requireProxy, async (req: Request, res: Response, next: NextFunction) => {
-  const body = req.body as Record<string, unknown>;
-  const modelId = body.model as string | undefined;
-  const userId = req.user!.id;
-  const apiKeyId = req.apiKey!.id;
-  const requestId = (req as any).id as string;
-
-  const start = Date.now();
-  let masterModel: MasterModel | undefined;
-  try {
-    masterModel = await enforceRequestGuards({ userId, apiKeyId, modelId, endpoint: "images_generations" });
-    const { raw, imageCount } = await activeProviderAdapter.forwardImage("generations", body);
-    const responseMs = Date.now() - start;
-
-    const { costTL, remainingTL } = await chargeUsage({
-      userId,
-      apiKeyId,
-      model: masterModel,
-      usage: { imageCount },
-      requestId,
-      rawUsageJson: { imageCount },
-      responseMs,
-      status: "success",
-    });
-
-    setBillingHeaders(res, costTL, remainingTL, requestId);
-    res.json(raw);
-  } catch (err) {
-    if (err instanceof InsufficientBalanceError || err instanceof RateLimitError || err instanceof ModelNotFoundError || err instanceof ModelDisabledError || err instanceof BadRequestError) {
-      return next(err);
-    }
-    if (masterModel) {
-      const responseMs = Date.now() - start;
-      chargeUsage({
-        userId,
-        apiKeyId,
-        model: masterModel,
-        usage: {},
-        requestId,
-        rawUsageJson: {},
-        errorCode: upstreamErrorCode(err),
-        responseMs,
-        status: "error",
-      })
-        .catch((e2) => logger.error({ err: e2 }, "error usage record failed"));
-    }
-    if (forwardUpstreamError(err, res)) return;
-    return next(err);
-  }
+router.post("/images/generations", requireProxy, (_req: Request, res: Response) => {
+  res.status(501).json({ error: "Image generation is disabled during provider migration.", code: "media_disabled" });
 });
 
 // POST /v1/images/edits
-router.post("/images/edits", requireProxy, async (req: Request, res: Response, next: NextFunction) => {
-  const body = req.body as Record<string, unknown>;
-  const modelId = body.model as string | undefined;
-  const userId = req.user!.id;
-  const apiKeyId = req.apiKey!.id;
-  const requestId = (req as any).id as string;
-
-  const start = Date.now();
-  let masterModel: MasterModel | undefined;
-  try {
-    masterModel = await enforceRequestGuards({ userId, apiKeyId, modelId, endpoint: "images_edits" });
-    const { raw, imageCount } = await activeProviderAdapter.forwardImage("edits", body);
-    const responseMs = Date.now() - start;
-
-    const { costTL, remainingTL } = await chargeUsage({
-      userId,
-      apiKeyId,
-      model: masterModel,
-      usage: { imageCount },
-      requestId,
-      rawUsageJson: { imageCount },
-      responseMs,
-      status: "success",
-    });
-
-    setBillingHeaders(res, costTL, remainingTL, requestId);
-    res.json(raw);
-  } catch (err) {
-    if (err instanceof InsufficientBalanceError || err instanceof RateLimitError || err instanceof ModelNotFoundError || err instanceof ModelDisabledError || err instanceof BadRequestError) {
-      return next(err);
-    }
-    if (masterModel) {
-      const responseMs = Date.now() - start;
-      chargeUsage({
-        userId,
-        apiKeyId,
-        model: masterModel,
-        usage: {},
-        requestId,
-        rawUsageJson: {},
-        errorCode: upstreamErrorCode(err),
-        responseMs,
-        status: "error",
-      })
-        .catch((e2) => logger.error({ err: e2 }, "error usage record failed"));
-    }
-    if (forwardUpstreamError(err, res)) return;
-    return next(err);
-  }
+router.post("/images/edits", requireProxy, (_req: Request, res: Response) => {
+  res.status(501).json({ error: "Image editing is disabled during provider migration.", code: "media_disabled" });
 });
 
 // POST /v1/videos/submit — stub (501)

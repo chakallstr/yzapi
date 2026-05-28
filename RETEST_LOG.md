@@ -757,6 +757,152 @@ Final retest status: ACCEPTED_LIVE_MANUAL_PAYMENT_CONFIG
 
 Agent 4 integrity guard: APPROVE
 
+## CLAUDE-POPUSK-MIGRATION-001 Local Retest
+
+Bug ID: R-BUG-001, R-BUG-004, R-BUG-005, R-BUG-006
+Fix decision ID: DEC-FIX-CLAUDE-POPUSK-MIGRATION-001
+Retest decision ID: DEC-RETEST-CLAUDE-POPUSK-MIGRATION-001
+Command or manual flow:
+- `npm test -- src/claude-popusk-contract.test.ts src/server/services/model-catalog.test.ts src/server/routes/v1-catalog.test.ts src/server/services/pricing-service.test.ts src/server/services/closerouter-service.test.ts src/server/services/status-service.test.ts src/api-docs-content.test.ts src/rejected-template-guard.test.ts`
+- `npm run lint`
+- `npm test`
+- `npm run build`
+- `npm run scan:public`
+- `node scripts/scan-secrets.mjs`
+- Final rerun after all edits: `npm test && npm run lint`
+Expected:
+- Active catalog text-only and canonical.
+- `/v1` catalog serializes customer-facing prices without raw provider/internal billing fields.
+- Image/video endpoints remain safe-disabled and no-charge.
+- Public examples use `https://yapayzekalab.org/v1`.
+- Build, scans and tests pass.
+Actual:
+- Targeted tests PASS: 8 files / 48 tests.
+- Full tests PASS: 31 files / 141 tests.
+- Lint PASS.
+- Build first failed on old theme guard fingerprint, then PASS after updating the guard fingerprint to `yapayzekalab.org/v1`.
+- Public scan PASS: 3 scanned / 0 hits.
+- Secret scan PASS: 234 scanned / 0 hits.
+Passed/Failed: Passed locally. Live deploy and live funded Claude Popusk billing not run.
+Evidence: Current session command output.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: ACCEPTED_LOCAL_RELEASE_BLOCKED
+
+Agent 4 integrity guard: NOT_RUN_AGENT_THREAD_LIMIT
+
+## CLAUDE-POPUSK-PRICE-ORDER-001 Public Price Tier and Ordering Retest
+
+Bug ID: R-BUG-004 / R-BUG-006
+Fix decision ID: DEC-FIX-CLAUDE-POPUSK-PRICE-ORDER-001
+Retest decision ID: DEC-RETEST-CLAUDE-POPUSK-PRICE-ORDER-001
+Command or manual flow:
+- Added failing catalog order test first.
+- Applied explicit backend/frontend display order.
+- Added frontend/backend price parity test.
+- Ran targeted and full local regression.
+Expected:
+- Basic text models are `$0.62/M`.
+- Standard GPT/o-series text models are `$1.00/M`.
+- Claude Opus 4.7 and GPT 5.5 premium models are `$1.20/M`.
+- Public catalog and site model list show the same cheapest-first order.
+- No secrets or internal billing details leak.
+Actual:
+- RED order test failed before fix because catalog started with premium `claude-opus-4-7`.
+- Targeted tests PASS: 2 files / 10 tests.
+- Full tests PASS: 31 files / 143 tests.
+- `npm run lint` PASS.
+- `npm run build` PASS.
+- `npm run scan:public` PASS, 0 hits.
+- `node scripts/scan-secrets.mjs` PASS, 235 scanned / 0 hits.
+Passed/Failed: Passed locally.
+Evidence: Current session command output; `CLAUDE_POPUSK_PRICE_TABLE.md`.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: ACCEPTED_LOCAL_PRICE_ORDER_PASS
+
+Agent 4 integrity guard: NOT_RUN_FOR_DEPLOY
+
+## FULL-E2E-001 Full Local/Live E2E Retest
+
+Bug ID: R-BUG-006 / E2E-BUG-001
+Fix decision ID: DEC-E2E-FULL-001
+Retest decision ID: DEC-E2E-FULL-001
+Command or manual flow:
+- Full local tests, targeted payment/catalog/provider contracts, lint, build, public scan, secret scan.
+- Local Docker Postgres up, migrations, seed, production server start.
+- Local smoke with expected 42 models.
+- Local UAT smoke.
+- Live smoke and live UAT smoke.
+- Local API negative flow with temporary API key rows, then cleanup.
+Expected:
+- Local production surface passes with 42 models.
+- Live public surface remains healthy.
+- API negative flows return JSON and do not charge.
+- Malformed JSON returns 400, not 500.
+Actual:
+- Local full tests PASS: 31 files / 144 tests.
+- Targeted contracts PASS: 6 files / 37 tests.
+- Lint/build/public scan/secret scan PASS.
+- Local smoke PASS: health/status/models 42, authless 401, JSON 404.
+- Local UAT PASS: 10/10, `qa-artifacts/uat-smoke-2026-05-28T12-12-35-627Z/uat-smoke-report.md`.
+- Live smoke PASS for public checks but still reports 33 models.
+- Live UAT PASS: 10/10, `qa-artifacts/uat-smoke-2026-05-28T12-04-50-626Z/uat-smoke-report.md`.
+- Live preflight with expected 42 models FAIL: live `/api/models` returned 33.
+- API negative flow PASS: no-auth 401, invalid 401, revoked 401, low-balance 402, unknown model 404, malformed JSON 400, messages no-auth 401, images no-auth 401.
+Passed/Failed: Local E2E passed after fix. Live deploy parity/funded billing failed or skipped.
+Evidence: `FULL_E2E_TEST_REPORT.md` and command output from this session.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: ACCEPTED_LOCAL_E2E_PASS_LIVE_PARITY_AND_FUNDED_BILLING_PENDING
+
+Agent 4 integrity guard: REJECT_LAUNCH_UNTIL_DEPLOY_PARITY_AND_FUNDED_BILLING
+
+## REMAINING-SAFE-TESTS-001 Remaining Tests With Provider E2E Excluded
+
+Bug ID: R-BUG-006 / CLAUDE-POPUSK-MIGRATION-001
+Fix decision ID: DEC-TEST-REMAINING-NO-PROVIDER-E2E-001
+Retest decision ID: DEC-RETEST-REMAINING-NO-PROVIDER-E2E-001
+Command or manual flow:
+- `npm test`
+- `npm run lint`
+- `npm run build`
+- `npm run scan:public`
+- `node scripts/scan-secrets.mjs`
+- `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`
+- `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`
+Expected:
+- Local regression passes.
+- Public bundle and repo secret scan remain clean.
+- Live public/system/authless API smoke passes.
+- Live UAT routes pass on desktop/mobile.
+- Shopier/Cryptomus provider E2E is not attempted by user scope decision.
+Actual:
+- `npm test` PASS: 31 files / 143 tests.
+- `npm run lint` PASS.
+- `npm run build` PASS.
+- `npm run scan:public` PASS: 3 scanned / 0 hits.
+- `node scripts/scan-secrets.mjs` PASS: 235 scanned / 0 hits.
+- Live VPS smoke PASS for `/health`, `/status`, `/api/models`, authless `/v1/chat/completions` 401, JSON 404 checks.
+- Live smoke skipped successful funded chat and low-balance checks because `SMOKE_API_KEY` and `SMOKE_LOW_BALANCE_API_KEY` were absent.
+- Live UAT smoke PASS: 10/10, report `qa-artifacts/uat-smoke-2026-05-28T12-00-34-459Z/uat-smoke-report.md`.
+- Live `/api/models` still reports 33 models, while local Claude Popusk catalog has 42; local catalog/pricing changes are not deployed yet.
+Passed/Failed: Passed for remaining safe tests. Not production-ready due live parity and funded billing gaps.
+Evidence: Current session command output and UAT artifact path above.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: ACCEPTED_SAFE_TESTS_PASS_DEPLOY_AND_FUNDED_BILLING_PENDING
+
+Agent 4 integrity guard: NOT_RUN_FOR_DEPLOY
+
 ## SHOPIER-OSB-RELAY-002 Non-success unknown callback fallback regression
 
 Bug ID: SHOPIER-OSB-RELAY-002
@@ -960,3 +1106,36 @@ Approval count: 3/3
 Final retest status: ACCEPTED_LIVE_PAYMENT_PHONE_RECHECK
 
 Agent 4 integrity guard: APPROVE
+
+## CLAUDE-POPUSK-PROVIDER-KEY-001 Direct Provider Probe Retest
+
+Bug ID: R-BUG-006
+Fix decision ID: DEC-FIX-CLAUDE-POPUSK-RESPONSES-CATALOG-001
+Retest decision ID: DEC-RETEST-CLAUDE-POPUSK-PROVIDER-KEY-001
+Command or manual flow:
+- Direct safe provider probe using user-provided key.
+- Tiny `/chat/completions` request with low max tokens.
+- Tiny `/messages` request.
+- `/responses` compatibility probe.
+- Local catalog/docs adjusted after `/responses` returned unsupported.
+- Full local regression and scans rerun.
+Expected:
+- Provider key authenticates.
+- Text chat path works with tiny spend.
+- Unsupported endpoints are not advertised as active.
+- No secret leakage.
+Actual:
+- `/models` PASS 200 with 42 models.
+- `/chat/completions` PASS 200, `gpt-5.4-mini`, answer `ok`, 9 total tokens.
+- `/messages` PASS 200, `claude-haiku-4-5-20251001`, answer `ok`.
+- `/responses` returned 404 `not_found`; catalog/docs updated.
+- Targeted tests PASS 5 files / 26 tests; full tests PASS 31 files / 141 tests; lint/build/public scan/secret scan PASS.
+Passed/Failed: Passed for chat/messages provider path. Responses unsupported and handled in local catalog/docs.
+Evidence: Current session command output. Provider key value omitted.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: ACCEPTED_LOCAL_PROVIDER_KEY_CHAT_MESSAGES_PASS
+
+Agent 4 integrity guard: NOT_RUN_AGENT_THREAD_LIMIT
