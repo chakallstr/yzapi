@@ -7,7 +7,7 @@ import { checkRateLimit } from "../services/rate-limit-service.js";
 import { reserveUsageBudget, settleReservedUsage } from "../services/billing-service.js";
 import { activeProviderAdapter } from "../services/provider-adapter.js";
 import { db } from "../db/client.js";
-import { modelOverrides, users } from "../db/schema.js";
+import { modelOverrides, systemConfig, users } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { buildRequestGuard, type RequestGuardResult } from "../services/request-guard-service.js";
 
@@ -96,6 +96,38 @@ function setBillingHeaders(res: Response, costTL: number, remainingTL: number, r
   res.setHeader("X-YZ-Request-Id", requestId);
 }
 
+async function getUserBalanceSnapshot(userId: string): Promise<{ remainingTL: number; remainingUSD: number; kur: number }> {
+  const [balanceRows, configRows] = await Promise.all([
+    db
+      .select({ bakiye: users.bakiyeTL })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1),
+    db
+      .select({ kur: systemConfig.kur })
+      .from(systemConfig)
+      .where(eq(systemConfig.id, 1))
+      .limit(1),
+  ]);
+
+  const remainingTL = Number(balanceRows[0]?.bakiye ?? 0);
+  const kur = Number(configRows[0]?.kur ?? 0);
+  const remainingUSD = kur > 0 ? remainingTL / kur : 0;
+
+  return { remainingTL, remainingUSD, kur };
+}
+
+function setExtendedBillingHeaders(
+  res: Response,
+  costTL: number,
+  remainingTL: number,
+  remainingUSD: number,
+  requestId: string,
+): void {
+  setBillingHeaders(res, costTL, remainingTL, requestId);
+  res.setHeader("X-YZ-Remaining-USD", remainingUSD.toFixed(4));
+}
+
 function upstreamErrorCode(err: unknown): string {
   const e = err as Error & { status?: number };
   return e.status ? `upstream_${e.status}` : "upstream_error";
@@ -144,7 +176,8 @@ async function handleTextJsonEndpoint(
       status: "success",
     });
 
-    setBillingHeaders(res, costTL, remainingTL, requestId);
+    const { remainingUSD } = await getUserBalanceSnapshot(userId);
+    setExtendedBillingHeaders(res, costTL, remainingTL, remainingUSD, requestId);
     res.json(raw);
   } catch (err) {
     if (err instanceof InsufficientBalanceError || err instanceof RateLimitError || err instanceof ModelNotFoundError || err instanceof ModelDisabledError || err instanceof BadRequestError) {
@@ -226,7 +259,8 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
         status: "success",
       });
 
-      setBillingHeaders(res, costTL, remainingTL, requestId);
+      const { remainingUSD } = await getUserBalanceSnapshot(userId);
+      setExtendedBillingHeaders(res, costTL, remainingTL, remainingUSD, requestId);
       res.json(raw);
     }
   } catch (err) {
@@ -260,6 +294,27 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
 
     if (forwardUpstreamError(err, res)) return;
     return next(err);
+  }
+});
+
+// GET /v1/balance
+router.get("/balance", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const snapshot = await getUserBalanceSnapshot(req.user!.id);
+    res.json({
+      object: "balance",
+      balance: {
+        tl: snapshot.remainingTL.toFixed(2),
+        usd: snapshot.remainingUSD.toFixed(4),
+      },
+      currency: {
+        primary: "USD",
+        settlement: "TRY",
+        kur: snapshot.kur > 0 ? snapshot.kur.toFixed(6) : null,
+      },
+    });
+  } catch (err) {
+    next(err);
   }
 });
 

@@ -107,7 +107,7 @@ describe("public /v1 catalog contract", () => {
     app.use(express.json());
     app.use("/v1", createV1CatalogRouter(async () => sampleEntries));
     app.use("/v1", (req, res, next) => {
-      const knownRoutes = [/^\/chat\/completions$/];
+      const knownRoutes = [/^\/balance$/, /^\/chat\/completions$/];
       if (knownRoutes.some((route) => route.test(req.path))) {
         next();
         return;
@@ -142,6 +142,10 @@ describe("public /v1 catalog contract", () => {
       });
       expect(chat.status).toBe(401);
       expect(await chat.json()).toMatchObject({ code: "invalid_api_key" });
+
+      const balance = await fetch(`${baseUrl}/v1/balance`);
+      expect(balance.status).toBe(401);
+      expect(await balance.json()).toMatchObject({ code: "invalid_api_key" });
     } finally {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => error ? reject(error) : resolve());

@@ -149,6 +149,7 @@ app.use("/api/telegram", telegramRouter);
 app.use("/v1", v1CatalogRouter);
 app.use("/v1", (req, res, next) => {
   const knownRoutes = [
+    /^\/balance$/,
     /^\/chat\/completions$/,
     /^\/responses$/,
     /^\/messages$/,
