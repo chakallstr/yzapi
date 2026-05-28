@@ -1,0 +1,32 @@
+import { NextFunction, Request, Response } from "express";
+import {
+  hasActiveVerifiedWhatsappForUser,
+  isWhatsappOtpEnabled,
+} from "../services/whatsapp-otp-service.js";
+
+export async function requireWhatsappVerified(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  if (!isWhatsappOtpEnabled()) {
+    next();
+    return;
+  }
+
+  const userId = req.user?.id || req.apiKey?.userId;
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  if (!(await hasActiveVerifiedWhatsappForUser(userId))) {
+    res.status(403).json({
+      error: "WhatsApp doğrulaması gerekli.",
+      code: "whatsapp_verification_required",
+    });
+    return;
+  }
+
+  next();
+}

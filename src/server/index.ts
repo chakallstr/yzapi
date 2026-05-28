@@ -9,6 +9,7 @@ import { requestId } from "./middleware/request-id.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { adminAuth } from "./middleware/admin-auth.js";
 import { userAuth } from "./middleware/user-auth.js";
+import { requireWhatsappVerified } from "./middleware/whatsapp-verified.js";
 import { startKurRefresh } from "./services/kur-service.js";
 import { startAllJobs } from "./jobs/index.js";
 import adminRouter from "./routes/admin.js";
@@ -127,11 +128,11 @@ app.get("/status", async (_req, res, next) => {
 // Admin auth (login/logout/me) — public, no middleware
 app.use("/api/admin", adminAuthRouter);
 // Protected admin routes — require admin JWT
-app.use("/api/admin", adminAuth, adminRouter);
+app.use("/api/admin", adminAuth, requireWhatsappVerified, adminRouter);
 // Google OAuth + token management
 app.use("/api/auth", authRouter);
 // User routes — require user JWT
-app.use("/api/user", userAuth, userRouter);
+app.use("/api/user", userAuth, requireWhatsappVerified, userRouter);
 
 app.use("/api", modelsRouter);
 app.use("/api", settingsRouter);
@@ -163,7 +164,7 @@ app.use("/v1", (req, res, next) => {
   const requestId = (req as any).id ?? "unknown";
   res.status(404).json({ error: "Not found", code: 404, requestId });
 });
-app.use("/v1", apiKeyAuth, proxyRouter);
+app.use("/v1", apiKeyAuth, requireWhatsappVerified, proxyRouter);
 
 // API misses must return JSON, not the SPA shell.
 app.use(["/api", "/v1"], (req, res) => {

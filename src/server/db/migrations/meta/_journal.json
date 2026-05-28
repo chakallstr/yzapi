@@ -57,6 +57,13 @@
       "when": 1779970800000,
       "tag": "0007_telegram_crypto_bot",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1780005600000,
+      "tag": "0008_whatsapp_otp",
+      "breakpoints": true
     }
   ]
 }

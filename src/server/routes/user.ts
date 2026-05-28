@@ -4,6 +4,7 @@ import { users, apiKeys, usageRecords } from "../db/schema.js";
 import { eq, and, desc } from "drizzle-orm";
 import { generateApiKey, hashApiKey } from "../services/api-key-service.js";
 import { writeAudit } from "../services/audit-service.js";
+import { getWhatsappVerificationSummary } from "../services/whatsapp-otp-service.js";
 
 const router = Router();
 
@@ -14,7 +15,8 @@ router.get("/me", async (req, res, next) => {
     if (!rows.length) { res.status(404).json({ error: "User not found" }); return; }
     const { passwordHash, ...safe } = rows[0];
     void passwordHash; // explicitly consumed
-    res.json(safe);
+    const whatsapp = await getWhatsappVerificationSummary(req.user!.id);
+    res.json({ ...safe, ...whatsapp });
   } catch (e) { next(e); }
 });
 

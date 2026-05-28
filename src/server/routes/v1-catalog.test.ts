@@ -95,7 +95,7 @@ describe("public /v1 catalog contract", () => {
 
     const catalogMount = indexSource.indexOf('app.use("/v1", v1CatalogRouter);');
     const allowlist = indexSource.indexOf("const knownRoutes = [");
-    const authProxy = indexSource.indexOf('app.use("/v1", apiKeyAuth, proxyRouter);');
+    const authProxy = indexSource.indexOf('app.use("/v1", apiKeyAuth, requireWhatsappVerified, proxyRouter);');
 
     expect(catalogMount).toBeGreaterThan(-1);
     expect(catalogMount).toBeLessThan(allowlist);

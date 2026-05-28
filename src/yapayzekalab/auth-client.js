@@ -1,5 +1,6 @@
 export const ACCESS_TOKEN_KEY = 'yz_access_token';
 export const REFRESH_TOKEN_KEY = 'yz_refresh_token';
+export const WHATSAPP_PENDING_TOKEN_KEY = 'whatsapp_pending_token';
 export const LEGACY_ACCESS_TOKEN_KEY = 'userAccessToken';
 export const LEGACY_REFRESH_TOKEN_KEY = 'userRefreshToken';
 
@@ -23,6 +24,7 @@ const readToken = (...keys) => {
 
 export const getAccessToken = () => readToken(ACCESS_TOKEN_KEY, LEGACY_ACCESS_TOKEN_KEY);
 export const getRefreshToken = () => readToken(REFRESH_TOKEN_KEY, LEGACY_REFRESH_TOKEN_KEY);
+export const getWhatsappPendingToken = () => readToken(WHATSAPP_PENDING_TOKEN_KEY);
 
 export const hasStoredAuth = () => Boolean(getAccessToken());
 
@@ -39,11 +41,24 @@ export const storeAuthTokens = ({ accessToken, refreshToken }) => {
   }
 };
 
+export const storeWhatsappPendingToken = (pendingToken) => {
+  const s = storage();
+  if (!s || !pendingToken) return;
+  s.setItem(WHATSAPP_PENDING_TOKEN_KEY, pendingToken);
+};
+
+export const clearWhatsappPendingToken = () => {
+  const s = storage();
+  if (!s) return;
+  s.removeItem(WHATSAPP_PENDING_TOKEN_KEY);
+};
+
 export const clearStoredAuth = () => {
   const s = storage();
   if (!s) return;
   s.removeItem(ACCESS_TOKEN_KEY);
   s.removeItem(REFRESH_TOKEN_KEY);
+  s.removeItem(WHATSAPP_PENDING_TOKEN_KEY);
   s.removeItem(LEGACY_ACCESS_TOKEN_KEY);
   s.removeItem(LEGACY_REFRESH_TOKEN_KEY);
 };

@@ -5,6 +5,7 @@ import { payments, pendingIbanPayments, systemConfig, users, transactions } from
 import { eq, desc, and } from "drizzle-orm";
 import { env } from "../lib/env.js";
 import { userAuth } from "../middleware/user-auth.js";
+import { requireWhatsappVerified } from "../middleware/whatsapp-verified.js";
 import { adminAuth } from "../middleware/admin-auth.js";
 import { calcKdv, creditUserBalance } from "../services/payment-common.js";
 import { buildCheckoutForm, verifyCallback } from "../services/shopier-service.js";
@@ -341,7 +342,7 @@ async function handleShopierCallbackBody(
 }
 
 // ── GET /api/payments/methods ─────────────────────────────────────────────────
-router.get("/methods", userAuth, async (_req, res, next) => {
+router.get("/methods", userAuth, requireWhatsappVerified, async (_req, res, next) => {
   try {
     const ibanEnabled = isIbanConfigured(env);
     const shopierEnabled = !!(env.SHOPIER_API_KEY && env.SHOPIER_API_SECRET);
@@ -386,7 +387,7 @@ router.get("/methods", userAuth, async (_req, res, next) => {
 });
 
 // ── POST /api/payments/shopier/init ──────────────────────────────────────────
-router.post("/shopier/init", userAuth, async (req, res, next) => {
+router.post("/shopier/init", userAuth, requireWhatsappVerified, async (req, res, next) => {
   try {
     if (!env.SHOPIER_API_KEY || !env.SHOPIER_API_SECRET) {
       res.status(503).json({ error: "Shopier ödeme yöntemi şu an kullanılamıyor." });
@@ -465,7 +466,7 @@ router.post(
 );
 
 // ── POST /api/payments/iban/init ─────────────────────────────────────────────
-router.post("/iban/init", userAuth, async (req, res, next) => {
+router.post("/iban/init", userAuth, requireWhatsappVerified, async (req, res, next) => {
   try {
     if (!isIbanConfigured(env)) {
       res.status(503).json({ error: "IBAN ödeme yöntemi şu an kullanılamıyor." });
@@ -551,7 +552,7 @@ router.post("/iban/init", userAuth, async (req, res, next) => {
 });
 
 // ── POST /api/payments/crypto/init ───────────────────────────────────────────
-router.post("/crypto/init", userAuth, async (req, res, next) => {
+router.post("/crypto/init", userAuth, requireWhatsappVerified, async (req, res, next) => {
   try {
     const settings = await getManualPaymentSettings();
     const cryptomusProviderEnabled = !!(env.CRYPTOMUS_MERCHANT_ID && env.CRYPTOMUS_API_KEY);
@@ -734,7 +735,7 @@ router.get("/crypto/callback", (_req, res) => {
 });
 
 // ── GET /api/payments/me ─────────────────────────────────────────────────────
-router.get("/me", userAuth, async (req, res, next) => {
+router.get("/me", userAuth, requireWhatsappVerified, async (req, res, next) => {
   try {
     const rows = await db.select().from(payments)
       .where(eq(payments.userId, req.user!.id))

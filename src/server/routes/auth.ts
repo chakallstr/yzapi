@@ -7,8 +7,22 @@ import {
   verifyOAuthState,
   isGoogleConfigured,
 } from "../services/google-oauth-service.js";
-import { signAccessToken, signRefreshToken, rotateRefreshToken, revokeRefreshToken } from "../services/auth-service.js";
+import {
+  rotateRefreshToken,
+  revokeRefreshToken,
+  signAccessToken,
+  signRefreshToken,
+  signWhatsappPendingToken,
+  verifyWhatsappPendingToken,
+} from "../services/auth-service.js";
 import { welcomeEmail } from "../services/email-service.js";
+import {
+  hasActiveVerifiedWhatsappForUser,
+  isWhatsappOtpEnabled,
+  resendWhatsappOtp,
+  startWhatsappOtp,
+  verifyWhatsappOtp,
+} from "../services/whatsapp-otp-service.js";
 import { db } from "../db/client.js";
 import { users, auditLogs } from "../db/schema.js";
 import { eq } from "drizzle-orm";
@@ -16,6 +30,21 @@ import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
+
+function buildFrontendReturnUrl(params: Record<string, string>): string {
+  const url = new URL(env.FRONTEND_AUTH_RETURN, env.APP_BASE_URL);
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value);
+  }
+  return url.toString();
+}
+
+function readPendingToken(req: { headers: Record<string, unknown>; body?: unknown }): string | null {
+  const header = String(req.headers.authorization || "");
+  if (header.startsWith("Bearer ")) return header.slice(7);
+  const body = req.body as { pendingToken?: unknown } | undefined;
+  return typeof body?.pendingToken === "string" ? body.pendingToken : null;
+}
 
 // GET /api/auth/google
 router.get("/google", (req, res) => {
@@ -87,14 +116,133 @@ router.get("/google/callback", async (req, res, next) => {
       actorId: userId,
     });
 
+    if (isWhatsappOtpEnabled() && !(await hasActiveVerifiedWhatsappForUser(userId))) {
+      await db.insert(auditLogs).values({
+        action: "user_whatsapp_otp_pending",
+        hedef: userId,
+        ozet: `WhatsApp OTP bekliyor: ${profile.email}`,
+        actorId: userId,
+      });
+      const pendingToken = signWhatsappPendingToken({ sub: userId, email: profile.email });
+      res.redirect(buildFrontendReturnUrl({ wv: "required", wpt: pendingToken }));
+      return;
+    }
+
     const accessToken = signAccessToken({ sub: userId, role: "user" });
     const refreshToken = await signRefreshToken(userId);
 
-    const returnUrl = `${env.APP_BASE_URL}${env.FRONTEND_AUTH_RETURN}?at=${encodeURIComponent(accessToken)}&rt=${encodeURIComponent(refreshToken)}`;
-    res.redirect(returnUrl);
+    res.redirect(buildFrontendReturnUrl({ at: accessToken, rt: refreshToken }));
   } catch (e) {
     next(e);
   }
+});
+
+// POST /api/auth/whatsapp-otp/start
+router.post("/whatsapp-otp/start", async (req, res, next) => {
+  try {
+    if (!isWhatsappOtpEnabled()) {
+      res.status(503).json({ error: "WhatsApp doğrulaması şu an kapalı." });
+      return;
+    }
+
+    const pendingToken = readPendingToken(req);
+    if (!pendingToken) {
+      res.status(401).json({ error: "WhatsApp doğrulama oturumu gerekli." });
+      return;
+    }
+    const pending = verifyWhatsappPendingToken(pendingToken);
+    const { phone } = req.body as { phone?: string };
+    if (!phone) {
+      res.status(400).json({ error: "phone required" });
+      return;
+    }
+
+    const result = await startWhatsappOtp({
+      userId: pending.sub,
+      phone,
+      ip: req.ip,
+      userAgent: req.get("user-agent") || "",
+    });
+
+    res.json(result);
+  } catch (e) { next(e); }
+});
+
+// POST /api/auth/whatsapp-otp/resend
+router.post("/whatsapp-otp/resend", async (req, res, next) => {
+  try {
+    if (!isWhatsappOtpEnabled()) {
+      res.status(503).json({ error: "WhatsApp doğrulaması şu an kapalı." });
+      return;
+    }
+
+    const pendingToken = readPendingToken(req);
+    if (!pendingToken) {
+      res.status(401).json({ error: "WhatsApp doğrulama oturumu gerekli." });
+      return;
+    }
+    const pending = verifyWhatsappPendingToken(pendingToken);
+    const { verificationId } = req.body as { verificationId?: string };
+    if (!verificationId) {
+      res.status(400).json({ error: "verificationId required" });
+      return;
+    }
+
+    const result = await resendWhatsappOtp({
+      userId: pending.sub,
+      verificationId,
+      ip: req.ip,
+      userAgent: req.get("user-agent") || "",
+    });
+
+    res.json(result);
+  } catch (e) { next(e); }
+});
+
+// POST /api/auth/whatsapp-otp/verify
+router.post("/whatsapp-otp/verify", async (req, res, next) => {
+  try {
+    if (!isWhatsappOtpEnabled()) {
+      res.status(503).json({ error: "WhatsApp doğrulaması şu an kapalı." });
+      return;
+    }
+
+    const pendingToken = readPendingToken(req);
+    if (!pendingToken) {
+      res.status(401).json({ error: "WhatsApp doğrulama oturumu gerekli." });
+      return;
+    }
+    const pending = verifyWhatsappPendingToken(pendingToken);
+    const { verificationId, code, marketingConsent } = req.body as {
+      verificationId?: string;
+      code?: string;
+      marketingConsent?: boolean;
+    };
+    if (!verificationId || !code) {
+      res.status(400).json({ error: "verificationId and code required" });
+      return;
+    }
+
+    const verified = await verifyWhatsappOtp({
+      userId: pending.sub,
+      verificationId,
+      code,
+      marketingConsent,
+      ip: req.ip,
+      userAgent: req.get("user-agent") || "",
+    });
+
+    await db.insert(auditLogs).values({
+      action: "user_whatsapp_otp_verified",
+      hedef: pending.sub,
+      ozet: `WhatsApp doğrulandı: ${pending.email}`,
+      actorId: pending.sub,
+    });
+
+    const accessToken = signAccessToken({ sub: pending.sub, role: "user" });
+    const refreshToken = await signRefreshToken(pending.sub);
+    res.json({ accessToken, refreshToken, ...verified });
+  } catch (e) { next(e); }
 });
 
 // POST /api/auth/refresh

@@ -2441,6 +2441,51 @@ Allowed next action: Run final secret scan, commit/push, then perform rollbackab
 Status: APPROVED
 
 Agent 4 integrity guard: APPROVE_WITH_LIMITATION
+
+---
+
+Decision ID: DEC-WHATSAPP-OTP-IMPLEMENT-001
+Decision title: Implement Google-afterflow WhatsApp OTP gate with OpenWA adapter
+Decision type: Feature/security implementation approval
+Related bug IDs: AUTH-WHATSAPP-OTP-001
+Evidence from reports:
+- User requirement: Google OAuth remains, WhatsApp OTP is required before normal user token issuance.
+- User requirement: OpenWA provider is selected.
+- User requirement: phone numbers are saved permanently and never hard-deleted; lifecycle uses status changes.
+Files likely affected:
+- `src/server/db/schema.ts`
+- `src/server/db/migrations/0008_whatsapp_otp.sql`
+- `src/server/services/whatsapp-otp-service.ts`
+- `src/server/routes/auth.ts`
+- `src/server/middleware/whatsapp-verified.ts`
+- `src/server/index.ts`
+- `src/server/routes/payments.ts`
+- `src/server/routes/user.ts`
+- `src/yapayzekalab/App.jsx`
+- `src/yapayzekalab/auth-client.js`
+Risk level: High
+Design/template impact: Limited to an auth overlay using the same existing login card variables and inline visual language; no theme/token/CSS file changes.
+Security impact: Positive if enabled with server-only OpenWA credentials; OTP and phone hashes are stored, logs redact phone/OTP/provider message fields, pending token is short-lived.
+Backend/API/billing impact: When `WHATSAPP_OTP_ENABLED=true`, user/admin/payment/API-key gateway access is blocked until phone verification. Default remains disabled to avoid locking out live users before OpenWA credentials are configured.
+Proposed action:
+1. Add OTP and verified phone tables with no hard-delete lifecycle.
+2. Add pending-token Google callback flow and OTP start/resend/verify endpoints.
+3. Add protected-route WhatsApp gate.
+4. Add current-theme frontend OTP state.
+5. Verify with targeted tests, full tests, typecheck, build, public scan and secret scan.
+Agent 1 vote: APPROVE
+Agent 1 reason: The feature directly addresses the requested registration gate and includes frontend regression coverage without changing the template.
+Agent 2 vote: APPROVE
+Agent 2 reason: The change is feature-flagged, adds durable schema, and protects user/payment/API surfaces only when enabled.
+Agent 3 vote: APPROVE
+Agent 3 reason: Visual lock is preserved and secrets remain server-side; deploy must wait for migration and OpenWA credential validation.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Implement and verify locally; do not mark production OTP live until OpenWA credentials and migration are applied on VPS.
+Status: COMPLETED_LOCAL_VERIFICATION_PENDING_DEPLOY
+
+Agent 4 integrity guard: APPROVE_WITH_LIMITATION
+Agent 4 reason: Written integrity gate confirms backend-only risk isolation plus same-theme frontend overlay; no real external agent quorum was spawned in this environment.
 Agent 4 reason: Written integrity gate approves rollbackable deploy mechanics and visual-lock constraints. Ruflo real-agent swarm was unavailable (`agentCount=0`), so this is a recorded role gate rather than an independent spawned-agent quorum.
 
 ---

@@ -12,9 +12,12 @@ import { ModelsTab } from './tab-models.jsx';
 import {
   apiJson,
   clearStoredAuth,
+  clearWhatsappPendingToken,
   getAccessToken,
+  getWhatsappPendingToken,
   hasStoredAuth,
   storeAuthTokens,
+  storeWhatsappPendingToken,
 } from './auth-client.js';
 
 /* ============================================
@@ -218,6 +221,165 @@ const LoginScreen = () => {
         <div style={{ textAlign: 'center', marginTop: 18, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.55 }}>
           Hesap oluşturma ve giriş aynı Google akışıyla tamamlanır.
         </div>
+      </div>
+    </div>
+  );
+};
+
+// === WhatsAppOtpScreen — Google sonrası telefon doğrulama ===========
+const WhatsAppOtpScreen = ({ pendingToken, onVerified, onCancel }) => {
+  const [phone, setPhone] = useState('');
+  const [code, setCode] = useState('');
+  const [verificationId, setVerificationId] = useState('');
+  const [phoneMasked, setPhoneMasked] = useState('');
+  const [marketingConsent, setMarketingConsent] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const requestOtp = async (mode = 'start') => {
+    setSubmitting(true);
+    setError('');
+    setMessage('');
+    try {
+      const response = await fetch(`/api/auth/whatsapp-otp/${mode}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${pendingToken}`,
+        },
+        body: JSON.stringify(mode === 'resend' ? { verificationId } : { phone, marketingConsent }),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.error || 'Kod gönderilemedi.');
+      setVerificationId(body.verificationId);
+      setPhoneMasked(body.phoneMasked || '');
+      setMessage('WhatsApp doğrulama kodu gönderildi.');
+    } catch (err) {
+      setError(err?.message || 'Kod gönderilemedi.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const verifyOtp = async () => {
+    setSubmitting(true);
+    setError('');
+    setMessage('');
+    try {
+      const response = await fetch('/api/auth/whatsapp-otp/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${pendingToken}`,
+        },
+        body: JSON.stringify({ verificationId, code, marketingConsent }),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.error || 'Kod doğrulanamadı.');
+      onVerified(body);
+    } catch (err) {
+      setError(err?.message || 'Kod doğrulanamadı.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 210,
+      background: 'linear-gradient(135deg, var(--bg) 0%, #e0e7ff 100%)',
+      display: 'grid', placeItems: 'center', padding: 24,
+    }} className="fade-in blueprint-grid yz-login-screen">
+      <div style={{
+        background: 'var(--surface)', borderRadius: 20, padding: 36,
+        width: '100%', maxWidth: 420, boxShadow: 'var(--sh-3)',
+        border: '1px solid var(--border)',
+      }} className="yz-login-card">
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+          <Logo />
+        </div>
+        <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.6, textAlign: 'center', margin: '0 0 6px' }}>
+          WhatsApp doğrulaması
+        </h2>
+        <p style={{ fontSize: 12, color: 'var(--ink-3)', textAlign: 'center', margin: '0 0 24px', lineHeight: 1.55 }}>
+          Google hesabın doğrulandı. Paneli açmadan önce WhatsApp numaranı tek seferlik kodla doğrula.
+        </p>
+
+        {!verificationId ? (
+          <>
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="05xx xxx xx xx"
+              inputMode="tel"
+              style={{
+                width: '100%', padding: '11px 14px', borderRadius: 10,
+                background: 'var(--surface)', border: '1px solid var(--border-st)',
+                fontSize: 13, color: 'var(--ink)', marginBottom: 10,
+              }}
+            />
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 11.5, color: 'var(--ink-2)', lineHeight: 1.45, marginBottom: 14 }}>
+              <input
+                type="checkbox"
+                checked={marketingConsent}
+                onChange={(e) => setMarketingConsent(e.target.checked)}
+                style={{ marginTop: 2 }}
+              />
+              Kampanya ve duyuru mesajlarını WhatsApp üzerinden almak istiyorum. Bu izin OTP için zorunlu değildir.
+            </label>
+            <button type="button" disabled={submitting} onClick={() => requestOtp('start')} style={{
+              width: '100%', padding: '11px 14px', borderRadius: 10,
+              background: 'var(--ink)', color: '#fff',
+              fontSize: 13, fontWeight: 600,
+            }}>
+              {submitting ? 'Gönderiliyor…' : 'WhatsApp kodu gönder'}
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: 10, textAlign: 'center' }}>
+              Kod gönderilen numara: <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>{phoneMasked}</span>
+            </div>
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
+              placeholder="6 haneli kod"
+              inputMode="numeric"
+              style={{
+                width: '100%', padding: '11px 14px', borderRadius: 10,
+                background: 'var(--surface)', border: '1px solid var(--border-st)',
+                fontSize: 13, color: 'var(--ink)', marginBottom: 10,
+                letterSpacing: 2, textAlign: 'center',
+              }}
+            />
+            <button type="button" disabled={submitting || code.length !== 6} onClick={verifyOtp} style={{
+              width: '100%', padding: '11px 14px', borderRadius: 10,
+              background: 'var(--ink)', color: '#fff',
+              fontSize: 13, fontWeight: 600,
+              marginBottom: 10,
+            }}>
+              {submitting ? 'Doğrulanıyor…' : 'Kodu doğrula'}
+            </button>
+            <button type="button" disabled={submitting} onClick={() => requestOtp('resend')} style={{
+              width: '100%', padding: '10px 14px', borderRadius: 10,
+              background: 'var(--surface)', border: '1px solid var(--border-st)',
+              fontSize: 12, fontWeight: 500, color: 'var(--ink-2)',
+            }}>
+              Kodu tekrar gönder
+            </button>
+          </>
+        )}
+
+        {message && <div style={{ marginTop: 14, fontSize: 12, color: '#047857', textAlign: 'center' }}>{message}</div>}
+        {error && <div style={{ marginTop: 14, fontSize: 12, color: '#b91c1c', textAlign: 'center' }}>{error}</div>}
+
+        <button type="button" onClick={onCancel} style={{
+          display: 'block', margin: '18px auto 0',
+          fontSize: 12, color: 'var(--ink-3)', background: 'transparent',
+        }}>
+          Girişe geri dön
+        </button>
       </div>
     </div>
   );
@@ -575,11 +737,13 @@ const SiteFooter = () => {
 };
 const App = ({ initialTab = 'home' }) => {
   const initialAuth = hasStoredAuth();
+  const initialWhatsappPending = getWhatsappPendingToken();
   const initialTabRequiresAuth = PROTECTED_TABS.has(initialTab);
   const [t, setTweak] = useAppSettings(TWEAK_DEFAULTS);
   const [tab, setTab] = useState(() => (!initialAuth && initialTabRequiresAuth ? 'home' : initialTab));
   const [isAuthenticated, setIsAuthenticated] = useState(initialAuth);
   const [showLogin, setShowLogin] = useState(() => !initialAuth && initialTabRequiresAuth);
+  const [whatsappPendingToken, setWhatsappPendingToken] = useState(initialWhatsappPending);
   const [pendingTab, setPendingTab] = useState(() => (!initialAuth && initialTabRequiresAuth ? initialTab : null));
   const [goto, setGoto] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -590,11 +754,29 @@ const App = ({ initialTab = 'home' }) => {
     const query = new URLSearchParams(window.location.search);
     const accessToken = query.get('at');
     const refreshToken = query.get('rt');
+    const whatsappToken = query.get('wpt');
 
-    if (!accessToken && !refreshToken) return;
+    if (!accessToken && !refreshToken && !whatsappToken) return;
+
+    if (whatsappToken) {
+      clearStoredAuth();
+      storeWhatsappPendingToken(whatsappToken);
+      query.delete('wpt');
+      query.delete('wv');
+
+      const cleanQuery = query.toString();
+      const cleanUrl = `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ''}${window.location.hash || ''}`;
+      window.history.replaceState(window.history.state, document.title, cleanUrl);
+
+      setWhatsappPendingToken(whatsappToken);
+      setIsAuthenticated(false);
+      setShowLogin(false);
+      return;
+    }
 
     const tokens = { accessToken, refreshToken };
     storeAuthTokens(tokens);
+    clearWhatsappPendingToken();
     query.delete('at');
     query.delete('rt');
 
@@ -603,6 +785,7 @@ const App = ({ initialTab = 'home' }) => {
     window.history.replaceState(window.history.state, document.title, cleanUrl);
 
     setIsAuthenticated(true);
+    setWhatsappPendingToken('');
     setShowLogin(false);
     setTab(pendingTab || (PROTECTED_TABS.has(initialTab) ? initialTab : 'account'));
     setPendingTab(null);
@@ -695,6 +878,7 @@ const App = ({ initialTab = 'home' }) => {
     if (action.logout) {
       clearStoredAuth();
       setIsAuthenticated(false);
+      setWhatsappPendingToken('');
       setPendingTab(null);
       setTab('home');
       return;
@@ -788,6 +972,26 @@ const App = ({ initialTab = 'home' }) => {
               setTab(pendingTab);
               setPendingTab(null);
             }
+          }}
+        />
+      )}
+
+      {whatsappPendingToken && (
+        <WhatsAppOtpScreen
+          pendingToken={whatsappPendingToken}
+          onVerified={(tokens) => {
+            storeAuthTokens(tokens);
+            clearWhatsappPendingToken();
+            setWhatsappPendingToken('');
+            setIsAuthenticated(true);
+            setShowLogin(false);
+            setTab(pendingTab || (PROTECTED_TABS.has(initialTab) ? initialTab : 'account'));
+            setPendingTab(null);
+          }}
+          onCancel={() => {
+            clearWhatsappPendingToken();
+            setWhatsappPendingToken('');
+            setShowLogin(true);
           }}
         />
       )}

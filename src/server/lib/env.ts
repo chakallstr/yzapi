@@ -14,11 +14,26 @@ const schema = z.object({
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   JWT_ACCESS_TTL_SEC: z.coerce.number().default(900),
   JWT_REFRESH_TTL_SEC: z.coerce.number().default(60 * 60 * 24 * 30),
+  WHATSAPP_PENDING_TTL_SEC: z.coerce.number().default(10 * 60),
 
   // Google OAuth (optional — graceful degrade if missing)
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().default("http://localhost:4567/api/auth/google/callback"),
+
+  // WhatsApp OTP after Google auth. Disabled by default until OpenWA is configured.
+  WHATSAPP_OTP_ENABLED: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  WHATSAPP_OTP_PROVIDER: z.enum(["openwa", "meta", "dry_run"]).default("dry_run"),
+  WHATSAPP_OTP_DRY_RUN: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  WHATSAPP_OTP_HASH_SECRET: z.string().optional(),
+  WHATSAPP_OTP_TTL_SEC: z.coerce.number().default(5 * 60),
+  WHATSAPP_OTP_RESEND_COOLDOWN_SEC: z.coerce.number().default(60),
+  WHATSAPP_OTP_MAX_ATTEMPTS: z.coerce.number().default(5),
+  WHATSAPP_OTP_MAX_SENDS_PER_PHONE_HOUR: z.coerce.number().default(5),
+  WHATSAPP_OTP_MAX_SENDS_PER_IP_HOUR: z.coerce.number().default(20),
+  OPENWA_API_URL: z.string().optional(),
+  OPENWA_API_KEY: z.string().optional(),
+  OPENWA_SESSION_ID: z.string().optional(),
 
   // Frontend
   APP_BASE_URL: z.string().default("http://localhost:4567"),

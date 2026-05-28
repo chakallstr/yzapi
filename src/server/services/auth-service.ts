@@ -12,6 +12,12 @@ export interface TokenPayload {
   jti?: string;
 }
 
+export interface WhatsappPendingPayload {
+  sub: string;
+  email: string;
+  type: "whatsapp_pending";
+}
+
 export async function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, 12);
 }
@@ -22,6 +28,20 @@ export async function comparePassword(plain: string, hash: string): Promise<bool
 
 export function signAccessToken(payload: { sub: string; role: "admin" | "user" }): string {
   return jwt.sign(payload, env.JWT_SECRET, { expiresIn: env.JWT_ACCESS_TTL_SEC });
+}
+
+export function signWhatsappPendingToken(payload: { sub: string; email: string }): string {
+  return jwt.sign({ ...payload, type: "whatsapp_pending" }, env.JWT_SECRET, {
+    expiresIn: env.WHATSAPP_PENDING_TTL_SEC,
+  });
+}
+
+export function verifyWhatsappPendingToken(token: string): WhatsappPendingPayload {
+  const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload & WhatsappPendingPayload;
+  if (payload.type !== "whatsapp_pending" || !payload.sub || !payload.email) {
+    throw new Error("Invalid WhatsApp pending token");
+  }
+  return { sub: payload.sub, email: payload.email, type: "whatsapp_pending" };
 }
 
 export async function signRefreshToken(userId: string): Promise<string> {

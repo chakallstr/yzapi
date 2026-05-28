@@ -66,6 +66,60 @@ export const users = pgTable(
   (t) => [uniqueIndex("users_email_idx").on(t.email)]
 );
 
+// ── whatsapp OTP and verified phone records ───────────────────────────────────
+export const whatsappOtpRequests = pgTable(
+  "whatsapp_otp_requests",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    purpose: text("purpose").notNull().default("signup"),
+    phoneE164: text("phone_e164").notNull(),
+    phoneHash: text("phone_hash").notNull(),
+    codeHash: text("code_hash").notNull(),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    sendCount: integer("send_count").notNull().default(1),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    ipHash: text("ip_hash").notNull().default(""),
+    userAgentHash: text("user_agent_hash").notNull().default(""),
+    provider: text("provider").notNull().default("openwa"),
+    providerMessageId: text("provider_message_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [
+    index("whatsapp_otp_user_idx").on(t.userId),
+    index("whatsapp_otp_phone_hash_idx").on(t.phoneHash),
+    index("whatsapp_otp_expires_at_idx").on(t.expiresAt),
+  ],
+);
+
+export const whatsappVerifiedNumbers = pgTable(
+  "whatsapp_verified_numbers",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    phoneE164: text("phone_e164").notNull(),
+    phoneHash: text("phone_hash").notNull(),
+    status: text("status").notNull().default("active"), // active | inactive | account_closed | blocked
+    verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull().default(sql`now()`),
+    replacedById: uuid("replaced_by_id"),
+    inactiveAt: timestamp("inactive_at", { withTimezone: true }),
+    inactiveReason: text("inactive_reason"),
+    marketingConsent: boolean("marketing_consent").notNull().default(false),
+    marketingConsentAt: timestamp("marketing_consent_at", { withTimezone: true }),
+    consentTextVersion: text("consent_text_version").notNull().default(""),
+    consentIpHash: text("consent_ip_hash").notNull().default(""),
+    consentUserAgentHash: text("consent_user_agent_hash").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [
+    uniqueIndex("whatsapp_verified_phone_hash_idx").on(t.phoneHash),
+    index("whatsapp_verified_user_status_idx").on(t.userId, t.status),
+  ],
+);
+
 // ── api_keys ───────────────────────────────────────────────────────────────────
 export const apiKeys = pgTable(
   "api_keys",
