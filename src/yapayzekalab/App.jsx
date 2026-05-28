@@ -87,22 +87,73 @@ const initialsFor = (value) => {
     .toUpperCase();
 };
 
-// --- Notifications mock --------------------------------------------
-const seedNotifs = [
-  { id: 1, text: 'Bakiye yüklendi · ₺250.00',         sub: 'Shopier · TR ödeme',                       time: '10 dk önce', dot: 'var(--ok)' },
-  { id: 2, text: 'Yeni API anahtarı oluşturuldu',     sub: 'yzk_live_YOUR_KEY',                         time: '22 dk önce', dot: 'var(--accent)' },
-  { id: 3, text: 'Claude Opus 4.7 fiyatı güncellendi', sub: 'USD/TL kuru: 34.50',                       time: '1 sa önce',  dot: 'var(--t-purple)' },
-];
+const ANNOUNCEMENT_DOT = {
+  bilgi: 'var(--accent)',
+  uyari: '#f59e0b',
+  hata: 'var(--err)',
+  basari: 'var(--ok)',
+};
+
+const formatNotifTime = (value) => {
+  const date = new Date(value || '');
+  if (Number.isNaN(date.getTime())) return 'yeni';
+  const diffMs = Date.now() - date.getTime();
+  const diffMin = Math.max(0, Math.round(diffMs / 60000));
+  if (diffMin < 1) return 'az önce';
+  if (diffMin < 60) return `${diffMin} dk önce`;
+  const diffHour = Math.round(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} sa önce`;
+  const diffDay = Math.round(diffHour / 24);
+  return `${diffDay} gün önce`;
+};
+
+const formatNotifSub = (item) => {
+  const tip = String(item?.tip || 'bilgi').toUpperCase();
+  const end = item?.bitis ? new Date(item.bitis) : null;
+  if (!end || Number.isNaN(end.getTime())) return `Sistem duyurusu · ${tip}`;
+  return `Sistem duyurusu · ${tip} · ${end.toLocaleString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} kadar`;
+};
 
 // === Notifications dropdown =========================================
 const NotificationsButton = () => {
   const [open, setOpen] = useState(false);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const ref = useRef(null);
+
+  const loadAnnouncements = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch('/api/announcements/active');
+      const body = await response.json().catch(() => []);
+      if (!response.ok) throw new Error(body?.message || `Bildirimler alınamadı (${response.status})`);
+      const rows = Array.isArray(body) ? body : [];
+      rows.sort((a, b) => new Date(b.baslangic || 0).getTime() - new Date(a.baslangic || 0).getTime());
+      setItems(rows);
+    } catch (err) {
+      setItems([]);
+      setError(err?.message || 'Bildirimler alınamadı.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
   }, []);
+  useEffect(() => {
+    loadAnnouncements();
+  }, [loadAnnouncements]);
+  useEffect(() => {
+    if (open) loadAnnouncements();
+  }, [open, loadAnnouncements]);
+
+  const activeCount = items.length;
+
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button onClick={() => setOpen(o => !o)}
@@ -113,10 +164,12 @@ const NotificationsButton = () => {
                 transition: 'background 0.15s ease',
               }}>
         <I.Bell size={15} stroke="var(--ink-2)" />
-        <span style={{
-          position: 'absolute', top: 6, right: 6, width: 7, height: 7, borderRadius: '50%',
-          background: 'var(--err)',
-        }} className="pulse-dot" />
+        {activeCount > 0 && (
+          <span style={{
+            position: 'absolute', top: 6, right: 6, width: 7, height: 7, borderRadius: '50%',
+            background: 'var(--err)',
+          }} className="pulse-dot" />
+        )}
       </button>
       {open && (
         <div className="fade-in" style={{
@@ -130,26 +183,41 @@ const NotificationsButton = () => {
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           }}>
             <span style={{ fontSize: 13, fontWeight: 600 }}>Bildirimler</span>
-            <Chip tone="accent" style={{ fontSize: 10 }}>3 yeni</Chip>
+            <Chip tone="accent" style={{ fontSize: 10 }}>{activeCount} aktif</Chip>
           </div>
-          {seedNotifs.map(n => (
+          {loading && (
+            <div style={{ padding: '16px 14px', fontSize: 11.5, color: 'var(--ink-3)' }}>
+              Bildirimler yükleniyor…
+            </div>
+          )}
+          {!loading && error && (
+            <div style={{ padding: '16px 14px', fontSize: 11.5, color: '#b91c1c' }}>
+              {error}
+            </div>
+          )}
+          {!loading && !error && activeCount === 0 && (
+            <div style={{ padding: '16px 14px', fontSize: 11.5, color: 'var(--ink-3)' }}>
+              Aktif admin duyurusu yok.
+            </div>
+          )}
+          {!loading && !error && items.map((n) => (
             <div key={n.id} className="card-hover" style={{
               padding: '12px 14px', borderBottom: '1px solid var(--border)',
-              display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer',
+              display: 'flex', gap: 10, alignItems: 'flex-start',
             }}>
-              <Dot color={n.dot} size={7} style={{ marginTop: 5 }} />
+              <Dot color={ANNOUNCEMENT_DOT[n.tip] || 'var(--accent)'} size={7} style={{ marginTop: 5 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink)' }}>{n.text}</div>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>{n.sub}</div>
-                <div style={{ fontSize: 10.5, color: 'var(--ink-4)', marginTop: 4 }}>{n.time}</div>
+                <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink)' }}>{n.mesaj}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>{formatNotifSub(n)}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--ink-4)', marginTop: 4 }}>{formatNotifTime(n.baslangic)}</div>
               </div>
             </div>
           ))}
-          <button style={{
+          <div style={{
             width: '100%', padding: '10px',
             fontSize: 11.5, fontWeight: 500, color: 'var(--accent-ink)',
-            background: 'transparent',
-          }}>Tümünü gör →</button>
+            background: 'transparent', textAlign: 'center',
+          }}>Admin duyuruları anlık yayınlanır</div>
         </div>
       )}
     </div>
