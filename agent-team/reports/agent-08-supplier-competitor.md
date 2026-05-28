@@ -13,7 +13,7 @@ Kapsam: CloseRouter, yapayzekapi.store, llm.gen.tr, model ekonomisi.
 ## Kararlar
 
 - Bizim aktif model: paket yok, bakiye var.
-- Text icin provider fiyat * 3.00 + 0.90 billing ratio.
+- Text icin doğrudan müşteri satış fiyatı tablosu kullanılıyor.
 - Rakip altina inme denemeleri aktif ana karar degil; marj korunacak.
 - Image/video ayri provider birimiyle fiyatlanacak.
 
@@ -30,4 +30,3 @@ Kapsam: CloseRouter, yapayzekapi.store, llm.gen.tr, model ekonomisi.
 - `/Users/ufuk/Documents/Belgeler - ufuk Mac mini/api/closerouter-api-tr-and-plan.md`
 - `/Users/ufuk/Documents/Belgeler - ufuk Mac mini/api/yapayzekapi-pricing-analysis.md`
 - `/Users/ufuk/Documents/Belgeler - ufuk Mac mini/api/llm-gen-tr-price-comparison.md`
-

@@ -96,7 +96,7 @@ Express + TypeScript API. Kullanıcı bakiye yükler, API key alır, model bazl�
   - `/api/models: 33`
   - `/v1/chat/completions unauth: 401`
   - bilinmeyen `/api/*` ve `/v1/*`: JSON `404`
-- Browser kontrolünde API sekmesi açıldı; aktivasyon akışı göründü; public body text içinde `çarpan|billing ratio|formül` izi yok.
+- Browser kontrolünde API sekmesi açıldı; aktivasyon akışı göründü; public body text içinde gizli fiyat izi yok.
 - Canlı test API key olmadığı için başarılı chat ve düşük bakiye `402` smoke maddeleri `manual-live-required` kaldı.
 
 ## Son Codex Aktivitesi (2026-05-24 ~22:46)

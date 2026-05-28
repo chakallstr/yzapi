@@ -94,7 +94,7 @@ Müşteri -> 9Router -> Provider
    - Yarım kalan stream error usage olarak kaydedilecek.
 
 5. Public UI sade kalacak.
-   - Çarpan/formül/billing ratio yok.
+   - Gizli fiyat izi yok.
    - USD ana fiyat, küçük TL karşılığı, kullanım maliyeti ve kalan bakiye var.
 
 ## POC Yapılacaklar

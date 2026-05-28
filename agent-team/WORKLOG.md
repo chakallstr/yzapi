@@ -61,7 +61,7 @@
 ### Doğrulama
 
 - Test Agent 1 - API/Proxy: `npm run lint` geçti; `/v1/responses` ve `/v1/messages` forwarder testleri eklendi.
-- Test Agent 2 - Billing/Security: `npm test` geçti; 7 test dosyası, 43 test. `src/App.tsx` ve `dist/assets` içinde public formül/çarpan/billing ratio izi bulunmadı. Secret scan gerçek production key/parola yakalamadı.
+- Test Agent 2 - Billing/Security: `npm test` geçti; 7 test dosyası, 43 test. `src/App.tsx` ve `dist/assets` içinde gizli fiyat izi bulunmadı. Secret scan gerçek production key/parola yakalamadı.
 - Test Agent 3 - Deploy/Smoke: `npm run build` geçti; `bash -n scripts/vps-setup.sh` ve `bash -n scripts/vps-deploy.sh` geçti; local production smoke `/health` 200 `db:"ok"`, `/api/models` 33 model, `/v1/chat/completions` auth yokken 401.
 - Independent QA: `git diff --check` temiz. Canlı VPS deploy yapılmadığı için canlı `https://yapayzekalab.org` smoke bu turda kapsam dışı kaldı.
 
@@ -96,7 +96,7 @@
   - `480p`: `0.016815`, sistem TL karşılığı `2.37511557482355`
   - `720p`: `0.0378`, sistem TL karşılığı `5.339242862226`
   - `1080p`: `0.08505`, sistem TL karşılığı `12.0132964400085`
-- Public formül sızıntısı kontrolü geçti: `src/App.tsx` ve `dist/assets` içinde `textCarpan`, `imageCarpan`, `videoCarpan`, `textBillingRatio`, `çarpan`, `billing ratio` izi bulunmadı.
+- Public formül sızıntısı kontrolü geçti: `src/App.tsx` ve `dist/assets` içinde gizli fiyat izi bulunmadı.
 - `git diff --check` temiz.
 
 ## 2026-05-24 — 2 saatlik GitHub araştırma maratonu başlatma
@@ -166,7 +166,7 @@
 - Local production smoke geçti: `/health` 200 `db:"ok"`, `/api/models` 33 model.
 - `/api/models` örnek kontrolü: `claude-sonnet-4.6` input/output `0.255`, `kimi-k2.5` output `0.38`, `seedance-2.0` `480p=0.016815`, `720p=0.0378`, `1080p=0.08505`.
 - Secret taraması geçti: tarama API key'i, verilen parola ve e-posta `src`, `pricing`, `docs`, `agent-team`, `README.md`, `CLAUDE.md`, `.env.example` içinde bulunmadı.
-- Public bundle formül sızıntısı kontrolü geçti: `src/App.tsx` ve `dist/assets` içinde public formül/çarpan/billing ratio izi bulunmadı.
+- Public bundle formül sızıntısı kontrolü geçti: `src/App.tsx` ve `dist/assets` içinde gizli fiyat izi bulunmadı.
 - `git diff --check` temiz.
 
 ## 2026-05-24 — CloseRouter karşılaştırma sonrası eksik metadata güncellemesi
@@ -202,7 +202,7 @@
 - `/api/models` örnek fiyat kontrolü: `claude-sonnet-4.6` input/output `0.255`, alias sayısı `2`.
 - Diff kontrolü: `localDiffCount=0`, `metadataDiffCount=0`, `missingFieldCount=0`.
 - Secret taraması geçti: tarama API key'i, verilen parola ve e-posta `src`, `pricing`, `docs`, `agent-team`, `README.md`, `CLAUDE.md`, `.env.example` içinde bulunmadı.
-- Public bundle formül sızıntısı kontrolü geçti: `src/App.tsx` ve `dist/assets` içinde public formül/çarpan/billing ratio izi bulunmadı.
+- Public bundle formül sızıntısı kontrolü geçti: `src/App.tsx` ve `dist/assets` içinde gizli fiyat izi bulunmadı.
 - `git diff --check` temiz.
 
 ## 2026-05-24 — API sistemi GitHub araştırması erken durdurma ve özet
@@ -312,7 +312,7 @@
 - `npm run lint` geçti.
 - `npm test` geçti: 10 dosya, 55 test.
 - `npm run build` geçti.
-- Public bundle scan: `dist/index.html` ve `dist/assets` içinde `CLOSEROUTER_API_KEY`, test key, carpan/formül/billing ratio izi yok.
+- Public bundle scan: `dist/index.html` ve `dist/assets` içinde upstream secret veya gizli fiyat izi yok.
 - `git diff --check` temiz.
 
 ### Sonuç
@@ -358,7 +358,7 @@
 - `npm run lint` geçti.
 - `npm test` geçti: 10 dosya, 57 test.
 - `npm run build` geçti.
-- Public bundle scan geçti: `dist/index.html` ve `dist/assets` içinde upstream secret, çarpan/formül/billing ratio izi yok.
+- Public bundle scan geçti: `dist/index.html` ve `dist/assets` içinde upstream secret veya gizli fiyat izi yok.
 - `git diff --check` temiz.
 
 ### Sonuç
@@ -426,7 +426,7 @@
   - bilinmeyen `/api/*` ve `/v1/*` için JSON `404` bekler.
   - canlı test API key yoksa `manual-live-required` yazar, sahte başarı üretmez.
 - `scripts/scan-public-bundle.mjs` eklendi:
-  - `dist/index.html` ve `dist/assets` içinde upstream secret, çarpan/formül/billing ratio ve eski fiyat izi arar.
+  - `dist/index.html` ve `dist/assets` içinde upstream secret, gizli fiyat izi ve eski fiyat izi arar.
 - `deploy/vps/yapayzekalab.service` systemd hardening ile güncellendi.
 - `deploy/vps/nginx-yapayzekalab.conf` security header'larıyla güncellendi.
 - `scripts/vps-setup.sh` `pg_dump` için `postgresql-client` kurar hale getirildi.
@@ -494,7 +494,7 @@
   - `/api/__smoke_missing_route__: json_404`
   - `/v1/__smoke_missing_route__: json_404`
   - `SMOKE_API_KEY` ve `SMOKE_LOW_BALANCE_API_KEY` olmadığı için başarılı chat ve düşük bakiye smoke maddeleri `manual-live-required` kaldı.
-- Browser kontrolünde API sekmesi açıldı; aktivasyon metinleri göründü; public body text içinde `çarpan|billing ratio|formül` izi yok.
+- Browser kontrolünde API sekmesi açıldı; aktivasyon metinleri göründü; public body text içinde gizli fiyat izi yok.
 
 ### Sonuç
 
