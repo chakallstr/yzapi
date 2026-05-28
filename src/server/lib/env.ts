@@ -47,10 +47,6 @@ const schema = z.object({
   CLOSEROUTER_API_KEY: z.string().optional(),
   CLOSEROUTER_BASE_URL: z.string().optional(),
   RATE_LIMIT_PER_KEY_PER_MIN: z.coerce.number().default(60),
-  TOKEN_WALLET_MODE: z.enum(["disabled", "shadow", "enforce"]).default("disabled"),
-  TOKEN_WALLET_BASE_USD_PER_M: z.coerce.number().positive().default(0.64),
-  SOLD_PACKAGE_TOKENS: z.coerce.number().int().positive().default(900_000),
-  INTERNAL_GRANTED_TOKENS: z.coerce.number().int().positive().default(1_000_000),
 
   // Shopier payment (optional — returns 503 when unset)
   SHOPIER_API_KEY: z.string().optional(),

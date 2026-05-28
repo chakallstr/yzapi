@@ -1,16 +1,16 @@
 # YapayZekaLab Billing Audit — Phase 2/3/4/5 Ara Bulgular
 
-## 1. 900K satış / 1M iç hesap
+## 1. Text fiyat normalizasyonu
 
 - Kodda görülen net kural `textBillingRatio = 0.9`.
 - Bu oran `src/server/services/pricing-service.ts` üzerinden `system_config.text_billing_ratio` alanından okunuyor.
 - `src/pricing.ts` içindeki text fiyat hesaplaması provider fiyatını `0.9` oranına bölerek müşteri satış fiyatını üretiyor.
-- Sonuç: `900K gerçek token = 1M faturalama token` normalizasyonu **fiyatlama katmanında** uygulanıyor.
+- Sonuç: text normalizasyonu **fiyatlama katmanında** uygulanıyor.
 - Aynı oran `src/server/services/billing-service.ts` içindeki gerçek kullanım sayımında ikinci kez uygulanmıyor; charge doğrudan `promptTokens / 1_000_000` ve `completionTokens / 1_000_000` üstünden gidiyor.
 
 ### Ara karar
 
-- Eğer iş kuralı gerçekten “900K satılır ama içerde 1M usable token gibi davranılır” ise bu kural bugün **dolaylı**, fiyat formülü içinde yaşıyor.
+- Eğer ürün dili ile teknik muhasebe ayrışıyorsa, bu kural bugün **dolaylı**, fiyat formülü içinde yaşıyor.
 - Eğer bu kuralın ödeme/paket diliyle de açık olması isteniyorsa ayrıca ürün kuralı olarak sabitlenmeli.
 - Şu aşamada aynı repo içinde “paket token bakiyesi” diye ayrı bir token cüzdanı yok; sistem TL bakiye düşüyor.
 
@@ -51,7 +51,7 @@
 ### HIGH-3 — Admin manuel bakiye düzenleme ödeme muhasebesinden ayrı
 
 - `/api/admin/users/:id/bakiye` route’u ödeme quote/helper yolunu kullanmıyor.
-- Bu kasıtlı yönetim aracı olabilir; ama 900K/1M veya USD→TL yuvarlama iş kuralı burada otomatik korunmuyor.
+- Bu kasıtlı yönetim aracı olabilir; ama metinsel satış dili veya USD→TL yuvarlama iş kuralı burada otomatik korunmuyor.
 
 ## 4. Test boşlukları
 

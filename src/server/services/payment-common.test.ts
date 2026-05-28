@@ -27,12 +27,6 @@ vi.mock("../db/client.js", () => ({
 
 vi.mock("./audit-service.js", () => ({ writeAudit: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("./email-service.js", () => ({ paymentReceiptEmail: vi.fn().mockResolvedValue(undefined) }));
-vi.mock("./token-wallet-service.js", () => ({
-  isTokenWalletEnabled: vi.fn(() => false),
-  grantedTokensFromUsd: vi.fn((amountUsd: number) => Math.ceil((amountUsd / 0.64) * 1_000_000)),
-  grantedTokensFromTl: vi.fn(() => 0),
-  TOKEN_WALLET_BILLING_BASIS: "base_text_equivalent",
-}));
 
 describe("calcKdv — KDV-inclusive math", () => {
   beforeEach(() => {
@@ -144,7 +138,6 @@ describe("creditUserBalance — usable TL balance", () => {
     expect(mocks.txInsertValues).toHaveBeenCalledWith(expect.objectContaining({
       tip: "yukleme",
       miktarTL: "120",
-      tokenAmount: null,
       oncekiBakiye: "40",
       sonrakiBakiye: "160",
       idempotencyKey: "pay_YZ-ABC123",
@@ -175,40 +168,5 @@ describe("creditUserBalance — usable TL balance", () => {
 
     expect(result).toEqual({ success: true, alreadyCredited: true, txId: "tx-existing" });
     expect(mocks.transaction).not.toHaveBeenCalled();
-  });
-
-  it("grants shadow tokens when token wallet is enabled", async () => {
-    const tokenWallet = await import("./token-wallet-service.js");
-    vi.mocked(tokenWallet.isTokenWalletEnabled).mockReturnValue(true);
-
-    mocks.limit
-      .mockResolvedValueOnce([{ id: "pay-1", durum: "bekliyor", transactionId: null }])
-      .mockResolvedValueOnce([{ email: "u@test.com", adSoyad: "Test User", bakiyeTL: "40.0000" }]);
-    mocks.transaction.mockImplementationOnce(async (fn) => fn({
-      update: vi.fn(() => ({
-        set: mocks.txUpdateSet.mockImplementation(() => ({
-          where: mocks.txUpdateWhere.mockReturnValue({
-            returning: mocks.txUpdateReturning.mockResolvedValue([{ email: "u@test.com", adSoyad: "Test User", bakiyeTL: "160.0000", tokenBalance: "15625000" }]),
-          }),
-        })),
-      })),
-      insert: vi.fn(() => ({
-        values: mocks.txInsertValues.mockReturnValue({
-          returning: mocks.txReturning.mockResolvedValue([{ id: "tx-123" }]),
-        }),
-      })),
-    }));
-
-    const { creditUserBalance } = await import("./payment-common.js");
-    const result = await creditUserBalance("user-1", "pay-1", 120, "iban", "YZ-ABC123", undefined, {
-      amountUsd: 10,
-      kurAtPayment: 12,
-    });
-
-    expect(result.grantedTokens).toBe(15_625_000);
-    expect(mocks.txInsertValues).toHaveBeenCalledWith(expect.objectContaining({
-      tokenAmount: "15625000",
-      billingBasis: "base_text_equivalent",
-    }));
   });
 });

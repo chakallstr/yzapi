@@ -71,13 +71,6 @@
       "when": 1780089600000,
       "tag": "0009_api_key_full_cipher",
       "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1780109400000,
-      "tag": "0010_token_wallet_shadow",
-      "breakpoints": true
     }
   ]
 }

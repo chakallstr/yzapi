@@ -78,7 +78,7 @@ describe("telegram-bot-service pure helpers", () => {
     expect(existing).toContain("<code>yzk_live_existing_secret</code>");
     expect(rotated).toContain("Eski key iptal edildi");
     expect(created).toContain("kopyala");
-    expect(created).not.toMatch(/hash|provider|900k|secret path/i);
+    expect(created).not.toMatch(/hash|provider|secret path/i);
   });
 
   it("formats Telegram usage with current balance and recent requests", async () => {

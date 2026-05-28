@@ -115,7 +115,7 @@ Kapsam: Sadece keşif. Kod değişikliği yok. Amaç, billing ve API usage yüze
   - `whatsapp_otp_requests`
   - `whatsapp_verified_numbers`
 
-## 5. Fiyatlandırma ve 900K -> 1M kuralı ile ilgili dosyalar
+## 5. Fiyatlandırma normalizasyonu ile ilgili dosyalar
 
 ### Ana pricing yüzeyi
 
@@ -134,8 +134,8 @@ Kapsam: Sadece keşif. Kod değişikliği yok. Amaç, billing ve API usage yüze
 
 - Keşif seviyesinde güçlü işaret:
   - `textBillingRatio = 0.9`
-  - rapor ve metinlerde `900k = 1M` ifadesi geçiyor
-- Ama bu aşamada henüz “gerçek satın alma paketi 900K satılıyor ve her yerde 1M usable credit yazılıyor” sonucu kesinleşmedi.
+  - rapor ve metinlerde açık normalizasyon dili geçiyor
+- Ama bu aşamada ürün dili ile teknik muhasebenin birebir aynı soyutlamada çalıştığı sonucu kesinleşmedi.
 - Bunun tam doğrusu Phase 2’de:
   - `pricing.ts`
   - payment init/callback
@@ -325,7 +325,7 @@ Billing / usage log açısından kritik yazan yerler:
 
 Henüz fix kararı değil. Sadece yüksek riskli inceleme hedefleri:
 
-- `textBillingRatio = 0.9` gerçekten 900K satış / 1M iç kullanım kuralı mı
+- `textBillingRatio = 0.9` doğrudan hangi satış anlatımına bağlı
 - stream öncesi rezervasyon yok gibi duruyor
 - `enforceRequestGuards` keşif seviyesinde sadece `balance > 0` kontrol ediyor; “tahmini maliyet yeterli mi” guard’ı henüz görünmedi
 - 95K hard backend context limiti bu turda görünmedi

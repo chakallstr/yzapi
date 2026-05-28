@@ -16,7 +16,7 @@ Express + TypeScript API. Kullanıcı bakiye yükler, API key alır, model bazl�
 |---|---|
 | Fiyatlama modeli | Paket yok. Bakiye/kredi bazlı düz satış. |
 | Text carpanı | `provider_fiyat × 3.00` |
-| Faturalama token | `real_tokens / 0.90` → 900K gerçek = 1M faturalama |
+| Faturalama token | `real_tokens / 0.90` normalizasyonu |
 | Efektif carpan | ~3.3333x |
 | Minimum yükleme | 250 TL |
 | KDV | Dahil fiyatlama |

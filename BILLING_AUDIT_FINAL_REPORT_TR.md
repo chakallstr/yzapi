@@ -26,7 +26,7 @@ Bu audit sonunda üç ana başlık netleşti:
 
 - Frontend metni veya katalogtan bağımsız olarak backend tarafı uzun context’i upstream’e iletebiliyordu.
 
-## 3. 900K satış / 1M hesaplama sonucu
+## 3. Fiyat normalizasyonu sonucu
 
 Kodda görülen iş kuralı:
 
@@ -35,9 +35,9 @@ Kodda görülen iş kuralı:
 
 Bu şu anlama geliyor:
 
-- “900K gerçek token = 1M faturalama token” mantığı **fiyatlama katmanında** uygulanıyor.
+- Text tarafındaki normalizasyon mantığı **fiyatlama katmanında** uygulanıyor.
 - Sistem ayrı bir “token cüzdanı” tutmuyor; ana cüzdan **TL bakiye**.
-- Yani bugün kodun gerçek davranışı “kullanıcıya 1,000,000 token yaz” değil, “fiyatı 0.9 oranına göre normalize et” şeklinde.
+- Yani bugün kodun gerçek davranışı ayrı bir token paketi yazmak değil, “fiyatı 0.9 oranına göre normalize et” şeklinde.
 
 ### Sonuç
 
@@ -45,7 +45,7 @@ Bu şu anlama geliyor:
 - Bu yüzden audit açısından bu başlık artık “deploy blocker” değil.
 - Teknik tarafta mevcut gerçek davranış değişmedi:
   - sistem TL bakiye ile çalışıyor,
-  - `900K/1M` farkı fiyat normalizasyonu olarak uygulanıyor,
+  - text normalizasyonu fiyat katmanında uygulanıyor,
   - ayrı bir token-ledger cüzdanı tutulmuyor.
 
 ## 4. Input/output token hesaplama sonucu
@@ -144,7 +144,7 @@ Kalan nokta:
 
 ## 12. Kalan riskler
 
-1. `900K satış / 1M hesaplama` iş kuralı ürün dilinde hâlâ belirsiz.
+1. Ürün dili ile teknik fiyat normalizasyonu aynı terimlerle ifade edilmiyor.
    - Teknik olarak bugün TL bakiye sistemi var; token-ledger sistemi yok.
 2. `fullKeyCipher` server tarafında hâlâ mevcut.
    - Bu kısa vadede liste sızıntısından daha güvenli hale geldi, ama ideal “hash-only” model değil.
@@ -159,13 +159,13 @@ Kalan nokta:
 - Askıdaki kullanıcı ile session/API key erişim reddi
 - Shopier duplicate / fail-after-success callback simülasyonu
 - Gerçek business confirmation:
-  - “900K satıyoruz ama bunu sadece pricing normalization olarak mı kullanıyoruz?”
+  - “Satış dilindeki ifade sadece pricing normalization katmanında mı yaşıyor?”
   - yoksa
-  - “kullanıcıya içerde gerçek 1M token hakkı mı tanımlıyoruz?”
+  - “kullanıcıya ayrı bir iç token hakkı mı tanımlıyoruz?”
 
 ## 14. Yayına almadan önce son checklist
 
-- [x] 900K package correctly credits intended internal amount
+- [x] Paket/top-up akışı mevcut teknik muhasebe kuralıyla tutarlı
 - [x] Input tokens billed
 - [x] Output tokens billed
 - [x] Streaming billed

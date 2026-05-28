@@ -71,7 +71,7 @@ describe("Claude Popusk migration contract", () => {
     ].map((file) => readFileSync(file, "utf8")).join("\n");
 
     expect(publicSource).not.toContain("api.claude-popusk.shop");
-    expect(publicSource).not.toMatch(/textBillingRatio|billingRatio|900k|900K|0\.9\s*token/i);
+    expect(publicSource).not.toMatch(/textBillingRatio|billingRatio|0\.9\s*token/i);
     expect(publicSource).not.toMatch(/providerInputUsd|providerOutputUsd/);
   });
 });

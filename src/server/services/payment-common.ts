@@ -5,7 +5,6 @@ import { env } from "../lib/env.js";
 import { writeAudit } from "./audit-service.js";
 import { logger } from "../lib/logger.js";
 import { paymentReceiptEmail } from "./email-service.js";
-import { grantedTokensFromTl, grantedTokensFromUsd, isTokenWalletEnabled, TOKEN_WALLET_BILLING_BASIS } from "./token-wallet-service.js";
 
 export interface KdvResult {
   gross: number;  // amount user enters / pays
@@ -29,7 +28,6 @@ export interface CreditResult {
   success: boolean;
   txId?: string;
   alreadyCredited?: boolean;
-  grantedTokens?: number;
 }
 
 /**
@@ -64,48 +62,24 @@ export async function creditUserBalance(
       return { success: true, alreadyCredited: true, txId: existing[0].transactionId ?? undefined };
     }
 
-  let txId: string | undefined;
-  let oncekiBakiye = 0;
-  let sonrakiBakiye = 0;
-  let grantedTokens = 0;
-  let oncekiTokenBalance = 0;
-  let sonrakiTokenBalance = 0;
-  let receiptUser: { email: string; adSoyad: string } | null = null;
+    let txId: string | undefined;
+    let oncekiBakiye = 0;
+    let sonrakiBakiye = 0;
+    let receiptUser: { email: string; adSoyad: string } | null = null;
 
     await db.transaction(async (tx) => {
-      grantedTokens = isTokenWalletEnabled()
-        ? (
-            paymentMeta?.amountUsd !== undefined
-              ? grantedTokensFromUsd(paymentMeta.amountUsd)
-              : paymentMeta?.kurAtPayment !== undefined
-                ? grantedTokensFromTl(miktarTL, paymentMeta.kurAtPayment)
-                : 0
-          )
-        : 0;
-
       // Atomic increment prevents stale balance overwrites under concurrent approvals.
       const updatedUsers = await tx
         .update(users)
-        .set({
-          bakiyeTL: sql`${users.bakiyeTL} + ${miktarTL}`,
-          ...(grantedTokens > 0 ? { tokenBalance: sql`${users.tokenBalance} + ${grantedTokens}` } : {}),
-          updatedAt: new Date(),
-        })
+        .set({ bakiyeTL: sql`${users.bakiyeTL} + ${miktarTL}`, updatedAt: new Date() })
         .where(eq(users.id, userId))
-        .returning({
-          email: users.email,
-          adSoyad: users.adSoyad,
-          bakiyeTL: users.bakiyeTL,
-          tokenBalance: users.tokenBalance,
-        });
+        .returning({ email: users.email, adSoyad: users.adSoyad, bakiyeTL: users.bakiyeTL });
 
       if (!updatedUsers.length) throw new Error(`User ${userId} not found`);
       const updatedUser = updatedUsers[0];
       receiptUser = { email: updatedUser.email, adSoyad: updatedUser.adSoyad };
       sonrakiBakiye = Number(updatedUser.bakiyeTL);
       oncekiBakiye = sonrakiBakiye - miktarTL;
-      sonrakiTokenBalance = Number(updatedUser.tokenBalance ?? 0);
-      oncekiTokenBalance = grantedTokens > 0 ? sonrakiTokenBalance - grantedTokens : sonrakiTokenBalance;
 
       // Insert transaction record (idempotency via payments.idempotencyKey unique constraint)
       const txInserted = await tx.insert(transactions).values({
@@ -113,13 +87,9 @@ export async function creditUserBalance(
         userEmail: updatedUser.email,
         tip: "yukleme",
         miktarTL: String(miktarTL),
-        tokenAmount: grantedTokens > 0 ? String(grantedTokens) : null,
         oncekiBakiye: String(oncekiBakiye),
         sonrakiBakiye: String(sonrakiBakiye),
-        oncekiTokenBalance: String(oncekiTokenBalance),
-        sonrakiTokenBalance: String(sonrakiTokenBalance),
         aciklama: `Bakiye yükleme (${metod})`,
-        billingBasis: grantedTokens > 0 ? TOKEN_WALLET_BILLING_BASIS : "tl_balance",
         metod,
         idempotencyKey: `pay_${idempotencyKey}`,
       }).returning({ id: transactions.id });
@@ -162,7 +132,7 @@ export async function creditUserBalance(
       },
     ).catch((e: unknown) => logger.error({ err: e }, "[payment-common] receipt email failed"));
 
-    return { success: true, txId, ...(grantedTokens > 0 ? { grantedTokens } : {}) };
+    return { success: true, txId };
   } catch (e: any) {
     logger.error({ err: e, userId, paymentId }, "creditUserBalance failed");
     return { success: false };

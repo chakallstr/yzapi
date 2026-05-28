@@ -16,15 +16,7 @@ router.get("/me", async (req, res, next) => {
     const { passwordHash, ...safe } = rows[0];
     void passwordHash; // explicitly consumed
     const whatsapp = await getWhatsappVerificationSummary(req.user!.id);
-    const tokenBalance = Number(safe.tokenBalance ?? 0);
-    const pendingReservedTokens = Number(safe.pendingReservedTokens ?? 0);
-    res.json({
-      ...safe,
-      tokenBalance,
-      pendingReservedTokens,
-      availableTokens: tokenBalance - pendingReservedTokens,
-      ...whatsapp,
-    });
+    res.json({ ...safe, ...whatsapp });
   } catch (e) { next(e); }
 });
 
@@ -67,16 +59,9 @@ router.get("/usage-records", async (req, res, next) => {
         type: usageRecords.type,
         inputUsage: usageRecords.inputUsage,
         outputUsage: usageRecords.outputUsage,
-        inputTokens: usageRecords.inputTokens,
-        outputTokens: usageRecords.outputTokens,
-        billableTokens: usageRecords.billableTokens,
-        reservedTokens: usageRecords.reservedTokens,
-        settledTokens: usageRecords.settledTokens,
         unitsUsage: usageRecords.unitsUsage,
         costTL: usageRecords.costTL,
         remainingTL: usageRecords.remainingTL,
-        remainingTokens: usageRecords.remainingTokens,
-        billingBasis: usageRecords.billingBasis,
         responseMs: usageRecords.responseMs,
         status: usageRecords.status,
         errorCode: usageRecords.errorCode,
@@ -94,16 +79,9 @@ router.get("/usage-records", async (req, res, next) => {
       type: r.type,
       inputUsage: r.inputUsage,
       outputUsage: r.outputUsage,
-      inputTokens: r.inputTokens,
-      outputTokens: r.outputTokens,
-      billableTokens: Number(r.billableTokens),
-      reservedTokens: Number(r.reservedTokens),
-      settledTokens: Number(r.settledTokens),
       unitsUsage: Number(r.unitsUsage),
       costTL: Number(r.costTL),
       remainingTL: r.remainingTL === null ? null : Number(r.remainingTL),
-      remainingTokens: r.remainingTokens === null ? null : Number(r.remainingTokens),
-      billingBasis: r.billingBasis,
       responseMs: r.responseMs,
       status: r.status,
       errorCode: r.errorCode,
