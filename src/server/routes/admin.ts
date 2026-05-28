@@ -17,6 +17,7 @@ import { writeAudit } from "../services/audit-service.js";
 import { refreshKur } from "../services/kur-service.js";
 import { getReconciliationReport } from "../services/reconciliation-service.js";
 import { encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
+import { grantedTokensFromTl, TOKEN_WALLET_BILLING_BASIS, isTokenWalletEnabled } from "../services/token-wallet-service.js";
 
 const router = Router();
 
@@ -27,6 +28,9 @@ function serializeUser(u: typeof users.$inferSelect) {
     email: u.email,
     adSoyad: u.adSoyad,
     bakiyeTL: Number(u.bakiyeTL),
+    tokenBalance: Number(u.tokenBalance ?? 0),
+    availableTokens: Number(u.tokenBalance ?? 0) - Number(u.pendingReservedTokens ?? 0),
+    pendingReservedTokens: Number(u.pendingReservedTokens ?? 0),
     toplamHarcamaTL: Number(u.toplamHarcamaTL),
     toplamIstek: u.toplamIstek,
     durum: u.durum,
@@ -97,9 +101,13 @@ function serializeTransaction(t: typeof transactions.$inferSelect) {
     userEmail: t.userEmail,
     tip: t.tip,
     miktarTL: Number(t.miktarTL),
+    tokenAmount: t.tokenAmount === null ? null : Number(t.tokenAmount),
     oncekiBakiye: Number(t.oncekiBakiye),
     sonrakiBakiye: Number(t.sonrakiBakiye),
+    oncekiTokenBalance: t.oncekiTokenBalance === null ? null : Number(t.oncekiTokenBalance),
+    sonrakiTokenBalance: t.sonrakiTokenBalance === null ? null : Number(t.sonrakiTokenBalance),
     aciklama: t.aciklama,
+    billingBasis: t.billingBasis,
     timestamp: t.timestamp instanceof Date ? t.timestamp.toISOString() : String(t.timestamp),
   };
 }
@@ -267,7 +275,7 @@ router.patch("/users/:id", async (req, res, next) => {
 router.post("/users/:id/bakiye", async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { miktar, aciklama } = req.body as { miktar: number; aciklama: string };
+    const { miktar, aciklama, tokenMiktar } = req.body as { miktar: number; aciklama: string; tokenMiktar?: number };
 
     const userRows = await db.select().from(users).where(eq(users.id, id)).limit(1);
     if (!userRows.length) return res.status(404).json({ error: "Kullanıcı bulunamadı" });
@@ -275,17 +283,34 @@ router.post("/users/:id/bakiye", async (req, res, next) => {
 
     const once = Number(user.bakiyeTL);
     const sonraki = Math.max(0, once + miktar);
+    const oncekiToken = Number(user.tokenBalance ?? 0);
+    let tokenDelta = Number.isFinite(Number(tokenMiktar)) ? Math.trunc(Number(tokenMiktar)) : 0;
 
-    await db.update(users).set({ bakiyeTL: String(sonraki), updatedAt: new Date() }).where(eq(users.id, id));
+    if (!tokenDelta && miktar !== 0 && isTokenWalletEnabled()) {
+      const cfgRows = await db.select({ kur: systemConfig.kur }).from(systemConfig).where(eq(systemConfig.id, 1)).limit(1);
+      tokenDelta = grantedTokensFromTl(Math.abs(miktar), Number(cfgRows[0]?.kur ?? 0)) * Math.sign(miktar);
+    }
+
+    const sonrakiToken = Math.max(0, oncekiToken + tokenDelta);
+
+    await db.update(users).set({
+      bakiyeTL: String(sonraki),
+      tokenBalance: String(sonrakiToken),
+      updatedAt: new Date(),
+    }).where(eq(users.id, id));
 
     const tx = await db.insert(transactions).values({
       userId: id,
       userEmail: user.email,
       tip: miktar >= 0 ? "manuel" : "kullanim",
       miktarTL: String(miktar),
+      tokenAmount: String(tokenDelta),
       oncekiBakiye: String(once),
       sonrakiBakiye: String(sonraki),
+      oncekiTokenBalance: String(oncekiToken),
+      sonrakiTokenBalance: String(sonrakiToken),
       aciklama: aciklama || (miktar >= 0 ? "Manuel yükleme" : "Manuel düşüm"),
+      billingBasis: tokenDelta ? TOKEN_WALLET_BILLING_BASIS : "tl_balance",
     }).returning();
 
     await writeAudit("bakiye_update", id, `${miktar >= 0 ? "+" : ""}${miktar} TL, ${once} → ${sonraki}`);
