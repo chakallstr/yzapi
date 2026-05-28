@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server/index.ts",
-    "build": "vite build && mkdir -p dist/server/db && esbuild src/server/index.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.js && esbuild src/server/db/migrate.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server/db/migrate.js && esbuild src/server/db/seed.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server/db/seed.js",
-    "postbuild": "mkdir -p dist/server/db && cp -R src/server/db/migrations dist/server/db/migrations && cp .env.example dist/.env.example 2>/dev/null || true && cp .htaccess dist/.htaccess 2>/dev/null || true",
+    "build": "rm -rf dist && vite build && esbuild src/server/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js",
+    "postbuild": "cp .htaccess dist/.htaccess 2>/dev/null || true",
     "start": "node dist/server.js",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",

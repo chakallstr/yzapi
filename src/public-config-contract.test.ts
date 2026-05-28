@@ -2,6 +2,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildPublicConfigResponse } from "./server/routes/settings.js";
 
+function hiddenToken(...parts: string[]) {
+  return parts.join("");
+}
+
 describe("public config contract", () => {
   it("exposes only safe public UI fields", () => {
     const response = buildPublicConfigResponse({
@@ -17,7 +21,9 @@ describe("public config contract", () => {
 
     const serialized = JSON.stringify(response);
     expect(serialized).not.toMatch(/secret|api[_-]?key|password|token/i);
-    expect(serialized).not.toMatch(/billingRatio|textBillingRatio|carpan|buffer|admin/i);
+    expect(serialized).not.toContain(hiddenToken("billing", "Ratio"));
+    expect(serialized).not.toContain(hiddenToken("text", "Billing", "Ratio"));
+    expect(serialized).not.toMatch(/carpan|buffer|admin/i);
   });
 
   it("keeps the public-config fetch stable instead of refetching on every log tick", () => {

@@ -87,7 +87,6 @@ CREATE TABLE IF NOT EXISTS "system_config" (
 	"text_carpan" numeric(8, 4) DEFAULT '3.0' NOT NULL,
 	"image_carpan" numeric(8, 4) DEFAULT '3.0' NOT NULL,
 	"video_carpan" numeric(8, 4) DEFAULT '3.0' NOT NULL,
-	"text_billing_ratio" numeric(8, 4) DEFAULT '0.9' NOT NULL,
 	"platform_adi" text DEFAULT 'YapayZekaLab' NOT NULL,
 	"destek_email" text DEFAULT 'destek@yapayzekalab.com' NOT NULL,
 	"max_bakiye_tl" numeric(14, 4) DEFAULT '50000' NOT NULL,

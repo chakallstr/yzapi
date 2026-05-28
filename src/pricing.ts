@@ -4,7 +4,6 @@ export interface PricingConfig {
   kur: number;
   liveKur: number;
   kurBuffer: number;
-  textBillingRatio: number;
   textCarpan: number;
   imageCarpan: number;
   videoCarpan: number;
@@ -37,13 +36,13 @@ function computeTextPrice(m: MasterModel, cfg: PricingConfig): ComputedPrice {
   if (m.customerInputUsd !== undefined) {
     result.input = { usd: m.customerInputUsd, tl: toTL(m.customerInputUsd, cfg) };
   } else if (m.providerInputUsd !== undefined) {
-    const usd = (m.providerInputUsd / cfg.textBillingRatio) * cfg.textCarpan;
+    const usd = m.providerInputUsd * cfg.textCarpan;
     result.input = { usd, tl: toTL(usd, cfg) };
   }
   if (m.customerOutputUsd !== undefined) {
     result.output = { usd: m.customerOutputUsd, tl: toTL(m.customerOutputUsd, cfg) };
   } else if (m.providerOutputUsd !== undefined) {
-    const usd = (m.providerOutputUsd / cfg.textBillingRatio) * cfg.textCarpan;
+    const usd = m.providerOutputUsd * cfg.textCarpan;
     result.output = { usd, tl: toTL(usd, cfg) };
   }
   return result;

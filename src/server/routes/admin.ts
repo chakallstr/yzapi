@@ -51,7 +51,6 @@ function serializeConfig(cfg: typeof systemConfig.$inferSelect) {
     textCarpan: Number(cfg.textCarpan),
     imageCarpan: Number(cfg.imageCarpan),
     videoCarpan: Number(cfg.videoCarpan),
-    textBillingRatio: Number(cfg.textBillingRatio),
     platformAdi: cfg.platformAdi,
     destekEmail: cfg.destekEmail,
     paymentWhatsappNumber: cfg.paymentWhatsappNumber,
@@ -152,7 +151,6 @@ router.post("/config", async (req, res, next) => {
     if (body.textCarpan !== undefined) updates.textCarpan = String(body.textCarpan);
     if (body.imageCarpan !== undefined) updates.imageCarpan = String(body.imageCarpan);
     if (body.videoCarpan !== undefined) updates.videoCarpan = String(body.videoCarpan);
-    if (body.textBillingRatio !== undefined) updates.textBillingRatio = String(body.textBillingRatio);
     if (body.platformAdi !== undefined) updates.platformAdi = body.platformAdi;
     if (body.destekEmail !== undefined) updates.destekEmail = body.destekEmail;
     if (body.paymentWhatsappNumber !== undefined) updates.paymentWhatsappNumber = String(body.paymentWhatsappNumber ?? "");

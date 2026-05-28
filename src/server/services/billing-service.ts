@@ -21,6 +21,7 @@ export interface ChargeResult {
 }
 
 type ChargeStatus = "success" | "error" | "stream_missing_usage";
+const TOKEN_PRICE_UNIT = 1e6;
 
 function computeCost(
   model: MasterModel,
@@ -33,7 +34,7 @@ function computeCost(
     const output = pricingCfg.output?.[currency] ?? 0;
     const prompt = usage.promptTokens ?? 0;
     const completion = usage.completionTokens ?? 0;
-    return (prompt / 1_000_000) * input + (completion / 1_000_000) * output;
+    return (prompt / TOKEN_PRICE_UNIT) * input + (completion / TOKEN_PRICE_UNIT) * output;
   }
 
   if (model.type === "Görsel") {

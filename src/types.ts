@@ -40,7 +40,6 @@ export interface AdminConfig {
   textCarpan: number;
   imageCarpan: number;
   videoCarpan: number;
-  textBillingRatio: number;
   platformAdi: string;
   destekEmail: string;
   maxBakiyeTL: number;

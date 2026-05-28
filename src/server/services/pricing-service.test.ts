@@ -6,7 +6,6 @@ const baseCfg: PricingConfig = {
   kur: 50,
   liveKur: 48,
   kurBuffer: 0.04,
-  textBillingRatio: 0.9,
   textCarpan: 3.0,
   imageCarpan: 3.0,
   videoCarpan: 3.0,
@@ -28,32 +27,31 @@ describe("computePrice — text model", () => {
     providerOutputUsd: 15,
   };
 
-  it("applies textBillingRatio and textCarpan to input", () => {
+  it("applies textCarpan to provider-based input pricing", () => {
     const result = computePrice(model, baseCfg);
-    const expectedInputUsd = (5 / baseCfg.textBillingRatio) * baseCfg.textCarpan;
+    const expectedInputUsd = 5 * baseCfg.textCarpan;
     expect(result.input?.usd).toBeCloseTo(expectedInputUsd, 6);
   });
 
   it("converts input to TL using sell kur", () => {
     const result = computePrice(model, baseCfg);
-    const expectedInputUsd = (5 / baseCfg.textBillingRatio) * baseCfg.textCarpan;
+    const expectedInputUsd = 5 * baseCfg.textCarpan;
     const expectedTL = expectedInputUsd * sellKur(baseCfg);
     expect(result.input?.tl).toBeCloseTo(expectedTL, 6);
   });
 
-  it("TL changes with different kur buffer — billingRatio independent", () => {
+  it("TL changes with different kur buffer while USD stays stable", () => {
     const cfg2 = { ...baseCfg, kurBuffer: 0.1 };
     const r1 = computePrice(model, baseCfg);
     const r2 = computePrice(model, cfg2);
     expect(r2.input!.tl).toBeGreaterThan(r1.input!.tl);
-    // USD should be the same — kur doesn't affect USD
     expect(r2.input!.usd).toBeCloseTo(r1.input!.usd, 6);
   });
 
-  it("textBillingRatio=1 yields base carpan pricing", () => {
-    const cfg = { ...baseCfg, textBillingRatio: 1.0 };
-    const result = computePrice(model, cfg);
-    expect(result.input?.usd).toBeCloseTo(5 * cfg.textCarpan, 6);
+  it("returns provider fallback pricing when customer text price is absent", () => {
+    const result = computePrice(model, baseCfg);
+    expect(result.input?.usd).toBeCloseTo(5 * baseCfg.textCarpan, 6);
+    expect(result.output?.usd).toBeCloseTo(15 * baseCfg.textCarpan, 6);
   });
 
   it("returns unit '1M token'", () => {
@@ -97,9 +95,9 @@ describe("computePrice — image model", () => {
     expect(result.output?.usd).toBeCloseTo(expectedUsd, 6);
   });
 
-  it("textBillingRatio does NOT affect image pricing", () => {
-    const cfg1 = { ...baseCfg, textBillingRatio: 0.5 };
-    const cfg2 = { ...baseCfg, textBillingRatio: 1.0 };
+  it("kur buffer changes TL only, not image USD", () => {
+    const cfg1 = { ...baseCfg, kurBuffer: 0.01 };
+    const cfg2 = { ...baseCfg, kurBuffer: 0.09 };
     const r1 = computePrice(model, cfg1);
     const r2 = computePrice(model, cfg2);
     expect(r1.input?.usd).toBeCloseTo(r2.input!.usd, 6);
@@ -132,9 +130,9 @@ describe("computePrice — video model", () => {
     expect(result.perResolution?.default?.usd).toBeCloseTo(expectedDefaultUsd, 6);
   });
 
-  it("textBillingRatio does NOT affect video pricing", () => {
-    const cfg1 = { ...baseCfg, textBillingRatio: 0.5 };
-    const cfg2 = { ...baseCfg, textBillingRatio: 1.0 };
+  it("kur buffer changes TL only, not video USD", () => {
+    const cfg1 = { ...baseCfg, kurBuffer: 0.01 };
+    const cfg2 = { ...baseCfg, kurBuffer: 0.09 };
     const r1 = computePrice(model, cfg1);
     const r2 = computePrice(model, cfg2);
     expect(r1.perResolution?.["720p"]?.usd).toBeCloseTo(r2.perResolution?.["720p"]?.usd!, 6);

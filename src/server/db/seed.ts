@@ -40,7 +40,6 @@ async function main() {
       textCarpan: "3.0",
       imageCarpan: "3.0",
       videoCarpan: "3.0",
-      textBillingRatio: "0.9",
       platformAdi: "YapayZekaLab",
       destekEmail: "destek@yapayzekalab.com",
       paymentWhatsappNumber: process.env.PAYMENT_WHATSAPP_NUMBER ?? "",

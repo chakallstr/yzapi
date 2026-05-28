@@ -12,7 +12,6 @@ export async function buildPricingConfig(): Promise<PricingConfig> {
     kur: Number(cfg.kur),
     liveKur: Number(cfg.liveKur),
     kurBuffer: Number(cfg.kurBuffer),
-    textBillingRatio: Number(cfg.textBillingRatio),
     textCarpan: Number(cfg.textCarpan),
     imageCarpan: Number(cfg.imageCarpan),
     videoCarpan: Number(cfg.videoCarpan),

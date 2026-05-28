@@ -15,6 +15,16 @@
 Options -Indexes
 ServerSignature Off
 
+<FilesMatch "\\.(map|sql)$">
+  Require all denied
+</FilesMatch>
+
+<FilesMatch "^(seed|migrate)\\.js$">
+  Require all denied
+</FilesMatch>
+
+RedirectMatch 404 (^|/)server/db/
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
 

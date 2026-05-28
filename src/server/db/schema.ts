@@ -25,7 +25,6 @@ export const systemConfig = pgTable("system_config", {
   textCarpan: numeric("text_carpan", { precision: 8, scale: 4 }).notNull().default("3.0"),
   imageCarpan: numeric("image_carpan", { precision: 8, scale: 4 }).notNull().default("3.0"),
   videoCarpan: numeric("video_carpan", { precision: 8, scale: 4 }).notNull().default("3.0"),
-  textBillingRatio: numeric("text_billing_ratio", { precision: 8, scale: 4 }).notNull().default("0.9"),
   platformAdi: text("platform_adi").notNull().default("YapayZekaLab"),
   destekEmail: text("destek_email").notNull().default("destek@yapayzekalab.com"),
   paymentWhatsappNumber: text("payment_whatsapp_number").notNull().default(""),

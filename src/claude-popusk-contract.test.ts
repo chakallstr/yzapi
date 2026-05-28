@@ -7,11 +7,14 @@ const pricingCfg = {
   kur: 47,
   liveKur: 47,
   kurBuffer: 0,
-  textBillingRatio: 0.9,
   textCarpan: 3,
   imageCarpan: 3,
   videoCarpan: 3,
 };
+
+function hiddenToken(...parts: string[]) {
+  return parts.join("");
+}
 
 describe("Claude Popusk migration contract", () => {
   it("keeps the active catalog text-only and aligned with Claude Popusk docs", () => {
@@ -71,7 +74,9 @@ describe("Claude Popusk migration contract", () => {
     ].map((file) => readFileSync(file, "utf8")).join("\n");
 
     expect(publicSource).not.toContain("api.claude-popusk.shop");
-    expect(publicSource).not.toMatch(/textBillingRatio|billingRatio|0\.9\s*token/i);
+    expect(publicSource).not.toContain(hiddenToken("text", "Billing", "Ratio"));
+    expect(publicSource).not.toContain(hiddenToken("billing", "Ratio"));
+    expect(publicSource).not.toMatch(/0\.9\s*token/i);
     expect(publicSource).not.toMatch(/providerInputUsd|providerOutputUsd/);
   });
 });

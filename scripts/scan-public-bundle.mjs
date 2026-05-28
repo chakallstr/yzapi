@@ -5,15 +5,21 @@ import { join } from "node:path";
 const roots = process.argv.slice(2);
 const scanRoots = roots.length ? roots : ["dist/index.html", "dist/assets"];
 const phrase = (...parts) => parts.join("");
+const hiddenToken = (...parts) => parts.join("");
 const needles = [
   "CLOSEROUTER_API_KEY",
   "closerouter_",
   "textCarpan",
   "imageCarpan",
   "videoCarpan",
-  "textBillingRatio",
-  "billingRatio",
-  "billing ratio",
+  hiddenToken("text", "Billing", "Ratio"),
+  hiddenToken("billing", "Ratio"),
+  hiddenToken("billing ", "ratio"),
+  hiddenToken("text_", "billing_", "ratio"),
+  hiddenToken("900", "K"),
+  hiddenToken("900", "_000"),
+  hiddenToken("1M ", "internal"),
+  hiddenToken("1_000", "_000"),
   "Satış çarpanı",
   "Sağlayıcı maliyeti ×",
   "× 3.0",

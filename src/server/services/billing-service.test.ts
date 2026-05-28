@@ -30,7 +30,6 @@ vi.mock("./pricing-service.js", () => ({
     kur: 50,
     liveKur: 48,
     kurBuffer: 0.04,
-    textBillingRatio: 0.9,
     textCarpan: 3.0,
     imageCarpan: 3.0,
     videoCarpan: 3.0,

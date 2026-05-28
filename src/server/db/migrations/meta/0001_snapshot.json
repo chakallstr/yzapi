@@ -815,13 +815,6 @@
           "notNull": true,
           "default": "'3.0'"
         },
-        "text_billing_ratio": {
-          "name": "text_billing_ratio",
-          "type": "numeric(8, 4)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'0.9'"
-        },
         "platform_adi": {
           "name": "platform_adi",
           "type": "text",

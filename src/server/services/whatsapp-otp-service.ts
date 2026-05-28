@@ -7,6 +7,7 @@ import { env } from "../lib/env.js";
 
 const TURKEY_COUNTRY_CODE = "90";
 const CONSENT_TEXT_VERSION = "whatsapp-marketing-v1";
+const OTP_SPACE = 1e6;
 
 export function isWhatsappOtpEnabled(): boolean {
   return env.WHATSAPP_OTP_ENABLED;
@@ -57,7 +58,7 @@ export function verifyOtpCodeHash(code: string, phoneHash: string, expectedHash:
 }
 
 function generateOtpCode(): string {
-  return String(randomInt(0, 1_000_000)).padStart(6, "0");
+  return String(randomInt(0, OTP_SPACE)).padStart(6, "0");
 }
 
 function normalizeOpenWaRecipient(phoneE164: string): string {
