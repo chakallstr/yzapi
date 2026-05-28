@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "../db/client.js";
 import { users, apiKeys, usageRecords } from "../db/schema.js";
 import { eq, and, desc } from "drizzle-orm";
-import { encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
+import { decryptApiKey, encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
 import { writeAudit } from "../services/audit-service.js";
 import { getWhatsappVerificationSummary } from "../services/whatsapp-otp-service.js";
 
@@ -28,6 +28,7 @@ router.get("/api-keys", async (req, res, next) => {
         id: apiKeys.id,
         ad: apiKeys.ad,
         maskedKey: apiKeys.maskedKey,
+        fullKeyCipher: apiKeys.fullKeyCipher,
         prefix: apiKeys.prefix,
         olusturma: apiKeys.olusturma,
         sonKullanim: apiKeys.sonKullanim,
@@ -35,7 +36,16 @@ router.get("/api-keys", async (req, res, next) => {
       })
       .from(apiKeys)
       .where(and(eq(apiKeys.userId, req.user!.id), eq(apiKeys.aktif, true)));
-    res.json(rows);
+    res.json(rows.map((row) => ({
+      id: row.id,
+      ad: row.ad,
+      maskedKey: row.maskedKey,
+      fullKey: decryptApiKey(row.fullKeyCipher) ?? null,
+      prefix: row.prefix,
+      olusturma: row.olusturma,
+      sonKullanim: row.sonKullanim,
+      aktif: row.aktif,
+    })));
   } catch (e) { next(e); }
 });
 

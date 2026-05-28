@@ -354,6 +354,10 @@ export async function getOrCreateTelegramApiKey(userId: string): Promise<{ creat
 
   if (existing.length) {
     const fullKey = decryptApiKey(existing[0].fullKeyCipher) ?? undefined;
+    if (!fullKey) {
+      await revokeActiveTelegramApiKeys(userId);
+      return createTelegramApiKeyForUser(userId, "telegram-recovery");
+    }
     return {
       created: false,
       maskedKey: existing[0].maskedKey,

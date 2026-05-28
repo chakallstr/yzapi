@@ -647,7 +647,7 @@ const AdminApiKeys = ({ apiKeys, users, token, refresh }) => {
         {apiKeys.length === 0 ? <div style={{ padding: 16 }}><EmptyState>API anahtarı yok.</EmptyState></div> : apiKeys.map((k, i) => (
           <div key={k.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) minmax(180px, 1fr) 110px 90px 90px', gap: 12, padding: '12px 16px', borderBottom: i < apiKeys.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center', fontSize: 12, minWidth: 780 }}>
             <span style={{ fontWeight: 600 }}>{k.ad}</span>
-            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }}>{k.maskedKey}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }}>{k.fullKey || 'Eski key raw saklanmadi.'}</span>
             <Chip tone={k.kind === 'sandbox' ? 'ok' : 'neutral'}>{k.kind || 'live'}</Chip>
             <Chip tone={k.aktif ? 'ok' : 'neutral'}>{k.aktif ? 'aktif' : 'pasif'}</Chip>
             <button onClick={() => revoke(k)} disabled={!k.aktif} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid #fecaca', color: '#b91c1c', fontSize: 11, opacity: k.aktif ? 1 : 0.5 }}>Revoke</button>

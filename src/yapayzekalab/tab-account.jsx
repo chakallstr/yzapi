@@ -57,7 +57,8 @@ const shortDate = (value) => {
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 };
-const maskedKeyText = (key) => key?.maskedKey || (key?.prefix ? `${key.prefix}_••••••••••••` : '—');
+const rawKeyText = (key) => key?.fullKey || key?.key || '';
+const rawKeyOrMessage = (key) => rawKeyText(key) || 'Eski key raw saklanmadi. Yeni key uret.';
 const buildWhatsAppPaymentLink = (paymentInstruction) => {
   const url = paymentInstruction?.whatsapp?.whatsappUrl;
   if (url) return url;
@@ -156,9 +157,9 @@ const SandboxKeyCard = ({ sandboxKey, sandboxFullKey, onCreate, busy }) => {
       ) : (
         <div className="fade-in" style={{ padding: 12, borderRadius: 9, background: 'var(--surface)', border: '1px dashed #a7f3d0', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: '#047857', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {sandboxFullKey || maskedKeyText(sandboxKey)}
+            {sandboxFullKey || rawKeyOrMessage(sandboxKey)}
           </span>
-          <button onClick={() => navigator.clipboard?.writeText(sandboxFullKey || sandboxKey?.maskedKey || '')} style={{ color: '#047857', padding: 4 }}><I.Copy size={12} stroke="#047857" /></button>
+          <button onClick={() => navigator.clipboard?.writeText(sandboxFullKey || rawKeyText(sandboxKey) || '')} style={{ color: '#047857', padding: 4 }}><I.Copy size={12} stroke="#047857" /></button>
         </div>
       )}
       <div style={{ display: 'flex', gap: 16, marginTop: 14, fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
@@ -431,7 +432,6 @@ const AccountTab = ({ ctx }) => {
   const [showNewKey, setShowNewKey] = useState(false);
   const [newKey, setNewKey] = useState('');
   const [keyName, setKeyName] = useState('production-key');
-  const [revealKey, setRevealKey] = useState({});
   const [panelError, setPanelError] = useState('');
   const [panelBusy, setPanelBusy] = useState(false);
   const [me, setMe] = useState(null);
@@ -888,7 +888,7 @@ const AccountTab = ({ ctx }) => {
           <div>
             <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: -0.2 }}>API anahtarları</div>
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
-              Authorization: Bearer <span style={{ fontFamily: 'var(--font-mono)' }}>yzk_live_…</span>
+              Authorization: Bearer <span style={{ fontFamily: 'var(--font-mono)' }}>yzk_live_senin_gercek_anahtarin</span>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -929,12 +929,9 @@ const AccountTab = ({ ctx }) => {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {revealKey[k.id] ? maskedKeyText(k) : maskedKeyText(k)}
+                  {rawKeyOrMessage(k)}
                 </span>
-                <button onClick={() => setRevealKey(s => ({ ...s, [k.id]: !s[k.id] }))} style={{ color: 'var(--ink-3)', padding: 2 }}>
-                  {revealKey[k.id] ? <I.Close size={11} stroke="var(--ink-3)" /> : <I.Sparkle size={11} stroke="var(--ink-3)" />}
-                </button>
-                <button onClick={() => navigator.clipboard?.writeText(k.maskedKey || k.prefix || '')} style={{ color: 'var(--ink-3)', padding: 2 }} title="Kopyala">
+                <button onClick={() => navigator.clipboard?.writeText(rawKeyText(k) || '')} style={{ color: 'var(--ink-3)', padding: 2 }} title="Kopyala">
                   <I.Copy size={11} stroke="var(--ink-3)" />
                 </button>
               </div>
