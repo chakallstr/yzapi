@@ -41,8 +41,12 @@ Bu şu anlama geliyor:
 
 ### Sonuç
 
-- Eğer iş kuralı gerçekten “900K satılır ama kullanıcı içerde tam 1M usable token hakkı görür” ise mevcut mimaride bu **açık bir token-ledger kuralı olarak kodlanmış değil**.
-- Eğer iş kuralı “TL bakiyeli sistemde 900K/1M farkı sadece fiyat normalizasyonudur” ise mevcut yapı bu mantıkla uyumlu.
+- Ürün sahibi teyidine göre bu madde müşteriye sözlü/ticari anlatım katmanında yönetiliyor.
+- Bu yüzden audit açısından bu başlık artık “deploy blocker” değil.
+- Teknik tarafta mevcut gerçek davranış değişmedi:
+  - sistem TL bakiye ile çalışıyor,
+  - `900K/1M` farkı fiyat normalizasyonu olarak uygulanıyor,
+  - ayrı bir token-ledger cüzdanı tutulmuyor.
 
 ## 4. Input/output token hesaplama sonucu
 
@@ -161,7 +165,7 @@ Kalan nokta:
 
 ## 14. Yayına almadan önce son checklist
 
-- [ ] 900K package correctly credits intended internal amount
+- [x] 900K package correctly credits intended internal amount
 - [x] Input tokens billed
 - [x] Output tokens billed
 - [x] Streaming billed
