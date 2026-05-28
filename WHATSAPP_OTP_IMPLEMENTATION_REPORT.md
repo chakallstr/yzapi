@@ -52,11 +52,22 @@ Implemented Google-afterflow WhatsApp OTP for YapayZekaLab without changing the 
 - Production build: passed.
 - Public bundle scan: passed, no OpenWA secret hits.
 - Secret scan: passed, no hits.
+- GitHub backup: pushed commit `201b932`.
+- Live deploy: completed behind feature flag with `WHATSAPP_OTP_ENABLED=false`.
+- Live migration check: `whatsapp_otp_requests` and `whatsapp_verified_numbers` exist.
+- Live smoke: `/health`, `/status`, `/api/models`, JSON 404 and unauthenticated `/v1/chat/completions` checks passed.
+- Live UAT smoke: 10 passed, 0 failed.
+- Live OTP safety check: `/api/auth/whatsapp-otp/start` returns 503 while feature flag is disabled.
 
 ## Remaining Deploy Requirements
 
-- Apply migration `0008_whatsapp_otp.sql` on VPS.
 - Configure server-only OpenWA env values.
 - Run a live OTP send to a test number.
 - Verify Google login pending-token redirect, OTP verify, `/api/user/me` allowed after OTP and blocked before OTP.
 - Keep `WHATSAPP_OTP_ENABLED=false` until the live OpenWA send path is verified.
+
+## Live Rollback
+
+- Deploy manifest: `/opt/turkapiprojesi/.deploy/releases/manual-20260528T131417Z-201b932.json`
+- Dist rollback: `/opt/turkapiprojesi/.deploy/rollback-manual-20260528T131417Z-201b932.sh`
+- DB backup: `/opt/turkapiprojesi/.deploy/db-backups/manual-20260528T131417Z-201b932.dump`

@@ -2482,7 +2482,7 @@ Agent 3 reason: Visual lock is preserved and secrets remain server-side; deploy 
 Approval count: 3/3
 Final decision: APPROVED
 Allowed next action: Implement and verify locally; do not mark production OTP live until OpenWA credentials and migration are applied on VPS.
-Status: COMPLETED_LOCAL_VERIFICATION_PENDING_DEPLOY
+Status: COMPLETED_DEPLOYED_WITH_OTP_FLAG_DISABLED
 
 Agent 4 integrity guard: APPROVE_WITH_LIMITATION
 Agent 4 reason: Written integrity gate confirms backend-only risk isolation plus same-theme frontend overlay; no real external agent quorum was spawned in this environment.
