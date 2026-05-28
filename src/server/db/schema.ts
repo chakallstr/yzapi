@@ -129,6 +129,7 @@ export const apiKeys = pgTable(
     ad: text("ad").notNull(),
     maskedKey: text("masked_key").notNull(),
     keyHash: text("key_hash"),
+    fullKeyCipher: text("full_key_cipher"),
     prefix: text("prefix").notNull().default(""),
     olusturma: timestamp("olusturma", { withTimezone: true }).notNull().default(sql`now()`),
     sonKullanim: timestamp("son_kullanim", { withTimezone: true }),

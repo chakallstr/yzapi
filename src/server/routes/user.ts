@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "../db/client.js";
 import { users, apiKeys, usageRecords } from "../db/schema.js";
 import { eq, and, desc } from "drizzle-orm";
-import { generateApiKey, hashApiKey } from "../services/api-key-service.js";
+import { encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
 import { writeAudit } from "../services/audit-service.js";
 import { getWhatsappVerificationSummary } from "../services/whatsapp-otp-service.js";
 
@@ -89,12 +89,14 @@ router.post("/api-keys", async (req, res, next) => {
 
     const { fullKey, prefix, maskedKey } = generateApiKey();
     const keyHash = await hashApiKey(fullKey);
+    const fullKeyCipher = encryptApiKey(fullKey);
 
     const inserted = await db.insert(apiKeys).values({
       userId: req.user!.id,
       ad: ad.trim(),
       maskedKey,
       keyHash,
+      fullKeyCipher,
       prefix,
     }).returning();
 

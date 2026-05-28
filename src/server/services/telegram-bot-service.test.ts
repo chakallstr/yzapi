@@ -60,17 +60,55 @@ describe("telegram-bot-service pure helpers", () => {
     });
     const existing = formatApiDeliveryMessage({
       balanceTL: 455.5,
+      fullKey: "yzk_live_existing_secret",
       maskedKey: "yzk_live_sec...cret",
       created: false,
+    });
+    const rotated = formatApiDeliveryMessage({
+      balanceTL: 455.5,
+      fullKey: "yzk_live_rotated_secret",
+      maskedKey: "yzk_live_rot...cret",
+      created: true,
+      rotated: true,
     });
 
     expect(created).toContain("yzk_live_secret");
     expect(created).toContain("<code>yzk_live_secret</code>");
-    expect(existing).not.toContain("yzk_live_secret");
-    expect(existing).toContain("yzk_live_sec...cret");
-    expect(existing).toContain("<code>yzk_live_sec...cret</code>");
-    expect(existing).toContain("Değiştir");
+    expect(existing).toContain("yzk_live_existing_secret");
+    expect(existing).toContain("<code>yzk_live_existing_secret</code>");
+    expect(rotated).toContain("Eski key iptal edildi");
     expect(created).toContain("kopyala");
     expect(created).not.toMatch(/hash|provider|900k|secret path/i);
+  });
+
+  it("formats Telegram usage with current balance and recent requests", async () => {
+    const { formatTelegramUsageMessage } = await import("./telegram-bot-service.js");
+
+    const message = formatTelegramUsageMessage({
+      balanceTL: 93.5,
+      usageItems: [
+        {
+          modelId: "claude-haiku-4-5",
+          costTL: 2.25,
+          remainingTL: 93.5,
+          status: "success",
+          timestamp: new Date("2026-05-28T14:10:00.000Z"),
+        },
+        {
+          modelId: "gpt-4o-mini",
+          costTL: 0,
+          remainingTL: 95.75,
+          status: "error",
+          timestamp: new Date("2026-05-28T14:08:00.000Z"),
+        },
+      ],
+    });
+
+    expect(message).toContain("Güncel bakiyen: 93.50 TL");
+    expect(message).toContain("claude-haiku-4-5");
+    expect(message).toContain("-2.25 TL");
+    expect(message).toContain("Kalan: 93.50 TL");
+    expect(message).toContain("gpt-4o-mini");
+    expect(message).toContain("Başarısız");
   });
 });

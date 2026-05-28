@@ -1,8 +1,9 @@
 import bcrypt from "bcrypt";
-import { randomBytes } from "crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 import { db } from "../db/client.js";
 import { apiKeys, users } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
+import { env } from "../lib/env.js";
 
 export interface GeneratedApiKey {
   fullKey: string;
@@ -20,6 +21,40 @@ export function generateApiKey(): GeneratedApiKey {
 
 export async function hashApiKey(fullKey: string): Promise<string> {
   return bcrypt.hash(fullKey, 10);
+}
+
+function apiKeyEncryptionKey(): Buffer {
+  return createHash("sha256").update(env.API_KEY_ENCRYPTION_SECRET || env.JWT_SECRET).digest();
+}
+
+export function encryptApiKey(fullKey: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", apiKeyEncryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(fullKey, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `v1.${iv.toString("base64url")}.${tag.toString("base64url")}.${encrypted.toString("base64url")}`;
+}
+
+export function decryptApiKey(payload?: string | null): string | null {
+  if (!payload) return null;
+  const [version, ivEncoded, tagEncoded, encryptedEncoded] = payload.split(".");
+  if (version !== "v1" || !ivEncoded || !tagEncoded || !encryptedEncoded) return null;
+
+  try {
+    const decipher = createDecipheriv(
+      "aes-256-gcm",
+      apiKeyEncryptionKey(),
+      Buffer.from(ivEncoded, "base64url"),
+    );
+    decipher.setAuthTag(Buffer.from(tagEncoded, "base64url"));
+    const decrypted = Buffer.concat([
+      decipher.update(Buffer.from(encryptedEncoded, "base64url")),
+      decipher.final(),
+    ]);
+    return decrypted.toString("utf8");
+  } catch {
+    return null;
+  }
 }
 
 export interface ValidatedKey {

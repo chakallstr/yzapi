@@ -1,9 +1,9 @@
 import { createHash, randomBytes } from "crypto";
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
-import { apiKeys, telegramAccounts, telegramDeliveries, telegramLinkCodes, users } from "../db/schema.js";
+import { apiKeys, telegramAccounts, telegramDeliveries, telegramLinkCodes, usageRecords, users } from "../db/schema.js";
 import { env } from "../lib/env.js";
-import { generateApiKey, hashApiKey } from "./api-key-service.js";
+import { decryptApiKey, encryptApiKey, generateApiKey, hashApiKey } from "./api-key-service.js";
 
 const TELEGRAM_API_BASE = "https://api.telegram.org";
 const LINK_CODE_TTL_MS = 15 * 60 * 1000;
@@ -27,6 +27,17 @@ export interface ApiDeliveryMessageInput {
   fullKey?: string;
   created: boolean;
   rotated?: boolean;
+}
+
+export interface TelegramUsageMessageInput {
+  balanceTL: number;
+  usageItems: Array<{
+    modelId: string;
+    costTL: number;
+    remainingTL: number | null;
+    status: string;
+    timestamp: Date | string;
+  }>;
 }
 
 export interface TelegramMessageEditInput {
@@ -109,9 +120,9 @@ export function buildTelegramApiKeyMenu() {
 }
 
 export function formatApiDeliveryMessage(input: ApiDeliveryMessageInput): string {
-  const visibleKey = input.created && input.fullKey ? input.fullKey : input.maskedKey;
+  const visibleKey = input.fullKey ?? input.maskedKey;
   const lines = [
-    input.rotated ? "Yeni API key hazır. Eski key kapanmadı:" : input.created ? "API erişimin hazır. Bu anahtar tek sefer tam gösterilir:" : "Aktif API anahtarın:",
+    input.rotated ? "Yeni API key hazır. Eski key iptal edildi:" : input.created ? "API erişimin hazır:" : "Aktif API anahtarın:",
     `<code>${escapeTelegramHtml(visibleKey)}</code>`,
     "",
     `Bakiye: ${input.balanceTL.toFixed(2)} TL`,
@@ -120,15 +131,46 @@ export function formatApiDeliveryMessage(input: ApiDeliveryMessageInput): string
 
   if (input.created) {
     lines.push("kopyala: Yukarıdaki kod alanına basılı tut.");
-    lines.push("Anahtarı güvenli sakla; panelde daha sonra sadece maskeli görünür.");
+    lines.push("Anahtarı güvenli sakla.");
   } else {
-    lines.push("Tam key güvenlik için saklanmaz. Değiştir yeni key üretir, eski key kapanmaz.");
+    lines.push(input.fullKey
+      ? "Değiştir mevcut key'i iptal eder ve yenisini üretir."
+      : "Bu eski key'in tam hali saklanmıyor. Değiştir mevcut key'i iptal eder ve yenisini üretir.");
   }
   return lines.join("\n");
 }
 
 export function formatBalanceMessage(balanceTL: number): string {
   return `Güncel bakiyen: ${balanceTL.toFixed(2)} TL`;
+}
+
+function formatTelegramUsageTimestamp(value: Date | string): string {
+  const date = value instanceof Date ? value : new Date(value);
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+export function formatTelegramUsageMessage(input: TelegramUsageMessageInput): string {
+  const lines = [`Güncel bakiyen: ${input.balanceTL.toFixed(2)} TL`, ""];
+
+  if (!input.usageItems.length) {
+    lines.push("Henüz kullanım kaydı yok.");
+    return lines.join("\n");
+  }
+
+  lines.push("Son kullanım:");
+  for (const [index, item] of input.usageItems.entries()) {
+    lines.push(
+      `${index + 1}. ${item.modelId} · -${item.costTL.toFixed(2)} TL · ${item.status === "success" ? "Başarılı" : "Başarısız"}`,
+    );
+    lines.push(`Kalan: ${(item.remainingTL ?? input.balanceTL).toFixed(2)} TL · ${formatTelegramUsageTimestamp(item.timestamp)}`);
+  }
+
+  return lines.join("\n");
 }
 
 export async function sendTelegramMessage(
@@ -281,11 +323,13 @@ export async function getUserBalanceTL(userId: string): Promise<number> {
 async function createTelegramApiKeyForUser(userId: string, name: string): Promise<{ created: true; maskedKey: string; fullKey: string; apiKeyId: string }> {
   const { fullKey, prefix, maskedKey } = generateApiKey();
   const keyHash = await hashApiKey(fullKey);
+  const fullKeyCipher = encryptApiKey(fullKey);
   const inserted = await db.insert(apiKeys).values({
     userId,
     ad: name,
     maskedKey,
     keyHash,
+    fullKeyCipher,
     prefix,
   }).returning({ id: apiKeys.id });
 
@@ -297,18 +341,55 @@ async function createTelegramApiKeyForUser(userId: string, name: string): Promis
   return { created: true, maskedKey, fullKey, apiKeyId: inserted[0].id };
 }
 
+async function revokeActiveTelegramApiKeys(userId: string): Promise<void> {
+  await db.update(apiKeys).set({ aktif: false }).where(and(eq(apiKeys.userId, userId), eq(apiKeys.aktif, true)));
+}
+
 export async function getOrCreateTelegramApiKey(userId: string): Promise<{ created: boolean; maskedKey: string; fullKey?: string; apiKeyId: string }> {
   const existing = await db
-    .select({ id: apiKeys.id, maskedKey: apiKeys.maskedKey })
+    .select({ id: apiKeys.id, maskedKey: apiKeys.maskedKey, fullKeyCipher: apiKeys.fullKeyCipher })
     .from(apiKeys)
     .where(and(eq(apiKeys.userId, userId), eq(apiKeys.aktif, true)))
     .limit(1);
 
   if (existing.length) {
-    return { created: false, maskedKey: existing[0].maskedKey, apiKeyId: existing[0].id };
+    const fullKey = decryptApiKey(existing[0].fullKeyCipher) ?? undefined;
+    return {
+      created: false,
+      maskedKey: existing[0].maskedKey,
+      fullKey,
+      apiKeyId: existing[0].id,
+    };
   }
 
   return createTelegramApiKeyForUser(userId, "telegram-delivery");
+}
+
+export async function getTelegramUsageMessage(userId: string): Promise<string> {
+  const balanceTL = await getUserBalanceTL(userId);
+  const rows = await db
+    .select({
+      modelId: usageRecords.modelId,
+      costTL: usageRecords.costTL,
+      remainingTL: usageRecords.remainingTL,
+      status: usageRecords.status,
+      timestamp: usageRecords.timestamp,
+    })
+    .from(usageRecords)
+    .where(eq(usageRecords.userId, userId))
+    .orderBy(desc(usageRecords.timestamp))
+    .limit(5);
+
+  return formatTelegramUsageMessage({
+    balanceTL,
+    usageItems: rows.map((row) => ({
+      modelId: row.modelId,
+      costTL: Number(row.costTL),
+      remainingTL: row.remainingTL === null ? null : Number(row.remainingTL),
+      status: row.status,
+      timestamp: row.timestamp,
+    })),
+  });
 }
 
 async function existingPaymentDelivery(paymentId?: string): Promise<{ id: string; status: string } | null> {
@@ -336,9 +417,13 @@ export async function deliverApiAccessToTelegramUser(opts: {
     return { delivered: true, alreadyDelivered: true };
   }
 
-  const key = opts.forceNewKey
-    ? await createTelegramApiKeyForUser(opts.userId, "telegram-change")
-    : await getOrCreateTelegramApiKey(opts.userId);
+  let key: Awaited<ReturnType<typeof getOrCreateTelegramApiKey>>;
+  if (opts.forceNewKey) {
+    await revokeActiveTelegramApiKeys(opts.userId);
+    key = await createTelegramApiKeyForUser(opts.userId, "telegram-change");
+  } else {
+    key = await getOrCreateTelegramApiKey(opts.userId);
+  }
   const balanceTL = await getUserBalanceTL(opts.userId);
   const message = formatApiDeliveryMessage({
     balanceTL,

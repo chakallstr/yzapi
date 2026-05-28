@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   createCryptoPayInvoice: vi.fn(),
   upsertTelegramAccount: vi.fn(),
   getUserBalanceTL: vi.fn(),
+  getTelegramUsageMessage: vi.fn(),
   deliverApiAccessToTelegramUser: vi.fn(),
   answerTelegramCallback: vi.fn(),
   editTelegramMessageText: vi.fn(),
@@ -97,6 +98,7 @@ vi.mock("../services/telegram-bot-service.js", () => ({
   editTelegramMessageText: mocks.editTelegramMessageText,
   formatBalanceMessage: vi.fn((balance: number) => `Güncel bakiyen: ${balance.toFixed(2)} TL`),
   getUserBalanceTL: mocks.getUserBalanceTL,
+  getTelegramUsageMessage: mocks.getTelegramUsageMessage,
   parseTelegramCommand: vi.fn(() => ({ type: "menu" })),
   sendTelegramMessage: mocks.sendTelegramMessage,
   upsertTelegramAccount: mocks.upsertTelegramAccount,
@@ -163,6 +165,7 @@ beforeEach(() => {
     telegramAccountId: "telegram_account_test_1",
   });
   mocks.getUserBalanceTL.mockResolvedValue(123.45);
+  mocks.getTelegramUsageMessage.mockResolvedValue("Güncel bakiyen: 123.45 TL\n\nSon kullanım:\n1. claude-haiku-4-5 · -2.25 TL");
   mocks.deliverApiAccessToTelegramUser.mockResolvedValue({ delivered: true, alreadyDelivered: false });
   mocks.createCryptoPayInvoice.mockResolvedValue({
     invoiceId: "invoice_test_1",
@@ -341,7 +344,7 @@ describe("telegram WebApp route contract", () => {
     }
   });
 
-  it("lets Telegram users create a fresh copyable API key without revoking the old one", async () => {
+  it("lets Telegram users rotate their API key directly from Telegram", async () => {
     const { baseUrl, server } = await createTelegramTestServer();
     try {
       const response = await fetch(`${baseUrl}/api/telegram/webhook`, {
@@ -364,6 +367,61 @@ describe("telegram WebApp route contract", () => {
         chatId: 7075241777,
         forceNewKey: true,
       });
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  it("shows the current balance again when the user returns to the main menu", async () => {
+    mocks.getUserBalanceTL.mockResolvedValueOnce(278.9);
+    const { baseUrl, server } = await createTelegramTestServer();
+    try {
+      const response = await fetch(`${baseUrl}/api/telegram/webhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          callback_query: {
+            id: "callback_menu",
+            data: "tg:menu",
+            from: { id: 7075241777, first_name: "Sesli" },
+            message: { message_id: 45, chat: { id: 7075241777 } },
+          },
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mocks.getUserBalanceTL).toHaveBeenCalledWith("user_test_1");
+      expect(mocks.editTelegramMessageText).toHaveBeenCalledWith(expect.objectContaining({
+        text: expect.stringContaining("Güncel bakiyen: 278.90 TL"),
+      }));
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  it("sends current balance and usage history for usage callbacks", async () => {
+    const { baseUrl, server } = await createTelegramTestServer();
+    try {
+      const response = await fetch(`${baseUrl}/api/telegram/webhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          callback_query: {
+            id: "callback_usage",
+            data: "tg:usage",
+            from: { id: 7075241777, first_name: "Sesli" },
+            message: { message_id: 44, chat: { id: 7075241777 } },
+          },
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mocks.getTelegramUsageMessage).toHaveBeenCalledWith("user_test_1");
+      expect(mocks.sendTelegramMessage).toHaveBeenCalledWith(
+        7075241777,
+        expect.stringContaining("Güncel bakiyen: 123.45 TL"),
+        expect.anything(),
+      );
     } finally {
       await closeServer(server);
     }

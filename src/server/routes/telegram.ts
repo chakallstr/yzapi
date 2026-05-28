@@ -25,6 +25,7 @@ import {
   editTelegramMessageText,
   formatBalanceMessage,
   getUserBalanceTL,
+  getTelegramUsageMessage,
   parseTelegramCommand,
   sendTelegramMessage,
   upsertTelegramAccount,
@@ -206,10 +207,11 @@ async function createTelegramTopup(userId: string, telegramId: string, amountUsd
 async function handleTopup(chatId: string | number, actor: TelegramActor, amountUsd: number): Promise<void> {
   const account = await upsertTelegramAccount(actor);
   const topup = await createTelegramTopup(account.userId, String(actor.id), amountUsd);
+  const balanceTL = await getUserBalanceTL(account.userId);
 
   await sendTelegramMessage(
     chatId,
-    `${topup.quote.amountUsd.toFixed(2)} USD bakiye yükleme invoice hazır.\nÖdeme sonrası API erişimi otomatik teslim edilir.`,
+    `${formatBalanceMessage(balanceTL)}\n${topup.quote.amountUsd.toFixed(2)} USD bakiye yükleme invoice hazır.\nÖdeme sonrası API erişimi otomatik teslim edilir.`,
     {
       inline_keyboard: [
         [{ text: "Crypto Bot ile öde", url: topup.invoice.payUrl }],
@@ -265,16 +267,18 @@ async function handleTelegramCallback(update: TelegramMessageUpdate): Promise<vo
   await answerTelegramCallback(callback.id);
   const chatId = callback.message?.chat.id ?? callback.from.id;
   const data = callback.data ?? "";
+  const account = await upsertTelegramAccount(callback.from);
+  const balance = await getUserBalanceTL(account.userId);
 
   if (data === "tg:topup:panel") {
-    const text = "Yükleme paneli hazır.\nUSD miktarını kendin seçebilir, Crypto Bot invoice alabilirsin.";
+    const text = `${formatBalanceMessage(balance)}\nYükleme paneli hazır.\nUSD miktarını kendin seçebilir, Crypto Bot invoice alabilirsin.`;
     const replyMarkup = buildTelegramTopupPanelMenu(telegramTopupWebAppUrl());
     await editOrSendTelegramMessage({ chatId, messageId: callback.message?.message_id, text, replyMarkup });
     return;
   }
 
   if (data === "tg:menu") {
-    const text = "Menü";
+    const text = `Menü\n${formatBalanceMessage(balance)}`;
     const replyMarkup = buildTelegramMainMenu();
     await editOrSendTelegramMessage({ chatId, messageId: callback.message?.message_id, text, replyMarkup });
     return;
@@ -285,10 +289,7 @@ async function handleTelegramCallback(update: TelegramMessageUpdate): Promise<vo
     return;
   }
 
-  const account = await upsertTelegramAccount(callback.from);
-
   if (data === "tg:balance") {
-    const balance = await getUserBalanceTL(account.userId);
     await sendTelegramMessage(chatId, formatBalanceMessage(balance), buildTelegramMainMenu());
     return;
   }
@@ -313,12 +314,12 @@ async function handleTelegramCallback(update: TelegramMessageUpdate): Promise<vo
   }
 
   if (data === "tg:usage") {
-    await sendTelegramMessage(chatId, `${env.APP_BASE_URL}/?tab=activity üzerinden kullanım geçmişini görebilirsin.`, buildTelegramMainMenu());
+    await sendTelegramMessage(chatId, await getTelegramUsageMessage(account.userId), buildTelegramMainMenu());
     return;
   }
 
   if (data === "tg:support") {
-    await sendTelegramMessage(chatId, env.TELEGRAM_SUPPORT_URL || "Destek: destek@yapayzekalab.com", buildTelegramMainMenu());
+    await sendTelegramMessage(chatId, `${formatBalanceMessage(balance)}\n${env.TELEGRAM_SUPPORT_URL || "Destek: destek@yapayzekalab.com"}`, buildTelegramMainMenu());
     return;
   }
 

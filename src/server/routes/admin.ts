@@ -16,7 +16,7 @@ import {
 import { writeAudit } from "../services/audit-service.js";
 import { refreshKur } from "../services/kur-service.js";
 import { getReconciliationReport } from "../services/reconciliation-service.js";
-import { generateApiKey, hashApiKey } from "../services/api-key-service.js";
+import { encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
 
 const router = Router();
 
@@ -555,6 +555,7 @@ router.post("/api-keys/:userId/create", async (req, res, next) => {
     const { ad } = req.body as { ad: string };
     const { fullKey, prefix, maskedKey } = generateApiKey();
     const keyHash = await hashApiKey(fullKey);
+    const fullKeyCipher = encryptApiKey(fullKey);
 
     const userRows = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
     if (!userRows.length) return res.status(404).json({ error: "Kullanıcı bulunamadı" });
@@ -564,6 +565,7 @@ router.post("/api-keys/:userId/create", async (req, res, next) => {
       ad: ad || "yeni-key",
       maskedKey,
       keyHash,
+      fullKeyCipher,
       prefix,
       aktif: true,
     }).returning();
