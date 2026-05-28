@@ -8,6 +8,16 @@ const getTelegramWebApp = () => {
   return window.Telegram?.WebApp || null;
 };
 
+const getTelegramInitData = () => {
+  const app = getTelegramWebApp();
+  if (app?.initData) return app.initData;
+  if (typeof window === 'undefined') return '';
+
+  const search = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  return hash.get('tgWebAppData') || search.get('tgWebAppData') || '';
+};
+
 async function telegramFetch(path, initData, options = {}) {
   const response = await fetch(path, {
     ...options,
@@ -39,7 +49,7 @@ export default function TelegramTopupApp() {
     app?.setHeaderColor?.('#10231d');
     app?.setBackgroundColor?.('#10231d');
 
-    const signedInitData = app?.initData || '';
+    const signedInitData = getTelegramInitData();
     setInitData(signedInitData);
     if (!signedInitData) {
       setError('Bu panel Telegram içinden açılmalı.');
