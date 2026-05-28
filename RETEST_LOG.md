@@ -1139,3 +1139,81 @@ Approval count: 3/3
 Final retest status: ACCEPTED_LOCAL_PROVIDER_KEY_CHAT_MESSAGES_PASS
 
 Agent 4 integrity guard: NOT_RUN_AGENT_THREAD_LIMIT
+
+## LIVE-DEPLOY-CLAUDE-POPUSK-001 Rollbackable Live Deploy Retest
+
+Bug ID: R-BUG-001, R-BUG-004, R-BUG-006, PAYMENT-INSTRUCTIONS-001
+Fix decision ID: DEC-DEPLOY-LIVE-CLAUDE-POPUSK-001
+Retest decision ID: DEC-RETEST-LIVE-DEPLOY-CLAUDE-POPUSK-001
+Command or manual flow:
+- Committed and pushed `b920f70` to `origin/phase/release-vps-beta`.
+- Created VPS backup: `/opt/turkapiprojesi/.deploy/backups/manual-20260528T123133Z-b920f70`.
+- Created rollback script: `/opt/turkapiprojesi/.deploy/rollback-manual-20260528T123133Z-b920f70.sh`.
+- Uploaded current `dist`, package files and restarted `turkapiprojesi.service`.
+- Applied migrations from deployed `dist/server/db/migrations`.
+- Ran live smoke with expected 42 models.
+- Ran live UAT smoke.
+- Ran live funded/low-balance temporary-key billing smoke and cleaned test data.
+Expected:
+- Live app serves the 42-model Claude Popusk catalog.
+- Public/API smoke remains healthy.
+- Funded text gateway request returns billing headers, usage row, transaction row and balance decrement.
+- Low-balance key returns 402.
+- Temporary live test data is removed.
+Actual:
+- Service active on configured `PORT=4568`.
+- Public `/health` and `/status` healthy; `/status` model count `42`.
+- `/api/models` and `/v1/models` return `42`.
+- `npm run smoke:vps` against live PASS.
+- `npm run qa:uat` against live PASS: 10/10.
+- Funded temporary key returned `200`; billing headers present; `usage_records` success; transaction created; balance `100.0000` -> `99.9035`.
+- Low-balance temporary key returned `402`; no usage rows for low-balance key.
+- Temporary test users cleanup: `0` remaining.
+Passed/Failed: Passed.
+Evidence: Current session command outputs and live HTTP checks.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: ACCEPTED_LIVE_DEPLOY_CORE_API_BILLING_PASS
+
+Agent 4 integrity guard: APPROVE_WITH_LIMITATION
+Agent 4 reason: Rollback, GitHub backup, live smoke/UAT and funded billing evidence are present. Actual spawned Ruflo agent quorum was unavailable, so this is a written role gate.
+
+## LIVE-LOG-REDACTION-001 Sensitive Header Log Redaction Retest
+
+Bug ID: SECURITY-LOG-AUTHORIZATION-001
+Fix decision ID: DEC-FIX-LOG-REDACTION-001
+Retest decision ID: DEC-RETEST-LIVE-LOG-REDACTION-001
+Command or manual flow:
+- Added logger redaction paths for Authorization, cookies, API key, token and payment signature fields.
+- Added `src/server/lib/logger-redaction.test.ts`.
+- Ran target test, full tests, lint, build, public scan and secret scan.
+- Committed and pushed `a079c56`.
+- Created VPS backup: `/opt/turkapiprojesi/.deploy/backups/manual-20260528T123831Z-a079c56`.
+- Created rollback script: `/opt/turkapiprojesi/.deploy/rollback-manual-20260528T123831Z-a079c56.sh`.
+- Deployed redaction build and restarted service.
+- Sent Authorization probe and checked journal since the probe.
+- Re-ran live funded billing smoke and checked journal after the funded call.
+Expected:
+- Raw `Bearer yzk_live_*` values must not appear in request logs.
+- Redaction marker should appear instead.
+- Core live smoke and funded billing continue to pass.
+Actual:
+- Target logger redaction test PASS: 2/2.
+- Full `npm test` PASS: 34 files / 152 tests.
+- `npm run lint` PASS.
+- `npm run build` PASS.
+- `npm run scan:public` PASS.
+- `node scripts/scan-secrets.mjs` PASS: 244 scanned / 0 hits.
+- Live probe: raw Authorization absent, redaction marker present.
+- Live funded billing after redaction: `200`, billing headers present, usage success, balance decremented, low balance `402`, cleanup `0`.
+Passed/Failed: Passed for future log redaction. Historical pre-fix logs may still contain headers and should be treated as sensitive server logs.
+Evidence: Current session command outputs and journal grep checks without printing secret values.
+Agent 1 retest vote: APPROVE
+Agent 2 retest vote: APPROVE
+Agent 3 retest vote: APPROVE
+Approval count: 3/3
+Final retest status: ACCEPTED_LIVE_LOG_REDACTION_PASS
+
+Agent 4 integrity guard: APPROVE_WITH_LIMITATION

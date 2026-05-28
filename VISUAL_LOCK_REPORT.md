@@ -284,3 +284,12 @@ Visual decision: PRESERVED LOCALLY. Browser screenshot comparison and deploy-sur
 - Live UAT smoke passed 10/10 on the currently deployed bundle, but live bundle is still old catalog state with 33 models.
 
 Visual decision: PRESERVED LOCALLY. Deploy-surface parity remains pending.
+## 2026-05-28 Live Deploy Visual Lock
+
+- Frontend styling/layout/theme files were not changed during the deploy step.
+- The only post-deploy code change was logger redaction in `src/server/lib/logger.ts` plus a backend test file.
+- Live UAT smoke after deploy passed 10/10.
+- Public bundle scan remained clean.
+- Restored visual shell guard remains in the test suite.
+
+Result: No intentional or detected template/color/layout change in this deploy pass.

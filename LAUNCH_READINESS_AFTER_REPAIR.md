@@ -211,3 +211,43 @@ Still blocking launch:
 - Billing headers, balance decrement and `usage_records` for a successful live provider call remain unproven after the latest local changes.
 
 Final verdict remains: NOT READY — API/BILLING/BALANCE BLOCKERS
+
+## 2026-05-28 15:40 TRT Live Deploy and Billing Gate Update
+
+Live deployment completed with GitHub backup and rollback scripts.
+
+Deployed commits:
+
+- `b920f70` — Claude Popusk catalog/payment fixes.
+- `a079c56` — sensitive request-header log redaction.
+
+Rollback assets:
+
+- `/opt/turkapiprojesi/.deploy/rollback-manual-20260528T123133Z-b920f70.sh`
+- `/opt/turkapiprojesi/.deploy/rollback-manual-20260528T123831Z-a079c56.sh`
+
+Passed after deploy:
+
+- Live `/health`: ok.
+- Live `/status`: ok, DB ok, AI provider ok, model count `42`.
+- Live `/api/models`: `42`.
+- Live `/v1/models`: `42`.
+- Unknown `/api/*` and `/v1/*`: JSON 404.
+- Authless `/v1/chat/completions`: 401.
+- Live UAT smoke: 10/10.
+- Google OAuth start: 302 to Google with callback `https://yapayzekalab.org/api/auth/google/callback`.
+- Funded temporary API key: successful tiny text call, billing headers present, usage row success, transaction created, balance decremented.
+- Low-balance temporary API key: 402, no usage row.
+- Temporary test data cleanup: 0 remaining users.
+- Sensitive Authorization header redaction: raw `Bearer yzk_live_*` absent in new logs, redaction marker present.
+
+Remaining risks:
+
+- Historical pre-fix service logs may contain Authorization headers from requests made before `a079c56`; treat journal access as sensitive and rotate any real customer keys if they were used before the redaction deploy.
+- Google OAuth browser callback was not completed with a real account in this run; only the live redirect start was verified.
+- Shopier/Cryptomus provider E2E remains excluded by user scope for this pass.
+- Full admin browser click-through is still not a fresh post-deploy evidence item in this run.
+
+Updated verdict: READY AFTER MINOR FIXES
+
+Reason: Core live deployment, catalog parity, text API billing, low-balance behavior, log redaction, live smoke and UAT are now verified. Remaining items are operational/browser/provider-scope checks rather than the previous API/billing/balance blocker.

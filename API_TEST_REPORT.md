@@ -374,3 +374,58 @@ Reason: no safe provider/live `SMOKE_API_KEY` is present in env, and no provider
 - `npm run build` PASS.
 - `npm run scan:public` PASS, 0 hits.
 - `node scripts/scan-secrets.mjs` PASS, 0 hits.
+
+---
+
+# Live Gateway Billing Verification After Deploy — 2026-05-28 15:40 TRT
+
+## Scope
+
+- Live VPS deploy target: `/opt/turkapiprojesi`.
+- GitHub backup branch: `phase/release-vps-beta`.
+- Deployed commits:
+  - `b920f70` Claude Popusk catalog/payment fixes.
+  - `a079c56` sensitive request-header log redaction.
+- Real payment providers were not exercised.
+- Temporary live DB users/API keys were created only for billing smoke and deleted in the same run.
+- Raw API keys and provider secrets were not written to this report.
+
+## Public/API Smoke
+
+- `SMOKE_EXPECTED_MODEL_COUNT=42 SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`: PASS.
+- `/health`: `ok`, DB `ok`.
+- `/status`: `ok`, model count `42`, AI provider `ok`.
+- `/api/models`: `42`.
+- `/v1/models`: `42`.
+- `/v1/chat/completions` without auth: `401`.
+- Unknown `/api/*` and `/v1/*`: JSON `404`.
+
+## Funded Billing E2E
+
+- Temporary funded `yzk_live_*` key: `POST /v1/chat/completions` returned `200`.
+- Model response: `gpt-5.4-mini-2026-03-17`.
+- Billing headers present:
+  - `X-YZ-Cost-TL`
+  - `X-YZ-Remaining-TL`
+  - `X-YZ-Request-Id`
+- DB `usage_records`: `success`, model `gpt-5.4-mini`.
+- DB `transactions`: usage transaction created.
+- Balance before/after: `100.0000 TL` → `99.9035 TL`.
+- Recorded cost: `0.0965 TL`.
+- Temporary test users cleanup: `0` remaining.
+
+## Low-Balance E2E
+
+- Temporary zero-balance `yzk_live_*` key: `POST /v1/chat/completions` returned `402`.
+- Low-balance provider call did not create usage rows for that key.
+- Temporary test users cleanup: `0` remaining.
+
+## Log Security Retest
+
+- After logger redaction deploy, a probe Authorization request was sent.
+- Journal check since the probe: raw `Bearer yzk_live_` absent.
+- Redaction marker present.
+
+## Current API Verdict
+
+PASS for live catalog, auth boundary, funded text gateway billing, cost headers, balance decrement, usage recording, low-balance behavior and log redaction.

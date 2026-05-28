@@ -2442,3 +2442,73 @@ Status: APPROVED
 
 Agent 4 integrity guard: APPROVE_WITH_LIMITATION
 Agent 4 reason: Written integrity gate approves rollbackable deploy mechanics and visual-lock constraints. Ruflo real-agent swarm was unavailable (`agentCount=0`), so this is a recorded role gate rather than an independent spawned-agent quorum.
+
+---
+
+Decision ID: DEC-FIX-LOG-REDACTION-001
+Decision title: Redact Authorization/API/payment secrets from request logs and redeploy
+Decision type: Security fix and deploy approval
+Related bug IDs: SECURITY-LOG-AUTHORIZATION-001
+Evidence from reports:
+- Live `systemctl status turkapiprojesi` after funded billing showed request headers containing Authorization values.
+- Raw API keys in logs are a launch security blocker even when the observed keys were temporary and deleted.
+Files likely affected:
+- `src/server/lib/logger.ts`
+- `src/server/lib/logger-redaction.test.ts`
+- Live VPS `/opt/turkapiprojesi/dist/server.js`
+Risk level: Critical
+Design/template impact: None; backend logging only.
+Security impact: High positive impact; prevents future Authorization/API-key/payment secret field leakage into structured logs.
+Backend/API/billing impact: No endpoint or billing logic change; logging-only behavior.
+Proposed action:
+1. Add pino redaction paths for request Authorization, cookies, x-api-key, token, apiKey, api_key, signature and sign fields.
+2. Add logger redaction contract test.
+3. Run target/full tests, lint, build, public scan and secret scan.
+4. Commit/push and redeploy with rollback backup.
+5. Send a live Authorization probe and confirm raw token is absent while redaction marker is present.
+Agent 1 vote: APPROVE
+Agent 1 reason: The issue is confirmed in live evidence and fix can be verified without affecting UI.
+Agent 2 vote: APPROVE
+Agent 2 reason: Logging redaction does not alter gateway billing behavior and should be deployed immediately.
+Agent 3 vote: APPROVE
+Agent 3 reason: Secret-bearing request logs are a security blocker; backend-only redaction preserves the visual lock.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Patch logger redaction, verify, commit/push, deploy and retest live logs.
+Status: COMPLETED
+
+Agent 4 integrity guard: APPROVE_WITH_LIMITATION
+
+---
+
+Decision ID: DEC-FINAL-REPAIR-RELEASE-001
+Decision title: After repairs and live deploy, is YapayZekaLab ready for real users without changing the existing site design?
+Decision type: Final release readiness vote
+Related bug IDs: R-BUG-001, R-BUG-004, R-BUG-006, PAYMENT-INSTRUCTIONS-001, SECURITY-LOG-AUTHORIZATION-001
+Evidence from reports:
+- GitHub backup completed for `b920f70` and `a079c56`.
+- Rollback scripts exist on VPS for both deploy steps.
+- Live smoke with expected 42 models passed.
+- Live UAT smoke passed 10/10.
+- Live funded temporary-key billing passed: headers present, usage success, transaction created, balance decremented.
+- Live low-balance temporary-key test passed with 402 and no usage rows.
+- Live log redaction passed: raw Authorization absent after redaction deploy.
+- OAuth start endpoint returns 302 to Google with production callback.
+Files likely affected: Reports only.
+Risk level: Medium
+Design/template impact: Preserved; no deploy-time frontend style/template changes.
+Security impact: Current forward-looking log redaction fixed; historical pre-fix logs remain sensitive.
+Backend/API/billing impact: Core text API billing verified live.
+Proposed action: Mark launch status as `READY AFTER MINOR FIXES`, not full production ready, until real browser OAuth callback/admin click-through and historical log/key rotation review are completed.
+Agent 1 vote: APPROVE
+Agent 1 reason: User-facing smoke/UAT and core API path now pass; remaining browser callback/admin checks are not core API/billing blockers.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend catalog, funded billing, low balance, usage records and balance decrement are verified live.
+Agent 3 vote: APPROVE
+Agent 3 reason: Visual lock is preserved and future log leakage is fixed; historical logs require ops handling before calling it fully production-ready.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Report `READY AFTER MINOR FIXES` with exact remaining risks; do not claim `READY FOR PRODUCTION`.
+Status: COMPLETED
+
+Agent 4 integrity guard: APPROVE_WITH_LIMITATION

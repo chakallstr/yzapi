@@ -378,3 +378,35 @@ Operasyon tarihi: 2026-05-26
   - `npm run scan:public` PASS 0 hits.
   - `node scripts/scan-secrets.mjs` PASS 235 scanned / 0 hits.
 - Result: Fixed locally. Not deployed.
+## 2026-05-28 Live Deploy, Billing Gate and Log Redaction
+
+Changed:
+- Deployed verified Claude Popusk catalog/payment-instruction build to live VPS.
+- Deployed logger redaction patch to prevent Authorization/API-key/payment secret fields from appearing in future request logs.
+- Added `src/server/lib/logger-redaction.test.ts`.
+
+Why:
+- Live had remained on the old 33-model catalog while local verified catalog had 42 models.
+- Live funded billing, balance decrement and `usage_records` were still unproven.
+- Post-deploy journal inspection showed request logs were writing Authorization headers, which is a security blocker.
+
+Verification:
+- `npm test -- src/server/lib/logger-redaction.test.ts`: PASS 2/2.
+- `npm test`: PASS 34 files / 152 tests.
+- `npm run lint`: PASS.
+- `npm run build`: PASS.
+- `npm run scan:public`: PASS.
+- `node scripts/scan-secrets.mjs`: PASS, 244 scanned / 0 hits.
+- `SMOKE_EXPECTED_MODEL_COUNT=42 SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`: PASS.
+- `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`: PASS 10/10.
+- Live funded temporary API-key smoke: PASS, billing headers present, usage success, transaction created, balance decremented.
+- Live low-balance temporary API-key smoke: PASS 402, no usage rows for low-balance key.
+- Live log redaction probe: raw Authorization absent, redaction marker present.
+
+Rollback:
+- `/opt/turkapiprojesi/.deploy/rollback-manual-20260528T123133Z-b920f70.sh`
+- `/opt/turkapiprojesi/.deploy/rollback-manual-20260528T123831Z-a079c56.sh`
+
+Remaining:
+- Historical pre-redaction logs should be treated as sensitive.
+- Real Google browser callback and full admin click-through are still recommended final checks.
