@@ -7,6 +7,7 @@ describe("logger redaction contract", () => {
     expect(redactPaths).toContain("req.headers.cookie");
     expect(redactPaths).toContain("req.headers['x-api-key']");
     expect(redactPaths).toContain("req.headers['proxy-authorization']");
+    expect(redactPaths).toContain("req.headers['x-telegram-init-data']");
   });
 
   it("redacts common payment/provider secret fields from structured logs", () => {

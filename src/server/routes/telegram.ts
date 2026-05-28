@@ -9,6 +9,7 @@ import { userAuth } from "../middleware/user-auth.js";
 import { calcKdv, creditUserBalance } from "../services/payment-common.js";
 import { buildUsdTopupQuote } from "../services/payment-pricing.js";
 import {
+  CryptoPayError,
   createCryptoPayInvoice,
   getPaidCryptoPayInvoice,
   verifyCryptoPayWebhook,
@@ -17,9 +18,11 @@ import {
 import {
   answerTelegramCallback,
   buildTelegramMainMenu,
+  buildTelegramTopupPanelMenu,
   consumeTelegramLinkCode,
   createTelegramLinkCode,
   deliverApiAccessToTelegramUser,
+  editTelegramMessageText,
   formatBalanceMessage,
   getUserBalanceTL,
   parseTelegramCommand,
@@ -27,14 +30,17 @@ import {
   upsertTelegramAccount,
   type TelegramActor,
 } from "../services/telegram-bot-service.js";
+import { TelegramWebAppAuthError, validateTelegramWebAppInitData } from "../services/telegram-webapp-auth-service.js";
 
 const router = Router();
+const TOPUP_QUICK_AMOUNTS_USD = [5, 10, 25];
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type RawRequest = Request & { rawBody?: string };
 
 interface TelegramMessageUpdate {
   message?: {
+    message_id?: number;
     text?: string;
     chat: { id: number | string };
     from?: TelegramActor;
@@ -43,7 +49,7 @@ interface TelegramMessageUpdate {
     id: string;
     data?: string;
     from: TelegramActor;
-    message?: { chat: { id: number | string } };
+    message?: { message_id?: number; chat: { id: number | string } };
   };
 }
 
@@ -63,6 +69,71 @@ function telegramSecretAllowed(req: Request): boolean {
 function cryptoPaySecretAllowed(req: Request): boolean {
   if (!env.CRYPTO_PAY_WEBHOOK_SECRET) return true;
   return req.params.secret === env.CRYPTO_PAY_WEBHOOK_SECRET;
+}
+
+function appBaseUrl(): string {
+  return env.APP_BASE_URL.replace(/\/+$/, "");
+}
+
+function telegramTopupWebAppUrl(): string {
+  return `${appBaseUrl()}/telegram/topup`;
+}
+
+function parseAmountUsd(value: unknown): number {
+  const raw = typeof value === "number" ? String(value) : (typeof value === "string" ? value.trim() : "");
+  if (!/^[0-9]+(?:\.[0-9]{1,2})?$/.test(raw)) {
+    throw new Error("Geçerli bir USD miktarı gir.");
+  }
+  const amount = Number(raw);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Geçerli bir USD miktarı gir.");
+  }
+  return amount;
+}
+
+function isTopupInputError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.message.startsWith("Minimum yükleme")
+    || error.message.startsWith("Maksimum yükleme")
+    || error.message.startsWith("Geçerli bir USD miktarı");
+}
+
+function validateWebAppActor(req: Request): TelegramActor {
+  return validateTelegramWebAppInitData(req.header("x-telegram-init-data")).actor;
+}
+
+function sendWebAppAuthError(res: Response, error: unknown): boolean {
+  if (error instanceof TelegramWebAppAuthError) {
+    res.status(401).json({ error: "Invalid Telegram WebApp init data" });
+    return true;
+  }
+  return false;
+}
+
+async function editOrSendTelegramMessage(input: {
+  chatId: string | number;
+  messageId?: number;
+  text: string;
+  replyMarkup: unknown;
+}): Promise<void> {
+  if (input.messageId) {
+    try {
+      await editTelegramMessageText({
+        chatId: input.chatId,
+        messageId: input.messageId,
+        text: input.text,
+        replyMarkup: input.replyMarkup,
+      });
+      return;
+    } catch (error) {
+      logger.warn({
+        chatId: input.chatId,
+        messageId: input.messageId,
+        error: error instanceof Error ? error.message : String(error),
+      }, "Telegram edit failed; sending a new message");
+    }
+  }
+  await sendTelegramMessage(input.chatId, input.text, input.replyMarkup);
 }
 
 function safeProviderPayload(payload: unknown): unknown {
@@ -89,6 +160,8 @@ async function paymentConfig() {
 }
 
 async function createTelegramTopup(userId: string, telegramId: string, amountUsd: number) {
+  if (!env.CRYPTO_PAY_API_TOKEN) throw new CryptoPayError("Crypto Pay API token is not configured");
+
   const cfg = await paymentConfig();
   const quote = buildUsdTopupQuote(amountUsd, cfg.kur);
 
@@ -193,6 +266,20 @@ async function handleTelegramCallback(update: TelegramMessageUpdate): Promise<vo
   const chatId = callback.message?.chat.id ?? callback.from.id;
   const data = callback.data ?? "";
 
+  if (data === "tg:topup:panel") {
+    const text = "Yükleme paneli hazır.\nUSD miktarını kendin seçebilir, Crypto Bot invoice alabilirsin.";
+    const replyMarkup = buildTelegramTopupPanelMenu(telegramTopupWebAppUrl());
+    await editOrSendTelegramMessage({ chatId, messageId: callback.message?.message_id, text, replyMarkup });
+    return;
+  }
+
+  if (data === "tg:menu") {
+    const text = "Menü";
+    const replyMarkup = buildTelegramMainMenu();
+    await editOrSendTelegramMessage({ chatId, messageId: callback.message?.message_id, text, replyMarkup });
+    return;
+  }
+
   if (data.startsWith("tg:topup:")) {
     await handleTopup(chatId, callback.from, Number(data.split(":")[2]));
     return;
@@ -211,6 +298,16 @@ async function handleTelegramCallback(update: TelegramMessageUpdate): Promise<vo
       userId: account.userId,
       telegramAccountId: account.telegramAccountId,
       chatId,
+    });
+    return;
+  }
+
+  if (data === "tg:apikey:change") {
+    await deliverApiAccessToTelegramUser({
+      userId: account.userId,
+      telegramAccountId: account.telegramAccountId,
+      chatId,
+      forceNewKey: true,
     });
     return;
   }
@@ -353,6 +450,70 @@ async function deliverPaidPayment(paymentId: string, userId: string): Promise<vo
 
 router.post("/crypto-pay/webhook", handleCryptoPayWebhook);
 router.post("/crypto-pay/webhook/:secret", handleCryptoPayWebhook);
+
+router.get("/webapp/me", async (req, res, next) => {
+  try {
+    if (!assertTelegramConfigured(res)) return;
+    const actor = validateWebAppActor(req);
+    const account = await upsertTelegramAccount(actor);
+    const balanceTL = await getUserBalanceTL(account.userId);
+    const cfg = await paymentConfig();
+
+    res.json({
+      user: {
+        telegramId: String(actor.id),
+        username: actor.username ?? null,
+        firstName: actor.first_name ?? null,
+        lastName: actor.last_name ?? null,
+      },
+      balanceTL,
+      kur: cfg.kur,
+      minBakiyeTL: cfg.minBakiyeTL,
+      maxBakiyeTL: cfg.maxBakiyeTL,
+      quickAmountsUsd: TOPUP_QUICK_AMOUNTS_USD,
+    });
+  } catch (e) {
+    if (sendWebAppAuthError(res, e)) return;
+    next(e);
+  }
+});
+
+router.post("/webapp/invoices", async (req, res, next) => {
+  try {
+    if (!assertTelegramConfigured(res)) return;
+    if (!env.CRYPTO_PAY_API_TOKEN) {
+      res.status(503).json({ error: "Crypto Pay is not configured" });
+      return;
+    }
+
+    const actor = validateWebAppActor(req);
+    const amountUsd = parseAmountUsd(req.body?.amountUsd);
+    const account = await upsertTelegramAccount(actor);
+    const topup = await createTelegramTopup(account.userId, String(actor.id), amountUsd);
+
+    res.json({
+      paymentId: topup.paymentId,
+      invoiceId: topup.invoice.invoiceId,
+      payUrl: topup.invoice.payUrl,
+      amountUsd: topup.quote.amountUsd,
+      payableTL: topup.quote.payableTL,
+      creditTL: topup.quote.creditTL,
+      kur: topup.quote.kur,
+      roundingTL: topup.quote.roundingTL,
+    });
+  } catch (e) {
+    if (sendWebAppAuthError(res, e)) return;
+    if (isTopupInputError(e)) {
+      res.status(400).json({ error: e instanceof Error ? e.message : "Geçerli bir USD miktarı gir." });
+      return;
+    }
+    if (e instanceof CryptoPayError) {
+      res.status(503).json({ error: "Crypto Pay invoice oluşturulamadı." });
+      return;
+    }
+    next(e);
+  }
+});
 
 router.post("/link-code", userAuth, async (req, res, next) => {
   try {

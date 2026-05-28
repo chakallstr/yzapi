@@ -11,18 +11,42 @@ describe("telegram-bot-service pure helpers", () => {
     expect(parseTelegramCommand("hello")).toEqual({ type: "menu" });
   });
 
-  it("builds a balance-first menu with top-up, API key, usage, and support actions", async () => {
+  it("builds a balance-first menu with WebApp top-up, API key, usage, and support actions", async () => {
     const { buildTelegramMainMenu } = await import("./telegram-bot-service.js");
 
     const menu = buildTelegramMainMenu();
     const serialized = JSON.stringify(menu);
 
     expect(serialized).toContain("tg:balance");
-    expect(serialized).toContain("tg:topup:5");
+    expect(serialized).toContain("tg:topup:panel");
+    expect(serialized).not.toContain("tg:topup:5");
     expect(serialized).toContain("tg:apikey");
     expect(serialized).toContain("tg:usage");
     expect(serialized).toContain("tg:support");
     expect(serialized).not.toMatch(/stars/i);
+  });
+
+  it("builds a Telegram WebApp top-up panel menu", async () => {
+    const { buildTelegramTopupPanelMenu } = await import("./telegram-bot-service.js");
+
+    const menu = buildTelegramTopupPanelMenu("https://yapayzekalab.org/telegram/topup");
+    const serialized = JSON.stringify(menu);
+
+    expect(serialized).toContain("Paneli Aç");
+    expect(serialized).toContain("\"web_app\"");
+    expect(serialized).toContain("https://yapayzekalab.org/telegram/topup");
+    expect(serialized).toContain("tg:menu");
+  });
+
+  it("builds an API key action menu with a change button that keeps the user on Telegram", async () => {
+    const { buildTelegramApiKeyMenu } = await import("./telegram-bot-service.js");
+
+    const menu = buildTelegramApiKeyMenu();
+    const serialized = JSON.stringify(menu);
+
+    expect(serialized).toContain("Değiştir");
+    expect(serialized).toContain("tg:apikey:change");
+    expect(serialized).toContain("tg:menu");
   });
 
   it("formats API delivery without exposing hashes or hidden provider internals", async () => {
@@ -41,8 +65,12 @@ describe("telegram-bot-service pure helpers", () => {
     });
 
     expect(created).toContain("yzk_live_secret");
+    expect(created).toContain("<code>yzk_live_secret</code>");
     expect(existing).not.toContain("yzk_live_secret");
     expect(existing).toContain("yzk_live_sec...cret");
+    expect(existing).toContain("<code>yzk_live_sec...cret</code>");
+    expect(existing).toContain("Değiştir");
+    expect(created).toContain("kopyala");
     expect(created).not.toMatch(/hash|provider|900k|secret path/i);
   });
 });

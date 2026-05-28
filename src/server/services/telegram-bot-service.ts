@@ -26,6 +26,14 @@ export interface ApiDeliveryMessageInput {
   maskedKey: string;
   fullKey?: string;
   created: boolean;
+  rotated?: boolean;
+}
+
+export interface TelegramMessageEditInput {
+  chatId: string | number;
+  messageId: string | number;
+  text: string;
+  replyMarkup?: unknown;
 }
 
 function sha256(input: string): string {
@@ -42,6 +50,13 @@ function displayName(actor: TelegramActor): string {
 
 function internalTelegramEmail(actor: TelegramActor): string {
   return `tg_${telegramId(actor)}@telegram.yapayzekalab.local`;
+}
+
+function escapeTelegramHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 export function parseTelegramCommand(text?: string): TelegramCommand {
@@ -61,13 +76,11 @@ export function buildTelegramMainMenu() {
   return {
     inline_keyboard: [
       [
-        { text: "Bakiye", callback_data: "tg:balance" },
-        { text: "API Key", callback_data: "tg:apikey" },
+        { text: "Yükleme Paneli", callback_data: "tg:topup:panel" },
       ],
       [
-        { text: "5 USD yükle", callback_data: "tg:topup:5" },
-        { text: "10 USD yükle", callback_data: "tg:topup:10" },
-        { text: "25 USD yükle", callback_data: "tg:topup:25" },
+        { text: "Bakiye", callback_data: "tg:balance" },
+        { text: "API Key", callback_data: "tg:apikey" },
       ],
       [
         { text: "Kullanım", callback_data: "tg:usage" },
@@ -77,16 +90,40 @@ export function buildTelegramMainMenu() {
   };
 }
 
+export function buildTelegramTopupPanelMenu(webAppUrl: string) {
+  return {
+    inline_keyboard: [
+      [{ text: "Paneli Aç", web_app: { url: webAppUrl } }],
+      [{ text: "Geri", callback_data: "tg:menu" }],
+    ],
+  };
+}
+
+export function buildTelegramApiKeyMenu() {
+  return {
+    inline_keyboard: [
+      [{ text: "Değiştir", callback_data: "tg:apikey:change" }],
+      [{ text: "Ana Menü", callback_data: "tg:menu" }],
+    ],
+  };
+}
+
 export function formatApiDeliveryMessage(input: ApiDeliveryMessageInput): string {
+  const visibleKey = input.created && input.fullKey ? input.fullKey : input.maskedKey;
   const lines = [
-    input.created ? "API erişimin hazır. Bu anahtar tek sefer tam gösterilir:" : "Aktif API anahtarın:",
-    input.created && input.fullKey ? input.fullKey : input.maskedKey,
+    input.rotated ? "Yeni API key hazır. Eski key kapanmadı:" : input.created ? "API erişimin hazır. Bu anahtar tek sefer tam gösterilir:" : "Aktif API anahtarın:",
+    `<code>${escapeTelegramHtml(visibleKey)}</code>`,
     "",
     `Bakiye: ${input.balanceTL.toFixed(2)} TL`,
     "API endpoint: https://api.yapayzekalab.org/v1",
   ];
 
-  if (input.created) lines.push("Anahtarı güvenli sakla; panelde daha sonra sadece maskeli görünür.");
+  if (input.created) {
+    lines.push("kopyala: Yukarıdaki kod alanına basılı tut.");
+    lines.push("Anahtarı güvenli sakla; panelde daha sonra sadece maskeli görünür.");
+  } else {
+    lines.push("Tam key güvenlik için saklanmaz. Değiştir yeni key üretir, eski key kapanmaz.");
+  }
   return lines.join("\n");
 }
 
@@ -94,7 +131,12 @@ export function formatBalanceMessage(balanceTL: number): string {
   return `Güncel bakiyen: ${balanceTL.toFixed(2)} TL`;
 }
 
-export async function sendTelegramMessage(chatId: string | number, text: string, replyMarkup?: unknown): Promise<{ messageId?: number }> {
+export async function sendTelegramMessage(
+  chatId: string | number,
+  text: string,
+  replyMarkup?: unknown,
+  parseMode?: "HTML" | "MarkdownV2",
+): Promise<{ messageId?: number }> {
   if (!env.TELEGRAM_BOT_TOKEN) throw new Error("Telegram bot token is not configured");
 
   const response = await fetch(`${TELEGRAM_API_BASE}/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -104,11 +146,29 @@ export async function sendTelegramMessage(chatId: string | number, text: string,
       chat_id: chatId,
       text,
       ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+      ...(parseMode ? { parse_mode: parseMode } : {}),
     }),
   });
   const data = await response.json() as { ok: boolean; result?: { message_id?: number }; description?: string };
   if (!data.ok) throw new Error(`Telegram sendMessage failed: ${data.description ?? "unknown"}`);
   return { messageId: data.result?.message_id };
+}
+
+export async function editTelegramMessageText(input: TelegramMessageEditInput): Promise<void> {
+  if (!env.TELEGRAM_BOT_TOKEN) throw new Error("Telegram bot token is not configured");
+
+  const response = await fetch(`${TELEGRAM_API_BASE}/bot${env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: input.chatId,
+      message_id: input.messageId,
+      text: input.text,
+      ...(input.replyMarkup ? { reply_markup: input.replyMarkup } : {}),
+    }),
+  });
+  const data = await response.json() as { ok: boolean; description?: string };
+  if (!data.ok) throw new Error(`Telegram editMessageText failed: ${data.description ?? "unknown"}`);
 }
 
 export async function answerTelegramCallback(callbackQueryId: string, text?: string): Promise<void> {
@@ -218,22 +278,12 @@ export async function getUserBalanceTL(userId: string): Promise<number> {
   return Number(rows[0]?.bakiyeTL ?? 0);
 }
 
-export async function getOrCreateTelegramApiKey(userId: string): Promise<{ created: boolean; maskedKey: string; fullKey?: string; apiKeyId: string }> {
-  const existing = await db
-    .select({ id: apiKeys.id, maskedKey: apiKeys.maskedKey })
-    .from(apiKeys)
-    .where(and(eq(apiKeys.userId, userId), eq(apiKeys.aktif, true)))
-    .limit(1);
-
-  if (existing.length) {
-    return { created: false, maskedKey: existing[0].maskedKey, apiKeyId: existing[0].id };
-  }
-
+async function createTelegramApiKeyForUser(userId: string, name: string): Promise<{ created: true; maskedKey: string; fullKey: string; apiKeyId: string }> {
   const { fullKey, prefix, maskedKey } = generateApiKey();
   const keyHash = await hashApiKey(fullKey);
   const inserted = await db.insert(apiKeys).values({
     userId,
-    ad: "telegram-delivery",
+    ad: name,
     maskedKey,
     keyHash,
     prefix,
@@ -245,6 +295,20 @@ export async function getOrCreateTelegramApiKey(userId: string): Promise<{ creat
   }).where(eq(users.id, userId));
 
   return { created: true, maskedKey, fullKey, apiKeyId: inserted[0].id };
+}
+
+export async function getOrCreateTelegramApiKey(userId: string): Promise<{ created: boolean; maskedKey: string; fullKey?: string; apiKeyId: string }> {
+  const existing = await db
+    .select({ id: apiKeys.id, maskedKey: apiKeys.maskedKey })
+    .from(apiKeys)
+    .where(and(eq(apiKeys.userId, userId), eq(apiKeys.aktif, true)))
+    .limit(1);
+
+  if (existing.length) {
+    return { created: false, maskedKey: existing[0].maskedKey, apiKeyId: existing[0].id };
+  }
+
+  return createTelegramApiKeyForUser(userId, "telegram-delivery");
 }
 
 async function existingPaymentDelivery(paymentId?: string): Promise<{ id: string; status: string } | null> {
@@ -265,23 +329,27 @@ export async function deliverApiAccessToTelegramUser(opts: {
   telegramAccountId: string;
   chatId: string | number;
   paymentId?: string;
+  forceNewKey?: boolean;
 }): Promise<{ delivered: boolean; alreadyDelivered: boolean; createdKey?: boolean; maskedKey?: string }> {
   const existingDelivery = await existingPaymentDelivery(opts.paymentId);
   if (existingDelivery?.status === "delivered") {
     return { delivered: true, alreadyDelivered: true };
   }
 
-  const key = await getOrCreateTelegramApiKey(opts.userId);
+  const key = opts.forceNewKey
+    ? await createTelegramApiKeyForUser(opts.userId, "telegram-change")
+    : await getOrCreateTelegramApiKey(opts.userId);
   const balanceTL = await getUserBalanceTL(opts.userId);
   const message = formatApiDeliveryMessage({
     balanceTL,
     maskedKey: key.maskedKey,
     fullKey: key.fullKey,
     created: key.created,
+    rotated: Boolean(opts.forceNewKey),
   });
 
   try {
-    const sent = await sendTelegramMessage(opts.chatId, message, buildTelegramMainMenu());
+    const sent = await sendTelegramMessage(opts.chatId, message, buildTelegramApiKeyMenu(), "HTML");
     const deliveryValues = {
       userId: opts.userId,
       telegramAccountId: opts.telegramAccountId,

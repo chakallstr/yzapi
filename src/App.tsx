@@ -1,4 +1,5 @@
 import YapayZekaLabApp from "./yapayzekalab/App.jsx";
+import TelegramTopupApp from "./yapayzekalab/TelegramTopupApp.jsx";
 
 type LegacyTab = "home" | "models" | "activity" | "account" | "admin";
 
@@ -21,5 +22,8 @@ const routeToInitialTab = (path: string): LegacyTab => {
 };
 
 export default function App() {
+  if (window.location.pathname.startsWith("/telegram/topup")) {
+    return <TelegramTopupApp />;
+  }
   return <YapayZekaLabApp initialTab={routeToInitialTab(window.location.pathname)} />;
 }
