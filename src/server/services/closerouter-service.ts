@@ -39,7 +39,7 @@ function extractTokenUsage(json: Record<string, unknown>): ChatUsage {
   };
 }
 
-function estimateTextTokens(value: unknown): number {
+export function estimateTextTokens(value: unknown): number {
   if (value === null || value === undefined) return 0;
   const text = typeof value === "string" ? value : JSON.stringify(value);
   return Math.max(1, Math.ceil(text.length / 4));
@@ -203,11 +203,12 @@ export async function forwardChatStream(
   res: Response
 ): Promise<ChatUsage> {
   const url = `${aiProviderBaseUrl()}/chat/completions`;
+  const providerBody = mapRequestBodyForProvider({ ...body, stream: true });
 
   const upstream = await fetch(url, {
     method: "POST",
     headers: { ...baseHeaders(), Accept: "text/event-stream" },
-    body: JSON.stringify({ ...body, stream: true }),
+    body: JSON.stringify(providerBody),
   });
 
   if (!upstream.ok) {
@@ -229,10 +230,24 @@ export async function forwardChatStream(
     }
 
     const usage: ChatUsage = { promptTokens: 0, completionTokens: 0 };
+    let assistantText = "";
+    let settled = false;
     const { Readable } = require("stream") as typeof import("stream");
     const nodeStream = Readable.fromWeb(upstream.body as import("stream/web").ReadableStream);
 
     let buffer = "";
+
+    const finalize = () => {
+      if (settled) return;
+      settled = true;
+      if (usage.promptTokens <= 0) {
+        usage.promptTokens = estimateTextTokens(providerBody.messages ?? "");
+      }
+      if (usage.completionTokens <= 0) {
+        usage.completionTokens = estimateTextTokens(assistantText);
+      }
+      resolve(usage);
+    };
 
     nodeStream.on("data", (chunk: Buffer) => {
       const text = chunk.toString();
@@ -253,6 +268,10 @@ export async function forwardChatStream(
             usage.promptTokens = u.prompt_tokens ?? usage.promptTokens;
             usage.completionTokens = u.completion_tokens ?? usage.completionTokens;
           }
+          const choice = (parsed.choices as Array<Record<string, unknown>> | undefined)?.[0];
+          const delta = choice?.delta as Record<string, unknown> | undefined;
+          const message = choice?.message as Record<string, unknown> | undefined;
+          assistantText += String(delta?.content ?? message?.content ?? "");
         } catch {
           // non-JSON chunk — ignore
         }
@@ -263,18 +282,19 @@ export async function forwardChatStream(
 
     nodeStream.on("end", () => {
       res.end();
-      resolve(usage);
+      finalize();
     });
 
     nodeStream.on("error", (err: Error) => {
       logger.error({ err }, "ai provider stream error");
       res.end();
-      reject(err);
+      finalize();
     });
 
     // Abort upstream if client disconnects
     res.req?.on("close", () => {
       nodeStream.destroy();
+      finalize();
     });
   });
 }

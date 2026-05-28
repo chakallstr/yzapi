@@ -888,7 +888,7 @@ const AccountTab = ({ ctx }) => {
           <div>
             <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: -0.2 }}>API anahtarları</div>
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
-              Authorization: Bearer <span style={{ fontFamily: 'var(--font-mono)' }}>yzk_live_senin_gercek_anahtarin</span>
+              Authorization: Bearer <span style={{ fontFamily: 'var(--font-mono)' }}>yzk-live-[sana_ozel_anahtar]</span>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

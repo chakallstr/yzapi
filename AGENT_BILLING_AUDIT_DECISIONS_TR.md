@@ -63,3 +63,91 @@ Approval count: 3/3
 Final decision: APPROVED
 Allowed next action: Dar backend güvenlik düzeltmeleri uygulanabilir.
 Status: Active
+
+Decision ID: DEC-CMD-001
+Decision title: Kritik billing ve auth testlerini çalıştır
+Decision type: Verification command
+Related bug IDs: BIL-CRIT-001, BIL-CRIT-002, SEC-HIGH-002
+Evidence from reports:
+- 95K limit ve reservation için yeni test dosyaları eklendi.
+- Stream ve bakiye stop-condition düzeltmeleri derleme/test ile doğrulanmalı.
+Files likely affected:
+- `src/server/services/request-guard-service.test.ts`
+- `src/server/services/billing-service.test.ts`
+- `src/server/middleware/user-auth.test.ts`
+- `src/server/middleware/admin-auth.test.ts`
+- `src/server/services/api-key-service.test.ts`
+Risk level: Low
+Design/template impact: None
+Security impact: Positive
+Backend/API/billing impact: Verification only
+Proposed action:
+- Hedefli Vitest komutunu çalıştır.
+- Başarılıysa ardından tam test paketine geç.
+Agent 1 vote: APPROVE
+Agent 1 reason: Hedefli test, bug fix doğrulaması için yeterli ve dar kapsamlı.
+Agent 2 vote: APPROVE
+Agent 2 reason: Finansal fixin kanıtı komut çıktısı olmadan kabul edilemez.
+Agent 3 vote: APPROVE
+Agent 3 reason: Görsel etkisi yok; sadece backend doğrulama.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Hedefli test komutu çalıştırılabilir.
+Status: Active
+
+Decision ID: DEC-CMD-002
+Decision title: Tam test ve derleme doğrulaması çalıştır
+Decision type: Verification command
+Related bug IDs: BIL-CRIT-001, BIL-CRIT-002, SEC-HIGH-002
+Evidence from reports:
+- Hedefli kritik testler geçti.
+- Regresyon riski nedeniyle tam test ve derleme kanıtı gerekiyor.
+Files likely affected:
+- backend billing/auth/proxy dosyaları
+- yeni test dosyaları
+Risk level: Medium
+Design/template impact: None
+Security impact: Positive
+Backend/API/billing impact: Verification only
+Proposed action:
+- `npm test`
+- `npm run lint`
+- `npm run build`
+Agent 1 vote: APPROVE
+Agent 1 reason: Tam regresyon kanıtı olmadan fix tamam sayılmamalı.
+Agent 2 vote: APPROVE
+Agent 2 reason: Type/lint/build kırıkları üretime sızmamalı.
+Agent 3 vote: APPROVE
+Agent 3 reason: Görsel değişiklik yok; teknik doğrulama gerekli.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Tam test, lint ve build komutları çalıştırılabilir.
+Status: Active
+
+Decision ID: DEC-CMD-003
+Decision title: Public bundle ve secret sızıntı taraması çalıştır
+Decision type: Verification command
+Related bug IDs: SEC-HIGH-002
+Evidence from reports:
+- API key listeleme ve auth katmanı değişti.
+- Secret ve raw key sızıntısı oluşmadığını kanıtlamak gerekiyor.
+Files likely affected:
+- `dist/**`
+- backend route/service dosyaları
+Risk level: Low
+Design/template impact: None
+Security impact: Positive
+Backend/API/billing impact: Verification only
+Proposed action:
+- `npm run scan:public`
+- `node scripts/scan-secrets.mjs`
+Agent 1 vote: APPROVE
+Agent 1 reason: Kullanıcıya açık bundle taraması release öncesi zorunlu.
+Agent 2 vote: APPROVE
+Agent 2 reason: Raw key/secret sızıntısı için kanıt lazım.
+Agent 3 vote: APPROVE
+Agent 3 reason: Görsel etkisiz, güvenlik kanıtı üretir.
+Approval count: 3/3
+Final decision: APPROVED
+Allowed next action: Public scan ve secret scan komutları çalıştırılabilir.
+Status: Active

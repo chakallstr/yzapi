@@ -16,7 +16,7 @@ import {
 import { writeAudit } from "../services/audit-service.js";
 import { refreshKur } from "../services/kur-service.js";
 import { getReconciliationReport } from "../services/reconciliation-service.js";
-import { decryptApiKey, encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
+import { encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
 
 const router = Router();
 
@@ -84,7 +84,6 @@ function serializeApiKey(k: typeof apiKeys.$inferSelect, userEmail?: string) {
     userEmail: userEmail ?? "",
     ad: k.ad,
     maskedKey: k.maskedKey,
-    fullKey: decryptApiKey(k.fullKeyCipher) ?? null,
     olusturma: k.olusturma instanceof Date ? k.olusturma.toISOString() : String(k.olusturma),
     sonKullanim: k.sonKullanim instanceof Date ? k.sonKullanim.toISOString() : k.sonKullanim,
     aktif: k.aktif,

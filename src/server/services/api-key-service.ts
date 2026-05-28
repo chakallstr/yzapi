@@ -81,6 +81,7 @@ export async function validateApiKey(headerValue: string): Promise<ValidatedKey 
 
   for (const { key, user } of candidates) {
     if (!key.keyHash) continue;
+    if (user.durum !== "aktif") continue;
     const match = await bcrypt.compare(raw, key.keyHash);
     if (match) {
       // Update last used timestamp (fire and forget)

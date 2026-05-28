@@ -192,4 +192,76 @@ describe("chargeUsage — billing service", () => {
     expect(result).toEqual({ costTL: 2.25, remainingTL: 95.75, alreadyCharged: true });
     expect(mockDbSqlBegin).not.toHaveBeenCalled();
   });
+
+  it("reserves balance before upstream usage starts", async () => {
+    mockSelectLimit.mockResolvedValueOnce([]);
+    mockTxSql
+      .mockResolvedValueOnce([{ bakiye_tl: "97.7500", email: "user@test.com" }])
+      .mockResolvedValueOnce([{ id: "reserve-tx-1" }]);
+
+    const { reserveUsageBudget } = await import("./billing-service.js");
+
+    const model = {
+      id: "gpt-4o",
+      name: "GPT-4o",
+      provider: "openai",
+      type: "Metin" as const,
+      context: "128K",
+      endpoints: ["chat"] as string[],
+      providerInputUsd: 5,
+      providerOutputUsd: 15,
+    };
+
+    const result = await reserveUsageBudget({
+      userId: "00000000-0000-0000-0000-000000000001",
+      apiKeyId: "00000000-0000-0000-0000-000000000002",
+      model,
+      usage: { promptTokens: 1000, completionTokens: 500 },
+      requestId: "reserve-1",
+    });
+
+    expect(result.reservedTL).toBe(2.25);
+    expect(result.remainingTL).toBe(97.75);
+    expect(mockDbSqlBegin).toHaveBeenCalledTimes(1);
+  });
+
+  it("reconciles a reservation by refunding the unused portion and recording final usage", async () => {
+    mockSelectLimit
+      .mockResolvedValueOnce([]) // existing usage record
+      .mockResolvedValueOnce([{ miktarTL: "-2.2500", sonrakiBakiye: "97.7500" }]); // reservation row
+    mockTxSql
+      .mockResolvedValueOnce([{ bakiye_tl: "98.8750", email: "user@test.com" }]) // refund update
+      .mockResolvedValueOnce([{ id: "refund-tx-1" }]) // refund tx
+      .mockResolvedValueOnce([{ bakiye_tl: "98.1250", email: "user@test.com" }]) // final charge update
+      .mockResolvedValueOnce([{ id: "final-tx-1" }]) // final tx
+      .mockResolvedValueOnce([]); // usage record insert
+
+    const { settleReservedUsage } = await import("./billing-service.js");
+
+    const model = {
+      id: "gpt-4o",
+      name: "GPT-4o",
+      provider: "openai",
+      type: "Metin" as const,
+      context: "128K",
+      endpoints: ["chat"] as string[],
+      providerInputUsd: 5,
+      providerOutputUsd: 15,
+    };
+
+    const result = await settleReservedUsage({
+      userId: "00000000-0000-0000-0000-000000000001",
+      apiKeyId: "00000000-0000-0000-0000-000000000002",
+      model,
+      usage: { promptTokens: 500, completionTokens: 250 },
+      responseMs: 120,
+      requestId: "reserve-1",
+      rawUsageJson: { promptTokens: 500, completionTokens: 250 },
+      status: "success",
+    });
+
+    expect(result.costTL).toBe(1.125);
+    expect(result.remainingTL).toBe(98.125);
+    expect(mockDbSqlBegin).toHaveBeenCalledTimes(1);
+  });
 });

@@ -88,6 +88,294 @@ async function findExistingCharge(requestId?: string): Promise<ChargeResult | nu
   };
 }
 
+async function findReservation(requestId?: string) {
+  if (!requestId) return null;
+
+  const rows = await db
+    .select({
+      miktarTL: transactions.miktarTL,
+      sonrakiBakiye: transactions.sonrakiBakiye,
+    })
+    .from(transactions)
+    .where(eq(transactions.idempotencyKey, `usage_reserve_${requestId}`))
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+function buildUsageChargeMeta(
+  model: MasterModel,
+  usage: UsageInfo,
+  pricingCfg: ReturnType<typeof computePrice>,
+  rawUsageJson?: unknown,
+) {
+  const rawCostTL = computeCost(model, usage, pricingCfg, "tl");
+  const rawCostUsd = computeCost(model, usage, pricingCfg, "usd");
+  const costTL = round4(rawCostTL);
+  const costUsd = round8(rawCostUsd);
+  const pricingSnapshot = buildPricingSnapshot(model, pricingCfg);
+  const inputUsage = usage.promptTokens ?? usage.imageCount ?? Math.round((usage.videoSeconds ?? 0) * 1000);
+  const outputUsage = usage.completionTokens ?? 0;
+  const recordType = model.type === "Metin" ? "text" : model.type === "Görsel" ? "image" : "video";
+
+  return {
+    costTL,
+    costUsd,
+    pricingSnapshot,
+    inputUsage,
+    outputUsage,
+    recordType,
+    rawUsageJson: rawUsageJson ?? usage,
+  };
+}
+
+export async function reserveUsageBudget(opts: {
+  userId: string;
+  apiKeyId: string;
+  model: MasterModel;
+  usage: UsageInfo;
+  requestId: string;
+}): Promise<{ reservedTL: number; remainingTL: number; alreadyReserved?: boolean }> {
+  const existing = await findReservation(opts.requestId);
+  if (existing) {
+    return {
+      reservedTL: Math.abs(Number(existing.miktarTL ?? 0)),
+      remainingTL: Number(existing.sonrakiBakiye ?? 0),
+      alreadyReserved: true,
+    };
+  }
+
+  const pricingCfg = await buildPricingConfig();
+  const patchedModel = await applyOverride(opts.model);
+  const meta = buildUsageChargeMeta(patchedModel, opts.usage, computePrice(patchedModel, pricingCfg));
+  const reserveTL = meta.costTL;
+
+  if (reserveTL <= 0) {
+    const balanceRows = await db.select({ bakiye: users.bakiyeTL }).from(users).where(eq(users.id, opts.userId)).limit(1);
+    return { reservedTL: 0, remainingTL: Number(balanceRows[0]?.bakiye ?? 0) };
+  }
+
+  const reserveStr = reserveTL.toFixed(4);
+  let remainingTL = 0;
+  let previousBalance = 0;
+  let userEmail = "";
+
+  const rows = await dbSql.begin(async (txSql) => {
+    const updated = await txSql<{ bakiye_tl: string; email: string }[]>`
+      UPDATE users
+      SET bakiye_tl = bakiye_tl - ${reserveStr}::numeric,
+          son_aktivite = now()
+      WHERE id = ${opts.userId}::uuid
+        AND bakiye_tl >= ${reserveStr}::numeric
+      RETURNING bakiye_tl, email
+    `;
+
+    if (!updated.length) return updated;
+
+    remainingTL = Number(updated[0].bakiye_tl);
+    previousBalance = remainingTL + reserveTL;
+    userEmail = updated[0].email;
+
+    const txRows = await txSql<{ id: string }[]>`
+      INSERT INTO transactions (
+        user_id,
+        user_email,
+        tip,
+        miktar_tl,
+        onceki_bakiye,
+        sonraki_bakiye,
+        aciklama,
+        idempotency_key
+      ) VALUES (
+        ${opts.userId}::uuid,
+        ${userEmail},
+        'kullanim_rezervasyon',
+        ${`-${reserveStr}`}::numeric,
+        ${previousBalance.toFixed(4)}::numeric,
+        ${remainingTL.toFixed(4)}::numeric,
+        ${`${opts.model.id} kullanım rezervasyonu`},
+        ${`usage_reserve_${opts.requestId}`}
+      )
+      RETURNING id
+    `;
+
+    return txRows.length ? updated : [];
+  });
+
+  if (!rows.length) {
+    throw new InsufficientBalanceError("Insufficient balance to reserve this request");
+  }
+
+  return { reservedTL: reserveTL, remainingTL };
+}
+
+export async function settleReservedUsage(opts: {
+  userId: string;
+  apiKeyId: string;
+  model: MasterModel;
+  usage: UsageInfo;
+  responseMs: number;
+  status: ChargeStatus;
+  requestId: string;
+  upstreamRequestId?: string;
+  rawUsageJson?: unknown;
+  errorCode?: string;
+}): Promise<ChargeResult> {
+  const existing = await findExistingCharge(opts.requestId);
+  if (existing) return existing;
+
+  const reservation = await findReservation(opts.requestId);
+  if (!reservation) {
+    return chargeUsage(opts);
+  }
+
+  const pricingCfg = await buildPricingConfig();
+  const patchedModel = await applyOverride(opts.model);
+  const computed = computePrice(patchedModel, pricingCfg);
+  const meta = buildUsageChargeMeta(patchedModel, opts.usage, computed, opts.rawUsageJson);
+  const reservedTL = Math.abs(Number(reservation.miktarTL ?? 0));
+  const reserveStr = reservedTL.toFixed(4);
+  const actualCostTL = opts.status === "error" ? meta.costTL : meta.costTL;
+  const actualCostUsd = meta.costUsd;
+  const actualCostStr = actualCostTL.toFixed(4);
+  const actualCostUsdStr = actualCostUsd.toFixed(8);
+
+  let remainingTL = Number(reservation.sonrakiBakiye ?? 0);
+  const errorCode = opts.errorCode ?? (opts.status === "stream_missing_usage" ? "stream_missing_usage" : undefined);
+
+  const rows = await dbSql.begin(async (txSql) => {
+    if (reservedTL > 0) {
+      const refundRows = await txSql<{ bakiye_tl: string; email: string }[]>`
+        UPDATE users
+        SET bakiye_tl = bakiye_tl + ${reserveStr}::numeric,
+            son_aktivite = now()
+        WHERE id = ${opts.userId}::uuid
+        RETURNING bakiye_tl, email
+      `;
+
+      if (!refundRows.length) return refundRows;
+
+      const refundAfter = Number(refundRows[0].bakiye_tl);
+      const refundBefore = refundAfter - reservedTL;
+
+      await txSql`
+        INSERT INTO transactions (
+          user_id,
+          user_email,
+          tip,
+          miktar_tl,
+          onceki_bakiye,
+          sonraki_bakiye,
+          aciklama,
+          idempotency_key
+        ) VALUES (
+          ${opts.userId}::uuid,
+          ${refundRows[0].email},
+          'iade',
+          ${reserveStr}::numeric,
+          ${refundBefore.toFixed(4)}::numeric,
+          ${refundAfter.toFixed(4)}::numeric,
+          ${`${opts.model.id} rezervasyon iadesi`},
+          ${`usage_release_${opts.requestId}`}
+        )
+      `;
+
+      remainingTL = refundAfter;
+    }
+
+    if (actualCostTL > 0) {
+      const chargeRows = await txSql<{ bakiye_tl: string; email: string }[]>`
+        UPDATE users
+        SET bakiye_tl = bakiye_tl - ${actualCostStr}::numeric,
+            toplam_harcama_tl = toplam_harcama_tl + ${actualCostStr}::numeric,
+            toplam_istek = toplam_istek + 1,
+            son_aktivite = now()
+        WHERE id = ${opts.userId}::uuid
+          AND bakiye_tl >= ${actualCostStr}::numeric
+        RETURNING bakiye_tl, email
+      `;
+
+      if (!chargeRows.length) return chargeRows;
+
+      const chargeAfter = Number(chargeRows[0].bakiye_tl);
+      const chargeBefore = chargeAfter + actualCostTL;
+
+      await txSql`
+        INSERT INTO transactions (
+          user_id,
+          user_email,
+          tip,
+          miktar_tl,
+          onceki_bakiye,
+          sonraki_bakiye,
+          aciklama,
+          idempotency_key
+        ) VALUES (
+          ${opts.userId}::uuid,
+          ${chargeRows[0].email},
+          'kullanim',
+          ${`-${actualCostStr}`}::numeric,
+          ${chargeBefore.toFixed(4)}::numeric,
+          ${chargeAfter.toFixed(4)}::numeric,
+          ${`${opts.model.id} kullanimi`},
+          ${`usage_final_${opts.requestId}`}
+        )
+      `;
+
+      remainingTL = chargeAfter;
+    }
+
+    await txSql`
+      INSERT INTO usage_records (
+        user_id,
+        api_key_id,
+        model_id,
+        type,
+        input_usage,
+        output_usage,
+        units_usage,
+        cost_usd,
+        cost_tl,
+        remaining_tl,
+        request_id,
+        upstream_request_id,
+        raw_usage_json,
+        pricing_snapshot_json,
+        error_code,
+        response_ms,
+        status
+      ) VALUES (
+        ${opts.userId}::uuid,
+        ${opts.apiKeyId}::uuid,
+        ${opts.model.id},
+        ${meta.recordType},
+        ${meta.inputUsage},
+        ${meta.outputUsage},
+        ${String(opts.usage.videoSeconds ?? opts.usage.imageCount ?? 0)}::numeric,
+        ${actualCostUsdStr}::numeric,
+        ${actualCostStr}::numeric,
+        ${remainingTL.toFixed(4)}::numeric,
+        ${opts.requestId},
+        ${opts.upstreamRequestId ?? null},
+        ${JSON.stringify(meta.rawUsageJson)}::jsonb,
+        ${JSON.stringify(meta.pricingSnapshot)}::jsonb,
+        ${errorCode ?? null},
+        ${opts.responseMs},
+        ${opts.status === "error" && actualCostTL === 0 ? "error" : "success"}
+      )
+    `;
+
+    return [{ bakiye_tl: remainingTL.toFixed(4) }];
+  });
+
+  if (!rows.length) {
+    throw new InsufficientBalanceError("Insufficient balance to settle this request");
+  }
+
+  logger.info({ userId: opts.userId, modelId: opts.model.id, costTL: actualCostTL, remainingTL }, "reserved usage settled");
+  return { costTL: actualCostTL, remainingTL };
+}
+
 export async function chargeUsage(opts: {
   userId: string;
   apiKeyId: string;
@@ -107,18 +395,13 @@ export async function chargeUsage(opts: {
 
   const pricingCfg = await buildPricingConfig();
   const patchedModel = await applyOverride(model);
-  const computed = computePrice(patchedModel, pricingCfg);
-
-  const rawCostTL = computeCost(patchedModel, usage, computed, "tl");
-  const rawCostUsd = computeCost(patchedModel, usage, computed, "usd");
-  const costTL = round4(rawCostTL);
-  const costUsd = round8(rawCostUsd);
-  const pricingSnapshot = buildPricingSnapshot(patchedModel, computed);
-
-  // Derive usageRecord fields
-  const inputUsage = usage.promptTokens ?? usage.imageCount ?? Math.round((usage.videoSeconds ?? 0) * 1000);
-  const outputUsage = usage.completionTokens ?? 0;
-  const recordType = model.type === "Metin" ? "text" : model.type === "Görsel" ? "image" : "video";
+  const meta = buildUsageChargeMeta(patchedModel, usage, computePrice(patchedModel, pricingCfg), rawUsageJson);
+  const costTL = meta.costTL;
+  const costUsd = meta.costUsd;
+  const pricingSnapshot = meta.pricingSnapshot;
+  const inputUsage = meta.inputUsage;
+  const outputUsage = meta.outputUsage;
+  const recordType = meta.recordType;
 
   if (status === "error" || costTL === 0) {
     // Insert usage record with cost=0, no balance deduction
@@ -136,7 +419,7 @@ export async function chargeUsage(opts: {
       remainingTL: remainingTL.toFixed(4),
       requestId,
       upstreamRequestId,
-      rawUsageJson: (rawUsageJson ?? usage) as any,
+      rawUsageJson: meta.rawUsageJson as any,
       pricingSnapshotJson: pricingSnapshot as any,
       errorCode: errorCode ?? (status === "stream_missing_usage" ? "stream_missing_usage" : undefined),
       responseMs,
@@ -226,7 +509,7 @@ export async function chargeUsage(opts: {
         ${remainingTL.toFixed(4)}::numeric,
         ${requestId ?? null},
         ${upstreamRequestId ?? null},
-        ${JSON.stringify(rawUsageJson ?? usage)}::jsonb,
+        ${JSON.stringify(meta.rawUsageJson)}::jsonb,
         ${JSON.stringify(pricingSnapshot)}::jsonb,
         ${errorCode ?? null},
         ${responseMs},
@@ -250,7 +533,7 @@ export async function chargeUsage(opts: {
       costTL: "0",
       requestId,
       upstreamRequestId,
-      rawUsageJson: (rawUsageJson ?? usage) as any,
+      rawUsageJson: meta.rawUsageJson as any,
       pricingSnapshotJson: pricingSnapshot as any,
       errorCode: "insufficient_balance",
       responseMs,

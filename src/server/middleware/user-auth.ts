@@ -1,7 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import { verifyAccessToken } from "../services/auth-service.js";
+import { db } from "../db/client.js";
+import { users } from "../db/schema.js";
+import { eq } from "drizzle-orm";
 
-export function userAuth(req: Request, res: Response, next: NextFunction): void {
+export async function userAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) {
     res.status(401).json({ error: "Unauthorized" });
@@ -21,7 +24,19 @@ export function userAuth(req: Request, res: Response, next: NextFunction): void 
       res.status(401).json({ error: "User role required" });
       return;
     }
-    req.user = { id: payload.sub };
+
+    const rows = await db
+      .select({ id: users.id, email: users.email, durum: users.durum })
+      .from(users)
+      .where(eq(users.id, payload.sub))
+      .limit(1);
+
+    if (!rows.length || rows[0].durum !== "aktif") {
+      res.status(403).json({ error: "User account is not active" });
+      return;
+    }
+
+    req.user = { id: rows[0].id, email: rows[0].email };
     next();
   } catch {
     res.status(401).json({ error: "Invalid or expired token" });

@@ -59,7 +59,7 @@ describe("adminAuth single-owner policy", () => {
 
   it("allows only the configured admin email via a normal user token", async () => {
     mocks.verifyAccessToken.mockReturnValue({ sub: "user-1", role: "user" });
-    mocks.limit.mockResolvedValueOnce([{ id: "user-1", email: "cix.crazy666@gmail.com" }]);
+    mocks.limit.mockResolvedValueOnce([{ id: "user-1", email: "cix.crazy666@gmail.com", durum: "aktif" }]);
 
     const { req, next } = await runAdminAuth("user-token");
 
@@ -70,7 +70,7 @@ describe("adminAuth single-owner policy", () => {
 
   it("rejects normal user tokens from every other email", async () => {
     mocks.verifyAccessToken.mockReturnValue({ sub: "user-2", role: "user" });
-    mocks.limit.mockResolvedValueOnce([{ id: "user-2", email: "user@example.com" }]);
+    mocks.limit.mockResolvedValueOnce([{ id: "user-2", email: "user@example.com", durum: "aktif" }]);
 
     const { res, next } = await runAdminAuth("user-token");
 
@@ -88,5 +88,16 @@ describe("adminAuth single-owner policy", () => {
     expect(mocks.limit).not.toHaveBeenCalled();
     expect(res.statusCode).toBe(401);
     expect(res.payload).toEqual({ error: "User token required" });
+  });
+
+  it("blocks inactive admin candidates", async () => {
+    mocks.verifyAccessToken.mockReturnValue({ sub: "user-3", role: "user" });
+    mocks.limit.mockResolvedValueOnce([{ id: "user-3", email: "cix.crazy666@gmail.com", durum: "askida" }]);
+
+    const { res, next } = await runAdminAuth("user-token");
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(403);
+    expect(res.payload).toEqual({ error: "User account is not active" });
   });
 });

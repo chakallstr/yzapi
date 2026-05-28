@@ -35,7 +35,7 @@ export async function adminAuth(req: Request, res: Response, next: NextFunction)
     }
 
     const rows = await db
-      .select({ id: users.id, email: users.email })
+      .select({ id: users.id, email: users.email, durum: users.durum })
       .from(users)
       .where(eq(users.id, payload.sub))
       .limit(1);
@@ -46,6 +46,10 @@ export async function adminAuth(req: Request, res: Response, next: NextFunction)
     }
 
     const user = rows[0];
+    if (user.durum !== "aktif") {
+      res.status(403).json({ error: "User account is not active" });
+      return;
+    }
     if (normalizeEmail(user.email) !== ADMIN_EMAIL) {
       res.status(403).json({ error: "Admin email required" });
       return;

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "../db/client.js";
 import { users, apiKeys, usageRecords } from "../db/schema.js";
 import { eq, and, desc } from "drizzle-orm";
-import { decryptApiKey, encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
+import { encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
 import { writeAudit } from "../services/audit-service.js";
 import { getWhatsappVerificationSummary } from "../services/whatsapp-otp-service.js";
 
@@ -40,7 +40,6 @@ router.get("/api-keys", async (req, res, next) => {
       id: row.id,
       ad: row.ad,
       maskedKey: row.maskedKey,
-      fullKey: decryptApiKey(row.fullKeyCipher) ?? null,
       prefix: row.prefix,
       olusturma: row.olusturma,
       sonKullanim: row.sonKullanim,

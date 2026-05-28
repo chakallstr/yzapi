@@ -4,11 +4,12 @@ import { logger } from "../lib/logger.js";
 import { BadRequestError, InsufficientBalanceError, ModelDisabledError, ModelNotFoundError, RateLimitError } from "../lib/errors.js";
 import { MASTER_MODELS, canonicalizeModelId, type MasterModel } from "../../master-models.js";
 import { checkRateLimit } from "../services/rate-limit-service.js";
-import { chargeUsage } from "../services/billing-service.js";
+import { reserveUsageBudget, settleReservedUsage } from "../services/billing-service.js";
 import { activeProviderAdapter } from "../services/provider-adapter.js";
 import { db } from "../db/client.js";
 import { modelOverrides, users } from "../db/schema.js";
 import { eq } from "drizzle-orm";
+import { buildRequestGuard, type RequestGuardResult } from "../services/request-guard-service.js";
 
 const router = Router();
 
@@ -67,6 +68,7 @@ async function enforceRequestGuards(opts: {
   apiKeyId: string;
   modelId: string | undefined;
   endpoint: string;
+  body: Record<string, unknown>;
 }): Promise<MasterModel> {
   const masterModel = await resolveEnabledModel(opts.modelId, opts.endpoint);
 
@@ -111,10 +113,19 @@ async function handleTextJsonEndpoint(
   const requestId = (req as any).id as string;
   const start = Date.now();
   let masterModel: MasterModel | undefined;
+  let guard: RequestGuardResult | undefined;
 
   try {
-    masterModel = await enforceRequestGuards({ userId, apiKeyId, modelId: model, endpoint });
-    const providerBody = { ...req.body, model: masterModel.id };
+    masterModel = await enforceRequestGuards({ userId, apiKeyId, modelId: model, endpoint, body: req.body as Record<string, unknown> });
+    guard = buildRequestGuard({ endpoint, model: masterModel, body: req.body as Record<string, unknown> });
+    await reserveUsageBudget({
+      userId,
+      apiKeyId,
+      model: masterModel,
+      usage: { promptTokens: guard.contextTokens, completionTokens: guard.reservedCompletionTokens },
+      requestId,
+    });
+    const providerBody = { ...guard.guardedBody, model: masterModel.id };
     const forwarder = endpoint === "responses"
       ? activeProviderAdapter.forwardResponses.bind(activeProviderAdapter)
       : activeProviderAdapter.forwardMessages.bind(activeProviderAdapter);
@@ -122,7 +133,7 @@ async function handleTextJsonEndpoint(
     const { raw, usage } = await forwarder(providerBody);
     const responseMs = Date.now() - start;
 
-    const { costTL, remainingTL } = await chargeUsage({
+    const { costTL, remainingTL } = await settleReservedUsage({
       userId,
       apiKeyId,
       model: masterModel,
@@ -139,15 +150,15 @@ async function handleTextJsonEndpoint(
     if (err instanceof InsufficientBalanceError || err instanceof RateLimitError || err instanceof ModelNotFoundError || err instanceof ModelDisabledError || err instanceof BadRequestError) {
       return next(err);
     }
-    if (masterModel) {
+    if (masterModel && guard) {
       const responseMs = Date.now() - start;
-      chargeUsage({
+      settleReservedUsage({
         userId,
         apiKeyId,
         model: masterModel,
-        usage: {},
+        usage: { promptTokens: guard.contextTokens, completionTokens: 0 },
         requestId,
-        rawUsageJson: {},
+        rawUsageJson: { promptTokens: guard.contextTokens, completionTokens: 0 },
         errorCode: upstreamErrorCode(err),
         responseMs,
         status: "error",
@@ -169,21 +180,27 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
   const start = Date.now();
   const isStream = stream === true;
   let masterModel: MasterModel | undefined;
+  let guard: RequestGuardResult | undefined;
 
   try {
-    masterModel = await enforceRequestGuards({ userId, apiKeyId, modelId: model, endpoint: "chat" });
+    masterModel = await enforceRequestGuards({ userId, apiKeyId, modelId: model, endpoint: "chat", body: req.body as Record<string, unknown> });
+    guard = buildRequestGuard({ endpoint: "chat", model: masterModel, body: req.body as Record<string, unknown> });
+    await reserveUsageBudget({
+      userId,
+      apiKeyId,
+      model: masterModel,
+      usage: { promptTokens: guard.contextTokens, completionTokens: guard.reservedCompletionTokens },
+      requestId,
+    });
+    const providerBody = { ...guard.guardedBody, model: masterModel.id };
 
     if (isStream) {
-      // Set billing headers before streaming — we'll add them via trailers or log them
-      // We cannot set headers after stream starts, so set placeholders
       res.setHeader("X-YZ-Request-Id", requestId);
-
-      const usage = await activeProviderAdapter.forwardChatStream({ ...req.body, model: masterModel.id }, res);
+      const usage = await activeProviderAdapter.forwardChatStream(providerBody as any, res);
       const responseMs = Date.now() - start;
 
-      // Billing out-of-band after stream completes
       const streamStatus = usage.promptTokens > 0 || usage.completionTokens > 0 ? "success" : "stream_missing_usage";
-      chargeUsage({
+      await settleReservedUsage({
         userId,
         apiKeyId,
         model: masterModel,
@@ -193,18 +210,12 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
         errorCode: streamStatus === "stream_missing_usage" ? "stream_missing_usage" : undefined,
         responseMs,
         status: streamStatus,
-      })
-        .then(({ costTL, remainingTL }) => {
-          logger.info({ userId, costTL, remainingTL, requestId }, "stream billed");
-        })
-        .catch((err) => {
-          logger.error({ err, requestId }, "stream billing failed (out-of-band)");
-        });
+      });
     } else {
-      const { raw, usage } = await activeProviderAdapter.forwardChat({ ...req.body, model: masterModel.id });
+      const { raw, usage } = await activeProviderAdapter.forwardChat(providerBody as any);
       const responseMs = Date.now() - start;
 
-      const { costTL, remainingTL } = await chargeUsage({
+      const { costTL, remainingTL } = await settleReservedUsage({
         userId,
         apiKeyId,
         model: masterModel,
@@ -231,16 +242,15 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       return next(err);
     }
 
-    // Log usage record for upstream errors
-    if (masterModel) {
+    if (masterModel && guard) {
       const responseMs = Date.now() - start;
-      chargeUsage({
+      settleReservedUsage({
         userId,
         apiKeyId,
         model: masterModel,
-        usage: {},
+        usage: { promptTokens: guard.contextTokens, completionTokens: 0 },
         requestId,
-        rawUsageJson: {},
+        rawUsageJson: { promptTokens: guard.contextTokens, completionTokens: 0 },
         errorCode: upstreamErrorCode(err),
         responseMs,
         status: "error",
