@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "../db/client.js";
-import { users, apiKeys, usageRecords } from "../db/schema.js";
+import { users, apiKeys, usageRecords, systemConfig } from "../db/schema.js";
 import { eq, and, desc } from "drizzle-orm";
 import { encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
 import { writeAudit } from "../services/audit-service.js";
@@ -15,8 +15,16 @@ router.get("/me", async (req, res, next) => {
     if (!rows.length) { res.status(404).json({ error: "User not found" }); return; }
     const { passwordHash, ...safe } = rows[0];
     void passwordHash; // explicitly consumed
+    const configRows = await db
+      .select({ kur: systemConfig.kur })
+      .from(systemConfig)
+      .where(eq(systemConfig.id, 1))
+      .limit(1);
+    const kur = Number(configRows[0]?.kur ?? 0);
+    const bakiyeTL = Number(safe.bakiyeTL ?? 0);
+    const bakiyeUsd = kur > 0 ? bakiyeTL / kur : 0;
     const whatsapp = await getWhatsappVerificationSummary(req.user!.id);
-    res.json({ ...safe, ...whatsapp });
+    res.json({ ...safe, bakiyeUsd, ...whatsapp });
   } catch (e) { next(e); }
 });
 

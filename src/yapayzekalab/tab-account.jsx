@@ -411,7 +411,7 @@ const TopUpAmount = ({ amount, selected, onSelect, tlRate }) => (
 
 const AccountTab = ({ ctx }) => {
   const { tweaks, setTweak, goto } = ctx;
-  const fallbackBalanceUSD = tweaks.balanceUSD ?? 0;
+  const fallbackBalanceUSD = 0;
   const tlRate = tweaks.tlRate ?? 34.5;
   const MIN_USD = 2;
 

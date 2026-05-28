@@ -49,7 +49,7 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "textMultiplier": 3.0,
   "mediaMultiplier": 2.3,
   "feePct": 5,
-  "balanceUSD": 15.20
+  "balanceUSD": 0
 }/*EDITMODE-END*/;
 
 const useAppSettings = (defaults) => {
