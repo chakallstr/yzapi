@@ -19,6 +19,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/server/db/migrate.ts",
     "db:seed": "tsx src/server/db/seed.ts",
+    "db:reset:users": "node scripts/reset-user-data.mjs --confirm",
     "db:studio": "drizzle-kit studio",
     "db:up": "docker compose up -d postgres",
     "deploy": "bash scripts/deploy.sh",

@@ -8,12 +8,9 @@ import * as schema from "./schema.js";
 
 const {
   systemConfig,
-  users,
   plans,
   providerDurumlari,
   announcements,
-  apiKeys,
-  transactions,
 } = schema;
 
 async function main() {
@@ -101,74 +98,7 @@ async function main() {
   }
   console.log("  plans upserted");
 
-  // ── users ─────────────────────────────────────────────────────────────────────
-  const seedUsers = [
-    {
-      id: "00000000-0000-0000-0000-000000000001",
-      email: "ali.yilmaz@ornek.com",
-      adSoyad: "Ali Yılmaz",
-      bakiyeTL: "250.50",
-      toplamHarcamaTL: "892.30",
-      toplamIstek: 1240,
-      durum: "aktif",
-      kayitTarihi: new Date("2026-01-15"),
-      sonAktivite: new Date("2026-05-23T14:22:00Z"),
-      plan: "gelistirici",
-      apiKeyCount: 2,
-      not: "",
-      gunlukLimitTL: null,
-    },
-    {
-      id: "00000000-0000-0000-0000-000000000002",
-      email: "zeynep.kaya@ornek.com",
-      adSoyad: "Zeynep Kaya",
-      bakiyeTL: "18.00",
-      toplamHarcamaTL: "1240.00",
-      toplamIstek: 3870,
-      durum: "aktif",
-      kayitTarihi: new Date("2026-02-08"),
-      sonAktivite: new Date("2026-05-23T16:05:00Z"),
-      plan: "pro",
-      apiKeyCount: 3,
-      not: "Aylık yükleme yapıyor",
-      gunlukLimitTL: "50",
-    },
-    {
-      id: "00000000-0000-0000-0000-000000000003",
-      email: "mehmet.demir@ornek.com",
-      adSoyad: "Mehmet Demir",
-      bakiyeTL: "0",
-      toplamHarcamaTL: "5.20",
-      toplamIstek: 18,
-      durum: "askida",
-      kayitTarihi: new Date("2026-04-20"),
-      sonAktivite: new Date("2026-05-01T09:10:00Z"),
-      plan: "ucretsiz",
-      apiKeyCount: 1,
-      not: "Deneme aşamasında",
-      gunlukLimitTL: "5",
-    },
-    {
-      id: "00000000-0000-0000-0000-000000000004",
-      email: "ayse.celik@firma.com",
-      adSoyad: "Ayşe Çelik",
-      bakiyeTL: "5000.00",
-      toplamHarcamaTL: "12400.00",
-      toplamIstek: 28900,
-      durum: "aktif",
-      kayitTarihi: new Date("2025-11-01"),
-      sonAktivite: new Date("2026-05-23T17:48:00Z"),
-      plan: "kurumsal",
-      apiKeyCount: 8,
-      not: "Kurumsal müşteri, öncelikli destek",
-      gunlukLimitTL: null,
-    },
-  ];
-
-  for (const user of seedUsers) {
-    await db.insert(users).values(user).onConflictDoNothing();
-  }
-  console.log("  users upserted");
+  console.log("  users skipped");
 
   // ── provider_durumlari ────────────────────────────────────────────────────────
   const seedProviders = [
@@ -198,92 +128,8 @@ async function main() {
     .onConflictDoNothing();
   console.log("  announcements upserted");
 
-  // ── api_keys ──────────────────────────────────────────────────────────────────
-  // NOTE (Phase B): These seed keys have keyHash=null and prefix="".
-  // They are display-only and will NOT authenticate via the new api-key-auth middleware.
-  // Real keys are created by users via POST /api/user/api-keys which bcrypt-hashes them.
-  const seedApiKeys = [
-    {
-      id: "00000000-0000-0000-0000-000000000021",
-      userId: "00000000-0000-0000-0000-000000000001",
-      ad: "production",
-      maskedKey: "yzk_live_••••a3f2",
-      keyHash: null,
-      prefix: "yzk_live_",
-      olusturma: new Date("2026-02-10T09:00:00Z"),
-      sonKullanim: new Date("2026-05-23T14:22:00Z"),
-      aktif: true,
-    },
-    {
-      id: "00000000-0000-0000-0000-000000000022",
-      userId: "00000000-0000-0000-0000-000000000001",
-      ad: "staging",
-      maskedKey: "yzk_test_••••8b1c",
-      keyHash: null,
-      prefix: "yzk_test_",
-      olusturma: new Date("2026-03-05T11:30:00Z"),
-      sonKullanim: null,
-      aktif: true,
-    },
-    {
-      id: "00000000-0000-0000-0000-000000000023",
-      userId: "00000000-0000-0000-0000-000000000002",
-      ad: "main",
-      maskedKey: "yzk_live_••••f44e",
-      keyHash: null,
-      prefix: "yzk_live_",
-      olusturma: new Date("2026-02-15T15:00:00Z"),
-      sonKullanim: new Date("2026-05-23T16:05:00Z"),
-      aktif: true,
-    },
-    {
-      id: "00000000-0000-0000-0000-000000000024",
-      userId: "00000000-0000-0000-0000-000000000004",
-      ad: "kurumsal-1",
-      maskedKey: "yzk_live_••••c0d8",
-      keyHash: null,
-      prefix: "yzk_live_",
-      olusturma: new Date("2025-11-02T10:00:00Z"),
-      sonKullanim: new Date("2026-05-23T17:48:00Z"),
-      aktif: true,
-    },
-  ];
-
-  for (const key of seedApiKeys) {
-    await db.insert(apiKeys).values(key).onConflictDoNothing();
-  }
-  console.log("  api_keys upserted");
-
-  // ── transactions ──────────────────────────────────────────────────────────────
-  const seedTransactions = [
-    {
-      id: "00000000-0000-0000-0000-000000000031",
-      userId: "00000000-0000-0000-0000-000000000001",
-      userEmail: "ali.yilmaz@ornek.com",
-      tip: "yukleme",
-      miktarTL: "200",
-      oncekiBakiye: "50.50",
-      sonrakiBakiye: "250.50",
-      aciklama: "Kredi kartı yükleme",
-      timestamp: new Date("2026-05-20T10:00:00Z"),
-    },
-    {
-      id: "00000000-0000-0000-0000-000000000032",
-      userId: "00000000-0000-0000-0000-000000000002",
-      userEmail: "zeynep.kaya@ornek.com",
-      tip: "kullanim",
-      miktarTL: "-32.00",
-      oncekiBakiye: "50.00",
-      sonrakiBakiye: "18.00",
-      aciklama: "claude-sonnet-4.6 kullanımı",
-      timestamp: new Date("2026-05-23T16:05:00Z"),
-    },
-  ];
-
-  for (const tx of seedTransactions) {
-    await db.insert(transactions).values(tx).onConflictDoNothing();
-  }
-  console.log("  transactions upserted");
+  console.log("  api_keys skipped");
+  console.log("  transactions skipped");
 
   console.log("Seed complete.");
   await sql.end();
