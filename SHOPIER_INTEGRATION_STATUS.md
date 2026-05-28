@@ -106,3 +106,32 @@ Current state: YapayZekaLab can safely receive Shopier OSB callbacks after the p
 - Current live env still has `SHOPIER_API_KEY` and `SHOPIER_API_SECRET` unset, so YapayZekaLab correctly keeps the Shopier method disabled and `/api/payments/shopier/init` returns `503` without creating a payment row.
 
 Conclusion: The Shopier notification destination is now saved and the receiving endpoint is safe. Automatic card payment is still not launch-approved until true checkout credentials are installed and a real provider test order/callback proves valid, invalid, failed and duplicate behavior.
+
+## Non-Success Fallback Repair - 2026-05-28 08:29 TRT
+
+Root cause:
+
+- The OSB receiver already forwarded invalid signatures and unknown successful payment callbacks to `SHOPIER_OSB_FALLBACK_URL`.
+- Valid non-success callbacks (`fail`, `cancel`, similar states) were handled before checking whether `platform_order_id` belonged to YapayZekaLab.
+- After the global Shopier OSB URL was saved to YapayZekaLab, that could swallow fail/cancel notifications for another Shopier service instead of relaying them.
+
+Local repair:
+
+- `src/server/routes/payments.ts` now checks for a local payment row inside the non-success branch.
+- If no local payment exists and fallback is allowed, the original form-urlencoded body is forwarded to the fallback URL and the response is `{ ok: true, forwarded: true }`.
+- If a local payment exists, only that payment is marked `basarisiz`.
+- No credit path, amount check, currency check, idempotency path, frontend style, template, color or layout changed.
+
+Verification:
+
+- RED: `npm test -- src/payment-safety-contract.test.ts` failed before production code change, 1 failed / 9 passed.
+- GREEN: `npm test -- src/payment-safety-contract.test.ts` passed 10/10.
+- Targeted: `npm test -- src/payment-safety-contract.test.ts src/server/services/shopier-service.test.ts src/server/services/payment-pricing.test.ts` passed 3 files / 22 tests.
+- Regression: `npm run lint`, full `npm test` 30 files / 135 tests, `npm run build`, `npm run scan:public`, and `node scripts/scan-secrets.mjs` passed.
+- Live current-state smoke and UAT passed, but this local repair has not been deployed because the required fourth integrity guard could not be spawned.
+
+Release status:
+
+- Local fix accepted by 3/3 voting agents for the narrow backend repair.
+- Deploy and launch remain blocked by the user-required fourth integrity guard capacity plus missing Shopier checkout and Cryptomus provider E2E.
+- Automatic Shopier payment remains not launch-approved until rotated checkout credentials are installed and valid, invalid, failed and duplicate callback behavior is proven on live/sandbox.

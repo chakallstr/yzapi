@@ -288,6 +288,23 @@ Updated verdict: API billing, low balance, IBAN and manual crypto are live-pass.
 
 ---
 
+# Shopier OSB Relay Non-Success Regression - 2026-05-28 08:29 TRT
+
+| Alan | Sonuç | Kanıt |
+|---|---|---|
+| Root cause | CONFIRMED | Valid `fail/cancel` Shopier callbacks were handled before confirming whether `platform_order_id` belonged to YapayZekaLab. |
+| Local fix | PASS LOCAL | Non-success callback branch now checks local payment row first; unknown rows on OSB can forward to fallback. |
+| Regression contract | PASS LOCAL | RED first failed 1/10; after fix `src/payment-safety-contract.test.ts` passed 10/10. |
+| Targeted payment tests | PASS LOCAL | 3 files / 22 tests passed. |
+| Full regression | PASS LOCAL | lint, 30 files / 135 tests, build, public scan and secret scan passed. |
+| Live smoke/UAT | PASS CURRENT LIVE | Live smoke passed; live UAT passed 10/10 at `qa-artifacts/uat-smoke-2026-05-28T05-28-20-934Z/uat-smoke-report.md`. |
+| Deploy status | BLOCKED | The code fix is local only; the required fourth integrity guard agent could not be spawned due agent thread limit. |
+| Provider E2E | BLOCKED | `SHOPIER_API_KEY`, `SHOPIER_API_SECRET`, `CRYPTOMUS_API_KEY`, `CRYPTOMUS_MERCHANT_ID` remain unset on live. |
+
+Backend/Billing residual policy note: if the configured OSB fallback returns non-OK or is missing, the current non-success JSON branch may acknowledge after admin logging. Before automatic Shopier launch, decide whether Shopier should retry on fallback failure or whether admin alert plus acknowledgement is the intended policy.
+
+---
+
 # Local Provider Callback Hardening — 2026-05-27 20:52 TRT
 
 ## Eklenen Güvenlik Korumaları

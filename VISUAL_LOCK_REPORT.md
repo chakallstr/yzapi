@@ -230,3 +230,27 @@ Visual diff notes:
 - No CSS, theme token, color, font, spacing, layout, card, button, modal, icon, animation, route or template code changed.
 - Existing payment instruction component was populated by live config only.
 - BEP20 was not displayed as an enabled payment network because the supplied wallet address is TRON-format.
+
+---
+
+## 2026-05-28 Shopier OSB Non-Success Fallback Repair
+
+Files checked for visual/template risk:
+
+- `src/server/routes/payments.ts`
+- `src/payment-safety-contract.test.ts`
+
+Verification:
+
+- `npm run lint`: PASS.
+- `npm test`: PASS, 30 files / 135 tests.
+- `npm run build`: PASS.
+- `npm run scan:public`: PASS, 3 scanned / 0 hits.
+- `node scripts/scan-secrets.mjs`: PASS, 233 scanned / 0 hits.
+- `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat`: PASS, 10/10 for current live surface.
+
+Visual diff notes:
+
+- No frontend source file changed.
+- No CSS, theme token, color, font, spacing, layout, card, button, modal, icon, animation, route or template code changed.
+- The repair is backend-only Shopier callback routing plus a source contract test.

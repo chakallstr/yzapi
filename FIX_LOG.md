@@ -308,3 +308,21 @@ Operasyon tarihi: 2026-05-26
   - Güvenli canlı backend E2E: geçici IBAN ve manual crypto init kayıtları oluşturuldu, metod/referans/WhatsApp eşleşmesi assert edildi, test kayıtları temizlendi.
   - Standard Chrome: manual USDT TRC20 cüzdan talimatı ve WhatsApp ödeme bildirimi butonu görünür hale geldi.
 - Sonuç: LIVE MANUAL PAYMENT CONFIG FIXED. Shopier/Cryptomus provider valid/invalid/duplicate E2E hâlâ rotated provider env olmadan launch PASS sayılmaz.
+
+## SHOPIER-OSB-RELAY-002 — Unknown non-success OSB callback fallback
+
+- Problem: Shopier OSB panel URL global olarak YapayZekaLab endpointine kaydedildiğinde, başka servise ait valid `fail/cancel` callbackleri yerel ödeme kaydı kontrolü yapılmadan YapayZekaLab içinde sonlandırılabiliyordu.
+- Kök neden: `result.status !== "success"` branch'i, `platform_order_id` için local `payments` row var mı diye bakmadan erken return ediyordu. Fallback sadece invalid signature ve unknown success pathlerinde çalışıyordu.
+- Karar: `DEC-FIX-SHOPIER-OSB-NON-SUCCESS-001`, 3/3 local fix APPROVED. Deploy kararı `DEC-DEPLOY-SHOPIER-OSB-NON-SUCCESS-001` ile 4. guard kapasitesi ve provider E2E eksikliği nedeniyle BLOCKED.
+- Yapılan değişiklik:
+  - Non-success Shopier callbacklerinde önce local payment row aranır.
+  - Unknown row ve OSB fallback açık ise callback body fallback URL’ye form-urlencoded olarak iletilir.
+  - Known YapayZekaLab payment ise eski davranış korunur ve ödeme `basarisiz` işaretlenir.
+  - Frontend, tema, renk, layout, modal, kart, buton veya responsive yapı değiştirilmedi.
+- Test:
+  - RED: `npm test -- src/payment-safety-contract.test.ts` önce 1/10 fail verdi.
+  - GREEN: aynı test PASS 10/10.
+  - Targeted: `npm test -- src/payment-safety-contract.test.ts src/server/services/shopier-service.test.ts src/server/services/payment-pricing.test.ts` PASS 3 files / 22 tests.
+  - Full: `npm run lint` PASS; `npm test` PASS 30 files / 135 tests; `npm run build` PASS; `npm run scan:public` PASS 0 hits; `node scripts/scan-secrets.mjs` PASS 233 scanned / 0 hits.
+  - Live current surface: `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps` PASS; `QA_BASE_URL=https://yapayzekalab.org npm run qa:uat` PASS 10/10.
+- Sonuç: FIXED LOCALLY. LIVE DEPLOY BLOCKED UNTIL FOURTH INTEGRITY GUARD CAN RUN AND PROVIDER E2E GATE IS RESOLVED.

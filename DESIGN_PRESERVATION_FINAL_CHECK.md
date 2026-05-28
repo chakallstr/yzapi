@@ -101,3 +101,25 @@ Agent 3 vote: APPROVE_WITH_LIVE_RETEST_REQUIRED
 Agent 3 reason: Source and smoke evidence preserve visual lock locally; live Chrome retest is still required after migration/deploy.
 Approval count: 3/3
 Final decision: DESIGN PRESERVED LOCALLY FOR MANUAL PAYMENT INSTRUCTIONS
+
+---
+
+## 2026-05-28 Shopier OSB Non-Success Fallback Check
+
+Result: PASS for local backend-only repair.
+
+- Homepage, Models, SSS, API/account tab, Admin tab and balance modal source files were not changed.
+- Only `src/server/routes/payments.ts` and `src/payment-safety-contract.test.ts` changed.
+- No CSS files, global classes, theme tokens, colors, typography, responsive breakpoints, landing layout, model card layout, button style, card style or modal style changed.
+- Public scan passed with 0 forbidden-template hits.
+- Live UAT for the current deployed surface passed 10/10: `qa-artifacts/uat-smoke-2026-05-28T05-28-20-934Z/uat-smoke-report.md`.
+
+DEC-DESIGN-SHOPIER-OSB-NON-SUCCESS-001:
+Agent 1 vote: APPROVE
+Agent 1 reason: The fix has no user-facing template or layout changes.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend callback routing change does not alter frontend rendering.
+Agent 3 vote: APPROVE
+Agent 3 reason: Visual lock is preserved; no style/template files touched.
+Approval count: 3/3
+Final decision: DESIGN PRESERVED FOR SHOPIER OSB NON-SUCCESS LOCAL FIX

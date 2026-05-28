@@ -757,6 +757,43 @@ Final retest status: ACCEPTED_LIVE_MANUAL_PAYMENT_CONFIG
 
 Agent 4 integrity guard: APPROVE
 
+## SHOPIER-OSB-RELAY-002 Non-success unknown callback fallback regression
+
+Bug ID: SHOPIER-OSB-RELAY-002
+Fix decision ID: DEC-FIX-SHOPIER-OSB-NON-SUCCESS-001
+Retest decision ID: DEC-RETEST-SHOPIER-OSB-NON-SUCCESS-001
+Command or manual flow:
+- RED: `npm test -- src/payment-safety-contract.test.ts` before production change.
+- GREEN: `npm test -- src/payment-safety-contract.test.ts` after backend-only fix.
+- Targeted: `npm test -- src/payment-safety-contract.test.ts src/server/services/shopier-service.test.ts src/server/services/payment-pricing.test.ts`.
+- Regression: `npm run lint`, full `npm test`, `npm run build`, `npm run scan:public`, `node scripts/scan-secrets.mjs`, live smoke and live UAT.
+Expected:
+- Contract test fails before the fix because non-success callbacks do not prove fallback routing.
+- After the fix, unknown non-success `/shopier/osb` callbacks can forward to `SHOPIER_OSB_FALLBACK_URL`.
+- Known YapayZekaLab non-success callbacks still mark only the local payment failed.
+- No frontend/theme files change and no secrets are introduced.
+Actual:
+- RED test failed as expected: 1 failed / 9 passed.
+- GREEN contract passed: 10/10.
+- Targeted payment tests passed: 3 files / 22 tests.
+- Full tests passed: 30 files / 135 tests.
+- Lint/typecheck passed.
+- Build passed.
+- Public scan passed: 3 scanned / 0 hits.
+- Secret scan passed: 233 scanned / 0 hits.
+- Live smoke passed for health/status/models/authless gateway/JSON 404; funded/low-balance env keys absent for smoke.
+- Live UAT passed: 10/10, report `qa-artifacts/uat-smoke-2026-05-28T05-28-20-934Z/uat-smoke-report.md`.
+Passed/Failed: Passed locally; not deployed because fourth integrity guard agent could not be spawned and provider E2E remains incomplete.
+Evidence: Current session command output; changed files are `src/server/routes/payments.ts` and `src/payment-safety-contract.test.ts`.
+Agent 1 retest vote: APPROVE_FOR_LOCAL_FIX
+Agent 2 retest vote: CONDITIONAL_APPROVE
+Agent 3 retest vote: APPROVE_FOR_LOCAL_FIX_REJECT_FOR_LAUNCH
+Approval count: 3/3 for local fix, 0/3 for launch
+Final retest status: ACCEPTED_LOCALLY_DEPLOY_BLOCKED
+
+Residual policy note:
+- Backend/Billing flagged that if fallback returns non-OK or is missing, the current non-success JSON-mode branch may still acknowledge a non-success callback after admin logging. Before final Shopier launch, decide whether fallback failure should force a non-2xx response so Shopier retries, or whether admin alert plus acknowledgement is intentional.
+
 ## SHOPIER-OSB-LIVE-DEPLOY-001 Live Relay Deploy Retest
 
 Bug ID: R-BUG-007

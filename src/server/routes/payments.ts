@@ -245,11 +245,23 @@ async function handleShopierCallbackBody(
   }
 
   if (result.status !== "success") {
-    if (result.platformOrderId) {
+    const paymentRowsForFailure = result.platformOrderId
+      ? await db.select().from(payments).where(eq(payments.id, result.platformOrderId)).limit(1)
+      : [];
+
+    if (!paymentRowsForFailure.length && opts.allowFallback && await forwardShopierOsbFallback(body)) {
+      res.status(200).json({ ok: true, forwarded: true });
+      return;
+    }
+
+    if (paymentRowsForFailure.length && result.platformOrderId) {
       await db.update(payments)
         .set({ durum: "basarisiz", tamamlanma: new Date() })
         .where(eq(payments.id, result.platformOrderId));
+    } else if (result.platformOrderId) {
+      logger.warn({ paymentId: result.platformOrderId }, "Shopier callback: payment not found");
     }
+
     adminPaymentNotificationEmail({
       title: "Shopier ödeme başarısız",
       method: "shopier",

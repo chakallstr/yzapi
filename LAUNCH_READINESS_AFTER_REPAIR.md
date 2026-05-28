@@ -88,6 +88,8 @@ NOT READY — PAYMENT SECURITY BLOCKERS
 - Latest Shopier OSB relay deploy `2026-05-27 23:57 TRT`: commit `62a1fe4` deployed as `manual-20260527T205709Z-62a1fe4`; live service active; VPS `dist/server.js` contains `/api/payments/shopier/osb`; live env contains `SHOPIER_OSB_FALLBACK_URL`; live smoke PASS; live UAT PASS 10/10, report `qa-artifacts/uat-smoke-2026-05-27T20-57-26-842Z/uat-smoke-report.md`.
 - Latest Shopier panel state: existing Chrome Shopier OSB field was prepared for `https://yapayzekalab.org/api/payments/shopier/osb`, but final provider-side `KAYDET` has not been submitted yet because this changes the global Shopier notification destination.
 - Latest full live recheck `2026-05-28 00:18 TRT`: Shopier OSB URL was saved in the provider panel; incomplete callback returned `400 JSON` and created no Shopier payment/transaction rows; local lint/tests/build/public scan/secret scan PASS; live smoke PASS; live UAT PASS 10/10; funded gateway billing PASS with balance decrement and usage record; low-balance key returned 402 without spend; IBAN/manual crypto temp init PASS; Shopier init remains safe-disabled with 503 because checkout credentials are unset.
+- Latest Shopier OSB non-success local repair `2026-05-28 08:29 TRT`: RED contract first failed 1/10; backend-only fix now checks local payment existence before handling valid non-success callbacks and forwards unknown OSB callbacks to fallback; contract PASS 10/10; targeted payment tests PASS 3 files / 22 tests; lint PASS; full tests PASS 30 files / 135 tests; build PASS; public scan PASS; secret scan PASS 233 scanned / 0 hits; live smoke PASS; live UAT PASS 10/10 (`qa-artifacts/uat-smoke-2026-05-28T05-28-20-934Z/uat-smoke-report.md`). This fix is not live-deployed because the required fourth integrity guard could not be spawned and automatic provider E2E remains incomplete.
+- Current agent gate update `2026-05-28 08:29 TRT`: Agent 1 QA/UAT APPROVE local fix but REJECT deploy/release; Agent 2 Backend/Billing CONDITIONAL_APPROVE local fix and flags fallback-failure response policy for final Shopier launch; Agent 3 Security/Release APPROVE backend-only fix but REJECT launch; Agent 4 integrity guard could not be spawned due agent thread limit, so deploy/full launch gate is blocked.
 
 ## Final 3-Agent Vote
 
@@ -105,3 +107,15 @@ Reason: Design was preserved and secret scan is clean, but full release cannot b
 Approval count: 0/3
 
 Final verdict: NOT READY — PAYMENT SECURITY BLOCKERS
+
+## Current Verdict After 2026-05-28 08:29 TRT Recheck
+
+Final verdict remains: NOT READY — PAYMENT SECURITY BLOCKERS
+
+Reasons:
+
+- Automatic Shopier checkout remains disabled on live because `SHOPIER_API_KEY` and `SHOPIER_API_SECRET` are unset.
+- Automatic Cryptomus provider remains disabled on live because `CRYPTOMUS_API_KEY` and `CRYPTOMUS_MERCHANT_ID` are unset.
+- Valid/invalid/failed/duplicate provider E2E for Shopier and Cryptomus is still not proven.
+- The local Shopier OSB non-success relay fix is verified but not deployed under the required four-agent gate.
+- The fourth integrity guard could not be spawned because the agent thread limit was reached, so the user's deployment governance rule blocks deploy/launch approval.

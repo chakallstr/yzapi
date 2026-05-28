@@ -34,6 +34,54 @@ Status: COMPLETED
 
 ---
 
+Decision ID: DEC-FIX-SHOPIER-OSB-NON-SUCCESS-001
+Decision title: Forward unknown non-success Shopier OSB callbacks to fallback
+Decision type: Fix approval
+Related bug IDs: SHOPIER-OSB-RELAY-002
+Evidence from reports: Shopier OSB URL is now globally saved to YapayZekaLab. Review found `result.status !== "success"` was handled before confirming the callback belongs to a local YapayZekaLab payment, so fail/cancel callbacks for another Shopier service could be acknowledged locally instead of relayed.
+Files likely affected: `src/server/routes/payments.ts`, `src/payment-safety-contract.test.ts`
+Risk level: Medium payment integration risk if left unfixed; low implementation risk.
+Design/template impact: None; backend callback handling and test only.
+Security impact: Positive; prevents accidental interception of another service's Shopier fail/cancel callbacks.
+Backend/API/billing impact: Positive; local YapayZekaLab failed payments still mark failed, unknown callbacks fall through to configured OSB fallback.
+Proposed action: Add a regression contract for unknown non-success fallback, then check payment existence before handling Shopier non-success callbacks locally.
+Agent 1 vote: APPROVE
+Agent 1 reason: QA/UAT accepted the narrow backend-only fix after RED test reproduced the regression risk.
+Agent 2 vote: APPROVE
+Agent 2 reason: Backend/billing impact is constrained to Shopier callback routing; no balance credit path is loosened.
+Agent 3 vote: APPROVE
+Agent 3 reason: Security/Release approved the backend-only scope and confirmed no visual/theme impact.
+Approval count: 3/3
+Final decision: APPROVED_FOR_LOCAL_FIX
+Allowed next action: Keep production code backend-only, run targeted and full regression, and do not claim launch readiness without provider E2E.
+Status: IMPLEMENTED_LOCALLY
+
+---
+
+Decision ID: DEC-DEPLOY-SHOPIER-OSB-NON-SUCCESS-001
+Decision title: Deploy Shopier non-success OSB fallback repair to live
+Decision type: Deploy gate
+Related bug IDs: SHOPIER-OSB-RELAY-002
+Evidence from reports: Local tests/build/scans and live smoke/UAT pass, but the user-required fourth end-to-end integrity guard could not be spawned because the agent thread limit was reached.
+Files likely affected: Live `dist/server.js` only if deployed.
+Risk level: Medium if deployed without full gate; low technical patch risk.
+Design/template impact: None.
+Security impact: Positive after deploy, but release governance is incomplete.
+Backend/API/billing impact: Shopier OSB unknown fail/cancel callbacks would safely forward to fallback.
+Proposed action: Do not deploy until the fourth guard capacity is available or the user explicitly overrides the four-agent deployment rule in writing.
+Agent 1 vote: APPROVE_FOR_FIX_NOT_RELEASE
+Agent 1 reason: QA/UAT approved code scope but rejected deploy/full release without the fourth guard and live provider E2E.
+Agent 2 vote: NEEDS_MORE_EVIDENCE
+Agent 2 reason: Backend tests pass locally, but live provider E2E and deploy gate are incomplete.
+Agent 3 vote: REJECT_FOR_LAUNCH
+Agent 3 reason: Security/Release says automatic Shopier/Cryptomus provider E2E and the full gate are still missing.
+Approval count: 1/3 for deploy
+Final decision: DEPLOY_BLOCKED
+Allowed next action: Keep local fix ready, update reports, and rerun four-agent deploy gate when capacity is available.
+Status: BLOCKED_BY_AGENT_CAPACITY_AND_PROVIDER_E2E
+
+---
+
 Decision ID: DEC-DEPLOY-SHOPIER-OSB-LIVE-001
 Decision title: Deploy Shopier OSB relay to live with fallback guard
 Decision type: Deploy approval and retest acceptance

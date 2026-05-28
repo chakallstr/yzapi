@@ -146,5 +146,7 @@ describe("payment safety contract", () => {
     expect(paymentsRoute).toContain("application/x-www-form-urlencoded");
     expect(paymentsRoute).toContain("forwarded: true");
     expect(paymentsRoute).toContain("mode: \"json\"");
+    expect(paymentsRoute).toMatch(/if\s*\(result\.status !== "success"\)[\s\S]{0,600}paymentRowsForFailure/);
+    expect(paymentsRoute).toMatch(/paymentRowsForFailure\.length[\s\S]{0,240}forwardShopierOsbFallback/);
   });
 });
