@@ -33,7 +33,6 @@
     "ops:vps-status": "bash scripts/vps-ops-status.sh"
   },
   "dependencies": {
-    "@google/genai": "^2.4.0",
     "@types/bcrypt": "^6.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node-cron": "^3.0.11",

@@ -8,7 +8,6 @@ const schema = z.object({
   PORT: z.coerce.number().default(4567),
   DATABASE_URL: z.string(),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
-  GEMINI_API_KEY: z.string().optional(),
 
   // Auth
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),

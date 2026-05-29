@@ -15,9 +15,6 @@ import authRouter from "./routes/auth.js";
 import userRouter from "./routes/user.js";
 import modelsRouter from "./routes/models.js";
 import settingsRouter from "./routes/settings.js";
-import logsRouter from "./routes/logs.js";
-import filesRouter from "./routes/files.js";
-import legacyRouter from "./routes/legacy.js";
 import proxyRouter from "./routes/proxy.js";
 import paymentsRouter from "./routes/payments.js";
 import telegramRouter from "./routes/telegram.js";
@@ -135,12 +132,6 @@ export function createApp(): express.Express {
 
   app.use("/api", modelsRouter);
   app.use("/api", settingsRouter);
-  app.use("/api", logsRouter);
-  // route-agent (legacy) and files endpoints spend the real GEMINI_API_KEY, so they
-  // must require an authenticated user. Public read endpoints (models, public-config,
-  // announcements) stay unauthenticated and are mounted above without userAuth.
-  app.use("/api", userAuth, requireWhatsappVerified, filesRouter);
-  app.use("/api", userAuth, requireWhatsappVerified, legacyRouter);
 
   app.use("/api/payments", paymentsRouter);
   app.use("/api/telegram", telegramRouter);
