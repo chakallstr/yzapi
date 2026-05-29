@@ -71,6 +71,13 @@
       "when": 1780089600000,
       "tag": "0009_api_key_full_cipher",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1780176000000,
+      "tag": "0010_telegram_link_identity",
+      "breakpoints": true
     }
   ]
 }

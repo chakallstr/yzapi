@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   insertedPayments: [] as Array<Record<string, unknown>>,
   updatedPayments: [] as Array<Record<string, unknown>>,
   createCryptoPayInvoice: vi.fn(),
+  createTelegramLinkCode: vi.fn(),
+  consumeTelegramLinkCode: vi.fn(),
+  parseTelegramCommand: vi.fn(() => ({ type: "menu" })),
   upsertTelegramAccount: vi.fn(),
   getUserBalanceTL: vi.fn(),
   getTelegramUsageMessage: vi.fn(),
@@ -50,7 +53,10 @@ vi.mock("../middleware/admin-auth.js", () => ({
 }));
 
 vi.mock("../middleware/user-auth.js", () => ({
-  userAuth: vi.fn((_req, _res, next) => next()),
+  userAuth: vi.fn((req, _res, next) => {
+    req.user = { id: "user_test_1", email: "user@example.com" };
+    next();
+  }),
 }));
 
 vi.mock("../services/payment-common.js", () => ({
@@ -92,14 +98,14 @@ vi.mock("../services/telegram-bot-service.js", () => ({
       [{ text: "Geri", callback_data: "tg:menu" }],
     ],
   })),
-  consumeTelegramLinkCode: vi.fn(),
-  createTelegramLinkCode: vi.fn(),
+  consumeTelegramLinkCode: mocks.consumeTelegramLinkCode,
+  createTelegramLinkCode: mocks.createTelegramLinkCode,
   deliverApiAccessToTelegramUser: mocks.deliverApiAccessToTelegramUser,
   editTelegramMessageText: mocks.editTelegramMessageText,
   formatBalanceMessage: vi.fn((balance: number) => `Güncel bakiyen: ${balance.toFixed(2)} TL`),
   getUserBalanceTL: mocks.getUserBalanceTL,
   getTelegramUsageMessage: mocks.getTelegramUsageMessage,
-  parseTelegramCommand: vi.fn(() => ({ type: "menu" })),
+  parseTelegramCommand: mocks.parseTelegramCommand,
   sendTelegramMessage: mocks.sendTelegramMessage,
   upsertTelegramAccount: mocks.upsertTelegramAccount,
 }));
@@ -125,6 +131,7 @@ function validInitData() {
 async function createTelegramTestServer(): Promise<{ baseUrl: string; server: Server }> {
   vi.resetModules();
   process.env.TELEGRAM_BOT_TOKEN = BOT_TOKEN;
+  process.env.TELEGRAM_BOT_USERNAME = "YapayZekaLabAPIBot";
   process.env.CRYPTO_PAY_API_TOKEN = "crypto-pay-token";
   process.env.APP_BASE_URL = "https://yapayzekalab.example";
 
@@ -153,6 +160,12 @@ async function readJson(response: globalThis.Response): Promise<Record<string, u
   return await response.json() as Record<string, unknown>;
 }
 
+async function flushAsyncWork(cycles = 8): Promise<void> {
+  for (let i = 0; i < cycles; i += 1) {
+    await Promise.resolve();
+  }
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date(NOW_SEC * 1000));
@@ -160,6 +173,13 @@ beforeEach(() => {
   mocks.configRows = [{ kur: "47.084289", minBakiyeTL: "250", maxBakiyeTL: "50000" }];
   mocks.insertedPayments = [];
   mocks.updatedPayments = [];
+  mocks.createTelegramLinkCode.mockResolvedValue({
+    code: "ABC123",
+    expiresAt: new Date("2026-05-29T10:15:00.000Z"),
+  });
+  mocks.consumeTelegramLinkCode.mockReset();
+  mocks.parseTelegramCommand.mockReset();
+  mocks.parseTelegramCommand.mockReturnValue({ type: "menu" });
   mocks.upsertTelegramAccount.mockResolvedValue({
     userId: "user_test_1",
     telegramAccountId: "telegram_account_test_1",
@@ -180,6 +200,24 @@ afterEach(() => {
 });
 
 describe("telegram WebApp route contract", () => {
+  it("returns a deep-link URL for authenticated site users who want to bind Telegram", async () => {
+    const { baseUrl, server } = await createTelegramTestServer();
+    try {
+      const response = await fetch(`${baseUrl}/api/telegram/link-code`, {
+        method: "POST",
+      });
+
+      expect(response.status).toBe(200);
+      expect(await readJson(response)).toMatchObject({
+        code: "ABC123",
+        deepLinkUrl: "https://t.me/YapayZekaLabAPIBot?start=link_ABC123",
+      });
+      expect(mocks.createTelegramLinkCode).toHaveBeenCalledWith("user_test_1");
+    } finally {
+      await closeServer(server);
+    }
+  });
+
   it("returns linked Telegram balance and payment limits for valid initData", async () => {
     const { baseUrl, server } = await createTelegramTestServer();
     try {
@@ -201,6 +239,30 @@ describe("telegram WebApp route contract", () => {
         },
       });
       expect(mocks.upsertTelegramAccount).toHaveBeenCalledWith(expect.objectContaining({ id: 7075241777 }));
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  it("blocks unlinked Telegram identities from opening the WebApp balance surface", async () => {
+    mocks.upsertTelegramAccount.mockResolvedValueOnce({
+      userId: null,
+      telegramAccountId: "telegram_account_test_1",
+      status: "unlinked",
+    });
+
+    const { baseUrl, server } = await createTelegramTestServer();
+    try {
+      const response = await fetch(`${baseUrl}/api/telegram/webapp/me`, {
+        headers: { "X-Telegram-Init-Data": validInitData() },
+      });
+
+      expect(response.status).toBe(409);
+      expect(await readJson(response)).toMatchObject({
+        error: "Telegram account is not linked",
+        code: "telegram_not_linked",
+      });
+      expect(mocks.getUserBalanceTL).not.toHaveBeenCalled();
     } finally {
       await closeServer(server);
     }
@@ -257,6 +319,35 @@ describe("telegram WebApp route contract", () => {
     }
   });
 
+  it("blocks invoice creation for unlinked Telegram identities", async () => {
+    mocks.upsertTelegramAccount.mockResolvedValueOnce({
+      userId: null,
+      telegramAccountId: "telegram_account_test_1",
+      status: "unlinked",
+    });
+
+    const { baseUrl, server } = await createTelegramTestServer();
+    try {
+      const response = await fetch(`${baseUrl}/api/telegram/webapp/invoices`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Telegram-Init-Data": validInitData(),
+        },
+        body: JSON.stringify({ amountUsd: "10" }),
+      });
+
+      expect(response.status).toBe(409);
+      expect(await readJson(response)).toMatchObject({
+        error: "Telegram account is not linked",
+        code: "telegram_not_linked",
+      });
+      expect(mocks.createCryptoPayInvoice).not.toHaveBeenCalled();
+    } finally {
+      await closeServer(server);
+    }
+  });
+
   it("rejects amounts outside existing TL limits before creating payment or provider invoice", async () => {
     const { baseUrl, server } = await createTelegramTestServer();
     try {
@@ -295,6 +386,7 @@ describe("telegram WebApp route contract", () => {
       });
 
       expect(response.status).toBe(200);
+      await flushAsyncWork();
       expect(mocks.answerTelegramCallback).toHaveBeenCalledWith("callback_test_1");
       expect(mocks.editTelegramMessageText).toHaveBeenCalledWith(expect.objectContaining({
         chatId: 7075241777,
@@ -330,6 +422,7 @@ describe("telegram WebApp route contract", () => {
       });
 
       expect(response.status).toBe(200);
+      await flushAsyncWork();
       expect(mocks.sendTelegramMessage).toHaveBeenCalledWith(
         7075241777,
         expect.stringContaining("Yükleme paneli hazır"),
@@ -361,6 +454,7 @@ describe("telegram WebApp route contract", () => {
       });
 
       expect(response.status).toBe(200);
+      await flushAsyncWork();
       expect(mocks.deliverApiAccessToTelegramUser).toHaveBeenCalledWith({
         userId: "user_test_1",
         telegramAccountId: "telegram_account_test_1",
@@ -390,6 +484,7 @@ describe("telegram WebApp route contract", () => {
       });
 
       expect(response.status).toBe(200);
+      await flushAsyncWork();
       expect(mocks.getUserBalanceTL).toHaveBeenCalledWith("user_test_1");
       expect(mocks.editTelegramMessageText).toHaveBeenCalledWith(expect.objectContaining({
         text: expect.stringContaining("Güncel bakiyen: 278.90 TL"),
@@ -416,12 +511,53 @@ describe("telegram WebApp route contract", () => {
       });
 
       expect(response.status).toBe(200);
+      await flushAsyncWork();
       expect(mocks.getTelegramUsageMessage).toHaveBeenCalledWith("user_test_1");
       expect(mocks.sendTelegramMessage).toHaveBeenCalledWith(
         7075241777,
         expect.stringContaining("Güncel bakiyen: 123.45 TL"),
         expect.anything(),
       );
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  it("acknowledges Telegram webhook before outbound Telegram API work finishes", async () => {
+    vi.useRealTimers();
+    let releaseSend: (() => void) | undefined;
+    const sendPending = new Promise<void>((resolve) => {
+      releaseSend = resolve;
+    });
+    mocks.sendTelegramMessage.mockReturnValueOnce(sendPending);
+
+    const { baseUrl, server } = await createTelegramTestServer();
+    try {
+      const responsePromise = fetch(`${baseUrl}/api/telegram/webhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: {
+            message_id: 46,
+            text: "/start",
+            chat: { id: 7075241777 },
+            from: { id: 7075241777, first_name: "Sesli" },
+          },
+        }),
+      });
+
+      const response = await Promise.race([
+        responsePromise,
+        new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 250)),
+      ]);
+
+      expect(response).not.toBe("timeout");
+      expect((response as globalThis.Response).status).toBe(200);
+      expect(await readJson(response as globalThis.Response)).toEqual({ ok: true });
+      expect(mocks.sendTelegramMessage).toHaveBeenCalled();
+
+      releaseSend?.();
+      await flushAsyncWork();
     } finally {
       await closeServer(server);
     }

@@ -18,6 +18,7 @@ const ADMIN_SECTIONS = [
   { id: 'providers', label: 'Sağlayıcı', Ico: I.Server },
   { id: 'kur', label: 'Kur', Ico: I.Coins },
   { id: 'payments', label: 'Ödeme', Ico: I.Wallet },
+  { id: 'telegram', label: 'Telegram', Ico: I.Bell },
   { id: 'apikeys', label: 'API anahtarları', Ico: I.Key },
   { id: 'logs', label: 'Loglar', Ico: I.Terminal },
   { id: 'animations', label: 'Animasyon', Ico: I.Sparkle },
@@ -111,7 +112,6 @@ const money = (value) => `₺${Number(value || 0).toLocaleString('tr-TR', { mini
 const usd = (value) => `$${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const initials = (name = '') => name.split(' ').filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'YZ';
 const userCodeFromId = (id = '') => (id ? `u-${String(id).replace(/-/g, '').slice(0, 8)}` : '—');
-
 const StatusChip = ({ status }) => {
   const tone = STATUS_TONE[status] || STATUS_TONE.bekliyor;
   return <Chip tone="neutral" style={{ background: tone.bg, color: tone.fg, fontSize: 10 }}>{tone.label || status}</Chip>;
@@ -560,7 +560,6 @@ const AdminOverrides = ({ overrides, token, refresh }) => {
     () => (overrides || []).find((override) => override.modelId === modelId) || null,
     [overrides, modelId],
   );
-
   useEffect(() => {
     setInputUsdOverride(currentOverride?.inputUsdOverride !== null && currentOverride?.inputUsdOverride !== undefined ? String(currentOverride.inputUsdOverride) : '');
     setOutputUsdOverride(currentOverride?.outputUsdOverride !== null && currentOverride?.outputUsdOverride !== undefined ? String(currentOverride.outputUsdOverride) : '');
@@ -1078,6 +1077,175 @@ const AdminLogs = ({ reconciliation, auditLogs, token }) => {
   );
 };
 
+const AdminTelegram = ({ token }) => {
+  const [accounts, setAccounts] = useState([]);
+  const [deliveries, setDeliveries] = useState([]);
+  const [conflicts, setConflicts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [busyKey, setBusyKey] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [accountRows, deliveryRows, conflictRows] = await Promise.all([
+        adminRequest('/api/telegram/admin/accounts', token),
+        adminRequest('/api/telegram/admin/deliveries', token),
+        adminRequest('/api/telegram/admin/conflicts', token),
+      ]);
+      setAccounts(Array.isArray(accountRows) ? accountRows : []);
+      setDeliveries(Array.isArray(deliveryRows) ? deliveryRows : []);
+      setConflicts(Array.isArray(conflictRows) ? conflictRows : []);
+    } catch (loadError) {
+      setError(loadError.message || 'Telegram admin verisi alınamadı.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, [token]);
+
+  const runReconcile = async () => {
+    setBusyKey('reconcile');
+    setMessage('');
+    try {
+      const result = await adminRequest('/api/telegram/admin/reconcile', token, { method: 'POST' });
+      setMessage(`Tarandı: ${result.scanned || 0} · birleşti: ${result.merged || 0} · bekleyen: ${result.skipped || 0}`);
+      await load();
+    } catch (actionError) {
+      setError(actionError.message || 'Telegram backfill çalıştırılamadı.');
+    } finally {
+      setBusyKey('');
+    }
+  };
+
+  const relinkConflict = async (row) => {
+    if (!row?.telegramAccountId || !row?.targetUserId) return;
+    setBusyKey(row.telegramAccountId);
+    setMessage('');
+    try {
+      await adminRequest('/api/telegram/admin/relink', token, {
+        method: 'POST',
+        body: { telegramAccountId: row.telegramAccountId, targetUserId: row.targetUserId },
+      });
+      setMessage(`Telegram ${row.telegramId} -> ${row.targetUserEmail || row.targetUserId} bağlandı.`);
+      await load();
+    } catch (actionError) {
+      setError(actionError.message || 'Telegram identity taşınamadı.');
+    } finally {
+      setBusyKey('');
+    }
+  };
+
+  const linkedCount = accounts.filter((row) => row.status === 'linked').length;
+  const unlinkedCount = accounts.filter((row) => row.status !== 'linked').length;
+  const failedDeliveries = deliveries.filter((row) => row.status === 'failed').length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={grid(180)}>
+        <AdminKPI label="Linked" value={linkedCount} Ico={I.Check} />
+        <AdminKPI label="Unlinked" value={unlinkedCount} Ico={I.Users} />
+        <AdminKPI label="Conflict" value={conflicts.length} Ico={I.Activity} />
+        <AdminKPI label="Delivery fail" value={failedDeliveries} Ico={I.Bell} />
+      </div>
+
+      <Card pad={18}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div>
+            <Caption>Telegram eşleme</Caption>
+            <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 4 }}>
+              Güvenli ghost hesaplar otomatik toparlanır. Manuel çatışmalar bu listede kalır.
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={() => load()} style={{ padding: '8px 11px', borderRadius: 9, border: '1px solid var(--border)', fontSize: 12 }}>Yenile</button>
+            <button onClick={runReconcile} disabled={busyKey === 'reconcile'} style={{ padding: '8px 11px', borderRadius: 9, background: 'var(--ink)', color: '#fff', fontSize: 12, opacity: busyKey === 'reconcile' ? 0.7 : 1 }}>
+              {busyKey === 'reconcile' ? 'Çalışıyor…' : 'Otomatik düzelt'}
+            </button>
+          </div>
+        </div>
+        {message && <div style={{ marginTop: 12, fontSize: 11.5, color: '#047857' }}>{message}</div>}
+        {error && <div style={{ marginTop: 12 }}><ErrorBox>{error}</ErrorBox></div>}
+      </Card>
+
+      <Card pad={0} style={{ overflow: 'hidden' }}>
+        <div style={{ padding: 16, borderBottom: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>Çatışmalar</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>Hedef kullanıcı bilinen ve güvenli olanlar doğrudan bağlanabilir.</div>
+        </div>
+        {loading ? <div style={{ padding: 16, fontSize: 12, color: 'var(--ink-3)' }}>Telegram verisi yükleniyor…</div> : null}
+        {!loading && conflicts.length === 0 ? <div style={{ padding: 16 }}><EmptyState>Çatışma görünmüyor.</EmptyState></div> : null}
+        {!loading && conflicts.map((row, index) => (
+          <div key={`${row.telegramAccountId}-${index}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) minmax(180px, 1.3fr) minmax(180px, 1.3fr) 140px 120px', gap: 12, padding: '12px 16px', borderBottom: index < conflicts.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center', fontSize: 12 }}>
+            <div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{row.telegramId}</div>
+              <div style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{row.username ? `@${row.username}` : row.status}</div>
+            </div>
+            <div>
+              <div style={{ fontWeight: 600 }}>Mevcut</div>
+              <div style={{ fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{row.currentUserEmail || row.currentUserId || '—'}</div>
+            </div>
+            <div>
+              <div style={{ fontWeight: 600 }}>Hedef</div>
+              <div style={{ fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{row.targetUserEmail || row.targetUserId || '—'}</div>
+            </div>
+            <Chip tone={row.canAutoMerge ? 'ok' : 'neutral'} style={{ fontSize: 10 }}>{row.reason}</Chip>
+            <button
+              onClick={() => relinkConflict(row)}
+              disabled={!row.canAutoMerge || !row.targetUserId || busyKey === row.telegramAccountId}
+              style={{
+                padding: '7px 10px',
+                borderRadius: 8,
+                border: '1px solid var(--border)',
+                fontSize: 11,
+                opacity: row.canAutoMerge && row.targetUserId ? 1 : 0.5,
+              }}
+            >
+              {busyKey === row.telegramAccountId ? 'Bağlanıyor…' : 'Bağla'}
+            </button>
+          </div>
+        ))}
+      </Card>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(280px, 1fr)', gap: 14 }}>
+        <Card pad={0} style={{ overflow: 'hidden' }}>
+          <div style={{ padding: 16, borderBottom: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>Telegram kimlikleri</div>
+          </div>
+          {accounts.slice(0, 12).map((row, index) => (
+            <div key={row.id || `${row.telegramId}-${index}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) minmax(180px, 1.4fr) 110px 120px', gap: 12, padding: '12px 16px', borderBottom: index < Math.min(accounts.length, 12) - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center', fontSize: 12 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{row.telegramId}</span>
+              <span style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{row.userEmail || 'bağlı değil'}</span>
+              <Chip tone={row.status === 'linked' ? 'ok' : 'neutral'}>{row.status}</Chip>
+              <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{safeDate(row.lastSeenAt || row.linkedAt)}</span>
+            </div>
+          ))}
+          {accounts.length === 0 && !loading ? <div style={{ padding: 16 }}><EmptyState>Telegram kimliği yok.</EmptyState></div> : null}
+        </Card>
+
+        <Card pad={0} style={{ overflow: 'hidden' }}>
+          <div style={{ padding: 16, borderBottom: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>Teslimatlar</div>
+          </div>
+          {deliveries.slice(0, 12).map((row, index) => (
+            <div key={row.id || index} style={{ display: 'grid', gridTemplateColumns: '110px 90px minmax(140px, 1fr)', gap: 12, padding: '12px 16px', borderBottom: index < Math.min(deliveries.length, 12) - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center', fontSize: 12 }}>
+              <Chip tone={row.status === 'delivered' ? 'ok' : row.status === 'failed' ? 'neutral' : 'accent'}>{row.status}</Chip>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }}>{row.deliveryType}</span>
+              <span style={{ color: row.status === 'failed' ? '#b91c1c' : 'var(--ink-3)' }}>{row.lastError || safeDate(row.deliveredAt || row.updatedAt)}</span>
+            </div>
+          ))}
+          {deliveries.length === 0 && !loading ? <div style={{ padding: 16 }}><EmptyState>Teslim kaydı yok.</EmptyState></div> : null}
+        </Card>
+      </div>
+    </div>
+  );
+};
+
 const AdminAnimations = ({ tweaks = {}, setTweak }) => {
   const Row = ({ children }) => (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) minmax(220px, 1.6fr)', gap: 14, alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>{children}</div>
@@ -1242,6 +1410,7 @@ const AdminTab = ({ ctx = {} }) => {
         {section === 'providers' && <AdminProviders providers={data.providers || []} token={token} refresh={refresh} />}
         {section === 'kur' && <AdminKur config={data.config} kurHistory={data.kurHistory || []} token={token} refresh={refresh} />}
         {section === 'payments' && <AdminPaymentSettings config={data.config} token={token} refresh={refresh} />}
+        {section === 'telegram' && <AdminTelegram token={token} />}
         {section === 'apikeys' && <AdminApiKeys apiKeys={data.apiKeys || []} users={data.users || []} token={token} refresh={refresh} filterUserId={trafficApiKeyJump.userId} filterApiKeyId={trafficApiKeyJump.apiKeyId} filterNonce={trafficApiKeyJump.nonce} />}
         {section === 'logs' && <AdminLogs reconciliation={data.reconciliation} auditLogs={data.auditLogs || []} token={token} />}
         {section === 'animations' && <AdminAnimations tweaks={tweaks} setTweak={setTweak} />}

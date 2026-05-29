@@ -173,6 +173,114 @@ const SandboxKeyCard = ({ sandboxKey, sandboxFullKey, onCreate, busy }) => {
   );
 };
 
+const TelegramLinkCard = ({ telegram, busy, message, onLink, onOpenBot, onRefresh, onUnlink }) => {
+  const linked = Boolean(telegram?.linked);
+  const username = telegram?.username ? `@${telegram.username}` : 'Telegram hesabı';
+  const linkedAt = telegram?.linkedAt ? shortDate(telegram.linkedAt) : '—';
+  const statusTone = linked ? 'ok' : 'neutral';
+
+  return (
+    <Card pad={22}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12 }}>
+        <div>
+          <Caption>Telegram</Caption>
+          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>Bot bağlantısı</div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.5 }}>
+            Telegram botu ile aynı bakiyeyi, aynı API key setini ve aynı kullanım geçmişini görürsün.
+          </div>
+        </div>
+        <Chip tone={statusTone} style={{ fontSize: 9.5 }}>
+          {linked ? 'bağlı' : 'bağlı değil'}
+        </Chip>
+      </div>
+
+      <div style={{ display: 'grid', gap: 10, marginBottom: 14 }}>
+        <div style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>Hesap</div>
+          <div style={{ fontSize: 12.5, fontWeight: 600 }}>{linked ? username : 'Telegram bağlama bekleniyor'}</div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>Yöntem</div>
+            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>{telegram?.linkMethod || 'site-first'}</div>
+          </div>
+          <div style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>Bağlanma</div>
+            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>{linkedAt}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <button
+          onClick={onLink}
+          disabled={busy}
+          style={{
+            padding: '9px 12px',
+            borderRadius: 9,
+            background: 'var(--ink)',
+            color: '#fff',
+            fontSize: 12,
+            fontWeight: 600,
+            opacity: busy ? 0.65 : 1,
+          }}
+        >
+          Telegram bağla
+        </button>
+        <button
+          onClick={onOpenBot}
+          disabled={!telegram?.botUrl}
+          style={{
+            padding: '9px 12px',
+            borderRadius: 9,
+            border: '1px solid var(--border)',
+            background: 'var(--surface)',
+            fontSize: 12,
+            opacity: telegram?.botUrl ? 1 : 0.55,
+          }}
+        >
+          Botu aç
+        </button>
+        <button
+          onClick={onRefresh}
+          disabled={busy}
+          style={{
+            padding: '9px 12px',
+            borderRadius: 9,
+            border: '1px solid var(--border)',
+            background: 'var(--surface)',
+            fontSize: 12,
+            opacity: busy ? 0.65 : 1,
+          }}
+        >
+          Yenile
+        </button>
+        <button
+          onClick={onUnlink}
+          disabled={!linked || busy}
+          style={{
+            padding: '9px 12px',
+            borderRadius: 9,
+            border: '1px solid #fecaca',
+            background: '#fff5f5',
+            color: '#b91c1c',
+            fontSize: 12,
+            opacity: linked && !busy ? 1 : 0.55,
+          }}
+        >
+          Bağlantıyı kaldır
+        </button>
+      </div>
+
+      <div style={{ fontSize: 11, color: message ? 'var(--accent-ink)' : 'var(--ink-3)', marginTop: 12, lineHeight: 1.5 }}>
+        {message || (linked
+          ? 'Telegram tarafından üretilen veya değiştirilen API keyler bu hesapta aynı anda görünür.'
+          : 'Önce site üzerinden bağla. Bot içindeki Mevcut hesabımı bağla akışı aynı üyelikte tamamlanır.')}
+      </div>
+    </Card>
+  );
+};
+
 // === TeamCard — projeye üye davet et ===============================
 const TeamCard = ({ team = [], onInvite, onRemove }) => {
   const [inviteEmail, setInviteEmail] = useState('');
@@ -449,11 +557,52 @@ const AccountTab = ({ ctx }) => {
   const [settingsName, setSettingsName] = useState('');
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState('');
+  const [telegramBusy, setTelegramBusy] = useState(false);
+  const [telegramMessage, setTelegramMessage] = useState('');
+  const telegramPollRef = useRef(null);
 
   const balanceUSD = asNumber(me?.bakiyeUsd, fallbackBalanceUSD);
   const userCode = me?.userCode || (me?.id ? `u-${String(me.id).replace(/-/g, '').slice(0, 8)}` : 'profil');
   const monthCostUsd = asNumber(monthlyReport?.summary?.costUsd, usageRows.reduce((sum, row) => sum + asNumber(row.costUsd, asNumber(row.costTL, 0) / tlRate), 0));
   const monthRequests = asNumber(monthlyReport?.summary?.requestCount, usageRows.length);
+
+  const applyMeData = (meData) => {
+    setMe(meData);
+    setSettingsName(meData?.adSoyad || '');
+    if (meData?.bakiyeUsd !== undefined) setTweak('balanceUSD', asNumber(meData.bakiyeUsd, fallbackBalanceUSD));
+  };
+
+  const refreshMe = async () => {
+    const meData = await apiJson('/api/user/me');
+    applyMeData(meData);
+    return meData;
+  };
+
+  const stopTelegramPolling = () => {
+    if (telegramPollRef.current) {
+      window.clearInterval(telegramPollRef.current);
+      telegramPollRef.current = null;
+    }
+  };
+
+  const startTelegramPolling = () => {
+    stopTelegramPolling();
+    const startedAt = Date.now();
+    telegramPollRef.current = window.setInterval(async () => {
+      try {
+        const meData = await refreshMe();
+        if (meData?.telegram?.linked) {
+          setTelegramMessage('Telegram hesabı bağlandı. Bot ve site artık aynı üyeliği kullanıyor.');
+          stopTelegramPolling();
+        } else if (Date.now() - startedAt > 90_000) {
+          setTelegramMessage('Telegram bağlantısı henüz tamamlanmadı. Bot içinden bağlama adımını bitirip Yenile ile tekrar kontrol et.');
+          stopTelegramPolling();
+        }
+      } catch {
+        stopTelegramPolling();
+      }
+    }, 4000);
+  };
 
   const loadMonthlyReport = async (month = currentMonth()) => {
     const report = await apiJson(`/api/user/reports/monthly?month=${encodeURIComponent(month)}`);
@@ -478,7 +627,7 @@ const AccountTab = ({ ctx }) => {
         safe(apiJson('/api/user/sandbox-key'), null),
         safe(apiJson(`/api/user/reports/monthly?month=${currentMonth()}`), null),
       ]);
-      setMe(meData);
+      applyMeData(meData);
       setApiKeys(Array.isArray(keysData) ? keysData : []);
       setUsageRows(Array.isArray(usageData) ? usageData : []);
       setPaymentRows(Array.isArray(paymentsData) ? paymentsData : []);
@@ -487,9 +636,7 @@ const AccountTab = ({ ctx }) => {
       setWebhooks(webhookData);
       setSandboxKey(sandboxData);
       setMonthlyReport(reportData);
-      setSettingsName(meData?.adSoyad || '');
       setSettingsMessage('');
-      if (meData?.bakiyeUsd !== undefined) setTweak('balanceUSD', asNumber(meData.bakiyeUsd, fallbackBalanceUSD));
     } catch (error) {
       setPanelError(error instanceof Error ? error.message : 'Panel verileri alınamadı');
     } finally {
@@ -499,6 +646,27 @@ const AccountTab = ({ ctx }) => {
 
   useEffect(() => {
     loadAccount();
+  }, []);
+
+  useEffect(() => () => stopTelegramPolling(), []);
+
+  useEffect(() => {
+    const handleLinked = () => {
+      void loadAccount();
+      setTelegramMessage('Telegram hesabı bağlandı. Bot ve site artık aynı üyeliği kullanıyor.');
+      stopTelegramPolling();
+    };
+    const handleError = (event) => {
+      const detail = typeof event?.detail === 'string' ? event.detail : 'Telegram bağlantısı tamamlanamadı.';
+      setTelegramMessage(detail);
+      stopTelegramPolling();
+    };
+    window.addEventListener('yz:telegram-linked', handleLinked);
+    window.addEventListener('yz:telegram-link-error', handleError);
+    return () => {
+      window.removeEventListener('yz:telegram-linked', handleLinked);
+      window.removeEventListener('yz:telegram-link-error', handleError);
+    };
   }, []);
 
   const createApiKey = async () => {
@@ -568,6 +736,56 @@ const AccountTab = ({ ctx }) => {
 
   const downloadReport = async (month, format) => {
     await downloadWithAuth(`/api/user/reports/monthly?month=${encodeURIComponent(month)}&format=${format}`, `yapayzekalab-${month}.${format}`);
+  };
+
+  const startTelegramLink = async () => {
+    setTelegramBusy(true);
+    setTelegramMessage('');
+    try {
+      const result = await apiJson('/api/telegram/link-code', { method: 'POST' });
+      if (result?.deepLinkUrl) {
+        window.open(result.deepLinkUrl, '_blank', 'noopener,noreferrer');
+      }
+      setTelegramMessage('Bot açıldı. Telegram içindeki bağlama adımını tamamla; panel bu durumu otomatik yenileyecek.');
+      startTelegramPolling();
+    } catch (error) {
+      setTelegramMessage(error instanceof Error ? error.message : 'Telegram link kodu üretilemedi.');
+    } finally {
+      setTelegramBusy(false);
+    }
+  };
+
+  const openTelegramBot = () => {
+    if (me?.telegram?.botUrl) window.open(me.telegram.botUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const refreshTelegramLink = async () => {
+    setTelegramBusy(true);
+    try {
+      const meData = await refreshMe();
+      setTelegramMessage(meData?.telegram?.linked ? 'Telegram bağlantısı güncel.' : 'Telegram henüz bağlı değil.');
+    } catch (error) {
+      setTelegramMessage(error instanceof Error ? error.message : 'Telegram durumu yenilenemedi.');
+    } finally {
+      setTelegramBusy(false);
+    }
+  };
+
+  const unlinkTelegramLink = async () => {
+    if (!me?.telegram?.linked) return;
+    const ok = window.confirm('Telegram bağlantısı kaldırılsın mı? Bakiye ve API key kayıtların silinmez.');
+    if (!ok) return;
+    setTelegramBusy(true);
+    try {
+      await apiJson('/api/telegram/unlink', { method: 'POST' });
+      stopTelegramPolling();
+      await refreshMe();
+      setTelegramMessage('Telegram bağlantısı kaldırıldı.');
+    } catch (error) {
+      setTelegramMessage(error instanceof Error ? error.message : 'Telegram bağlantısı kaldırılamadı.');
+    } finally {
+      setTelegramBusy(false);
+    }
   };
 
   const rawAmount = customAmount ? Number(customAmount) : topUp;
@@ -893,6 +1111,16 @@ const AccountTab = ({ ctx }) => {
         <AutoRechargeCard tweaks={tweaks} setTweak={setTweak} />
         <SandboxKeyCard sandboxKey={sandboxKey} sandboxFullKey={sandboxFullKey} onCreate={createSandboxKey} busy={sandboxBusy} />
       </div>
+
+      <TelegramLinkCard
+        telegram={me?.telegram}
+        busy={telegramBusy}
+        message={telegramMessage}
+        onLink={startTelegramLink}
+        onOpenBot={openTelegramBot}
+        onRefresh={refreshTelegramLink}
+        onUnlink={unlinkTelegramLink}
+      />
 
       {/* Team + Webhooks */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 18 }}>

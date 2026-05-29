@@ -13,11 +13,14 @@ import { ModelsTab } from './tab-models.jsx';
 import { LEGAL_DOCS } from './legal-docs.js';
 import {
   apiJson,
+  clearTelegramLinkPayload,
   clearStoredAuth,
   clearWhatsappPendingToken,
   getAccessToken,
+  getTelegramLinkPayload,
   getWhatsappPendingToken,
   hasStoredAuth,
+  storeTelegramLinkPayload,
   storeAuthTokens,
   storeWhatsappPendingToken,
 } from './auth-client.js';
@@ -116,6 +119,18 @@ const formatNotifSub = (item) => {
   const end = item?.bitis ? new Date(item.bitis) : null;
   if (!end || Number.isNaN(end.getTime())) return `Sistem duyurusu · ${tip}`;
   return `Sistem duyurusu · ${tip} · ${end.toLocaleString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} kadar`;
+};
+
+const TELEGRAM_LOGIN_FIELDS = ['id', 'first_name', 'last_name', 'username', 'photo_url', 'auth_date', 'hash'];
+
+const readTelegramLinkPayloadFromQuery = (query) => {
+  const payload = {};
+  for (const field of TELEGRAM_LOGIN_FIELDS) {
+    const value = query.get(field);
+    if (value) payload[field] = value;
+  }
+  if (!payload.id || !payload.auth_date || !payload.hash) return null;
+  return payload;
 };
 
 // === Notifications dropdown =========================================
@@ -925,8 +940,14 @@ const App = ({ initialTab = 'home' }) => {
     const accessToken = query.get('at');
     const refreshToken = query.get('rt');
     const whatsappToken = query.get('wpt');
+    const telegramLinkPayload = readTelegramLinkPayloadFromQuery(query);
 
-    if (!accessToken && !refreshToken && !whatsappToken) return;
+    if (telegramLinkPayload) {
+      storeTelegramLinkPayload(telegramLinkPayload);
+      for (const field of TELEGRAM_LOGIN_FIELDS) query.delete(field);
+    }
+
+    if (!accessToken && !refreshToken && !whatsappToken && !telegramLinkPayload) return;
 
     if (whatsappToken) {
       clearStoredAuth();
@@ -941,6 +962,19 @@ const App = ({ initialTab = 'home' }) => {
       setWhatsappPendingToken(whatsappToken);
       setIsAuthenticated(false);
       setShowLogin(false);
+      return;
+    }
+
+    if (!accessToken && !refreshToken) {
+      const cleanQuery = query.toString();
+      const cleanUrl = `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ''}${window.location.hash || ''}`;
+      window.history.replaceState(window.history.state, document.title, cleanUrl);
+      if (!hasStoredAuth()) {
+        setPendingTab('account');
+        setShowLogin(true);
+      } else {
+        setTab('account');
+      }
       return;
     }
 
@@ -960,6 +994,34 @@ const App = ({ initialTab = 'home' }) => {
     setTab(pendingTab || (PROTECTED_TABS.has(initialTab) ? initialTab : 'account'));
     setPendingTab(null);
   }, [initialTab, pendingTab]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    const payload = getTelegramLinkPayload();
+    if (!payload) return undefined;
+
+    let cancelled = false;
+    void apiJson('/api/telegram/login-link', { method: 'POST', body: payload })
+      .then(() => apiJson('/api/user/me'))
+      .then((data) => {
+        clearTelegramLinkPayload();
+        if (cancelled || !data) return;
+        setProfile(data);
+        if (data.bakiyeUsd !== undefined) setTweak('balanceUSD', Number(data.bakiyeUsd));
+        setTab('account');
+        setGoto('settings');
+        window.dispatchEvent(new Event('yz:telegram-linked'));
+      })
+      .catch((error) => {
+        clearTelegramLinkPayload();
+        if (cancelled) return;
+        window.dispatchEvent(new CustomEvent('yz:telegram-link-error', {
+          detail: error?.message || 'Telegram bağlantısı tamamlanamadı.',
+        }));
+      });
+
+    return () => { cancelled = true; };
+  }, [isAuthenticated, setTweak]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = t.theme;

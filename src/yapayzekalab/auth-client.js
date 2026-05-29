@@ -1,6 +1,7 @@
 export const ACCESS_TOKEN_KEY = 'yz_access_token';
 export const REFRESH_TOKEN_KEY = 'yz_refresh_token';
 export const WHATSAPP_PENDING_TOKEN_KEY = 'whatsapp_pending_token';
+export const TELEGRAM_LINK_PAYLOAD_KEY = 'telegram_link_payload';
 export const LEGACY_ACCESS_TOKEN_KEY = 'userAccessToken';
 export const LEGACY_REFRESH_TOKEN_KEY = 'userRefreshToken';
 
@@ -25,6 +26,15 @@ const readToken = (...keys) => {
 export const getAccessToken = () => readToken(ACCESS_TOKEN_KEY, LEGACY_ACCESS_TOKEN_KEY);
 export const getRefreshToken = () => readToken(REFRESH_TOKEN_KEY, LEGACY_REFRESH_TOKEN_KEY);
 export const getWhatsappPendingToken = () => readToken(WHATSAPP_PENDING_TOKEN_KEY);
+export const getTelegramLinkPayload = () => {
+  const raw = readToken(TELEGRAM_LINK_PAYLOAD_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
 
 export const hasStoredAuth = () => Boolean(getAccessToken());
 
@@ -47,10 +57,22 @@ export const storeWhatsappPendingToken = (pendingToken) => {
   s.setItem(WHATSAPP_PENDING_TOKEN_KEY, pendingToken);
 };
 
+export const storeTelegramLinkPayload = (payload) => {
+  const s = storage();
+  if (!s || !payload) return;
+  s.setItem(TELEGRAM_LINK_PAYLOAD_KEY, JSON.stringify(payload));
+};
+
 export const clearWhatsappPendingToken = () => {
   const s = storage();
   if (!s) return;
   s.removeItem(WHATSAPP_PENDING_TOKEN_KEY);
+};
+
+export const clearTelegramLinkPayload = () => {
+  const s = storage();
+  if (!s) return;
+  s.removeItem(TELEGRAM_LINK_PAYLOAD_KEY);
 };
 
 export const clearStoredAuth = () => {
@@ -59,6 +81,7 @@ export const clearStoredAuth = () => {
   s.removeItem(ACCESS_TOKEN_KEY);
   s.removeItem(REFRESH_TOKEN_KEY);
   s.removeItem(WHATSAPP_PENDING_TOKEN_KEY);
+  s.removeItem(TELEGRAM_LINK_PAYLOAD_KEY);
   s.removeItem(LEGACY_ACCESS_TOKEN_KEY);
   s.removeItem(LEGACY_REFRESH_TOKEN_KEY);
 };

@@ -4,9 +4,41 @@ import { users, apiKeys, usageRecords, systemConfig } from "../db/schema.js";
 import { eq, and, desc } from "drizzle-orm";
 import { encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
 import { writeAudit } from "../services/audit-service.js";
+import { getTelegramAccountSummary } from "../services/telegram-bot-service.js";
 import { getWhatsappVerificationSummary } from "../services/whatsapp-otp-service.js";
 
 const router = Router();
+
+async function buildUserMePayload(userId: string, safe: Record<string, unknown>) {
+  const configRows = await db
+    .select({ kur: systemConfig.kur })
+    .from(systemConfig)
+    .where(eq(systemConfig.id, 1))
+    .limit(1);
+  const kur = Number(configRows[0]?.kur ?? 0);
+  const bakiyeTL = Number(safe.bakiyeTL ?? 0);
+  const bakiyeUsd = kur > 0 ? bakiyeTL / kur : 0;
+  const userCode = safe.id ? `u-${String(safe.id).replace(/-/g, "").slice(0, 8)}` : null;
+  const [whatsapp, telegramSummary] = await Promise.all([
+    getWhatsappVerificationSummary(userId),
+    getTelegramAccountSummary(userId),
+  ]);
+  return {
+    ...safe,
+    bakiyeUsd,
+    userCode,
+    telegram: {
+      linked: telegramSummary.linked,
+      telegramId: telegramSummary.telegramId,
+      username: telegramSummary.username,
+      linkedAt: telegramSummary.linkedAt,
+      status: telegramSummary.status,
+      linkMethod: telegramSummary.linkMethod,
+      botUrl: telegramSummary.botUrl,
+    },
+    ...whatsapp,
+  };
+}
 
 // GET /api/user/me
 router.get("/me", async (req, res, next) => {
@@ -15,17 +47,7 @@ router.get("/me", async (req, res, next) => {
     if (!rows.length) { res.status(404).json({ error: "User not found" }); return; }
     const { passwordHash, ...safe } = rows[0];
     void passwordHash; // explicitly consumed
-    const configRows = await db
-      .select({ kur: systemConfig.kur })
-      .from(systemConfig)
-      .where(eq(systemConfig.id, 1))
-      .limit(1);
-    const kur = Number(configRows[0]?.kur ?? 0);
-    const bakiyeTL = Number(safe.bakiyeTL ?? 0);
-    const bakiyeUsd = kur > 0 ? bakiyeTL / kur : 0;
-    const userCode = safe.id ? `u-${String(safe.id).replace(/-/g, "").slice(0, 8)}` : null;
-    const whatsapp = await getWhatsappVerificationSummary(req.user!.id);
-    res.json({ ...safe, bakiyeUsd, userCode, ...whatsapp });
+    res.json(await buildUserMePayload(req.user!.id, safe));
   } catch (e) { next(e); }
 });
 
@@ -53,17 +75,7 @@ router.patch("/me", async (req, res, next) => {
 
     const { passwordHash, ...safe } = updatedRows[0];
     void passwordHash;
-    const configRows = await db
-      .select({ kur: systemConfig.kur })
-      .from(systemConfig)
-      .where(eq(systemConfig.id, 1))
-      .limit(1);
-    const kur = Number(configRows[0]?.kur ?? 0);
-    const bakiyeTL = Number(safe.bakiyeTL ?? 0);
-    const bakiyeUsd = kur > 0 ? bakiyeTL / kur : 0;
-    const userCode = safe.id ? `u-${String(safe.id).replace(/-/g, "").slice(0, 8)}` : null;
-    const whatsapp = await getWhatsappVerificationSummary(req.user!.id);
-    res.json({ ...safe, bakiyeUsd, userCode, ...whatsapp });
+    res.json(await buildUserMePayload(req.user!.id, safe));
   } catch (e) { next(e); }
 });
 

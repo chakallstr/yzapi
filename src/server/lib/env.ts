@@ -62,7 +62,9 @@ const schema = z.object({
 
   // Telegram + Crypto Pay bot channel (optional — endpoints return 503 when unset)
   TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_BOT_USERNAME: z.string().optional(),
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
+  TELEGRAM_LOGIN_MAX_AGE_SEC: z.coerce.number().default(15 * 60),
   TELEGRAM_SUPPORT_URL: z.string().default(""),
   CRYPTO_PAY_API_TOKEN: z.string().optional(),
   CRYPTO_PAY_API_BASE_URL: z.string().optional(),

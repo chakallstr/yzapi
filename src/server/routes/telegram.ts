@@ -17,6 +17,8 @@ import {
 } from "../services/crypto-pay-service.js";
 import {
   answerTelegramCallback,
+  adminLinkTelegramIdentity,
+  buildTelegramOnboardingMenu,
   buildTelegramMainMenu,
   buildTelegramTopupPanelMenu,
   consumeTelegramLinkCode,
@@ -24,13 +26,20 @@ import {
   deliverApiAccessToTelegramUser,
   editTelegramMessageText,
   formatBalanceMessage,
+  formatTelegramLinkRequiredMessage,
   getUserBalanceTL,
   getTelegramUsageMessage,
+  linkTelegramLogin,
+  listTelegramLinkConflicts,
   parseTelegramCommand,
+  provisionTelegramOnlyUser,
+  runTelegramLinkBackfill,
   sendTelegramMessage,
+  unlinkTelegramAccount,
   upsertTelegramAccount,
   type TelegramActor,
 } from "../services/telegram-bot-service.js";
+import { TelegramLoginAuthError, validateTelegramLoginPayload } from "../services/telegram-login-auth-service.js";
 import { TelegramWebAppAuthError, validateTelegramWebAppInitData } from "../services/telegram-webapp-auth-service.js";
 
 const router = Router();
@@ -40,6 +49,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 type RawRequest = Request & { rawBody?: string };
 
 interface TelegramMessageUpdate {
+  update_id?: number;
   message?: {
     message_id?: number;
     text?: string;
@@ -78,6 +88,26 @@ function appBaseUrl(): string {
 
 function telegramTopupWebAppUrl(): string {
   return `${appBaseUrl()}/telegram/topup`;
+}
+
+function telegramDashboardUrl(): string {
+  return `${appBaseUrl()}/dashboard?telegramLink=1`;
+}
+
+function telegramDeepLink(code: string): string | null {
+  const username = env.TELEGRAM_BOT_USERNAME?.replace(/^@/, "");
+  return username ? `https://t.me/${username}?start=link_${code}` : null;
+}
+
+function isLinkedTelegramIdentity(account: { userId?: string | null; status?: string | null }): account is { userId: string; status?: string | null } {
+  return Boolean(account.userId) && account.status !== "unlinked" && account.status !== "blocked";
+}
+
+function telegramNotLinkedPayload() {
+  return {
+    error: "Telegram account is not linked",
+    code: "telegram_not_linked",
+  };
 }
 
 function parseAmountUsd(value: unknown): number {
@@ -204,10 +234,19 @@ async function createTelegramTopup(userId: string, telegramId: string, amountUsd
   return { paymentId, invoice, quote };
 }
 
-async function handleTopup(chatId: string | number, actor: TelegramActor, amountUsd: number): Promise<void> {
-  const account = await upsertTelegramAccount(actor);
-  const topup = await createTelegramTopup(account.userId, String(actor.id), amountUsd);
-  const balanceTL = await getUserBalanceTL(account.userId);
+async function onboardingReplyMarkup() {
+  return buildTelegramOnboardingMenu(telegramDashboardUrl());
+}
+
+async function sendTelegramLinkRequired(chatId: string | number, messageId?: number): Promise<void> {
+  const text = formatTelegramLinkRequiredMessage();
+  const replyMarkup = await onboardingReplyMarkup();
+  await editOrSendTelegramMessage({ chatId, messageId, text, replyMarkup });
+}
+
+async function handleTopup(chatId: string | number, linkedUserId: string, actor: TelegramActor, amountUsd: number): Promise<void> {
+  const topup = await createTelegramTopup(linkedUserId, String(actor.id), amountUsd);
+  const balanceTL = await getUserBalanceTL(linkedUserId);
 
   await sendTelegramMessage(
     chatId,
@@ -231,7 +270,12 @@ async function handleTelegramMessage(update: TelegramMessageUpdate): Promise<voi
   if (command.type === "link") {
     const linked = await consumeTelegramLinkCode(command.code, message.from);
     if (linked.status === "linked") {
-      await sendTelegramMessage(chatId, "Telegram hesabın YapayZekaLab hesabına bağlandı.", buildTelegramMainMenu());
+      const balanceTL = await getUserBalanceTL(linked.userId);
+      await sendTelegramMessage(
+        chatId,
+        `Telegram hesabın YapayZekaLab hesabına bağlandı.\n${formatBalanceMessage(balanceTL)}`,
+        buildTelegramMainMenu(),
+      );
       return;
     }
     await sendTelegramMessage(
@@ -244,13 +288,22 @@ async function handleTelegramMessage(update: TelegramMessageUpdate): Promise<voi
     return;
   }
 
-  if (command.type === "topup") {
-    await handleTopup(chatId, message.from, command.amountUsd);
+  const account = await upsertTelegramAccount(message.from);
+  if (!isLinkedTelegramIdentity(account)) {
+    await sendTelegramMessage(
+      chatId,
+      formatTelegramLinkRequiredMessage(),
+      await onboardingReplyMarkup(),
+    );
     return;
   }
 
-  const account = await upsertTelegramAccount(message.from);
   const balance = await getUserBalanceTL(account.userId);
+  if (command.type === "topup") {
+    await handleTopup(chatId, account.userId, message.from, command.amountUsd);
+    return;
+  }
+
   await sendTelegramMessage(
     chatId,
     command.type === "start"
@@ -268,6 +321,28 @@ async function handleTelegramCallback(update: TelegramMessageUpdate): Promise<vo
   const chatId = callback.message?.chat.id ?? callback.from.id;
   const data = callback.data ?? "";
   const account = await upsertTelegramAccount(callback.from);
+
+  if (data === "tg:provision") {
+    const provisioned = await provisionTelegramOnlyUser(account.id, callback.from);
+    const balance = await getUserBalanceTL(provisioned.userId);
+    await editOrSendTelegramMessage({
+      chatId,
+      messageId: callback.message?.message_id,
+      text: `Telegram hesabın oluşturuldu.\n${formatBalanceMessage(balance)}`,
+      replyMarkup: buildTelegramMainMenu(),
+    });
+    return;
+  }
+
+  if (!isLinkedTelegramIdentity(account)) {
+    if (data === "tg:support") {
+      await sendTelegramMessage(chatId, env.TELEGRAM_SUPPORT_URL || "Destek: destek@yapayzekalab.com", await onboardingReplyMarkup());
+      return;
+    }
+    await sendTelegramLinkRequired(chatId, callback.message?.message_id);
+    return;
+  }
+
   const balance = await getUserBalanceTL(account.userId);
 
   if (data === "tg:topup:panel") {
@@ -285,7 +360,7 @@ async function handleTelegramCallback(update: TelegramMessageUpdate): Promise<vo
   }
 
   if (data.startsWith("tg:topup:")) {
-    await handleTopup(chatId, callback.from, Number(data.split(":")[2]));
+    await handleTopup(chatId, account.userId, callback.from, Number(data.split(":")[2]));
     return;
   }
 
@@ -297,7 +372,7 @@ async function handleTelegramCallback(update: TelegramMessageUpdate): Promise<vo
   if (data === "tg:apikey") {
     await deliverApiAccessToTelegramUser({
       userId: account.userId,
-      telegramAccountId: account.telegramAccountId,
+      telegramAccountId: account.id ?? (account as { telegramAccountId?: string }).telegramAccountId ?? "",
       chatId,
     });
     return;
@@ -306,7 +381,7 @@ async function handleTelegramCallback(update: TelegramMessageUpdate): Promise<vo
   if (data === "tg:apikey:change") {
     await deliverApiAccessToTelegramUser({
       userId: account.userId,
-      telegramAccountId: account.telegramAccountId,
+      telegramAccountId: account.id ?? (account as { telegramAccountId?: string }).telegramAccountId ?? "",
       chatId,
       forceNewKey: true,
     });
@@ -326,6 +401,20 @@ async function handleTelegramCallback(update: TelegramMessageUpdate): Promise<vo
   await sendTelegramMessage(chatId, "Menü", buildTelegramMainMenu());
 }
 
+function processTelegramUpdateInBackground(update: TelegramMessageUpdate): void {
+  void (async () => {
+    if (update.message) await handleTelegramMessage(update);
+    if (update.callback_query) await handleTelegramCallback(update);
+  })().catch((error) => {
+    logger.error({
+      updateId: update.update_id,
+      hasMessage: Boolean(update.message),
+      hasCallback: Boolean(update.callback_query),
+      error: error instanceof Error ? error.message : String(error),
+    }, "Telegram webhook background processing failed");
+  });
+}
+
 router.post("/webhook", async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!assertTelegramConfigured(res)) return;
@@ -335,8 +424,7 @@ router.post("/webhook", async (req: Request, res: Response, next: NextFunction) 
     }
 
     const update = req.body as TelegramMessageUpdate;
-    if (update.message) await handleTelegramMessage(update);
-    if (update.callback_query) await handleTelegramCallback(update);
+    processTelegramUpdateInBackground(update);
     res.json({ ok: true });
   } catch (e) {
     next(e);
@@ -429,7 +517,7 @@ function amountMatches(payment: typeof payments.$inferSelect, invoice: CryptoPay
 async function deliverPaidPayment(paymentId: string, userId: string): Promise<void> {
   const accountRows = await db.select().from(telegramAccounts).where(eq(telegramAccounts.userId, userId)).limit(1);
   const account = accountRows[0];
-  if (!account) {
+  if (!account || !isLinkedTelegramIdentity(account)) {
     await db.insert(telegramDeliveries).values({
       userId,
       paymentId,
@@ -457,6 +545,10 @@ router.get("/webapp/me", async (req, res, next) => {
     if (!assertTelegramConfigured(res)) return;
     const actor = validateWebAppActor(req);
     const account = await upsertTelegramAccount(actor);
+    if (!isLinkedTelegramIdentity(account)) {
+      res.status(409).json(telegramNotLinkedPayload());
+      return;
+    }
     const balanceTL = await getUserBalanceTL(account.userId);
     const cfg = await paymentConfig();
 
@@ -490,6 +582,10 @@ router.post("/webapp/invoices", async (req, res, next) => {
     const actor = validateWebAppActor(req);
     const amountUsd = parseAmountUsd(req.body?.amountUsd);
     const account = await upsertTelegramAccount(actor);
+    if (!isLinkedTelegramIdentity(account)) {
+      res.status(409).json(telegramNotLinkedPayload());
+      return;
+    }
     const topup = await createTelegramTopup(account.userId, String(actor.id), amountUsd);
 
     res.json({
@@ -519,8 +615,60 @@ router.post("/webapp/invoices", async (req, res, next) => {
 router.post("/link-code", userAuth, async (req, res, next) => {
   try {
     const result = await createTelegramLinkCode(req.user!.id);
-    res.json(result);
+    const deepLinkUrl = telegramDeepLink(result.code);
+    res.json({ ...result, deepLinkUrl });
   } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/unlink", userAuth, async (req, res, next) => {
+  try {
+    const result = await unlinkTelegramAccount(req.user!.id);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/login-link", userAuth, async (req, res, next) => {
+  try {
+    const actor = validateTelegramLoginPayload(req.body);
+    const result = await linkTelegramLogin(req.user!.id, actor);
+    if (result.status === "conflict") {
+      res.status(409).json({
+        error: "Telegram account is already linked to another user",
+        code: "telegram_link_conflict",
+      });
+      return;
+    }
+    res.json({ success: true, telegramAccountId: result.telegramAccountId });
+  } catch (e) {
+    if (e instanceof TelegramLoginAuthError) {
+      res.status(401).json({ error: "Invalid Telegram login payload" });
+      return;
+    }
+    next(e);
+  }
+});
+
+router.get("/login-link", userAuth, async (req, res, next) => {
+  try {
+    const actor = validateTelegramLoginPayload(req.query);
+    const result = await linkTelegramLogin(req.user!.id, actor);
+    if (result.status === "conflict") {
+      res.status(409).json({
+        error: "Telegram account is already linked to another user",
+        code: "telegram_link_conflict",
+      });
+      return;
+    }
+    res.json({ success: true, telegramAccountId: result.telegramAccountId });
+  } catch (e) {
+    if (e instanceof TelegramLoginAuthError) {
+      res.status(401).json({ error: "Invalid Telegram login payload" });
+      return;
+    }
     next(e);
   }
 });
@@ -536,6 +684,9 @@ router.get("/admin/accounts", adminAuth, async (_req, res, next) => {
         firstName: telegramAccounts.firstName,
         lastName: telegramAccounts.lastName,
         linkedAt: telegramAccounts.linkedAt,
+        status: telegramAccounts.status,
+        linkMethod: telegramAccounts.linkMethod,
+        lastSeenAt: telegramAccounts.lastSeenAt,
         userEmail: users.email,
         bakiyeTL: users.bakiyeTL,
       })
@@ -552,6 +703,46 @@ router.get("/admin/deliveries", adminAuth, async (_req, res, next) => {
   try {
     const rows = await db.select().from(telegramDeliveries);
     res.json(rows);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get("/admin/conflicts", adminAuth, async (_req, res, next) => {
+  try {
+    res.json(await listTelegramLinkConflicts());
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/admin/reconcile", adminAuth, async (_req, res, next) => {
+  try {
+    res.json(await runTelegramLinkBackfill());
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/admin/relink", adminAuth, async (req, res, next) => {
+  try {
+    const telegramAccountId = String(req.body?.telegramAccountId || "").trim();
+    const targetUserId = String(req.body?.targetUserId || "").trim();
+    if (!UUID_RE.test(telegramAccountId) || !UUID_RE.test(targetUserId)) {
+      res.status(400).json({ error: "telegramAccountId ve targetUserId gerekli." });
+      return;
+    }
+
+    const result = await adminLinkTelegramIdentity(telegramAccountId, targetUserId);
+    if (result.status === "not_found") {
+      res.status(404).json({ error: "Telegram identity bulunamadı." });
+      return;
+    }
+    if (result.status === "conflict") {
+      res.status(409).json({ error: "Telegram identity güvenli şekilde taşınamadı.", code: "telegram_link_conflict" });
+      return;
+    }
+    res.json({ success: true, ...result });
   } catch (e) {
     next(e);
   }

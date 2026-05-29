@@ -5,6 +5,7 @@ describe("telegram-bot-service pure helpers", () => {
     const { parseTelegramCommand } = await import("./telegram-bot-service.js");
 
     expect(parseTelegramCommand("/start")).toEqual({ type: "start" });
+    expect(parseTelegramCommand("/start link_ABC-123")).toEqual({ type: "link", code: "ABC-123" });
     expect(parseTelegramCommand("/link ABC-123")).toEqual({ type: "link", code: "ABC-123" });
     expect(parseTelegramCommand("/topup 10.50")).toEqual({ type: "topup", amountUsd: 10.5 });
     expect(parseTelegramCommand("/topup")).toEqual({ type: "menu" });
