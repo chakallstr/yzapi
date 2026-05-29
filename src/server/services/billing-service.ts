@@ -235,8 +235,8 @@ export async function settleReservedUsage(opts: {
   const meta = buildUsageChargeMeta(patchedModel, opts.usage, computed, opts.rawUsageJson);
   const reservedTL = Math.abs(Number(reservation.miktarTL ?? 0));
   const reserveStr = reservedTL.toFixed(4);
-  const actualCostTL = opts.status === "error" ? meta.costTL : meta.costTL;
-  const actualCostUsd = meta.costUsd;
+  const actualCostTL = opts.status === "error" ? 0 : meta.costTL;
+  const actualCostUsd = opts.status === "error" ? 0 : meta.costUsd;
   const actualCostStr = actualCostTL.toFixed(4);
   const actualCostUsdStr = actualCostUsd.toFixed(8);
 
@@ -361,7 +361,7 @@ export async function settleReservedUsage(opts: {
         ${JSON.stringify(meta.pricingSnapshot)}::jsonb,
         ${errorCode ?? null},
         ${opts.responseMs},
-        ${opts.status === "error" && actualCostTL === 0 ? "error" : "success"}
+        ${opts.status === "error" ? "error" : "success"}
       )
     `;
 

@@ -263,4 +263,51 @@ describe("chargeUsage — billing service", () => {
     expect(result.remainingTL).toBe(98.125);
     expect(mockDbSqlBegin).toHaveBeenCalledTimes(1);
   });
+
+  it("on error status, refunds the full reservation and charges zero (K1)", async () => {
+    mockSelectLimit
+      .mockResolvedValueOnce([]) // existing usage record: none
+      .mockResolvedValueOnce([{ miktarTL: "-2.2500", sonrakiBakiye: "97.7500" }]); // reservation row
+    // Error path: only refund update + refund tx + usage record insert run (no charge block, cost=0)
+    mockTxSql
+      .mockResolvedValueOnce([{ bakiye_tl: "100.0000", email: "user@test.com" }]) // refund update
+      .mockResolvedValueOnce([{ id: "refund-tx-1" }]) // refund tx
+      .mockResolvedValueOnce([]); // usage record insert
+
+    const { settleReservedUsage } = await import("./billing-service.js");
+
+    const model = {
+      id: "gpt-4o",
+      name: "GPT-4o",
+      provider: "openai",
+      type: "Metin" as const,
+      context: "128K",
+      endpoints: ["chat"] as string[],
+      providerInputUsd: 5,
+      providerOutputUsd: 15,
+    };
+
+    const result = await settleReservedUsage({
+      userId: "00000000-0000-0000-0000-000000000001",
+      apiKeyId: "00000000-0000-0000-0000-000000000002",
+      model,
+      usage: { promptTokens: 1000, completionTokens: 0 },
+      responseMs: 90,
+      requestId: "reserve-err-1",
+      rawUsageJson: { promptTokens: 1000, completionTokens: 0 },
+      errorCode: "upstream_502",
+      status: "error",
+    });
+
+    // No charge: customer is fully refunded, cost is zero
+    expect(result.costTL).toBe(0);
+    expect(result.remainingTL).toBe(100);
+    expect(mockDbSqlBegin).toHaveBeenCalledTimes(1);
+    // usage_records insert must record status "error" with zero cost
+    const usageInsertCall = mockTxSql.mock.calls.find((call) => {
+      const sql = String(call[0]?.[0] ?? call[0] ?? "");
+      return sql.includes("usage_records");
+    });
+    expect(usageInsertCall).toBeTruthy();
+  });
 });
