@@ -284,6 +284,11 @@ export async function settleReservedUsage(opts: {
     }
 
     if (actualCostTL > 0) {
+      // Service was already delivered upstream, so the final charge must NOT be
+      // blocked by a balance guard. The reservation already verified balance at
+      // reserve time; if the real cost exceeded the reservation (overage), we
+      // still record the true charge (balance may dip slightly negative) instead
+      // of committing the refund and dropping the charge + usage record (Y2).
       const chargeRows = await txSql<{ bakiye_tl: string; email: string }[]>`
         UPDATE users
         SET bakiye_tl = bakiye_tl - ${actualCostStr}::numeric,
@@ -291,11 +296,10 @@ export async function settleReservedUsage(opts: {
             toplam_istek = toplam_istek + 1,
             son_aktivite = now()
         WHERE id = ${opts.userId}::uuid
-          AND bakiye_tl >= ${actualCostStr}::numeric
         RETURNING bakiye_tl, email
       `;
 
-      if (!chargeRows.length) return chargeRows;
+      if (!chargeRows.length) return chargeRows; // user row missing — abort settle
 
       const chargeAfter = Number(chargeRows[0].bakiye_tl);
       const chargeBefore = chargeAfter + actualCostTL;

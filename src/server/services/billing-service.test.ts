@@ -310,4 +310,53 @@ describe("chargeUsage — billing service", () => {
     });
     expect(usageInsertCall).toBeTruthy();
   });
+
+  it("settles even when real cost exceeds reservation without dropping the charge (Y2)", async () => {
+    mockSelectLimit
+      .mockResolvedValueOnce([]) // existing usage record: none
+      .mockResolvedValueOnce([{ miktarTL: "-2.2500", sonrakiBakiye: "1.0000" }]); // small reservation, low remaining
+    // Overage path: refund (+2.25) then charge a larger actual cost. The charge
+    // UPDATE no longer has a balance guard, so it must succeed and write the
+    // final tx + usage record (regression guard for Y2 partial-commit bug).
+    mockTxSql
+      .mockResolvedValueOnce([{ bakiye_tl: "3.2500", email: "user@test.com" }]) // refund update (1.00 + 2.25)
+      .mockResolvedValueOnce([{ id: "refund-tx-1" }]) // refund tx
+      .mockResolvedValueOnce([{ bakiye_tl: "-1.2500", email: "user@test.com" }]) // charge update (3.25 - 4.50), may dip negative
+      .mockResolvedValueOnce([{ id: "final-tx-1" }]) // final tx
+      .mockResolvedValueOnce([]); // usage record insert
+
+    const { settleReservedUsage } = await import("./billing-service.js");
+
+    const model = {
+      id: "gpt-4o",
+      name: "GPT-4o",
+      provider: "openai",
+      type: "Metin" as const,
+      context: "128K",
+      endpoints: ["chat"] as string[],
+      providerInputUsd: 5,
+      providerOutputUsd: 15,
+    };
+
+    // computePrice mock => input 15 tl/1M, output 60 tl/1M.
+    // 1000 prompt + 1000 completion => (1000/1e6)*750? no: mock returns tl input 750, output 3000.
+    // cost = (1000/1e6)*750 + (1000/1e6)*3000 = 0.75 + 3.0 = 3.75 (just needs to exceed reserve 2.25)
+    const result = await settleReservedUsage({
+      userId: "00000000-0000-0000-0000-000000000001",
+      apiKeyId: "00000000-0000-0000-0000-000000000002",
+      model,
+      usage: { promptTokens: 1000, completionTokens: 1000 },
+      responseMs: 150,
+      requestId: "reserve-overage-1",
+      rawUsageJson: { promptTokens: 1000, completionTokens: 1000 },
+      status: "success",
+    });
+
+    // The final charge must be applied (no silent drop), balance reflects charge update
+    expect(result.costTL).toBeGreaterThan(2.25);
+    expect(result.remainingTL).toBe(-1.25);
+    expect(mockDbSqlBegin).toHaveBeenCalledTimes(1);
+    // both refund and charge UPDATEs plus the usage record insert ran
+    expect(mockTxSql).toHaveBeenCalledTimes(5);
+  });
 });
