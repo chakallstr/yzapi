@@ -537,45 +537,162 @@ const AdminOverrides = ({ overrides, token, refresh }) => {
   const [modelId, setModelId] = useState(MODELS[0]?.id || '');
   const [inputUsdOverride, setInputUsdOverride] = useState('');
   const [outputUsdOverride, setOutputUsdOverride] = useState('');
+  const [enabled, setEnabled] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+
+  const selectedModel = useMemo(() => MODELS.find((m) => m.id === modelId) || MODELS[0], [modelId]);
+  const currentOverride = useMemo(
+    () => (overrides || []).find((override) => override.modelId === modelId) || null,
+    [overrides, modelId],
+  );
+
+  useEffect(() => {
+    setInputUsdOverride(currentOverride?.inputUsdOverride !== null && currentOverride?.inputUsdOverride !== undefined ? String(currentOverride.inputUsdOverride) : '');
+    setOutputUsdOverride(currentOverride?.outputUsdOverride !== null && currentOverride?.outputUsdOverride !== undefined ? String(currentOverride.outputUsdOverride) : '');
+    setEnabled(currentOverride ? currentOverride.enabled !== false : true);
+    setSaved(false);
+    setError('');
+  }, [currentOverride, modelId]);
+
+  const startEdit = (override) => {
+    setModelId(override.modelId);
+    setInputUsdOverride(override.inputUsdOverride !== null && override.inputUsdOverride !== undefined ? String(override.inputUsdOverride) : '');
+    setOutputUsdOverride(override.outputUsdOverride !== null && override.outputUsdOverride !== undefined ? String(override.outputUsdOverride) : '');
+    setEnabled(override.enabled !== false);
+    setSaved(false);
+    setError('');
+  };
+
+  const clearForm = () => {
+    setInputUsdOverride('');
+    setOutputUsdOverride('');
+    setEnabled(true);
+    setSaved(false);
+    setError('');
+  };
 
   const save = async () => {
+    const nextInput = inputUsdOverride === '' ? null : Number(inputUsdOverride);
+    const nextOutput = outputUsdOverride === '' ? null : Number(outputUsdOverride);
+    if ((nextInput !== null && !Number.isFinite(nextInput)) || (nextOutput !== null && !Number.isFinite(nextOutput))) {
+      setError('Override alanlarına geçerli sayı gir.');
+      setSaved(false);
+      return;
+    }
+    setSaving(true);
+    setError('');
+    setSaved(false);
+    try {
+      await adminRequest('/api/admin/model-overrides', token, {
+        method: 'POST',
+        body: {
+          modelId,
+          enabled,
+          inputUsdOverride: nextInput,
+          outputUsdOverride: nextOutput,
+          notlar: 'Admin panelinden güncellendi',
+        },
+      });
+      await refresh();
+      setSaved(true);
+    } catch (saveError) {
+      setError(saveError.message || 'Override kaydedilemedi.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleOverride = async (override) => {
     await adminRequest('/api/admin/model-overrides', token, {
       method: 'POST',
       body: {
-        modelId,
-        enabled: true,
-        inputUsdOverride: inputUsdOverride === '' ? null : Number(inputUsdOverride),
-        outputUsdOverride: outputUsdOverride === '' ? null : Number(outputUsdOverride),
-        notlar: 'Admin panelinden güncellendi',
+        modelId: override.modelId,
+        enabled: !override.enabled,
+        inputUsdOverride: override.inputUsdOverride,
+        outputUsdOverride: override.outputUsdOverride,
+        notlar: 'Admin panelinden durum güncellendi',
       },
     });
-    setInputUsdOverride('');
-    setOutputUsdOverride('');
     await refresh();
+    if (modelId === override.modelId) {
+      setEnabled(!override.enabled);
+    }
+  };
+
+  const removeOverride = async (override) => {
+    if (!window.confirm(`${modelMeta(override.modelId).label} override silinsin mi?`)) return;
+    await adminRequest(`/api/admin/model-overrides/${encodeURIComponent(override.modelId)}`, token, {
+      method: 'DELETE',
+    });
+    await refresh();
+    if (modelId === override.modelId) clearForm();
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <Card pad={18}>
         <Caption>Model override</Caption>
-        <div style={grid(180)}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) 150px', gap: 12, alignItems: 'end' }}>
           <select value={modelId} onChange={(e) => setModelId(e.target.value)} style={inputStyle}>
             {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
           </select>
           <input value={inputUsdOverride} onChange={(e) => setInputUsdOverride(e.target.value)} placeholder="input USD/M override" type="number" step="0.0001" style={inputStyle} />
           <input value={outputUsdOverride} onChange={(e) => setOutputUsdOverride(e.target.value)} placeholder="output USD/M override" type="number" step="0.0001" style={inputStyle} />
-          <button onClick={save} style={{ borderRadius: 9, background: 'var(--ink)', color: '#fff', fontWeight: 600 }}>Kaydet</button>
+          <button onClick={save} disabled={saving} style={{ borderRadius: 9, background: 'var(--ink)', color: '#fff', fontWeight: 600, opacity: saving ? 0.7 : 1 }}>{saving ? 'Kaydediliyor…' : 'Kaydet'}</button>
         </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginTop: 12 }}>
+          <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+            <Caption>Geçerli fiyat</Caption>
+            <div style={{ fontSize: 14, fontWeight: 600, marginTop: 6 }}>{selectedModel ? `${usd(selectedModel.input)} · ${usd(selectedModel.output)}` : '—'}</div>
+            <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 4 }}>{selectedModel?.ctx || '—'} ctx · {selectedModel?.provider || '—'}</div>
+          </div>
+          <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+            <Caption>Etkin fiyat</Caption>
+            <div style={{ fontSize: 14, fontWeight: 600, marginTop: 6 }}>
+              {usd(inputUsdOverride === '' ? selectedModel?.input : Number(inputUsdOverride || 0))} · {usd(outputUsdOverride === '' ? selectedModel?.output : Number(outputUsdOverride || 0))}
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 4 }}>{currentOverride ? 'override mevcut' : 'taban fiyat'}</div>
+          </div>
+          <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <Caption>Durum</Caption>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <StatusChip status={enabled ? 'aktif' : 'kapali'} />
+              <button onClick={() => setEnabled((value) => !value)} style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11 }}>
+                {enabled ? 'Pasifleştir' : 'Aktifleştir'}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+          <button onClick={clearForm} style={{ padding: '8px 11px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11 }}>Formu temizle</button>
+          {currentOverride && (
+            <button onClick={() => removeOverride(currentOverride)} style={{ padding: '8px 11px', borderRadius: 8, border: '1px solid #fecaca', background: '#fff1f2', color: '#b91c1c', fontSize: 11 }}>
+              Override kaldır
+            </button>
+          )}
+          {saved && <Chip tone="ok">Override kaydedildi</Chip>}
+        </div>
+        {error && <div style={{ marginTop: 10 }}><ErrorBox>{error}</ErrorBox></div>}
       </Card>
       <Card pad={0} style={{ overflow: 'hidden' }}>
         {(overrides || []).length === 0 ? <div style={{ padding: 16 }}><EmptyState>Override yok.</EmptyState></div> : overrides.map((o, i) => {
           const m = modelMeta(o.modelId);
           return (
-            <div key={o.modelId} style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 1fr) 140px 140px 90px', gap: 12, padding: '13px 16px', borderBottom: i < overrides.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center', fontSize: 12 }}>
-              <span style={{ fontFamily: 'var(--font-mono)' }}>{m.label}</span>
+            <div key={o.modelId} style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 1fr) 120px 120px 80px 220px', gap: 12, padding: '13px 16px', borderBottom: i < overrides.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center', fontSize: 12 }}>
+              <div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{m.label}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 3 }}>{m.id}</div>
+              </div>
               <span>{o.inputUsdOverride === null ? '—' : usd(o.inputUsdOverride)}</span>
               <span>{o.outputUsdOverride === null ? '—' : usd(o.outputUsdOverride)}</span>
               <Chip tone={o.enabled ? 'ok' : 'neutral'}>{o.enabled ? 'aktif' : 'pasif'}</Chip>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button onClick={() => startEdit(o)} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11 }}>Düzenle</button>
+                <button onClick={() => toggleOverride(o)} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11 }}>{o.enabled ? 'Pasifleştir' : 'Aktifleştir'}</button>
+                <button onClick={() => removeOverride(o)} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid #fecaca', background: '#fff1f2', color: '#b91c1c', fontSize: 11 }}>Override kaldır</button>
+              </div>
             </div>
           );
         })}
