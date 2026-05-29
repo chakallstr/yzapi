@@ -267,10 +267,14 @@ const AdminUsers = ({ users, token, refresh }) => {
     await refresh();
   };
 
-  const updateBalance = async (user) => {
-    const amount = Number(window.prompt(`${user.email} için TL bakiye değişimi`, '0'));
-    if (!Number.isFinite(amount) || amount === 0) return;
-    const note = window.prompt('Açıklama', 'Manuel admin işlemi') || 'Manuel admin işlemi';
+  const updateBalance = async (user, mode = 'add') => {
+    const isRemove = mode === 'remove';
+    const label = isRemove ? 'silinecek' : 'eklenecek';
+    const rawAmount = Number(window.prompt(`${user.email} için ${label} TL tutarı`, '0'));
+    if (!Number.isFinite(rawAmount) || rawAmount <= 0) return;
+    const amount = isRemove ? -Math.abs(rawAmount) : Math.abs(rawAmount);
+    const defaultNote = isRemove ? 'Manuel admin bakiye düşümü' : 'Manuel admin bakiye ekleme';
+    const note = window.prompt('Açıklama', defaultNote) || defaultNote;
     await adminRequest(`/api/admin/users/${user.id}/bakiye`, token, { method: 'POST', body: { miktar: amount, aciklama: note } });
     await refresh();
   };
@@ -303,7 +307,8 @@ const AdminUsers = ({ users, token, refresh }) => {
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <button onClick={() => updateUser(u, { durum: u.durum === 'aktif' ? 'askida' : 'aktif' })} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11 }}>Durum</button>
                 <button onClick={() => updateUser(u, { plan: u.plan === 'pro' ? 'kurumsal' : 'pro' })} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11 }}>Plan</button>
-                <button onClick={() => updateBalance(u)} style={{ padding: '6px 9px', borderRadius: 8, background: 'var(--ink)', color: '#fff', fontSize: 11 }}>Bakiye</button>
+                <button onClick={() => updateBalance(u, 'add')} style={{ padding: '6px 9px', borderRadius: 8, background: 'var(--ink)', color: '#fff', fontSize: 11 }}>Bakiye +</button>
+                <button onClick={() => updateBalance(u, 'remove')} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid #fecaca', background: '#fff1f2', color: '#b91c1c', fontSize: 11 }}>Bakiye -</button>
               </div>
             </div>
           );
