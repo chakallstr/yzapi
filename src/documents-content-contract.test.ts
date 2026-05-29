@@ -27,4 +27,13 @@ describe("documents tab content contract", () => {
     expect(combined).toContain("Claude Code");
     expect(combined).toContain("Bu yayındaki kararlı dokümantasyon OpenAI-uyumlu istemcilere odaklanır.");
   });
+
+  it("contains deeper sdk, error and billing documentation blocks", () => {
+    expect(combined).toContain("Node.js · OpenAI SDK");
+    expect(combined).toContain("Python · OpenAI istemcisi");
+    expect(combined).toContain("X-YZ-Remaining-USD");
+    expect(combined).toContain("Sık görülen hata cevapları");
+    expect(combined).toContain("Kod kopyala");
+    expect(combined).toContain("Kopyalandı");
+  });
 });

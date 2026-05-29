@@ -11,6 +11,7 @@ export const API_DOC_SECTIONS = [
       "Ana metin endpointi: `/v1/chat/completions`",
       "Bakiye sorgu endpointi: `/v1/balance`",
       "Modelleri canlı çekmek için: `/v1/models`",
+      "Başlamadan önce panelden kendi API anahtarını oluştur ve hesabında kullanılabilir bakiye bulundur.",
     ],
     codeBlocks: [
       {
@@ -26,6 +27,27 @@ export const API_DOC_SECTIONS = [
     ],
     "max_tokens": 120
   }'`,
+      },
+    ],
+  },
+  {
+    key: "auth",
+    label: "Kimlik doğrulama",
+    title: "API anahtarı ve bağlantı mantığı",
+    intro:
+      "YapayZekaLab herkese açık ortak bir anahtar kullanmaz. Her kullanıcı kendi panelinden ürettiği `yzk_live_` anahtarıyla bağlanır. Bu anahtar kullanıcı bakiyesine, kullanım kayıtlarına ve limit kontrolüne bağlıdır.",
+    bullets: [
+      "Anahtar biçimi `yzk_live_` ile başlar.",
+      "Anahtar yalnız sana aittir; başka kullanıcı verisine erişim vermez.",
+      "Bakiyen biterse istekler durur; sistem ücretsiz sınırsız kullanım açmaz.",
+      "Geçersiz, iptal edilmiş veya askıya alınmış anahtar `401` alır.",
+      "Admin panelinde oluşturulan anahtarlar da kullanıcı hesabına bağlı çalışır.",
+    ],
+    codeBlocks: [
+      {
+        language: "bash",
+        title: "Header örneği",
+        code: `Authorization: Bearer yzk_live_YOUR_KEY`,
       },
     ],
   },
@@ -93,6 +115,16 @@ export const API_DOC_SECTIONS = [
         ],
       },
       {
+        name: "Cherry Studio",
+        type: "Desktop · OpenAI-compatible",
+        steps: [
+          "Model sağlayıcısı olarak OpenAI-compatible profil aç.",
+          "Base URL `https://yapayzekalab.org/v1` olsun.",
+          "API Key olarak `yzk_live_...` kullan.",
+          "İlk denemede `/v1/models` üzerinden gördüğün canonical model adını seç.",
+        ],
+      },
+      {
         name: "Claude Code",
         type: "CLI · not",
         steps: [
@@ -104,20 +136,85 @@ export const API_DOC_SECTIONS = [
     ],
   },
   {
+    key: "sdk",
+    label: "SDK örnekleri",
+    title: "cURL, Node.js ve Python ile bağlan",
+    intro:
+      "En hızlı başlangıç cURL ile olur. Uygulamaya geçerken OpenAI uyumlu istemcilerde yalnızca base URL ve model adını değiştirmen yeterlidir.",
+    codeBlocks: [
+      {
+        language: "bash",
+        title: "cURL · chat/completions",
+        code: `curl -X POST https://yapayzekalab.org/v1/chat/completions \\
+  -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "gpt-5.5",
+    "messages": [
+      { "role": "system", "content": "Kısa ve net yanıt ver." },
+      { "role": "user", "content": "Bir satırlık selam ver." }
+    ],
+    "max_tokens": 120
+  }'`,
+      },
+      {
+        language: "javascript",
+        title: "Node.js · OpenAI SDK",
+        code: `import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: "yzk_live_YOUR_KEY",
+  baseURL: "https://yapayzekalab.org/v1",
+});
+
+const response = await client.chat.completions.create({
+  model: "claude-sonnet-4-6",
+  messages: [
+    { role: "user", content: "Kısa bir ürün açıklaması yaz." }
+  ],
+  max_tokens: 220,
+});
+
+console.log(response.choices[0]?.message?.content);`,
+      },
+      {
+        language: "python",
+        title: "Python · OpenAI istemcisi",
+        code: `from openai import OpenAI
+
+client = OpenAI(
+    api_key="yzk_live_YOUR_KEY",
+    base_url="https://yapayzekalab.org/v1",
+)
+
+response = client.chat.completions.create(
+    model="gemini-3.1-pro-preview",
+    messages=[
+        {"role": "user", "content": "3 maddelik özet çıkar."}
+    ],
+    max_tokens=180,
+)
+
+print(response.choices[0].message.content)`,
+      },
+    ],
+  },
+  {
     key: "endpoints",
     label: "Endpoint yüzeyi",
     title: "Aktif endpointler ve davranışları",
     intro:
       "Dış yüzey tek v1 gateway’dir. Auth’suz istekler reddedilir. Başarılı JSON yanıtlarında maliyet ve kalan bakiye header’ları döner.",
-    bullets: [
-      "`GET /v1/models` → aktif model kataloğu",
-      "`GET /v1/models/count` → aktif model adedi",
-      "`GET /v1/providers` → sağlayıcı özeti",
-      "`GET /v1/balance` → kalan TL ve USD bakiye",
-      "`POST /v1/chat/completions` → ana üretim endpointi",
-      "`POST /v1/messages` → Anthropic uyumlu mesaj endpointi",
-      "`POST /v1/responses` → destek varsa çalışır, aksi durumda güvenli JSON hata döner",
-      "`/v1/images/*` ve `/v1/videos/*` → bu geçişte kapalı, 501 JSON hata döner ve ücret yazmaz",
+    referenceRows: [
+      { key: "GET /v1/models", value: "Aktif model kataloğu" },
+      { key: "GET /v1/models/count", value: "Aktif model adedi" },
+      { key: "GET /v1/providers", value: "Sağlayıcı özeti" },
+      { key: "GET /v1/balance", value: "Kalan TL ve USD bakiye" },
+      { key: "POST /v1/chat/completions", value: "Ana üretim endpointi" },
+      { key: "POST /v1/messages", value: "Anthropic uyumlu mesaj endpointi" },
+      { key: "POST /v1/responses", value: "Destek varsa çalışır, değilse güvenli JSON hata döner" },
+      { key: "POST /v1/images/*", value: "Bu geçişte kapalı, 501 JSON hata döner" },
+      { key: "POST /v1/videos/*", value: "Bu geçişte kapalı, 501 JSON hata döner" },
     ],
     codeBlocks: [
       {
@@ -156,6 +253,31 @@ export const API_DOC_SECTIONS = [
       "`X-YZ-Remaining-USD` → çağrı sonrası kalan USD eşdeğeri",
       "`X-YZ-Request-Id` → destek ve log eşleştirme kimliği",
       "Geçersiz veya bakiyesi bitmiş anahtar `401` ya da güvenli yetersiz bakiye hatası alır.",
+      "Başarılı JSON çağrılarında bu header’lar döner; hata senaryolarında güvenli JSON cevap üretilir.",
+    ],
+    codeBlocks: [
+      {
+        language: "text",
+        title: "Örnek response header seti",
+        code: `X-YZ-Cost-TL: 0.4182
+X-YZ-Remaining-TL: 472.58
+X-YZ-Remaining-USD: 9.9961
+X-YZ-Request-Id: req_123456789`,
+      },
+    ],
+  },
+  {
+    key: "streaming",
+    label: "Streaming",
+    title: "Streaming çağrılarında davranış",
+    intro:
+      "Streaming isteklerinde sistem önce güvenli rezervasyon yapar, sonra gerçek kullanım geldiğinde mahsuplaşır. Bu yüzden bakiye bittiğinde ücretsiz uzun akış açık kalmaz.",
+    bullets: [
+      "İstek başlamadan önce güvenli kullanım rezervi hesaplanır.",
+      "Provider son kullanım bilgisi verirse gerçek kullanım üzerinden kayıt tutulur.",
+      "Provider usage eksikse güvenli fallback hesap devreye girer.",
+      "Yetersiz bakiye varsa stream başlamadan çağrı bloklanır.",
+      "Görsel ve video stream akışları bu sürümde aktif değildir.",
     ],
   },
   {
@@ -205,6 +327,36 @@ export const API_DOC_SECTIONS = [
     ],
   },
   {
+    key: "errors",
+    label: "Hatalar",
+    title: "Sık görülen hata cevapları",
+    intro:
+      "İstemcini kurarken en çok yetkilendirme, bakiye ve desteklenmeyen endpoint durumlarıyla karşılaşırsın. Aşağıdaki özet beklenen güvenli davranışı gösterir.",
+    referenceRows: [
+      { key: "401", value: "API key yok, hatalı, askıda veya iptal edilmiş" },
+      { key: "402 / güvenli bakiye hatası", value: "Kullanım için yeterli bakiye yok" },
+      { key: "404", value: "Bilinmeyen / desteklenmeyen v1 route" },
+      { key: "501", value: "Görsel veya video endpointi bu geçişte kapalı" },
+      { key: "503", value: "Upstream proxy veya özel entegrasyon henüz yapılandırılmamış" },
+    ],
+  },
+  {
+    key: "workflow",
+    label: "Kurulum akışı",
+    title: "Sıfırdan çalışan kurulum sırası",
+    intro:
+      "Dökümanı ilk kez okuyan biri için en kısa güvenli akış aşağıdaki gibidir.",
+    bullets: [
+      "1. Google ile giriş yap.",
+      "2. Hesap panelinden `yzk_live_` anahtarını oluştur.",
+      "3. Bakiye yükle ve panelde onaylandığını gör.",
+      "4. `/v1/balance` ile kalan bakiyeni doğrula.",
+      "5. `/v1/models` ile aktif modeli seç.",
+      "6. `/v1/chat/completions` ile ilk küçük metin çağrını yap.",
+      "7. Gerekirse sonra istemcini `Cline`, `Kilo Code`, `OpenCode` veya `Roo Code` ile kalıcı kur.",
+    ],
+  },
+  {
     key: "notes",
     label: "Önemli notlar",
     title: "Kullanım notları ve sınırlar",
@@ -216,6 +368,7 @@ export const API_DOC_SECTIONS = [
       "Streaming destekleyen istemcilerde model uyumluluğunu katalogdan seç.",
       "Gerçek canlı akışta görsel ve video çağrılarını bu sürümde açma; kapalıdır.",
       "Yasal metinler, KVKK ve satış koşulları footer bağlantılarında ayrıca bulunur.",
+      "Sorun yaşarsan `X-YZ-Request-Id` değerini destek ekibine iletmek hata ayıklamayı hızlandırır.",
     ],
   },
 ];
@@ -226,6 +379,12 @@ export const buildApiDocsPlainText = () =>
 
     if (section.bullets?.length) {
       parts.push("", ...section.bullets.map((bullet) => `- ${bullet}`));
+    }
+
+    if (section.referenceRows?.length) {
+      section.referenceRows.forEach((row) => {
+        parts.push(`- ${row.key}: ${row.value}`);
+      });
     }
 
     if (section.clientCards?.length) {

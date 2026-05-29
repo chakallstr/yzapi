@@ -4,6 +4,7 @@ import { API_DOC_SECTIONS, buildApiDocsPlainText } from './api-docs.js';
 
 const DocumentsTab = () => {
   const [copied, setCopied] = useState(false);
+  const [copiedBlock, setCopiedBlock] = useState('');
   const docs = useMemo(() => API_DOC_SECTIONS, []);
 
   const copyAll = async () => {
@@ -13,6 +14,16 @@ const DocumentsTab = () => {
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
       setCopied(false);
+    }
+  };
+
+  const copyBlock = async (key, text) => {
+    try {
+      await navigator.clipboard?.writeText(text);
+      setCopiedBlock(key);
+      window.setTimeout(() => setCopiedBlock(''), 1600);
+    } catch {
+      setCopiedBlock('');
     }
   };
 
@@ -118,6 +129,27 @@ const DocumentsTab = () => {
                   </div>
                 ) : null}
 
+                {doc.referenceRows?.length ? (
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                    {doc.referenceRows.map((row, index) => (
+                      <div
+                        key={row.key}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'minmax(160px, 0.9fr) minmax(0, 1.4fr)',
+                          gap: 12,
+                          padding: '12px 14px',
+                          background: index % 2 === 0 ? 'var(--surface)' : 'var(--surface-2)',
+                          borderBottom: index < doc.referenceRows.length - 1 ? '1px solid var(--border)' : 'none',
+                        }}
+                      >
+                        <code style={{ fontSize: 11.5, color: 'var(--ink)', fontFamily: 'var(--font-mono)' }}>{row.key}</code>
+                        <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.62 }}>{row.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
                 {doc.modelGroups?.length ? (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 }}>
                     {doc.modelGroups.map((group) => (
@@ -137,7 +169,27 @@ const DocumentsTab = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {doc.codeBlocks.map((block) => (
                       <div key={block.title}>
-                        <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 8 }}>{block.title}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                          <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{block.title}</div>
+                          <button
+                            onClick={() => copyBlock(`${doc.key}-${block.title}`, block.code)}
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: 9,
+                              background: copiedBlock === `${doc.key}-${block.title}` ? 'var(--ok-bg)' : 'var(--surface-2)',
+                              color: copiedBlock === `${doc.key}-${block.title}` ? '#047857' : 'var(--ink-2)',
+                              fontSize: 11,
+                              fontWeight: 600,
+                              border: '1px solid var(--border)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                            }}
+                          >
+                            <I.Copy size={12} stroke={copiedBlock === `${doc.key}-${block.title}` ? '#047857' : 'var(--ink-2)'} />
+                            {copiedBlock === `${doc.key}-${block.title}` ? 'Kopyalandı' : 'Kod kopyala'}
+                          </button>
+                        </div>
                         <pre style={{ margin: 0, padding: 14, borderRadius: 12, background: '#0f172a', color: '#e2e8f0', overflowX: 'auto', fontSize: 11.5, lineHeight: 1.6 }}>
                           <code>{block.code}</code>
                         </pre>
