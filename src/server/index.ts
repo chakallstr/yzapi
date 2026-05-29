@@ -49,6 +49,11 @@ function formatUptime(seconds: number): string {
 const app = express();
 const startedAt = Date.now();
 
+// Behind nginx reverse proxy: trust exactly one proxy hop so req.ip resolves to
+// the real client IP (X-Forwarded-For) for per-IP rate limiting and OTP IP limits.
+// Use 1 (not true) to avoid X-Forwarded-For spoofing past the known proxy.
+app.set("trust proxy", 1);
+
 app.use(express.json({
   limit: "10mb",
   verify: (req, _res, buf) => {
