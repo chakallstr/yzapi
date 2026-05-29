@@ -164,4 +164,53 @@ describe("money flow: /v1/chat/completions billing", () => {
     }
     expect(after).toBeCloseTo(before, 4);
   });
+
+  it("bills two requests separately even when the client reuses X-Request-Id (K2)", async () => {
+    // Two successful upstream calls; the client sends the SAME X-Request-Id on both.
+    nock(new URL(UPSTREAM).origin)
+      .post(/\/chat\/completions$/)
+      .twice()
+      .reply(200, {
+        id: "chatcmpl_ok",
+        object: "chat.completion",
+        choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 1000, completion_tokens: 200 },
+      });
+
+    const before = await getBalance();
+    const clientId = "client-replayed-id-should-be-ignored";
+
+    const res1 = await request(app)
+      .post("/v1/chat/completions")
+      .set("Authorization", `Bearer ${FULL_KEY}`)
+      .set("X-Request-Id", clientId)
+      .send({ model: MODEL.id, messages: [{ role: "user", content: "hi" }] });
+    const res2 = await request(app)
+      .post("/v1/chat/completions")
+      .set("Authorization", `Bearer ${FULL_KEY}`)
+      .set("X-Request-Id", clientId)
+      .send({ model: MODEL.id, messages: [{ role: "user", content: "hi" }] });
+
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
+
+    // Server-generated ids must differ despite the identical client header.
+    const id1 = res1.headers["x-yz-request-id"];
+    const id2 = res2.headers["x-yz-request-id"];
+    expect(id1).toBeTruthy();
+    expect(id2).toBeTruthy();
+    expect(id1).not.toBe(id2);
+    expect(id1).not.toBe(clientId);
+
+    const u1 = await waitForUsageRecord(id1);
+    const u2 = await waitForUsageRecord(id2);
+    expect(u1?.status).toBe("success");
+    expect(u2?.status).toBe("success");
+
+    // Both requests were billed (no idempotent free ride): balance dropped by
+    // roughly twice a single request's cost.
+    const single = Number(res1.headers["x-yz-cost-tl"]);
+    const after = await getBalance();
+    expect(before - after).toBeCloseTo(single * 2, 2);
+  });
 });
