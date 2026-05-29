@@ -142,8 +142,11 @@ app.use("/api/user", userAuth, requireWhatsappVerified, userRouter);
 app.use("/api", modelsRouter);
 app.use("/api", settingsRouter);
 app.use("/api", logsRouter);
-app.use("/api", filesRouter);
-app.use("/api", legacyRouter);
+// route-agent (legacy) and files endpoints spend the real GEMINI_API_KEY, so they
+// must require an authenticated user. Public read endpoints (models, public-config,
+// announcements) stay unauthenticated and are mounted above without userAuth.
+app.use("/api", userAuth, requireWhatsappVerified, filesRouter);
+app.use("/api", userAuth, requireWhatsappVerified, legacyRouter);
 
 // Payment routes — mixed auth (user-auth + public webhooks + admin)
 app.use("/api/payments", paymentsRouter);
