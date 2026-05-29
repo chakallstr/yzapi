@@ -41,14 +41,43 @@ sudo chmod 600 /opt/turkapiprojesi/.env.production
 - `PORT=4568`
 - `DATABASE_URL`
 - `JWT_SECRET`
+- `API_KEY_ENCRYPTION_SECRET` (zorunlu; `JWT_SECRET`'tan **farklı**, en az 32 karakter — saklı API anahtarlarını şifreler)
 - `APP_BASE_URL=https://yapayzekalab.org`
 - `FRONTEND_AUTH_RETURN=/`
 - `CLOSEROUTER_API_KEY`
 - ödeme ve email secretları
+- `TELEGRAM_BOT_TOKEN` kullanılıyorsa `TELEGRAM_WEBHOOK_SECRET` (zorunlu — aşağıdaki Telegram Webhook bölümüne bakın)
+- WhatsApp OTP açıksa (`WHATSAPP_OTP_ENABLED=true`) `WHATSAPP_OTP_HASH_SECRET` (zorunlu; `JWT_SECRET`'tan farklı)
 
 Admin ayrı şifre kullanmaz; admin yetkisi `cix.crazy666@gmail.com` Google/user oturumuyla verilir.
 
-Deploy scripti required alanları boş bırakılmışsa durur. `.env.production` izni `600` olmalıdır.
+Deploy scripti required alanları boş bırakılmışsa durur. `.env.production` izni `600` olmalıdır. Ayrıca `API_KEY_ENCRYPTION_SECRET == JWT_SECRET` ise ve `TELEGRAM_BOT_TOKEN` set olup `TELEGRAM_WEBHOOK_SECRET` boşsa deploy başlamadan durur (fail-fast).
+
+## Telegram Webhook Secret (K4)
+
+`TELEGRAM_BOT_TOKEN` set ise, production'da `TELEGRAM_WEBHOOK_SECRET` **zorunludur**; aksi halde webhook gelen tüm update'leri reddeder ve bot durur. `.env.production` içindeki değer ile Telegram `setWebhook` `secret_token` **birebir aynı** olmalıdır:
+
+```bash
+# .env.production içinde set:  TELEGRAM_WEBHOOK_SECRET=<32+ char rastgele>
+curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
+  -d "url=https://yapayzekalab.org/api/payments/telegram/webhook" \
+  -d "secret_token=<TELEGRAM_WEBHOOK_SECRET ile AYNI>"
+curl -s "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo" | jq
+```
+
+## API Key Şifreleme Secret Rotasyonu (Y4)
+
+`API_KEY_ENCRYPTION_SECRET` değiştirilirse mevcut saklı API anahtarı şifreleri çözülemez hale gelir. Güvenli rotasyon:
+
+```bash
+# 1. Yeni secret'ı API_KEY_ENCRYPTION_SECRET'a koy
+# 2. Önceki değeri API_KEY_ENCRYPTION_SECRET_OLD'a koy
+# 3. Dry-run:
+npm run db:rotate-cipher
+# 4. Onayla (kalıcı yeniden şifreleme):
+npm run db:rotate-cipher -- --confirm
+# 5. Tüm satırlar rotate olunca API_KEY_ENCRYPTION_SECRET_OLD'u kaldır
+```
 
 ## Deploy
 

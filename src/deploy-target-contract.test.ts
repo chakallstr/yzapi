@@ -26,4 +26,16 @@ describe("live VPS deploy target contract", () => {
     expect(docs).not.toContain("APP_DIR=/opt/yapayzekalab bash scripts/vps-deploy.sh");
     expect(docs).not.toContain("/opt/yapayzekalab/.deploy/rollback-last.sh");
   });
+
+  it("enforces production secret guards in the deploy script (K4, Y4)", () => {
+    const script = source("scripts/vps-deploy.sh");
+
+    // Y4: API key encryption secret is a required env key and must differ from JWT_SECRET.
+    expect(script).toContain("API_KEY_ENCRYPTION_SECRET");
+    expect(script).toContain("must differ from JWT_SECRET");
+
+    // K4: when the Telegram bot is configured, the webhook secret is mandatory.
+    expect(script).toContain("TELEGRAM_BOT_TOKEN");
+    expect(script).toContain("TELEGRAM_WEBHOOK_SECRET");
+  });
 });

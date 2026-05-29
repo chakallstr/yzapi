@@ -7,7 +7,7 @@ SMOKE_BASE_URL="${SMOKE_BASE_URL:-http://127.0.0.1:4568}"
 DEPLOY_STATE_DIR="${DEPLOY_STATE_DIR:-${APP_DIR}/.deploy}"
 BACKUP_DIR="${BACKUP_DIR:-${DEPLOY_STATE_DIR}/db-backups}"
 RELEASE_DIR="${RELEASE_DIR:-${DEPLOY_STATE_DIR}/releases}"
-REQUIRED_ENV_KEYS=(NODE_ENV PORT DATABASE_URL JWT_SECRET APP_BASE_URL FRONTEND_AUTH_RETURN CLOSEROUTER_API_KEY)
+REQUIRED_ENV_KEYS=(NODE_ENV PORT DATABASE_URL JWT_SECRET API_KEY_ENCRYPTION_SECRET APP_BASE_URL FRONTEND_AUTH_RETURN CLOSEROUTER_API_KEY)
 
 cd "${APP_DIR}"
 mkdir -p "${DEPLOY_STATE_DIR}" "${BACKUP_DIR}" "${RELEASE_DIR}"
@@ -32,6 +32,28 @@ done
 if (( ${#missing_env[@]} > 0 )); then
   printf 'Missing required env keys: %s\n' "${missing_env[*]}" >&2
   exit 1
+fi
+
+# Y4: API_KEY_ENCRYPTION_SECRET must differ from JWT_SECRET, otherwise a single
+# JWT_SECRET leak also decrypts every stored API key. env.ts enforces this at
+# boot in production; catch it here so a bad config fails the deploy early
+# (before migrate, which would otherwise crash on the same superRefine).
+jwt_secret_val="$(grep -E '^JWT_SECRET=' .env.production | head -n1 | cut -d= -f2-)"
+api_enc_val="$(grep -E '^API_KEY_ENCRYPTION_SECRET=' .env.production | head -n1 | cut -d= -f2-)"
+if [[ -n "${api_enc_val}" && "${api_enc_val}" == "${jwt_secret_val}" ]]; then
+  echo "API_KEY_ENCRYPTION_SECRET must differ from JWT_SECRET (secret separation); aborting." >&2
+  exit 1
+fi
+
+# K4: if the Telegram bot channel is configured, the webhook secret is mandatory
+# in production — otherwise the webhook rejects every update and the bot stops.
+if grep -Eq '^TELEGRAM_BOT_TOKEN=.+' .env.production; then
+  if ! grep -Eq '^TELEGRAM_WEBHOOK_SECRET=.+' .env.production; then
+    echo "TELEGRAM_BOT_TOKEN is set but TELEGRAM_WEBHOOK_SECRET is missing." >&2
+    echo "K4 rejects all webhook updates in production without it (bot stops); aborting." >&2
+    echo "Set TELEGRAM_WEBHOOK_SECRET and bind it via Telegram setWebhook secret_token." >&2
+    exit 1
+  fi
 fi
 
 previous_rev="$(git rev-parse HEAD)"
