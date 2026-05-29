@@ -1,5 +1,4 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { timingSafeEqual } from "crypto";
 import { eq, or } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { payments, systemConfig, telegramAccounts, telegramDeliveries, users } from "../db/schema.js";
@@ -7,6 +6,7 @@ import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { adminAuth } from "../middleware/admin-auth.js";
 import { userAuth } from "../middleware/user-auth.js";
+import { isTelegramWebhookAuthorized } from "./telegram-webhook-auth.js";
 import { calcKdv, creditUserBalance } from "../services/payment-common.js";
 import { buildUsdTopupQuote } from "../services/payment-pricing.js";
 import {
@@ -74,17 +74,11 @@ function assertTelegramConfigured(res: Response): boolean {
 }
 
 function telegramSecretAllowed(req: Request): boolean {
-  const expected = env.TELEGRAM_WEBHOOK_SECRET;
-  if (!expected) {
-    // Production must have a webhook secret configured; otherwise the webhook is
-    // open and an attacker can forge updates to hijack a victim's API key delivery.
-    if (env.NODE_ENV === "production") return false;
-    return true; // dev/test convenience only
-  }
-  const got = String(req.header("x-telegram-bot-api-secret-token") ?? "");
-  const a = Buffer.from(got);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
+  return isTelegramWebhookAuthorized({
+    expectedSecret: env.TELEGRAM_WEBHOOK_SECRET,
+    providedToken: req.header("x-telegram-bot-api-secret-token") ?? undefined,
+    nodeEnv: env.NODE_ENV,
+  });
 }
 
 function cryptoPaySecretAllowed(req: Request): boolean {
