@@ -12,6 +12,7 @@ import {
   auditLogs,
   transactions,
   kurHistory,
+  usageRecords,
 } from "../db/schema.js";
 import { writeAudit } from "../services/audit-service.js";
 import { refreshKur } from "../services/kur-service.js";
@@ -37,6 +38,28 @@ function serializeUser(u: typeof users.$inferSelect) {
     apiKeyCount: u.apiKeyCount,
     not: u.not,
     gunlukLimitTL: u.gunlukLimitTL !== null ? Number(u.gunlukLimitTL) : null,
+  };
+}
+
+function serializeUsageRecord(r: typeof usageRecords.$inferSelect) {
+  return {
+    id: r.id,
+    userId: r.userId,
+    apiKeyId: r.apiKeyId,
+    modelId: r.modelId,
+    type: r.type,
+    inputUsage: r.inputUsage,
+    outputUsage: r.outputUsage,
+    unitsUsage: Number(r.unitsUsage),
+    costUsd: Number(r.costUsd),
+    costTL: Number(r.costTL),
+    remainingTL: r.remainingTL === null ? null : Number(r.remainingTL),
+    requestId: r.requestId,
+    upstreamRequestId: r.upstreamRequestId,
+    errorCode: r.errorCode,
+    responseMs: r.responseMs,
+    status: r.status,
+    timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),
   };
 }
 
@@ -236,6 +259,81 @@ router.get("/users", async (req, res, next) => {
     if (durum) rows = rows.filter((u) => u.durum === durum);
 
     res.json(rows.map(serializeUser));
+  } catch (e) { next(e); }
+});
+
+router.get("/users/:id/detail", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const userRows = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    if (!userRows.length) return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+
+    const user = userRows[0];
+    const [keyRows, usageRows, txRows] = await Promise.all([
+      db.select().from(apiKeys).where(eq(apiKeys.userId, id)).orderBy(desc(apiKeys.olusturma)),
+      db.select().from(usageRecords).where(eq(usageRecords.userId, id)).orderBy(desc(usageRecords.timestamp)).limit(50),
+      db.select().from(transactions).where(eq(transactions.userId, id)).orderBy(desc(transactions.timestamp)).limit(50),
+    ]);
+
+    const modelMap = new Map<string, {
+      modelId: string;
+      requests: number;
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+      costTL: number;
+      lastStatus: string;
+      lastSeen: string;
+    }>();
+
+    for (const row of usageRows) {
+      const key = row.modelId;
+      const current = modelMap.get(key) ?? {
+        modelId: row.modelId,
+        requests: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        costTL: 0,
+        lastStatus: row.status,
+        lastSeen: row.timestamp instanceof Date ? row.timestamp.toISOString() : String(row.timestamp),
+      };
+      current.requests += 1;
+      current.inputTokens += row.inputUsage ?? 0;
+      current.outputTokens += row.outputUsage ?? 0;
+      current.totalTokens += (row.inputUsage ?? 0) + (row.outputUsage ?? 0);
+      current.costTL += Number(row.costTL ?? 0);
+      current.lastStatus = row.status;
+      modelMap.set(key, current);
+    }
+
+    const modelStats = [...modelMap.values()].sort((a, b) => b.costTL - a.costTL);
+    const totalInputTokens = usageRows.reduce((sum, row) => sum + (row.inputUsage ?? 0), 0);
+    const totalOutputTokens = usageRows.reduce((sum, row) => sum + (row.outputUsage ?? 0), 0);
+    const totalCostTL = usageRows.reduce((sum, row) => sum + Number(row.costTL ?? 0), 0);
+    const successfulRequests = usageRows.filter((row) => row.status === "success").length;
+    const failedRequests = usageRows.filter((row) => row.status !== "success").length;
+    const userCode = user.id ? `u-${String(user.id).replace(/-/g, "").slice(0, 8)}` : null;
+
+    res.json({
+      user: serializeUser(user),
+      userCode,
+      summary: {
+        requestCount: usageRows.length,
+        successfulRequests,
+        failedRequests,
+        totalInputTokens,
+        totalOutputTokens,
+        totalTokens: totalInputTokens + totalOutputTokens,
+        totalCostTL,
+        activeApiKeyCount: keyRows.filter((row) => row.aktif).length,
+        totalApiKeyCount: keyRows.length,
+      },
+      apiKeys: keyRows.map((row) => serializeApiKey(row, user.email)),
+      usageRecords: usageRows.map(serializeUsageRecord),
+      transactions: txRows.map(serializeTransaction),
+      modelStats,
+    });
   } catch (e) { next(e); }
 });
 

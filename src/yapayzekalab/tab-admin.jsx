@@ -108,6 +108,7 @@ const safeDate = (value) => {
 const money = (value) => `₺${Number(value || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const usd = (value) => `$${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const initials = (name = '') => name.split(' ').filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'YZ';
+const userCodeFromId = (id = '') => (id ? `u-${String(id).replace(/-/g, '').slice(0, 8)}` : '—');
 
 const StatusChip = ({ status }) => {
   const tone = STATUS_TONE[status] || STATUS_TONE.bekliyor;
@@ -256,6 +257,11 @@ const AdminDashboard = ({ dashboard, config, auditLogs, providers }) => {
 
 const AdminUsers = ({ users, token, refresh }) => {
   const [q, setQ] = useState('');
+  const [openUserId, setOpenUserId] = useState('');
+  const [detailById, setDetailById] = useState({});
+  const [detailLoadingId, setDetailLoadingId] = useState('');
+  const [detailError, setDetailError] = useState('');
+  const [draftById, setDraftById] = useState({});
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return users;
@@ -276,6 +282,83 @@ const AdminUsers = ({ users, token, refresh }) => {
     const defaultNote = isRemove ? 'Manuel admin bakiye düşümü' : 'Manuel admin bakiye ekleme';
     const note = window.prompt('Açıklama', defaultNote) || defaultNote;
     await adminRequest(`/api/admin/users/${user.id}/bakiye`, token, { method: 'POST', body: { miktar: amount, aciklama: note } });
+    await refresh();
+    if (openUserId === user.id) await loadDetail(user.id, true);
+  };
+
+  const loadDetail = async (userId, force = false) => {
+    if (!force && detailById[userId]) return detailById[userId];
+    setDetailLoadingId(userId);
+    setDetailError('');
+    try {
+      const detail = await adminRequest(`/api/admin/users/${userId}/detail`, token);
+      setDetailById((current) => ({ ...current, [userId]: detail }));
+      setDraftById((current) => ({
+        ...current,
+        [userId]: {
+          adSoyad: detail.user?.adSoyad || '',
+          durum: detail.user?.durum || 'aktif',
+          plan: detail.user?.plan || 'ucretsiz',
+          not: detail.user?.not || '',
+          gunlukLimitTL: detail.user?.gunlukLimitTL ?? '',
+        },
+      }));
+      return detail;
+    } finally {
+      setDetailLoadingId('');
+    }
+  };
+
+  const toggleDetail = async (userId) => {
+    if (openUserId === userId) {
+      setOpenUserId('');
+      setDetailError('');
+      return;
+    }
+    setOpenUserId(userId);
+    try {
+      await loadDetail(userId);
+    } catch (error) {
+      setDetailError(error.message || 'Kullanıcı detayı alınamadı.');
+    }
+  };
+
+  const setDraftField = (userId, key, value) => {
+    setDraftById((current) => ({
+      ...current,
+      [userId]: {
+        ...(current[userId] || {}),
+        [key]: value,
+      },
+    }));
+  };
+
+  const saveDetail = async (userId) => {
+    const draft = draftById[userId];
+    if (!draft) return;
+    await adminRequest(`/api/admin/users/${userId}`, token, {
+      method: 'PATCH',
+      body: {
+        adSoyad: draft.adSoyad,
+        durum: draft.durum,
+        plan: draft.plan,
+        not: draft.not,
+        gunlukLimitTL: draft.gunlukLimitTL === '' ? null : Number(draft.gunlukLimitTL),
+      },
+    });
+    await refresh();
+    await loadDetail(userId, true);
+  };
+
+  const createAdminKey = async (user) => {
+    const ad = window.prompt(`${user.email} için API anahtarı adı`, 'admin-olusturulan-key');
+    if (!ad?.trim()) return;
+    const result = await adminRequest(`/api/admin/api-keys/${user.id}/create`, token, {
+      method: 'POST',
+      body: { ad: ad.trim() },
+    });
+    window.alert(`Yeni anahtar oluşturuldu: ${result.maskedKey}`);
+    if (openUserId === user.id) await loadDetail(user.id, true);
     await refresh();
   };
 
@@ -305,11 +388,143 @@ const AdminUsers = ({ users, token, refresh }) => {
               <Chip tone="neutral" style={{ background: planTone.bg, color: planTone.fg, fontSize: 10 }}>{u.plan}</Chip>
               <StatusChip status={u.durum} />
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button onClick={() => toggleDetail(u.id)} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11 }}>{openUserId === u.id ? 'Kapat' : 'Detay'}</button>
                 <button onClick={() => updateUser(u, { durum: u.durum === 'aktif' ? 'askida' : 'aktif' })} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11 }}>Durum</button>
                 <button onClick={() => updateUser(u, { plan: u.plan === 'pro' ? 'kurumsal' : 'pro' })} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11 }}>Plan</button>
                 <button onClick={() => updateBalance(u, 'add')} style={{ padding: '6px 9px', borderRadius: 8, background: 'var(--ink)', color: '#fff', fontSize: 11 }}>Bakiye +</button>
                 <button onClick={() => updateBalance(u, 'remove')} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid #fecaca', background: '#fff1f2', color: '#b91c1c', fontSize: 11 }}>Bakiye -</button>
               </div>
+              {openUserId === u.id && (
+                <div style={{ gridColumn: '1 / -1', paddingTop: 10 }}>
+                  {detailError && <ErrorBox>{detailError}</ErrorBox>}
+                  {detailLoadingId === u.id && <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Kullanıcı detayı yükleniyor…</div>}
+                  {detailById[u.id] && (() => {
+                    const detail = detailById[u.id];
+                    const draft = draftById[u.id] || {};
+                    return (
+                      <Card pad={16} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+                          <div>
+                            <div style={{ fontSize: 15, fontWeight: 600 }}>{detail.user?.adSoyad || detail.user?.email}</div>
+                            <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>{detail.user?.email}</div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>{detail.userCode || userCodeFromId(u.id)}</Chip>
+                            <StatusChip status={detail.user?.durum} />
+                            <Chip tone="neutral" style={{ background: planTone.bg, color: planTone.fg, fontSize: 10 }}>{detail.user?.plan}</Chip>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 14 }}>
+                          <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Toplam istek</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{fmt.num(detail.summary?.requestCount || 0)}</div></div>
+                          <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Input token</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{fmt.num(detail.summary?.totalInputTokens || 0)}</div></div>
+                          <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Output token</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{fmt.num(detail.summary?.totalOutputTokens || 0)}</div></div>
+                          <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Toplam harcama</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{money(detail.summary?.totalCostTL || 0)}</div></div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 16 }}>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <Caption>Ad soyad</Caption>
+                            <input value={draft.adSoyad || ''} onChange={(e) => setDraftField(u.id, 'adSoyad', e.target.value)} style={inputStyle} />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <Caption>Durum</Caption>
+                            <select value={draft.durum || 'aktif'} onChange={(e) => setDraftField(u.id, 'durum', e.target.value)} style={inputStyle}>
+                              <option value="aktif">aktif</option>
+                              <option value="askida">askıda</option>
+                            </select>
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <Caption>Plan</Caption>
+                            <select value={draft.plan || 'ucretsiz'} onChange={(e) => setDraftField(u.id, 'plan', e.target.value)} style={inputStyle}>
+                              <option value="ucretsiz">ucretsiz</option>
+                              <option value="pro">pro</option>
+                              <option value="kurumsal">kurumsal</option>
+                            </select>
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <Caption>Günlük limit TL</Caption>
+                            <input value={draft.gunlukLimitTL ?? ''} onChange={(e) => setDraftField(u.id, 'gunlukLimitTL', e.target.value)} type="number" step="0.01" placeholder="boş = limitsiz" style={inputStyle} />
+                          </label>
+                        </div>
+
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                          <Caption>Admin notu</Caption>
+                          <textarea value={draft.not || ''} onChange={(e) => setDraftField(u.id, 'not', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical', minHeight: 78 }} />
+                        </label>
+
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+                          <button onClick={() => saveDetail(u.id)} style={{ padding: '9px 12px', borderRadius: 9, background: 'var(--ink)', color: '#fff', fontSize: 12, fontWeight: 600 }}>Detayı kaydet</button>
+                          <button onClick={() => createAdminKey(u)} style={{ padding: '9px 12px', borderRadius: 9, border: '1px solid var(--border)', fontSize: 12 }}>API key oluştur</button>
+                          <button onClick={() => updateBalance(u, 'add')} style={{ padding: '9px 12px', borderRadius: 9, border: '1px solid var(--border)', fontSize: 12 }}>Bakiye ekle</button>
+                          <button onClick={() => updateBalance(u, 'remove')} style={{ padding: '9px 12px', borderRadius: 9, border: '1px solid #fecaca', background: '#fff1f2', color: '#b91c1c', fontSize: 12 }}>Bakiye sil</button>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 14 }}>
+                          <Card pad={0} style={{ overflow: 'hidden' }}>
+                            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+                              <div style={{ fontSize: 13, fontWeight: 600 }}>API anahtarları</div>
+                            </div>
+                            {(detail.apiKeys || []).length === 0 ? <div style={{ padding: 14 }}><EmptyState>API anahtarı yok.</EmptyState></div> : detail.apiKeys.map((key, index) => (
+                              <div key={key.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 120px 110px', gap: 10, padding: '10px 14px', borderBottom: index < detail.apiKeys.length - 1 ? '1px solid var(--border)' : 'none', fontSize: 11.5 }}>
+                                <div><div style={{ fontWeight: 600 }}>{key.ad}</div><div style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{key.maskedKey}</div></div>
+                                <div style={{ color: 'var(--ink-3)' }}>{safeDate(key.sonKullanim || key.olusturma)}</div>
+                                <StatusChip status={key.aktif ? 'aktif' : 'kapali'} />
+                              </div>
+                            ))}
+                          </Card>
+
+                          <Card pad={0} style={{ overflow: 'hidden' }}>
+                            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+                              <div style={{ fontSize: 13, fontWeight: 600 }}>Model kullanımı</div>
+                            </div>
+                            {(detail.modelStats || []).length === 0 ? <div style={{ padding: 14 }}><EmptyState>Kullanım kaydı yok.</EmptyState></div> : detail.modelStats.slice(0, 8).map((row, index) => (
+                              <div key={`${row.modelId}-${index}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) 70px 110px 110px', gap: 10, padding: '10px 14px', borderBottom: index < Math.min(detail.modelStats.length, 8) - 1 ? '1px solid var(--border)' : 'none', fontSize: 11.5 }}>
+                                <div><div style={{ fontWeight: 600 }}>{modelMeta(row.modelId).label}</div><div style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{row.modelId}</div></div>
+                                <div className="tnum">{fmt.num(row.requests)}</div>
+                                <div className="tnum">{fmt.num(row.totalTokens)}</div>
+                                <div className="tnum" style={{ fontWeight: 600 }}>{money(row.costTL)}</div>
+                              </div>
+                            ))}
+                          </Card>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 0.9fr)', gap: 14, marginTop: 14 }}>
+                          <Card pad={0} style={{ overflow: 'hidden' }}>
+                            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+                              <div style={{ fontSize: 13, fontWeight: 600 }}>Son API kullanımı</div>
+                            </div>
+                            {(detail.usageRecords || []).length === 0 ? <div style={{ padding: 14 }}><EmptyState>Kullanım kaydı yok.</EmptyState></div> : detail.usageRecords.slice(0, 12).map((row, index) => (
+                              <div key={row.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(170px, 1fr) 70px 70px 90px 90px 120px', gap: 10, padding: '10px 14px', borderBottom: index < Math.min(detail.usageRecords.length, 12) - 1 ? '1px solid var(--border)' : 'none', fontSize: 11.5 }}>
+                                <div><div style={{ fontWeight: 600 }}>{modelMeta(row.modelId).label}</div><div style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{row.requestId || row.id}</div></div>
+                                <div className="tnum">{fmt.num(row.inputUsage || 0)}</div>
+                                <div className="tnum">{fmt.num(row.outputUsage || 0)}</div>
+                                <div className="tnum">{money(row.costTL || 0)}</div>
+                                <StatusChip status={row.status === 'success' ? 'aktif' : 'askida'} />
+                                <div style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{safeDate(row.timestamp)}</div>
+                              </div>
+                            ))}
+                          </Card>
+
+                          <Card pad={0} style={{ overflow: 'hidden' }}>
+                            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+                              <div style={{ fontSize: 13, fontWeight: 600 }}>Bakiye hareketleri</div>
+                            </div>
+                            {(detail.transactions || []).length === 0 ? <div style={{ padding: 14 }}><EmptyState>Hareket yok.</EmptyState></div> : detail.transactions.slice(0, 12).map((row, index) => (
+                              <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '90px 90px 1fr 110px', gap: 10, padding: '10px 14px', borderBottom: index < Math.min(detail.transactions.length, 12) - 1 ? '1px solid var(--border)' : 'none', fontSize: 11.5 }}>
+                                <div className="tnum" style={{ fontWeight: 600, color: Number(row.miktarTL || 0) >= 0 ? '#047857' : '#b91c1c' }}>{money(row.miktarTL || 0)}</div>
+                                <div className="tnum">{money(row.sonrakiBakiye || 0)}</div>
+                                <div>{row.aciklama || row.tip}</div>
+                                <div style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{safeDate(row.timestamp)}</div>
+                              </div>
+                            ))}
+                          </Card>
+                        </div>
+                      </Card>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           );
         })}
