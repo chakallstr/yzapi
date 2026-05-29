@@ -18,7 +18,8 @@ describe("account balance real-source contract", () => {
   it("returns bakiyeUsd and a stable userCode from backend me route", () => {
     expect(userRouteSource).toContain("const bakiyeUsd =");
     expect(userRouteSource).toContain('const userCode = safe.id ? `u-${String(safe.id).replace(/-/g, "").slice(0, 8)}` : null;');
-    expect(userRouteSource).toContain("res.json({ ...safe, bakiyeUsd, userCode, ...whatsapp });");
+    expect(userRouteSource).toContain("async function buildUserMePayload");
+    expect(userRouteSource).toContain("res.json(await buildUserMePayload(req.user!.id, safe));");
   });
 
   it("routes profile menu items to real account sections", () => {

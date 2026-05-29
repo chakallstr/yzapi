@@ -18,9 +18,16 @@ import { writeAudit } from "../services/audit-service.js";
 import { refreshKur } from "../services/kur-service.js";
 import { getReconciliationReport } from "../services/reconciliation-service.js";
 import { encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
+import { getAdminTrafficAnalytics, type TrafficWindow } from "../services/admin-traffic-service.js";
 
 const router = Router();
 const SINGLE_ADMIN_EMAIL = "cix.crazy666@gmail.com";
+const ALLOWED_TRAFFIC_WINDOWS = new Set<TrafficWindow>(["24h", "7d", "30d"]);
+
+function parseTrafficWindow(raw: unknown): TrafficWindow {
+  const value = String(raw ?? "24h") as TrafficWindow;
+  return ALLOWED_TRAFFIC_WINDOWS.has(value) ? value : "24h";
+}
 
 // ── Helper: serialize timestamps to ISO strings ────────────────────────────────
 function serializeUser(u: typeof users.$inferSelect) {
@@ -533,6 +540,69 @@ router.get("/dashboard", async (_req, res, next) => {
         timestamp: a.timestamp instanceof Date ? a.timestamp.toISOString() : String(a.timestamp),
       })),
     });
+  } catch (e) { next(e); }
+});
+
+router.get("/traffic", async (req, res, next) => {
+  try {
+    const window = parseTrafficWindow((req.query as Record<string, string>).window);
+    res.json(await getAdminTrafficAnalytics(window));
+  } catch (e) { next(e); }
+});
+
+router.get("/traffic/overview", async (req, res, next) => {
+  try {
+    const window = parseTrafficWindow((req.query as Record<string, string>).window);
+    const data = await getAdminTrafficAnalytics(window);
+    res.json(data.overview);
+  } catch (e) { next(e); }
+});
+
+router.get("/traffic/timeseries", async (req, res, next) => {
+  try {
+    const window = parseTrafficWindow((req.query as Record<string, string>).window);
+    const data = await getAdminTrafficAnalytics(window);
+    res.json(data.timeseries);
+  } catch (e) { next(e); }
+});
+
+router.get("/traffic/models", async (req, res, next) => {
+  try {
+    const window = parseTrafficWindow((req.query as Record<string, string>).window);
+    const data = await getAdminTrafficAnalytics(window);
+    res.json(data.models);
+  } catch (e) { next(e); }
+});
+
+router.get("/traffic/providers", async (req, res, next) => {
+  try {
+    const window = parseTrafficWindow((req.query as Record<string, string>).window);
+    const data = await getAdminTrafficAnalytics(window);
+    res.json(data.providers);
+  } catch (e) { next(e); }
+});
+
+router.get("/traffic/users", async (req, res, next) => {
+  try {
+    const window = parseTrafficWindow((req.query as Record<string, string>).window);
+    const data = await getAdminTrafficAnalytics(window);
+    res.json(data.users);
+  } catch (e) { next(e); }
+});
+
+router.get("/traffic/api-keys", async (req, res, next) => {
+  try {
+    const window = parseTrafficWindow((req.query as Record<string, string>).window);
+    const data = await getAdminTrafficAnalytics(window);
+    res.json(data.apiKeys);
+  } catch (e) { next(e); }
+});
+
+router.get("/traffic/errors", async (req, res, next) => {
+  try {
+    const window = parseTrafficWindow((req.query as Record<string, string>).window);
+    const data = await getAdminTrafficAnalytics(window);
+    res.json(data.errors);
   } catch (e) { next(e); }
 });
 

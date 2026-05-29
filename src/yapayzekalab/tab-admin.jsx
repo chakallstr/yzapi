@@ -3,6 +3,7 @@ import {
   I, Card, Chip, Caption, PulseDot,
   PROVIDERS, MODELS, modelMeta, fmt, useCountUp,
 } from './shared.jsx';
+import { AdminTrafficAnalytics } from './tab-admin-traffic.jsx';
 
 const LAUNCH_ADMIN_EMAIL = 'cix.crazy666@gmail.com';
 const ACCESS_TOKEN_KEY = 'yz_access_token';
@@ -10,6 +11,7 @@ const LEGACY_ACCESS_TOKEN_KEY = 'userAccessToken';
 
 const ADMIN_SECTIONS = [
   { id: 'dashboard', label: 'Dashboard', Ico: I.Activity },
+  { id: 'traffic', label: 'Trafik Analitiği', Ico: I.TrendUp },
   { id: 'users', label: 'Kullanıcılar', Ico: I.Users },
   { id: 'overrides', label: 'Modeller', Ico: I.Layers },
   { id: 'announce', label: 'Duyurular', Ico: I.Megaphone },
@@ -255,7 +257,7 @@ const AdminDashboard = ({ dashboard, config, auditLogs, providers }) => {
   );
 };
 
-const AdminUsers = ({ users, token, refresh }) => {
+const AdminUsers = ({ users, token, refresh, focusUserId = '', focusNonce = '' }) => {
   const [q, setQ] = useState('');
   const [openUserId, setOpenUserId] = useState('');
   const [detailById, setDetailById] = useState({});
@@ -361,6 +363,17 @@ const AdminUsers = ({ users, token, refresh }) => {
     if (openUserId === user.id) await loadDetail(user.id, true);
     await refresh();
   };
+
+  useEffect(() => {
+    if (!focusUserId) return;
+    const user = users.find((row) => row.id === focusUserId);
+    if (!user) return;
+    setQ(user.email || user.adSoyad || '');
+    setOpenUserId(focusUserId);
+    loadDetail(focusUserId, true).catch((error) => {
+      setDetailError(error.message || 'Kullanıcı detayı alınamadı.');
+    });
+  }, [focusUserId, focusNonce, users]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -944,10 +957,24 @@ const AdminPaymentSettings = ({ config, token, refresh }) => {
   );
 };
 
-const AdminApiKeys = ({ apiKeys, users, token, refresh }) => {
+const AdminApiKeys = ({ apiKeys, users, token, refresh, filterUserId = '', filterApiKeyId = '', filterNonce = '' }) => {
   const [userId, setUserId] = useState('');
   const [name, setName] = useState('admin-created-key');
   const [createdKey, setCreatedKey] = useState('');
+
+  useEffect(() => {
+    if (filterUserId) setUserId(filterUserId);
+  }, [filterUserId, filterNonce]);
+
+  const filteredKeys = useMemo(() => {
+    return apiKeys.filter((key) => {
+      if (filterUserId && key.userId !== filterUserId) return false;
+      if (filterApiKeyId && key.id !== filterApiKeyId) return false;
+      return true;
+    });
+  }, [apiKeys, filterApiKeyId, filterUserId]);
+
+  const selectedUser = users.find((user) => user.id === (filterUserId || userId));
 
   const create = async () => {
     if (!userId) return;
@@ -966,6 +993,14 @@ const AdminApiKeys = ({ apiKeys, users, token, refresh }) => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <Card pad={18}>
         <Caption>Admin API key yönetimi</Caption>
+        {(filterUserId || filterApiKeyId) && (
+          <div style={{ marginTop: 10, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <Chip tone="neutral" style={{ fontSize: 10.5 }}>
+              Filtre: {selectedUser?.email || filterUserId}
+              {filterApiKeyId ? ` · key ${filterApiKeyId.slice(0, 8)}` : ''}
+            </Chip>
+          </div>
+        )}
         <div style={grid(200)}>
           <select value={userId} onChange={(e) => setUserId(e.target.value)} style={inputStyle}>
             <option value="">Kullanıcı seç</option>
@@ -981,8 +1016,8 @@ const AdminApiKeys = ({ apiKeys, users, token, refresh }) => {
         )}
       </Card>
       <Card pad={0} style={{ overflow: 'hidden' }}>
-        {apiKeys.length === 0 ? <div style={{ padding: 16 }}><EmptyState>API anahtarı yok.</EmptyState></div> : apiKeys.map((k, i) => (
-          <div key={k.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) minmax(180px, 1fr) 110px 90px 90px', gap: 12, padding: '12px 16px', borderBottom: i < apiKeys.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center', fontSize: 12, minWidth: 780 }}>
+        {filteredKeys.length === 0 ? <div style={{ padding: 16 }}><EmptyState>API anahtarı yok.</EmptyState></div> : filteredKeys.map((k, i) => (
+          <div key={k.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) minmax(180px, 1fr) 110px 90px 90px', gap: 12, padding: '12px 16px', borderBottom: i < filteredKeys.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center', fontSize: 12, minWidth: 780 }}>
             <span style={{ fontWeight: 600 }}>{k.ad}</span>
             <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }}>{k.fullKey || 'Eski key raw saklanmadi.'}</span>
             <Chip tone={k.kind === 'sandbox' ? 'ok' : 'neutral'}>{k.kind || 'live'}</Chip>
@@ -1121,6 +1156,8 @@ const AdminTab = ({ ctx = {} }) => {
   });
   const [loading, setLoading] = useState(Boolean(token));
   const [error, setError] = useState('');
+  const [trafficUserJump, setTrafficUserJump] = useState({ userId: '', nonce: '' });
+  const [trafficApiKeyJump, setTrafficApiKeyJump] = useState({ userId: '', apiKeyId: '', nonce: '' });
 
   const refresh = async (nextToken = token) => {
     if (!nextToken) return;
@@ -1151,6 +1188,20 @@ const AdminTab = ({ ctx = {} }) => {
       // Çıkış için client token temizliği yeterli.
     }
     setToken('');
+  };
+
+  const openTrafficUser = (row) => {
+    if (!row?.userId) return;
+    setTrafficUserJump({ userId: row.userId, nonce: `${Date.now()}` });
+    setSection('users');
+  };
+
+  const openTrafficApiKeys = (row) => {
+    const userId = row?.userId || '';
+    const apiKeyId = row?.apiKeyId || '';
+    if (!userId && !apiKeyId) return;
+    setTrafficApiKeyJump({ userId, apiKeyId, nonce: `${Date.now()}` });
+    setSection('apikeys');
   };
 
   if (!token) {
@@ -1184,13 +1235,14 @@ const AdminTab = ({ ctx = {} }) => {
 
       <div key={section} className="fade-in">
         {section === 'dashboard' && <AdminDashboard dashboard={data.dashboard} config={data.config} providers={data.providers || []} auditLogs={data.auditLogs || []} />}
-        {section === 'users' && <AdminUsers users={data.users || []} token={token} refresh={refresh} />}
+        {section === 'traffic' && <AdminTrafficAnalytics token={token} onOpenUser={openTrafficUser} onOpenApiKeys={openTrafficApiKeys} />}
+        {section === 'users' && <AdminUsers users={data.users || []} token={token} refresh={refresh} focusUserId={trafficUserJump.userId} focusNonce={trafficUserJump.nonce} />}
         {section === 'overrides' && <AdminOverrides overrides={data.overrides || []} token={token} refresh={refresh} />}
         {section === 'announce' && <AdminAnnouncements announcements={data.announcements || []} token={token} refresh={refresh} />}
         {section === 'providers' && <AdminProviders providers={data.providers || []} token={token} refresh={refresh} />}
         {section === 'kur' && <AdminKur config={data.config} kurHistory={data.kurHistory || []} token={token} refresh={refresh} />}
         {section === 'payments' && <AdminPaymentSettings config={data.config} token={token} refresh={refresh} />}
-        {section === 'apikeys' && <AdminApiKeys apiKeys={data.apiKeys || []} users={data.users || []} token={token} refresh={refresh} />}
+        {section === 'apikeys' && <AdminApiKeys apiKeys={data.apiKeys || []} users={data.users || []} token={token} refresh={refresh} filterUserId={trafficApiKeyJump.userId} filterApiKeyId={trafficApiKeyJump.apiKeyId} filterNonce={trafficApiKeyJump.nonce} />}
         {section === 'logs' && <AdminLogs reconciliation={data.reconciliation} auditLogs={data.auditLogs || []} token={token} />}
         {section === 'animations' && <AdminAnimations tweaks={tweaks} setTweak={setTweak} />}
       </div>
