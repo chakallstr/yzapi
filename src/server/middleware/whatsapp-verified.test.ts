@@ -73,4 +73,22 @@ describe("requireWhatsappVerified", () => {
     expect(next).toHaveBeenCalledOnce();
     expect(verifiedMock).not.toHaveBeenCalled();
   });
+
+  it("allows authenticated profile read and save routes before whatsapp verification", async () => {
+    enabledMock.mockReturnValue(true);
+    const next = vi.fn() as NextFunction;
+
+    await requireWhatsappVerified(
+      {
+        user: { id: "user-2", email: "user@example.com" },
+        path: "/me",
+        method: "GET",
+      } as Request,
+      mockResponse(),
+      next,
+    );
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(verifiedMock).not.toHaveBeenCalled();
+  });
 });

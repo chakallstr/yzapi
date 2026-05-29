@@ -27,6 +27,15 @@ export async function requireWhatsappVerified(
     return;
   }
 
+  if (
+    req.user &&
+    req.path === "/me" &&
+    (req.method === "GET" || req.method === "PATCH")
+  ) {
+    next();
+    return;
+  }
+
   if (!(await hasActiveVerifiedWhatsappForUser(userId))) {
     res.status(403).json({
       error: "WhatsApp doğrulaması gerekli.",
