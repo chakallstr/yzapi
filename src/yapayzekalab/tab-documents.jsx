@@ -27,6 +27,13 @@ const DocumentsTab = () => {
     }
   };
 
+  const navigateToDoc = (key) => {
+    const target = document.getElementById(`doc-${key}`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.history.replaceState(null, '', `#doc-${key}`);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
@@ -56,14 +63,15 @@ const DocumentsTab = () => {
           <Caption>İçindekiler</Caption>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
             {docs.map((doc, index) => (
-              <a
+              <button
                 key={doc.key}
-                href={`#doc-${doc.key}`}
+                onClick={() => navigateToDoc(doc.key)}
+                type="button"
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   gap: 10, padding: '10px 12px', borderRadius: 10,
                   background: 'var(--surface-2)', border: '1px solid var(--border)',
-                  color: 'var(--ink)', textDecoration: 'none',
+                  color: 'var(--ink)', textDecoration: 'none', textAlign: 'left', width: '100%',
                 }}
               >
                 <div>
@@ -71,7 +79,7 @@ const DocumentsTab = () => {
                   <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 2 }}>{doc.label}</div>
                 </div>
                 <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5 }}>{index + 1}</Chip>
-              </a>
+              </button>
             ))}
           </div>
         </Card>

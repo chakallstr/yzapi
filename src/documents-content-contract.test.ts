@@ -36,4 +36,11 @@ describe("documents tab content contract", () => {
     expect(combined).toContain("Kod kopyala");
     expect(combined).toContain("Kopyalandı");
   });
+
+  it("lets the table of contents scroll to the selected document block", () => {
+    expect(docsSource).toContain("navigateToDoc");
+    expect(docsSource).toContain("scrollIntoView");
+    expect(docsSource).toContain("window.history.replaceState");
+    expect(docsSource).toContain("onClick={() => navigateToDoc(doc.key)}");
+  });
 });
