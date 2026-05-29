@@ -23,38 +23,59 @@ export async function hashApiKey(fullKey: string): Promise<string> {
   return bcrypt.hash(fullKey, 10);
 }
 
-function apiKeyEncryptionKey(): Buffer {
-  return createHash("sha256").update(env.API_KEY_ENCRYPTION_SECRET || env.JWT_SECRET).digest();
+function deriveKey(secret: string): Buffer {
+  return createHash("sha256").update(secret).digest();
 }
 
-export function encryptApiKey(fullKey: string): string {
+// Secret used to encrypt NEW ciphers. In production env.ts requires a dedicated
+// API_KEY_ENCRYPTION_SECRET (distinct from JWT_SECRET); the JWT_SECRET fallback
+// only applies in dev/test for backward compatibility.
+export function primaryEncryptionSecret(): string {
+  return env.API_KEY_ENCRYPTION_SECRET || env.JWT_SECRET;
+}
+
+// Secrets tried (in order) when decrypting. The optional
+// API_KEY_ENCRYPTION_SECRET_OLD lets us read ciphers written under the previous
+// key during a rotation window, so rotating the secret never bricks existing
+// stored keys. Once `rotate-api-key-cipher` has re-encrypted everything, the
+// OLD secret can be removed and the JWT_SECRET fallback no longer decrypts.
+export function decryptionSecrets(): string[] {
+  const secrets = [primaryEncryptionSecret()];
+  if (env.API_KEY_ENCRYPTION_SECRET_OLD) secrets.push(env.API_KEY_ENCRYPTION_SECRET_OLD);
+  return secrets;
+}
+
+export function encryptApiKey(fullKey: string, secret: string = primaryEncryptionSecret()): string {
   const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", apiKeyEncryptionKey(), iv);
+  const cipher = createCipheriv("aes-256-gcm", deriveKey(secret), iv);
   const encrypted = Buffer.concat([cipher.update(fullKey, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
   return `v1.${iv.toString("base64url")}.${tag.toString("base64url")}.${encrypted.toString("base64url")}`;
 }
 
-export function decryptApiKey(payload?: string | null): string | null {
+export function decryptApiKey(payload?: string | null, secrets: string[] = decryptionSecrets()): string | null {
   if (!payload) return null;
   const [version, ivEncoded, tagEncoded, encryptedEncoded] = payload.split(".");
   if (version !== "v1" || !ivEncoded || !tagEncoded || !encryptedEncoded) return null;
 
-  try {
-    const decipher = createDecipheriv(
-      "aes-256-gcm",
-      apiKeyEncryptionKey(),
-      Buffer.from(ivEncoded, "base64url"),
-    );
-    decipher.setAuthTag(Buffer.from(tagEncoded, "base64url"));
-    const decrypted = Buffer.concat([
-      decipher.update(Buffer.from(encryptedEncoded, "base64url")),
-      decipher.final(),
-    ]);
-    return decrypted.toString("utf8");
-  } catch {
-    return null;
+  for (const secret of secrets) {
+    try {
+      const decipher = createDecipheriv(
+        "aes-256-gcm",
+        deriveKey(secret),
+        Buffer.from(ivEncoded, "base64url"),
+      );
+      decipher.setAuthTag(Buffer.from(tagEncoded, "base64url"));
+      const decrypted = Buffer.concat([
+        decipher.update(Buffer.from(encryptedEncoded, "base64url")),
+        decipher.final(),
+      ]);
+      return decrypted.toString("utf8");
+    } catch {
+      // Try the next secret (rotation fallback).
+    }
   }
+  return null;
 }
 
 export interface ValidatedKey {

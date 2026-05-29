@@ -12,7 +12,14 @@ const schema = z.object({
 
   // Auth
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
-  API_KEY_ENCRYPTION_SECRET: z.string().optional(),
+  // Dedicated secret for encrypting stored full API keys. Required in production
+  // (must differ from JWT_SECRET) so a JWT_SECRET leak cannot also decrypt API
+  // keys. In dev/test it falls back to JWT_SECRET.
+  API_KEY_ENCRYPTION_SECRET: z.string().min(32).optional(),
+  // Previous API key encryption secret, kept only during a rotation window so
+  // ciphers written under the old key can still be decrypted until
+  // `rotate-api-key-cipher` re-encrypts them.
+  API_KEY_ENCRYPTION_SECRET_OLD: z.string().min(32).optional(),
   JWT_ACCESS_TTL_SEC: z.coerce.number().default(900),
   JWT_REFRESH_TTL_SEC: z.coerce.number().default(60 * 60 * 24 * 30),
   WHATSAPP_PENDING_TTL_SEC: z.coerce.number().default(10 * 60),
@@ -30,7 +37,7 @@ const schema = z.object({
   WHATSAPP_OTP_ENABLED: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   WHATSAPP_OTP_PROVIDER: z.enum(["openwa", "meta", "dry_run"]).default("dry_run"),
   WHATSAPP_OTP_DRY_RUN: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
-  WHATSAPP_OTP_HASH_SECRET: z.string().optional(),
+  WHATSAPP_OTP_HASH_SECRET: z.string().min(32).optional(),
   WHATSAPP_OTP_TTL_SEC: z.coerce.number().default(5 * 60),
   WHATSAPP_OTP_RESEND_COOLDOWN_SEC: z.coerce.number().default(60),
   WHATSAPP_OTP_MAX_ATTEMPTS: z.coerce.number().default(5),
@@ -103,8 +110,44 @@ const schema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
+}).superRefine((val, ctx) => {
+  // Production-only secret-separation requirements. In dev/test we allow the
+  // JWT_SECRET fallback so local setups stay frictionless.
+  if (val.NODE_ENV !== "production") return;
+
+  if (!val.API_KEY_ENCRYPTION_SECRET) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["API_KEY_ENCRYPTION_SECRET"],
+      message:
+        "Production'da zorunlu — JWT_SECRET'a fallback, tek secret sızıntısında tüm API anahtarlarının çözülmesine yol açar.",
+    });
+  } else if (val.API_KEY_ENCRYPTION_SECRET === val.JWT_SECRET) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["API_KEY_ENCRYPTION_SECRET"],
+      message: "JWT_SECRET ile aynı olamaz (secret ayrımı).",
+    });
+  }
+
+  if (val.WHATSAPP_OTP_ENABLED) {
+    if (!val.WHATSAPP_OTP_HASH_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["WHATSAPP_OTP_HASH_SECRET"],
+        message: "WhatsApp OTP açıkken production'da zorunlu.",
+      });
+    } else if (val.WHATSAPP_OTP_HASH_SECRET === val.JWT_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["WHATSAPP_OTP_HASH_SECRET"],
+        message: "JWT_SECRET ile aynı olamaz (secret ayrımı).",
+      });
+    }
+  }
 });
 
+export const envSchema = schema;
 export const env = schema.parse(process.env);
 
 export function aiProviderApiKey(): string | undefined {

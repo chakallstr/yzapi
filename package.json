@@ -21,6 +21,7 @@
     "smoke:vps": "node scripts/vps-smoke.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/server/db/migrate.ts",
+    "db:rotate-cipher": "tsx src/server/db/rotate-api-key-cipher.ts",
     "db:seed": "tsx src/server/db/seed.ts",
     "db:reset:users": "node scripts/reset-user-data.mjs --confirm",
     "db:studio": "drizzle-kit studio",
