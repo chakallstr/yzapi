@@ -49,4 +49,12 @@ describe("single owner admin contract", () => {
     expect(app).toContain('path.startsWith("/dashboard")');
     expect(app).toContain('return "account"');
   });
+
+  it("prevents the single owner admin account from being suspended through admin user updates", () => {
+    const adminRoute = source("src/server/routes/admin.ts");
+
+    expect(adminRoute).toContain('const SINGLE_ADMIN_EMAIL = "cix.crazy666@gmail.com"');
+    expect(adminRoute).toContain("Tek admin hesabı askıya alınamaz");
+    expect(adminRoute).toContain("body.durum !== undefined");
+  });
 });

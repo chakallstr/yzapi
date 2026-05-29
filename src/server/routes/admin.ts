@@ -19,6 +19,7 @@ import { getReconciliationReport } from "../services/reconciliation-service.js";
 import { encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
 
 const router = Router();
+const SINGLE_ADMIN_EMAIL = "cix.crazy666@gmail.com";
 
 // ── Helper: serialize timestamps to ISO strings ────────────────────────────────
 function serializeUser(u: typeof users.$inferSelect) {
@@ -244,6 +245,18 @@ router.patch("/users/:id", async (req, res, next) => {
     const body = req.body;
     const updates: Partial<typeof users.$inferInsert> = {};
 
+    const existingRows = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    if (!existingRows.length) return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+    const existingUser = existingRows[0];
+
+    if (
+      body.durum !== undefined &&
+      String(existingUser.email || "").trim().toLowerCase() === SINGLE_ADMIN_EMAIL &&
+      body.durum !== "aktif"
+    ) {
+      return res.status(400).json({ error: "Tek admin hesabı askıya alınamaz." });
+    }
+
     if (body.adSoyad !== undefined) updates.adSoyad = body.adSoyad;
     if (body.durum !== undefined) updates.durum = body.durum;
     if (body.plan !== undefined) updates.plan = body.plan;
@@ -256,7 +269,6 @@ router.patch("/users/:id", async (req, res, next) => {
     updates.updatedAt = new Date();
 
     const updated = await db.update(users).set(updates).where(eq(users.id, id)).returning();
-    if (!updated.length) return res.status(404).json({ error: "Kullanıcı bulunamadı" });
     await writeAudit("user_update", id, `Güncellendi: ${Object.keys(body).join(", ")}`);
     res.json(serializeUser(updated[0]));
   } catch (e) { next(e); }
