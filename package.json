@@ -13,6 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
+    "e2e": "playwright test --project=chromium",
+    "e2e:up": "bash scripts/e2e-up.sh",
     "scan:public": "node scripts/scan-public-bundle.mjs",
     "qa:uat": "node scripts/yapayzekalab-uat-smoke.mjs",
     "smoke:vps": "node scripts/vps-smoke.mjs",
@@ -57,6 +59,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/express": "^4.17.21",
     "@types/nock": "^10.0.3",
     "@types/node": "^22.14.0",
