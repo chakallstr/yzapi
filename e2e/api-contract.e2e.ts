@@ -70,6 +70,16 @@ test.describe("security: auth-gated endpoints (K3)", () => {
     const res = await request.post("/api/files/sci-1/analyze", { data: {} });
     expect(res.status()).toBe(401);
   });
+
+  test("POST /api/settings without admin auth is rejected (401)", async ({ request }) => {
+    const res = await request.post("/api/settings", { data: { fallbackModel: "x" } });
+    expect(res.status()).toBe(401);
+  });
+
+  test("GET /api/settings stays public", async ({ request }) => {
+    const res = await request.get("/api/settings");
+    expect(res.status()).toBe(200);
+  });
 });
 
 test.describe("security: /v1 proxy requires API key", () => {
