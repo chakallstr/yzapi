@@ -37,7 +37,7 @@ export function signWhatsappPendingToken(payload: { sub: string; email: string }
 }
 
 export function verifyWhatsappPendingToken(token: string): WhatsappPendingPayload {
-  const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload & WhatsappPendingPayload;
+  const payload = jwt.verify(token, env.JWT_SECRET, { algorithms: ["HS256"] }) as JwtPayload & WhatsappPendingPayload;
   if (payload.type !== "whatsapp_pending" || !payload.sub || !payload.email) {
     throw new Error("Invalid WhatsApp pending token");
   }
@@ -62,7 +62,7 @@ export async function signRefreshToken(userId: string): Promise<string> {
 }
 
 export function verifyAccessToken(token: string): TokenPayload {
-  const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload & TokenPayload;
+  const payload = jwt.verify(token, env.JWT_SECRET, { algorithms: ["HS256"] }) as JwtPayload & TokenPayload;
   if (!payload.sub || !payload.role) throw new Error("Invalid token payload");
   return { sub: payload.sub, role: payload.role, jti: payload.jti };
 }
@@ -70,7 +70,7 @@ export function verifyAccessToken(token: string): TokenPayload {
 export async function rotateRefreshToken(
   refreshToken: string
 ): Promise<{ accessToken: string; refreshToken: string }> {
-  const payload = jwt.verify(refreshToken, env.JWT_SECRET) as JwtPayload & {
+  const payload = jwt.verify(refreshToken, env.JWT_SECRET, { algorithms: ["HS256"] }) as JwtPayload & {
     sub: string;
     jti: string;
     type: string;
@@ -99,7 +99,7 @@ export async function rotateRefreshToken(
 
 export async function revokeRefreshToken(refreshToken: string): Promise<void> {
   try {
-    const payload = jwt.verify(refreshToken, env.JWT_SECRET) as JwtPayload & { jti: string };
+    const payload = jwt.verify(refreshToken, env.JWT_SECRET, { algorithms: ["HS256"] }) as JwtPayload & { jti: string };
     await db.update(sessions).set({ revoked: true }).where(eq(sessions.jti, payload.jti));
   } catch {
     // Already invalid — fine

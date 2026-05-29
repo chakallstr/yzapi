@@ -2,6 +2,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { systemConfig } from "../db/schema.js";
+import { adminAuth } from "../middleware/admin-auth.js";
 
 const router = Router();
 
@@ -57,7 +58,9 @@ router.get("/public-config", async (_req, res) => {
   }
 });
 
-router.post("/settings", (req, res) => {
+// Mutating runtime routing settings requires admin auth — previously this was
+// open, letting anyone change fallbackModel / systemInstructions / weights.
+router.post("/settings", adminAuth, (req, res) => {
   defaultSettings = { ...defaultSettings, ...req.body };
   res.json({ success: true, settings: defaultSettings });
 });

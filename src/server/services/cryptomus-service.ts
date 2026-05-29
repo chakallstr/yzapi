@@ -1,4 +1,4 @@
-import { createHash } from "crypto";
+import { createHash, timingSafeEqual } from "crypto";
 import { env } from "../lib/env.js";
 import { roundUpUsdAmount } from "./payment-pricing.js";
 
@@ -83,6 +83,9 @@ export function verifyWebhook(rawBody: Record<string, unknown>): WebhookVerifyRe
   const b64 = Buffer.from(json).toString("base64");
   const hash = createHash("md5").update(b64 + apiKey).digest("hex");
 
-  const valid = hash === receivedSign;
+  // Constant-time compare (consistent with the other webhook verifiers).
+  const a = Buffer.from(hash);
+  const b = Buffer.from(String(receivedSign));
+  const valid = a.length === b.length && timingSafeEqual(a, b);
   return { valid, payload: dataWithoutSign };
 }
