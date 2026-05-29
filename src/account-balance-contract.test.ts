@@ -24,9 +24,9 @@ describe("account balance real-source contract", () => {
 
   it("routes profile menu items to real account sections", () => {
     expect(appSource).toContain("label: 'API anahtarları'");
-    expect(appSource).toContain("section: 'keys'");
+    expect(appSource).toContain("section: 'account-keys'");
     expect(appSource).toContain("label: 'Hesap ayarları'");
-    expect(appSource).toContain("section: 'settings'");
+    expect(appSource).toContain("section: 'account-settings'");
     expect(accountSource).toContain('id="account-keys"');
     expect(accountSource).toContain('id="account-settings"');
   });
