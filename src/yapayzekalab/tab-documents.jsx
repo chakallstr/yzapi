@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react';
 import { I, Card, Chip, Caption } from './shared.jsx';
-import { LEGAL_DOCS, LEGAL_DOC_ORDER, buildLegalDocsPlainText } from './legal-docs.js';
+import { API_DOC_SECTIONS, buildApiDocsPlainText } from './api-docs.js';
 
 const DocumentsTab = () => {
   const [copied, setCopied] = useState(false);
-  const docs = useMemo(() => LEGAL_DOC_ORDER.map((key) => ({ key, ...LEGAL_DOCS[key] })), []);
+  const docs = useMemo(() => API_DOC_SECTIONS, []);
 
   const copyAll = async () => {
     try {
-      await navigator.clipboard?.writeText(buildLegalDocsPlainText());
+      await navigator.clipboard?.writeText(buildApiDocsPlainText());
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
@@ -22,10 +22,10 @@ const DocumentsTab = () => {
         <div>
           <Caption>Documents</Caption>
           <h2 style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.8, margin: '6px 0 6px' }}>
-            Resmi dokümanlar, <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: 'var(--ink-3)' }}>tek sayfada</span>
+            Claude Popusk akışı, <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: 'var(--ink-3)' }}>YapayZekaLab’e uyarlanmış</span>
           </h2>
           <p style={{ fontSize: 12.5, color: 'var(--ink-2)', margin: 0, lineHeight: 1.55, maxWidth: 720 }}>
-            KVKK, Kullanıcı Sözleşmesi, Gizlilik ve Mesafeli Satış metinleri burada tam haliyle yer alır.
+            `docs.claude-popusk.shop` içeriğinin ürününe uyarlanmış sürümü burada yer alır. Araç bağlantıları, model kimlikleri, v1 endpoint yüzeyi ve bakiye davranışı YapayZekaLab canlı akışına göre yazılmıştır.
           </p>
         </div>
         <button onClick={copyAll} style={{
@@ -57,7 +57,7 @@ const DocumentsTab = () => {
               >
                 <div>
                   <div style={{ fontSize: 12.5, fontWeight: 600 }}>{doc.title}</div>
-                  <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 2 }}>{doc.body.length} paragraf</div>
+                  <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 2 }}>{doc.label}</div>
                 </div>
                 <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5 }}>{index + 1}</Chip>
               </a>
@@ -70,17 +70,81 @@ const DocumentsTab = () => {
             <Card key={doc.key} pad={22} id={`doc-${doc.key}`} style={{ scrollMarginTop: 84 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
                 <div>
-                  <Caption>Belge</Caption>
+                  <Caption>{doc.label}</Caption>
                   <div style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>{doc.title}</div>
                 </div>
                 <Chip tone="accent" style={{ fontSize: 9.5 }}>{doc.key.toUpperCase()}</Chip>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {doc.body.map((paragraph, index) => (
-                  <p key={index} style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.72 }}>
-                    {paragraph}
-                  </p>
-                ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.72 }}>
+                  {doc.intro}
+                </p>
+
+                {doc.bullets?.length ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {doc.bullets.map((bullet, index) => (
+                      <div key={index} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', marginTop: 7, flexShrink: 0 }} />
+                        <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.68 }}>{bullet}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {doc.clientCards?.length ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+                    {doc.clientCards.map((card) => (
+                      <div key={card.name} style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', borderRadius: 12, padding: 14 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>{card.name}</div>
+                            <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 2 }}>{card.type}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                          {card.steps.map((step, index) => (
+                            <p key={index} style={{ margin: 0, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.62 }}>
+                              {index + 1}. {step}
+                            </p>
+                          ))}
+                        </div>
+                        {card.code ? (
+                          <pre style={{ margin: '12px 0 0', padding: 12, borderRadius: 10, background: '#0f172a', color: '#e2e8f0', overflowX: 'auto', fontSize: 11, lineHeight: 1.55 }}>
+                            <code>{card.code}</code>
+                          </pre>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {doc.modelGroups?.length ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 }}>
+                    {doc.modelGroups.map((group) => (
+                      <div key={group.family} style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', borderRadius: 12, padding: 14 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 10 }}>{group.family}</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {group.models.map((model) => (
+                            <code key={model} style={{ fontSize: 11.5, color: 'var(--ink-2)', fontFamily: 'var(--font-mono)' }}>{model}</code>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {doc.codeBlocks?.length ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {doc.codeBlocks.map((block) => (
+                      <div key={block.title}>
+                        <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 8 }}>{block.title}</div>
+                        <pre style={{ margin: 0, padding: 14, borderRadius: 12, background: '#0f172a', color: '#e2e8f0', overflowX: 'auto', fontSize: 11.5, lineHeight: 1.6 }}>
+                          <code>{block.code}</code>
+                        </pre>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </Card>
           ))}
