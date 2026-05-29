@@ -42,6 +42,8 @@ describe("Claude Popusk migration contract", () => {
     expect(computePrice(byId.get("gpt-5.2")!, pricingCfg).input?.usd).toBeCloseTo(0.75, 6);
     expect(computePrice(byId.get("gpt-5.3-chat-latest")!, pricingCfg).input?.usd).toBeCloseTo(0.8, 6);
     expect(computePrice(byId.get("gpt-5.4")!, pricingCfg).input?.usd).toBeCloseTo(1.0, 6);
+    expect(computePrice(byId.get("gemini-3.1-pro-preview")!, pricingCfg).input?.usd).toBeCloseTo(0.85, 6);
+    expect(computePrice(byId.get("gemini-3-pro-preview")!, pricingCfg).input?.usd).toBeCloseTo(0.69, 6);
     expect(computePrice(byId.get("claude-opus-4-7")!, pricingCfg).input?.usd).toBeCloseTo(1.2, 6);
     expect(computePrice(byId.get("gpt-5.5")!, pricingCfg).input?.usd).toBeCloseTo(1.15, 6);
   });

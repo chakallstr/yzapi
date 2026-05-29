@@ -19,4 +19,10 @@ describe("admin override ui contract", () => {
     expect(source).toContain("Kaydediliyor");
     expect(source).toContain("Override kaydedildi");
   });
+
+  it("normalizes decimal comma input before saving overrides", () => {
+    expect(source).toContain("normalizeDecimalInput");
+    expect(source).toContain("replace(',', '.')");
+    expect(source).toContain("inputMode=\"decimal\"");
+  });
 });

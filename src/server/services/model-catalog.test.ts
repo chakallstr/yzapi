@@ -22,7 +22,10 @@ describe("MASTER_MODELS — Claude Popusk text catalog", () => {
     const byId = new Map(MASTER_MODELS.map((model) => [model.id, model]));
 
     expect(byId.get("claude-haiku-4-5-20251001")?.customerInputUsd).toBe(0.62);
-    expect(byId.get("gemini-3-flash-preview")?.customerInputUsd).toBe(0.62);
+    expect(byId.get("gemini-3-flash-preview")?.customerInputUsd).toBe(0.69);
+    expect(byId.get("gemini-3-pro-preview")?.customerInputUsd).toBe(0.69);
+    expect(byId.get("gemini-3.1-pro-preview")?.customerInputUsd).toBe(0.85);
+    expect(byId.get("gemini-3.1-pro-preview-customtools")?.customerInputUsd).toBe(0.85);
     expect(byId.get("o3-mini")?.customerInputUsd).toBe(0.68);
     expect(byId.get("o4-mini")?.customerInputUsd).toBe(0.72);
     expect(byId.get("o3")?.customerInputUsd).toBe(0.75);

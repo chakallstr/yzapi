@@ -77,6 +77,10 @@ const CUSTOMER_PRICE_OVERRIDES = new Map<string, number>([
   ["gpt-5-mini-2025-08-07", 0.64],
   ["gpt-5-nano", 0.62],
   ["gpt-5-nano-2025-08-07", 0.62],
+  ["gemini-3.1-pro-preview", 0.85],
+  ["gemini-3.1-pro-preview-customtools", 0.85],
+  ["gemini-3-pro-preview", 0.69],
+  ["gemini-3-flash-preview", 0.69],
 ]);
 
 function familyPrice(id: string): number {

@@ -112,6 +112,7 @@ const money = (value) => `₺${Number(value || 0).toLocaleString('tr-TR', { mini
 const usd = (value) => `$${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const initials = (name = '') => name.split(' ').filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'YZ';
 const userCodeFromId = (id = '') => (id ? `u-${String(id).replace(/-/g, '').slice(0, 8)}` : '—');
+const normalizeDecimalInput = (value) => String(value ?? '').trim().replace(',', '.');
 const StatusChip = ({ status }) => {
   const tone = STATUS_TONE[status] || STATUS_TONE.bekliyor;
   return <Chip tone="neutral" style={{ background: tone.bg, color: tone.fg, fontSize: 10 }}>{tone.label || status}</Chip>;
@@ -560,6 +561,8 @@ const AdminOverrides = ({ overrides, token, refresh }) => {
     () => (overrides || []).find((override) => override.modelId === modelId) || null,
     [overrides, modelId],
   );
+  const normalizedInputUsdOverride = normalizeDecimalInput(inputUsdOverride);
+  const normalizedOutputUsdOverride = normalizeDecimalInput(outputUsdOverride);
   useEffect(() => {
     setInputUsdOverride(currentOverride?.inputUsdOverride !== null && currentOverride?.inputUsdOverride !== undefined ? String(currentOverride.inputUsdOverride) : '');
     setOutputUsdOverride(currentOverride?.outputUsdOverride !== null && currentOverride?.outputUsdOverride !== undefined ? String(currentOverride.outputUsdOverride) : '');
@@ -586,8 +589,8 @@ const AdminOverrides = ({ overrides, token, refresh }) => {
   };
 
   const save = async () => {
-    const nextInput = inputUsdOverride === '' ? null : Number(inputUsdOverride);
-    const nextOutput = outputUsdOverride === '' ? null : Number(outputUsdOverride);
+    const nextInput = normalizedInputUsdOverride === '' ? null : Number(normalizedInputUsdOverride);
+    const nextOutput = normalizedOutputUsdOverride === '' ? null : Number(normalizedOutputUsdOverride);
     if ((nextInput !== null && !Number.isFinite(nextInput)) || (nextOutput !== null && !Number.isFinite(nextOutput))) {
       setError('Override alanlarına geçerli sayı gir.');
       setSaved(false);
@@ -650,8 +653,8 @@ const AdminOverrides = ({ overrides, token, refresh }) => {
           <select value={modelId} onChange={(e) => setModelId(e.target.value)} style={inputStyle}>
             {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
           </select>
-          <input value={inputUsdOverride} onChange={(e) => setInputUsdOverride(e.target.value)} placeholder="input USD/M override" type="number" step="0.0001" style={inputStyle} />
-          <input value={outputUsdOverride} onChange={(e) => setOutputUsdOverride(e.target.value)} placeholder="output USD/M override" type="number" step="0.0001" style={inputStyle} />
+          <input value={inputUsdOverride} onChange={(e) => setInputUsdOverride(e.target.value)} placeholder="input USD/M override" type="text" inputMode="decimal" style={inputStyle} />
+          <input value={outputUsdOverride} onChange={(e) => setOutputUsdOverride(e.target.value)} placeholder="output USD/M override" type="text" inputMode="decimal" style={inputStyle} />
           <button onClick={save} disabled={saving} style={{ borderRadius: 9, background: 'var(--ink)', color: '#fff', fontWeight: 600, opacity: saving ? 0.7 : 1 }}>{saving ? 'Kaydediliyor…' : 'Kaydet'}</button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginTop: 12 }}>
@@ -663,7 +666,7 @@ const AdminOverrides = ({ overrides, token, refresh }) => {
           <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
             <Caption>Etkin fiyat</Caption>
             <div style={{ fontSize: 14, fontWeight: 600, marginTop: 6 }}>
-              {usd(inputUsdOverride === '' ? selectedModel?.input : Number(inputUsdOverride || 0))} · {usd(outputUsdOverride === '' ? selectedModel?.output : Number(outputUsdOverride || 0))}
+              {usd(normalizedInputUsdOverride === '' ? selectedModel?.input : Number(normalizedInputUsdOverride || 0))} · {usd(normalizedOutputUsdOverride === '' ? selectedModel?.output : Number(normalizedOutputUsdOverride || 0))}
             </div>
             <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 4 }}>{currentOverride ? 'override mevcut' : 'taban fiyat'}</div>
           </div>

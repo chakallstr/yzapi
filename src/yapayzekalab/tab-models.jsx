@@ -18,6 +18,21 @@ const TYPE_META = {
   text:  { label: 'Metin', Ico: I.Text,  color: 'var(--accent)' },
 };
 
+const MODEL_TYPE_MAP = {
+  Metin: 'text',
+};
+
+const mapApiModel = (model) => ({
+  id: model.id,
+  label: model.name,
+  provider: (model.providerSlug || model.provider || '').toLowerCase(),
+  type: MODEL_TYPE_MAP[model.type] || 'text',
+  input: Number(model.computed?.input?.usd ?? model.customerInputUsd ?? 0),
+  output: Number(model.computed?.output?.usd ?? model.customerOutputUsd ?? 0),
+  ctx: model.context || '—',
+  enabled: model.enabled !== false,
+});
+
 const ProviderBadge = ({ provider }) => {
   const p = PROVIDERS[provider] || { short: provider, bg: 'rgba(15,23,42,0.06)', ink: 'var(--ink-2)' };
   return (
@@ -152,6 +167,32 @@ const ModelsTab = ({ ctx }) => {
   const [filter, setFilter] = useState('text');
   const [providerFilter, setProviderFilter] = useState('all');
   const [compareIds, setCompareIds] = useState([]);
+  const [liveModels, setLiveModels] = useState([]);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadModels = async () => {
+      try {
+        const response = await fetch('/api/models');
+        if (!response.ok) throw new Error(`model catalog failed (${response.status})`);
+        const data = await response.json();
+        if (cancelled) return;
+        const nextModels = Array.isArray(data) ? data.map(mapApiModel).filter((model) => model.enabled) : [];
+        setLiveModels(nextModels);
+      } catch {
+        if (!cancelled) setLiveModels([]);
+      }
+    };
+
+    loadModels();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const catalogModels = liveModels.length ? liveModels : MODELS;
 
   const toggleCompare = (id) => {
     setCompareIds(prev => {
@@ -162,17 +203,29 @@ const ModelsTab = ({ ctx }) => {
   };
 
   const filtered = useMemo(() => {
-    return MODELS.filter(m => m.type === filter && (providerFilter === 'all' || m.provider === providerFilter));
-  }, [filter, providerFilter]);
+    const needle = search.trim().toLowerCase();
+
+    return catalogModels
+      .filter((m) => m.type === filter && (providerFilter === 'all' || m.provider === providerFilter))
+      .filter((m) => {
+        if (!needle) return true;
+        return `${m.label} ${m.id} ${m.provider}`.toLowerCase().includes(needle);
+      })
+      .sort((a, b) => {
+        const priceDelta = (b.input ?? 0) - (a.input ?? 0);
+        if (priceDelta !== 0) return priceDelta;
+        return a.label.localeCompare(b.label, 'tr');
+      });
+  }, [catalogModels, filter, providerFilter, search]);
 
   const counts = useMemo(() => ({
-    text:  MODELS.filter(m => m.type === 'text').length,
-  }), []);
+    text: catalogModels.filter(m => m.type === 'text').length,
+  }), [catalogModels]);
 
   const providersFor = useMemo(() => {
-    const set = new Set(MODELS.filter(m => m.type === filter).map(m => m.provider));
+    const set = new Set(catalogModels.filter(m => m.type === filter).map(m => m.provider));
     return ['all', ...Array.from(set)];
-  }, [filter]);
+  }, [catalogModels, filter]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
@@ -181,7 +234,7 @@ const ModelsTab = ({ ctx }) => {
         <div>
           <Caption>Modeller</Caption>
           <h2 style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.8, margin: '6px 0 6px' }}>
-            {MODELS.length} metin modeli, <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: 'var(--ink-3)' }}>tek API geçidi</span>
+            {catalogModels.length} metin modeli, <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: 'var(--ink-3)' }}>tek API geçidi</span>
           </h2>
           <p style={{ fontSize: 12.5, color: 'var(--ink-2)', margin: 0, maxWidth: 640, lineHeight: 1.55 }}>
             Tüm fiyatlar <strong>USD</strong> bazındadır. TL gösterimleri yalnızca bilgi amaçlıdır.
@@ -230,24 +283,46 @@ const ModelsTab = ({ ctx }) => {
       </Card>
 
       {/* Provider filter chips */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', letterSpacing: 0.6, marginRight: 4 }}>SAĞLAYICI</span>
-        {providersFor.map(p => {
-          const on = providerFilter === p;
-          const meta = p === 'all' ? null : PROVIDERS[p];
-          return (
-            <button key={p} onClick={() => setProviderFilter(p)} style={{
-              padding: '5px 11px', fontSize: 11.5, fontWeight: 500, borderRadius: 999,
-              background: on ? 'var(--ink)' : (meta?.bg || 'var(--surface)'),
-              color: on ? 'var(--surface)' : (meta?.ink || 'var(--ink-2)'),
-              border: on ? '1px solid var(--ink)' : '1px solid var(--border)',
-              fontFamily: p === 'all' ? 'var(--font-sans)' : 'var(--font-mono)',
-              letterSpacing: p === 'all' ? 0 : 0.3,
-            }}>
-              {p === 'all' ? 'Tümü' : meta.short}
-            </button>
-          );
-        })}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', letterSpacing: 0.6, marginRight: 4 }}>SAĞLAYICI</span>
+          {providersFor.map(p => {
+            const on = providerFilter === p;
+            const meta = p === 'all' ? null : PROVIDERS[p];
+            return (
+              <button key={p} onClick={() => setProviderFilter(p)} style={{
+                padding: '5px 11px', fontSize: 11.5, fontWeight: 500, borderRadius: 999,
+                background: on ? 'var(--ink)' : (meta?.bg || 'var(--surface)'),
+                color: on ? 'var(--surface)' : (meta?.ink || 'var(--ink-2)'),
+                border: on ? '1px solid var(--ink)' : '1px solid var(--border)',
+                fontFamily: p === 'all' ? 'var(--font-sans)' : 'var(--font-mono)',
+                letterSpacing: p === 'all' ? 0 : 0.3,
+              }}>
+                {p === 'all' ? 'Tümü' : meta.short}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ position: 'relative', maxWidth: 420 }}>
+          <I.Search size={14} stroke="var(--ink-3)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Model ara"
+            type="text"
+            style={{
+              width: '100%',
+              padding: '11px 14px 11px 36px',
+              borderRadius: 10,
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
+              color: 'var(--ink)',
+              fontSize: 12.5,
+              outline: 'none',
+            }}
+          />
+        </div>
       </div>
 
       {/* Compare tray */}

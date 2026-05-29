@@ -151,10 +151,10 @@ const MODELS = [
   { id: 'o3-2025-04-16', label: 'o3 2025-04-16', provider: 'openai', type: 'text', input: 0.75, output: 0.75, ctx: '200K' },
   { id: 'o3-mini', label: 'o3-mini', provider: 'openai', type: 'text', input: 0.68, output: 0.68, ctx: '200K' },
   { id: 'o3-mini-2025-01-31', label: 'o3-mini 2025-01-31', provider: 'openai', type: 'text', input: 0.68, output: 0.68, ctx: '200K' },
-  { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview', provider: 'google', type: 'text', input: 0.62, output: 0.62, ctx: '1M' },
-  { id: 'gemini-3.1-pro-preview-customtools', label: 'Gemini 3.1 Pro Preview Custom Tools', provider: 'google', type: 'text', input: 0.62, output: 0.62, ctx: '1M' },
-  { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro Preview', provider: 'google', type: 'text', input: 0.62, output: 0.62, ctx: '1M' },
-  { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash Preview', provider: 'google', type: 'text', input: 0.62, output: 0.62, ctx: '1M' }
+  { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview', provider: 'google', type: 'text', input: 0.85, output: 0.85, ctx: '1M' },
+  { id: 'gemini-3.1-pro-preview-customtools', label: 'Gemini 3.1 Pro Preview Custom Tools', provider: 'google', type: 'text', input: 0.85, output: 0.85, ctx: '1M' },
+  { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro Preview', provider: 'google', type: 'text', input: 0.69, output: 0.69, ctx: '1M' },
+  { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash Preview', provider: 'google', type: 'text', input: 0.69, output: 0.69, ctx: '1M' }
 ];
 
 MODELS.sort((a, b) => (MODEL_DISPLAY_INDEX[a.id] ?? Number.MAX_SAFE_INTEGER) - (MODEL_DISPLAY_INDEX[b.id] ?? Number.MAX_SAFE_INTEGER));
