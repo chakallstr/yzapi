@@ -359,4 +359,54 @@ describe("chargeUsage — billing service", () => {
     // both refund and charge UPDATEs plus the usage record insert ran
     expect(mockTxSql).toHaveBeenCalledTimes(5);
   });
+
+  it("charges the estimate and records stream_missing_usage when the upstream omits usage (G4)", async () => {
+    mockSelectLimit
+      .mockResolvedValueOnce([]) // existing usage record: none
+      .mockResolvedValueOnce([{ miktarTL: "-2.2500", sonrakiBakiye: "97.7500" }]); // reservation row
+    // Fallback ON: this is NOT an error, so the estimated cost is still charged.
+    mockTxSql
+      .mockResolvedValueOnce([{ bakiye_tl: "100.0000", email: "user@test.com" }]) // refund update
+      .mockResolvedValueOnce([{ id: "refund-tx-1" }]) // refund tx
+      .mockResolvedValueOnce([{ bakiye_tl: "99.2500", email: "user@test.com" }]) // charge update
+      .mockResolvedValueOnce([{ id: "final-tx-1" }]) // final tx
+      .mockResolvedValueOnce([]); // usage record insert
+
+    const { settleReservedUsage } = await import("./billing-service.js");
+
+    const model = {
+      id: "gpt-4o",
+      name: "GPT-4o",
+      provider: "openai",
+      type: "Metin" as const,
+      context: "128K",
+      endpoints: ["chat"] as string[],
+      providerInputUsd: 5,
+      providerOutputUsd: 15,
+    };
+
+    // computePrice mock => input 750 tl/1M. 1000 prompt tokens => 0.75 TL estimate.
+    const result = await settleReservedUsage({
+      userId: "00000000-0000-0000-0000-000000000001",
+      apiKeyId: "00000000-0000-0000-0000-000000000002",
+      model,
+      usage: { promptTokens: 1000, completionTokens: 0 },
+      responseMs: 110,
+      requestId: "reserve-stream-missing-1",
+      rawUsageJson: { promptTokens: 1000, completionTokens: 0 },
+      status: "stream_missing_usage",
+    });
+
+    // Unlike the error path (cost 0), the estimate is charged here.
+    expect(result.costTL).toBeGreaterThan(0);
+    expect(mockDbSqlBegin).toHaveBeenCalledTimes(1);
+    // refund + charge + usage record insert all ran (5 tx calls)
+    expect(mockTxSql).toHaveBeenCalledTimes(5);
+    // usage_records insert must carry the stream_missing_usage status + error code
+    const usageInsertCall = mockTxSql.mock.calls.find((call) => {
+      const sql = String(call[0]?.[0] ?? call[0] ?? "");
+      return sql.includes("usage_records");
+    });
+    expect(usageInsertCall).toBeTruthy();
+  });
 });
