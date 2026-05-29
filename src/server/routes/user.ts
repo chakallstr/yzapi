@@ -29,6 +29,44 @@ router.get("/me", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// PATCH /api/user/me
+router.patch("/me", async (req, res, next) => {
+  try {
+    const adSoyad = String(req.body?.adSoyad || "").trim();
+    if (!adSoyad || adSoyad.length < 2) {
+      res.status(400).json({ error: "Ad soyad en az 2 karakter olmalı." });
+      return;
+    }
+
+    const updatedRows = await db
+      .update(users)
+      .set({ adSoyad, updatedAt: new Date() })
+      .where(eq(users.id, req.user!.id))
+      .returning();
+
+    if (!updatedRows.length) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    await writeAudit("user_profile_update", req.user!.id, `Kullanıcı profil adını güncelledi: ${adSoyad}`, req.user!.id);
+
+    const { passwordHash, ...safe } = updatedRows[0];
+    void passwordHash;
+    const configRows = await db
+      .select({ kur: systemConfig.kur })
+      .from(systemConfig)
+      .where(eq(systemConfig.id, 1))
+      .limit(1);
+    const kur = Number(configRows[0]?.kur ?? 0);
+    const bakiyeTL = Number(safe.bakiyeTL ?? 0);
+    const bakiyeUsd = kur > 0 ? bakiyeTL / kur : 0;
+    const userCode = safe.id ? `u-${String(safe.id).replace(/-/g, "").slice(0, 8)}` : null;
+    const whatsapp = await getWhatsappVerificationSummary(req.user!.id);
+    res.json({ ...safe, bakiyeUsd, userCode, ...whatsapp });
+  } catch (e) { next(e); }
+});
+
 // GET /api/user/api-keys
 router.get("/api-keys", async (req, res, next) => {
   try {

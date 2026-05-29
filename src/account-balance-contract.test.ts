@@ -29,4 +29,14 @@ describe("account balance real-source contract", () => {
     expect(accountSource).toContain('id="account-keys"');
     expect(accountSource).toContain('id="account-settings"');
   });
+
+  it("uses the real display name in the top-right account trigger instead of a hardcoded label", () => {
+    expect(appSource).toContain("const displayName = profile?.adSoyad || profile?.email?.split('@')[0] || 'Hesabım';");
+    expect(appSource).not.toContain("<div style={{ fontSize: 12, fontWeight: 500 }}>Hesabım</div>");
+  });
+
+  it("exposes editable account settings actions in the account panel", () => {
+    expect(accountSource).toContain("Profili kaydet");
+    expect(accountSource).toContain("/api/user/me");
+  });
 });

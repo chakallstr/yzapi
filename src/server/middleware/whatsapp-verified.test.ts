@@ -59,4 +59,18 @@ describe("requireWhatsappVerified", () => {
 
     expect(next).toHaveBeenCalledOnce();
   });
+
+  it("always allows the single admin owner email", async () => {
+    enabledMock.mockReturnValue(true);
+    const next = vi.fn() as NextFunction;
+
+    await requireWhatsappVerified(
+      { user: { id: "user-1", email: "cix.crazy666@gmail.com" } } as Request,
+      mockResponse(),
+      next,
+    );
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(verifiedMock).not.toHaveBeenCalled();
+  });
 });

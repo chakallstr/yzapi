@@ -539,8 +539,8 @@ const UserMenu = ({ onAction, profile, balanceUSD }) => {
           fontSize: 11, fontWeight: 600,
         }}>{initialsFor(displayName)}</div>
         <div style={{ lineHeight: 1.15, marginRight: 2, textAlign: 'left' }}>
-          <div style={{ fontSize: 12, fontWeight: 500 }}>Hesabım</div>
-          <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>{plan}</div>
+          <div style={{ fontSize: 12, fontWeight: 500, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</div>
+          <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>{profile?.email ? plan : 'hesap'}</div>
         </div>
         <I.Chevron size={12} stroke="var(--ink-3)" style={{
           transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0)',

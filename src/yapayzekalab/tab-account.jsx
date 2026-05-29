@@ -446,6 +446,9 @@ const AccountTab = ({ ctx }) => {
   const [sandboxFullKey, setSandboxFullKey] = useState('');
   const [sandboxBusy, setSandboxBusy] = useState(false);
   const [monthlyReport, setMonthlyReport] = useState(null);
+  const [settingsName, setSettingsName] = useState('');
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState('');
 
   const balanceUSD = asNumber(me?.bakiyeUsd, fallbackBalanceUSD);
   const userCode = me?.userCode || (me?.id ? `u-${String(me.id).replace(/-/g, '').slice(0, 8)}` : 'profil');
@@ -484,6 +487,8 @@ const AccountTab = ({ ctx }) => {
       setWebhooks(webhookData);
       setSandboxKey(sandboxData);
       setMonthlyReport(reportData);
+      setSettingsName(meData?.adSoyad || '');
+      setSettingsMessage('');
       if (meData?.bakiyeUsd !== undefined) setTweak('balanceUSD', asNumber(meData.bakiyeUsd, fallbackBalanceUSD));
     } catch (error) {
       setPanelError(error instanceof Error ? error.message : 'Panel verileri alınamadı');
@@ -523,6 +528,21 @@ const AccountTab = ({ ctx }) => {
       setPanelError(error instanceof Error ? error.message : 'Sandbox anahtarı oluşturulamadı');
     } finally {
       setSandboxBusy(false);
+    }
+  };
+
+  const saveProfileSettings = async () => {
+    setSettingsSaving(true);
+    setSettingsMessage('');
+    try {
+      const updated = await apiJson('/api/user/me', { method: 'PATCH', body: { adSoyad: settingsName } });
+      setMe(updated);
+      setSettingsName(updated?.adSoyad || settingsName);
+      setSettingsMessage('Profil kaydedildi');
+    } catch (error) {
+      setSettingsMessage(error instanceof Error ? error.message : 'Profil kaydedilemedi');
+    } finally {
+      setSettingsSaving(false);
     }
   };
 
@@ -1043,21 +1063,52 @@ const AccountTab = ({ ctx }) => {
           <div style={{ fontSize: 14, fontWeight: 600 }}>Hesap ayarları</div>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>Profil, iletişim ve benzersiz hesap kodu</div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px 110px', gap: 10, padding: '12px 20px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
-          {['Ad soyad','E-posta','Hesap kodu','Durum'].map(h => (
-            <Caption key={h} style={{ fontSize: 9 }}>{h}</Caption>
-          ))}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px 110px', gap: 10, padding: '14px 20px', alignItems: 'center', fontSize: 12 }}>
-          <span style={{ fontWeight: 500 }}>{me?.adSoyad || '—'}</span>
-          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{me?.email || '—'}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Chip tone="neutral" style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)' }}>{userCode}</Chip>
-            <button onClick={() => navigator.clipboard?.writeText(userCode)} style={{ color: 'var(--ink-3)', padding: 2 }} title="Kod kopyala">
-              <I.Copy size={11} stroke="var(--ink-3)" />
-            </button>
+        <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1.1fr 1fr 160px 110px', gap: 12, alignItems: 'end' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Caption style={{ fontSize: 9 }}>Ad soyad</Caption>
+            <input
+              value={settingsName}
+              onChange={(e) => setSettingsName(e.target.value)}
+              placeholder="Ad soyad"
+              style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-2)', fontSize: 12, outline: 'none' }}
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Caption style={{ fontSize: 9 }}>E-posta</Caption>
+            <div style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-2)', fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{me?.email || '—'}</div>
+          </label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Caption style={{ fontSize: 9 }}>Hesap kodu</Caption>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Chip tone="neutral" style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)' }}>{userCode}</Chip>
+              <button onClick={() => navigator.clipboard?.writeText(userCode)} style={{ color: 'var(--ink-3)', padding: 2 }} title="Kod kopyala">
+                <I.Copy size={11} stroke="var(--ink-3)" />
+              </button>
+            </div>
           </div>
-          <Chip tone={me?.durum === 'aktif' ? 'ok' : 'neutral'} style={{ fontSize: 9.5, justifySelf: 'start' }}>{me?.durum || 'aktif'}</Chip>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Caption style={{ fontSize: 9 }}>Durum</Caption>
+            <Chip tone={me?.durum === 'aktif' ? 'ok' : 'neutral'} style={{ fontSize: 9.5, justifySelf: 'start' }}>{me?.durum || 'aktif'}</Chip>
+          </div>
+        </div>
+        <div style={{ padding: '0 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ fontSize: 11, color: settingsMessage === 'Profil kaydedildi' ? '#047857' : 'var(--ink-3)' }}>{settingsMessage || 'Google hesabındaki e-posta sabittir. Buradan görünen adını değiştirebilirsin.'}</div>
+          <button
+            onClick={saveProfileSettings}
+            disabled={settingsSaving || settingsName.trim().length < 2}
+            style={{
+              padding: '9px 14px',
+              borderRadius: 10,
+              background: settingsSaving || settingsName.trim().length < 2 ? 'var(--ink-4)' : 'var(--ink)',
+              color: '#fff',
+              fontSize: 12,
+              fontWeight: 600,
+              opacity: settingsSaving || settingsName.trim().length < 2 ? 0.6 : 1,
+              cursor: settingsSaving || settingsName.trim().length < 2 ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {settingsSaving ? 'Kaydediliyor…' : 'Profili kaydet'}
+          </button>
         </div>
       </Card>
 

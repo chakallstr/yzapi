@@ -100,4 +100,9 @@ describe("adminAuth single-owner policy", () => {
     expect(res.statusCode).toBe(403);
     expect(res.payload).toEqual({ error: "User account is not active" });
   });
+
+  it("keeps the configured owner email as the only admin identity", async () => {
+    const source = await import("./admin-auth.js");
+    expect(source.ADMIN_EMAIL).toBe("cix.crazy666@gmail.com");
+  });
 });

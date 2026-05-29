@@ -3,6 +3,7 @@ import {
   hasActiveVerifiedWhatsappForUser,
   isWhatsappOtpEnabled,
 } from "../services/whatsapp-otp-service.js";
+import { ADMIN_EMAIL } from "./admin-auth.js";
 
 export async function requireWhatsappVerified(
   req: Request,
@@ -17,6 +18,12 @@ export async function requireWhatsappVerified(
   const userId = req.user?.id || req.apiKey?.userId;
   if (!userId) {
     res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const email = String(req.user?.email || "").trim().toLowerCase();
+  if (email === ADMIN_EMAIL) {
+    next();
     return;
   }
 
