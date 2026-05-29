@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "../db/client.js";
-import { announcements, modelOverrides } from "../db/schema.js";
+import { announcements, modelOverrides, modelRuntimePolicies } from "../db/schema.js";
 import { and, eq, lte, gte } from "drizzle-orm";
 import { MASTER_MODELS } from "../../master-models.js";
 import { computePrice } from "../../pricing.js";
@@ -14,10 +14,13 @@ router.get("/models", async (_req, res, next) => {
     const cfg = await buildPricingConfig();
 
     const overrides = await db.select().from(modelOverrides);
+    const runtimePolicies = await db.select().from(modelRuntimePolicies);
     const overrideMap = new Map(overrides.map((o) => [o.modelId, o]));
+    const runtimeMap = new Map(runtimePolicies.map((o) => [o.modelId, o]));
 
     const result = MASTER_MODELS.map((m) => {
       const ovr = overrideMap.get(m.id);
+      const runtime = runtimeMap.get(m.id);
       const patched = { ...m };
       if (ovr) {
         if (m.type === "Metin") {
@@ -28,10 +31,16 @@ router.get("/models", async (_req, res, next) => {
           if (ovr.outputUsdOverride !== null) patched.providerImageOutputUsd = Number(ovr.outputUsdOverride);
         }
       }
+      if (runtime?.contextOverrideTokens && runtime.contextOverrideTokens > 0) {
+        patched.contextTokens = runtime.contextOverrideTokens;
+      }
+      if (runtime?.maxOutputTokens && runtime.maxOutputTokens > 0) {
+        patched.maxOutputTokens = runtime.maxOutputTokens;
+      }
       return {
         ...patched,
         computed: computePrice(patched, cfg),
-        enabled: ovr ? ovr.enabled : true,
+        enabled: (ovr ? ovr.enabled !== false : true) && (runtime ? runtime.enabled !== false : true),
       };
     });
 

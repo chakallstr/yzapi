@@ -2,7 +2,7 @@ import { Router } from "express";
 import { MASTER_MODELS, type MasterModel } from "../../master-models.js";
 import { computePrice, type ComputedPrice } from "../../pricing.js";
 import { db } from "../db/client.js";
-import { modelOverrides } from "../db/schema.js";
+import { modelOverrides, modelRuntimePolicies } from "../db/schema.js";
 import { buildPricingConfig } from "../services/pricing-service.js";
 
 type V1ModelPricing = {
@@ -65,11 +65,16 @@ function buildPricing(computed: ComputedPrice | undefined): V1ModelPricing | nul
 
 async function buildCatalogEntries(): Promise<V1CatalogEntry[]> {
   const cfg = await buildPricingConfig();
-  const overrides = await db.select().from(modelOverrides);
+  const [overrides, runtimePolicies] = await Promise.all([
+    db.select().from(modelOverrides),
+    db.select().from(modelRuntimePolicies),
+  ]);
   const overrideMap = new Map(overrides.map((override) => [override.modelId, override]));
+  const runtimeMap = new Map(runtimePolicies.map((policy) => [policy.modelId, policy]));
 
   return MASTER_MODELS.map((model) => {
     const override = overrideMap.get(model.id);
+    const runtime = runtimeMap.get(model.id);
     const patched = { ...model };
     if (override) {
       if (model.type === "Metin") {
@@ -80,10 +85,16 @@ async function buildCatalogEntries(): Promise<V1CatalogEntry[]> {
         if (override.outputUsdOverride !== null) patched.providerImageOutputUsd = Number(override.outputUsdOverride);
       }
     }
+    if (runtime?.contextOverrideTokens && runtime.contextOverrideTokens > 0) {
+      patched.contextTokens = runtime.contextOverrideTokens;
+    }
+    if (runtime?.maxOutputTokens && runtime.maxOutputTokens > 0) {
+      patched.maxOutputTokens = runtime.maxOutputTokens;
+    }
     return {
       model: patched,
       computed: computePrice(patched, cfg),
-      enabled: override ? override.enabled : true,
+      enabled: (override ? override.enabled !== false : true) && (runtime ? runtime.enabled !== false : true),
     };
   });
 }

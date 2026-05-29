@@ -138,6 +138,63 @@ export const apiKeys = pgTable(
   (t) => [index("api_keys_prefix_idx").on(t.prefix)]
 );
 
+// ── system_api_config (single-row, id = 1) ───────────────────────────────────
+export const systemApiConfig = pgTable("system_api_config", {
+  id: integer("id").primaryKey().default(1),
+  activeProviderId: text("active_provider_id").notNull().default("closerouter"),
+  defaultContextLimitTokens: integer("default_context_limit_tokens").notNull().default(95_000),
+  defaultOutputReserveTokens: integer("default_output_reserve_tokens").notNull().default(4_096),
+  defaultPerKeyPerMinute: integer("default_per_key_per_minute").notNull().default(60),
+  defaultPerUserPerMinute: integer("default_per_user_per_minute").notNull().default(120),
+  defaultPerIpPerMinute: integer("default_per_ip_per_minute").notNull().default(240),
+  defaultRequestTimeoutMs: integer("default_request_timeout_ms").notNull().default(60_000),
+  defaultStreamTimeoutMs: integer("default_stream_timeout_ms").notNull().default(120_000),
+  allowStreaming: boolean("allow_streaming").notNull().default(true),
+  allowResponsesEndpoint: boolean("allow_responses_endpoint").notNull().default(true),
+  allowMessagesEndpoint: boolean("allow_messages_endpoint").notNull().default(true),
+  allowChatEndpoint: boolean("allow_chat_endpoint").notNull().default(true),
+  enforceModelAllowlist: boolean("enforce_model_allowlist").notNull().default(false),
+  defaultMaxTokensPerRequest: integer("default_max_tokens_per_request").notNull().default(4_096),
+  defaultTemperatureMin: numeric("default_temperature_min", { precision: 6, scale: 3 }).notNull().default("0"),
+  defaultTemperatureMax: numeric("default_temperature_max", { precision: 6, scale: 3 }).notNull().default("2"),
+  defaultTopPMin: numeric("default_top_p_min", { precision: 6, scale: 3 }).notNull().default("0"),
+  defaultTopPMax: numeric("default_top_p_max", { precision: 6, scale: 3 }).notNull().default("1"),
+  insufficientBalanceBlockEnabled: boolean("insufficient_balance_block_enabled").notNull().default(true),
+  streamMissingUsageFallbackEnabled: boolean("stream_missing_usage_fallback_enabled").notNull().default(true),
+  upstream402PassThroughEnabled: boolean("upstream_402_pass_through_enabled").notNull().default(true),
+  maintenanceModeForApi: boolean("maintenance_mode_for_api").notNull().default(false),
+  maintenanceMessage: text("maintenance_message").notNull().default("API geçici olarak bakım modunda."),
+  strictCanonicalModelIds: boolean("strict_canonical_model_ids").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+});
+
+// ── api_key_policies ──────────────────────────────────────────────────────────
+export const apiKeyPolicies = pgTable(
+  "api_key_policies",
+  {
+    apiKeyId: uuid("api_key_id").primaryKey().references(() => apiKeys.id, { onDelete: "cascade" }),
+    perKeyPerMinute: integer("per_key_per_minute"),
+    maxContextTokens: integer("max_context_tokens"),
+    maxOutputTokens: integer("max_output_tokens"),
+    allowedModels: jsonb("allowed_models").notNull().default(sql`'[]'::jsonb`),
+    dailySpendLimitTL: numeric("daily_spend_limit_tl", { precision: 14, scale: 4 }),
+    monthlySpendLimitTL: numeric("monthly_spend_limit_tl", { precision: 14, scale: 4 }),
+    allowStreaming: boolean("allow_streaming"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [index("api_key_policies_updated_idx").on(t.updatedAt)],
+);
+
+// ── model_runtime_policies ────────────────────────────────────────────────────
+export const modelRuntimePolicies = pgTable("model_runtime_policies", {
+  modelId: text("model_id").primaryKey(),
+  enabled: boolean("enabled").notNull().default(true),
+  contextOverrideTokens: integer("context_override_tokens"),
+  maxOutputTokens: integer("max_output_tokens"),
+  allowStreaming: boolean("allow_streaming"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+});
+
 // ── plans ──────────────────────────────────────────────────────────────────────
 export const plans = pgTable("plans", {
   id: text("id").primaryKey(),

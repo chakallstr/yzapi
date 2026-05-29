@@ -12,6 +12,7 @@ const LEGACY_ACCESS_TOKEN_KEY = 'userAccessToken';
 const ADMIN_SECTIONS = [
   { id: 'dashboard', label: 'Dashboard', Ico: I.Activity },
   { id: 'traffic', label: 'Trafik Analitiği', Ico: I.TrendUp },
+  { id: 'api', label: 'API Yönetimi', Ico: I.Server },
   { id: 'users', label: 'Kullanıcılar', Ico: I.Users },
   { id: 'overrides', label: 'Modeller', Ico: I.Layers },
   { id: 'announce', label: 'Duyurular', Ico: I.Megaphone },
@@ -716,6 +717,388 @@ const AdminOverrides = ({ overrides, token, refresh }) => {
   );
 };
 
+const API_SUB_SECTIONS = [
+  { id: 'general', label: 'Genel API' },
+  { id: 'limits', label: 'Limitler' },
+  { id: 'models', label: 'Model Politikaları' },
+  { id: 'keys', label: 'API Key Politikaları' },
+  { id: 'providers', label: 'Provider Yönlendirme' },
+  { id: 'security', label: 'Davranış ve Güvenlik' },
+];
+
+const AdminApiSettings = ({ token, apiKeys = [] }) => {
+  const [subSection, setSubSection] = useState('general');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState('');
+  const [saved, setSaved] = useState('');
+  const [apiSettings, setApiSettings] = useState(null);
+  const [providerSnapshot, setProviderSnapshot] = useState({ activeProviderId: 'closerouter', providers: [] });
+  const [modelPolicies, setModelPolicies] = useState([]);
+  const [configForm, setConfigForm] = useState({});
+  const [selectedModelId, setSelectedModelId] = useState('');
+  const [modelForm, setModelForm] = useState({});
+  const [selectedKeyId, setSelectedKeyId] = useState('');
+  const [keyPolicySnapshot, setKeyPolicySnapshot] = useState(null);
+  const [keyForm, setKeyForm] = useState({});
+
+  const selectedModel = useMemo(
+    () => modelPolicies.find((row) => row.modelId === selectedModelId) || modelPolicies[0] || null,
+    [modelPolicies, selectedModelId],
+  );
+  const selectedKey = useMemo(
+    () => apiKeys.find((row) => row.id === selectedKeyId) || apiKeys[0] || null,
+    [apiKeys, selectedKeyId],
+  );
+
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [settings, providers, models] = await Promise.all([
+        adminRequest('/api/admin/api-settings', token),
+        adminRequest('/api/admin/api-settings/providers', token),
+        adminRequest('/api/admin/api-settings/models', token),
+      ]);
+      setApiSettings(settings);
+      setProviderSnapshot(providers);
+      setModelPolicies(models);
+      setConfigForm({
+        ...settings.general,
+        ...settings.limits,
+        ...settings.behavior,
+      });
+      if (!selectedModelId && models[0]?.modelId) setSelectedModelId(models[0].modelId);
+      if (!selectedKeyId && apiKeys[0]?.id) setSelectedKeyId(apiKeys[0].id);
+    } catch (loadError) {
+      setError(loadError.message || 'API yönetimi verisi alınamadı.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, [token]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void load();
+    }, 60000);
+    return () => window.clearInterval(timer);
+  }, [token, selectedModelId, selectedKeyId, apiKeys.length]);
+
+  useEffect(() => {
+    if (!selectedModel) return;
+    setModelForm({
+      pricingEnabled: selectedModel.pricingEnabled !== false,
+      runtimeEnabled: selectedModel.runtimeEnabled !== false,
+      inputUsdOverride: selectedModel.inputUsdOverride ?? '',
+      outputUsdOverride: selectedModel.outputUsdOverride ?? '',
+      contextOverrideTokens: selectedModel.contextOverrideTokens ?? '',
+      maxOutputTokens: selectedModel.runtimeMaxOutputTokens ?? '',
+      allowStreaming: selectedModel.allowStreaming ?? selectedModel.supportsStreaming,
+    });
+  }, [selectedModel]);
+
+  useEffect(() => {
+    if (!selectedKeyId) return;
+    adminRequest(`/api/admin/api-settings/api-keys/${selectedKeyId}/policy`, token)
+      .then((snapshot) => {
+        setKeyPolicySnapshot(snapshot);
+        setKeyForm({
+          perKeyPerMinute: snapshot.policy?.perKeyPerMinute ?? configForm.defaultPerKeyPerMinute ?? '',
+          maxContextTokens: snapshot.policy?.maxContextTokens ?? configForm.defaultContextLimitTokens ?? '',
+          maxOutputTokens: snapshot.policy?.maxOutputTokens ?? configForm.defaultMaxTokensPerRequest ?? '',
+          allowedModels: Array.isArray(snapshot.policy?.allowedModels) ? snapshot.policy.allowedModels.join(', ') : '',
+          dailySpendLimitTL: snapshot.policy?.dailySpendLimitTL ?? '',
+          monthlySpendLimitTL: snapshot.policy?.monthlySpendLimitTL ?? '',
+          allowStreaming: snapshot.policy?.allowStreaming ?? true,
+        });
+      })
+      .catch((keyError) => {
+        setError(keyError.message || 'API key politikası alınamadı.');
+      });
+  }, [selectedKeyId, token, configForm.defaultPerKeyPerMinute, configForm.defaultContextLimitTokens, configForm.defaultMaxTokensPerRequest]);
+
+  const setConfigField = (key, value) => {
+    setSaved('');
+    setConfigForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const saveConfig = async () => {
+    setSaving('config');
+    setSaved('');
+    setError('');
+    try {
+      await adminRequest('/api/admin/api-settings', token, { method: 'POST', body: configForm });
+      await load();
+      setSaved('API ayarları kaydedildi.');
+    } catch (saveError) {
+      setError(saveError.message || 'API ayarları kaydedilemedi.');
+    } finally {
+      setSaving('');
+    }
+  };
+
+  const saveModel = async () => {
+    if (!selectedModelId) return;
+    setSaving('model');
+    setSaved('');
+    setError('');
+    try {
+      await adminRequest(`/api/admin/api-settings/models/${encodeURIComponent(selectedModelId)}`, token, {
+        method: 'POST',
+        body: {
+          pricingEnabled: Boolean(modelForm.pricingEnabled),
+          runtimeEnabled: Boolean(modelForm.runtimeEnabled),
+          inputUsdOverride: modelForm.inputUsdOverride === '' ? null : Number(normalizeDecimalInput(modelForm.inputUsdOverride)),
+          outputUsdOverride: modelForm.outputUsdOverride === '' ? null : Number(normalizeDecimalInput(modelForm.outputUsdOverride)),
+          contextOverrideTokens: modelForm.contextOverrideTokens === '' ? null : Number(modelForm.contextOverrideTokens),
+          maxOutputTokens: modelForm.maxOutputTokens === '' ? null : Number(modelForm.maxOutputTokens),
+          allowStreaming: Boolean(modelForm.allowStreaming),
+        },
+      });
+      await load();
+      setSaved('Model politikası kaydedildi.');
+    } catch (saveError) {
+      setError(saveError.message || 'Model politikası kaydedilemedi.');
+    } finally {
+      setSaving('');
+    }
+  };
+
+  const saveKeyPolicy = async () => {
+    if (!selectedKeyId) return;
+    setSaving('key');
+    setSaved('');
+    setError('');
+    try {
+      await adminRequest(`/api/admin/api-settings/api-keys/${selectedKeyId}/policy`, token, {
+        method: 'POST',
+        body: {
+          perKeyPerMinute: keyForm.perKeyPerMinute === '' ? null : Number(keyForm.perKeyPerMinute),
+          maxContextTokens: keyForm.maxContextTokens === '' ? null : Number(keyForm.maxContextTokens),
+          maxOutputTokens: keyForm.maxOutputTokens === '' ? null : Number(keyForm.maxOutputTokens),
+          allowedModels: String(keyForm.allowedModels || '').split(',').map((entry) => entry.trim()).filter(Boolean),
+          dailySpendLimitTL: keyForm.dailySpendLimitTL === '' ? null : Number(normalizeDecimalInput(keyForm.dailySpendLimitTL)),
+          monthlySpendLimitTL: keyForm.monthlySpendLimitTL === '' ? null : Number(normalizeDecimalInput(keyForm.monthlySpendLimitTL)),
+          allowStreaming: Boolean(keyForm.allowStreaming),
+        },
+      });
+      setSaved('API key politikası kaydedildi.');
+      setKeyPolicySnapshot(await adminRequest(`/api/admin/api-settings/api-keys/${selectedKeyId}/policy`, token));
+    } catch (saveError) {
+      setError(saveError.message || 'API key politikası kaydedilemedi.');
+    } finally {
+      setSaving('');
+    }
+  };
+
+  const TopCard = ({ label, value, sub }) => (
+    <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+      <Caption>{label}</Caption>
+      <div style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{value}</div>
+      {sub && <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 4 }}>{sub}</div>}
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <Card pad={18}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div>
+            <Caption>API yönetimi</Caption>
+            <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 4 }}>
+              Hız, context, endpoint, model ve anahtar politikaları tek yerden yönetilir.
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={() => load()} style={{ padding: '8px 11px', borderRadius: 9, border: '1px solid var(--border)', fontSize: 12 }}>Yenile</button>
+            <button onClick={saveConfig} disabled={saving === 'config'} style={{ padding: '8px 11px', borderRadius: 9, background: 'var(--ink)', color: '#fff', fontSize: 12, opacity: saving === 'config' ? 0.7 : 1 }}>
+              {saving === 'config' ? 'Kaydediliyor…' : 'Üst ayarları kaydet'}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ ...grid(180), marginTop: 14 }}>
+          <TopCard label="Aktif provider" value={providerSnapshot.activeProviderId || configForm.activeProviderId || 'closerouter'} />
+          <TopCard label="Context limiti" value={`${fmt.num(Number(configForm.defaultContextLimitTokens || 0))}`} sub="95K varsayılan sınır" />
+          <TopCard label="Key / dk" value={fmt.num(Number(configForm.defaultPerKeyPerMinute || 0))} sub="dakika başına anahtar limiti" />
+          <TopCard label="Bakım modu" value={configForm.maintenanceModeForApi ? 'Açık' : 'Kapalı'} sub={configForm.maintenanceModeForApi ? (configForm.maintenanceMessage || 'Bakım mesajı var') : 'canlı trafik açık'} />
+        </div>
+      </Card>
+
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {API_SUB_SECTIONS.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setSubSection(item.id)}
+            style={{
+              padding: '8px 11px',
+              borderRadius: 9,
+              border: '1px solid var(--border)',
+              background: subSection === item.id ? 'var(--ink)' : 'var(--surface)',
+              color: subSection === item.id ? '#fff' : 'var(--ink-2)',
+              fontSize: 11.5,
+              fontWeight: 600,
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {loading && <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>API yönetimi verisi yükleniyor…</div>}
+      {error && <ErrorBox>{error}</ErrorBox>}
+      {saved && (
+        <div style={{ padding: 10, borderRadius: 10, background: 'var(--ok-bg)', border: '1px solid #a7f3d0', color: '#047857', fontSize: 12 }}>
+          {saved}
+        </div>
+      )}
+
+      {subSection === 'general' && (
+        <Card pad={18}>
+          <div style={grid(220)}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <Caption>Aktif provider</Caption>
+              <select value={configForm.activeProviderId || 'closerouter'} onChange={(e) => setConfigField('activeProviderId', e.target.value)} style={inputStyle}>
+                {(providerSnapshot.providers || []).map((provider) => <option key={provider.id} value={provider.id}>{provider.label}</option>)}
+              </select>
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <Caption>Request timeout (ms)</Caption>
+              <input value={configForm.defaultRequestTimeoutMs ?? ''} onChange={(e) => setConfigField('defaultRequestTimeoutMs', e.target.value)} type="number" style={inputStyle} />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <Caption>Stream timeout (ms)</Caption>
+              <input value={configForm.defaultStreamTimeoutMs ?? ''} onChange={(e) => setConfigField('defaultStreamTimeoutMs', e.target.value)} type="number" style={inputStyle} />
+            </label>
+          </div>
+          <div style={{ ...grid(220), marginTop: 12 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={Boolean(configForm.allowChatEndpoint)} onChange={(e) => setConfigField('allowChatEndpoint', e.target.checked)} />Chat endpoint açık</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={Boolean(configForm.allowResponsesEndpoint)} onChange={(e) => setConfigField('allowResponsesEndpoint', e.target.checked)} />Responses endpoint açık</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={Boolean(configForm.allowMessagesEndpoint)} onChange={(e) => setConfigField('allowMessagesEndpoint', e.target.checked)} />Messages endpoint açık</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={Boolean(configForm.allowStreaming)} onChange={(e) => setConfigField('allowStreaming', e.target.checked)} />Streaming açık</label>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}><input type="checkbox" checked={Boolean(configForm.maintenanceModeForApi)} onChange={(e) => setConfigField('maintenanceModeForApi', e.target.checked)} />Bakım modu</label>
+            <textarea value={configForm.maintenanceMessage || ''} onChange={(e) => setConfigField('maintenanceMessage', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical', minHeight: 76 }} />
+          </div>
+        </Card>
+      )}
+
+      {subSection === 'limits' && (
+        <Card pad={18}>
+          <div style={grid(220)}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><Caption>Context limiti</Caption><input value={configForm.defaultContextLimitTokens ?? ''} onChange={(e) => setConfigField('defaultContextLimitTokens', e.target.value)} type="number" style={inputStyle} /></label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><Caption>Output reserve</Caption><input value={configForm.defaultOutputReserveTokens ?? ''} onChange={(e) => setConfigField('defaultOutputReserveTokens', e.target.value)} type="number" style={inputStyle} /></label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><Caption>Request max token</Caption><input value={configForm.defaultMaxTokensPerRequest ?? ''} onChange={(e) => setConfigField('defaultMaxTokensPerRequest', e.target.value)} type="number" style={inputStyle} /></label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><Caption>Key / dk</Caption><input value={configForm.defaultPerKeyPerMinute ?? ''} onChange={(e) => setConfigField('defaultPerKeyPerMinute', e.target.value)} type="number" style={inputStyle} /></label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><Caption>User / dk</Caption><input value={configForm.defaultPerUserPerMinute ?? ''} onChange={(e) => setConfigField('defaultPerUserPerMinute', e.target.value)} type="number" style={inputStyle} /></label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><Caption>IP / dk</Caption><input value={configForm.defaultPerIpPerMinute ?? ''} onChange={(e) => setConfigField('defaultPerIpPerMinute', e.target.value)} type="number" style={inputStyle} /></label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><Caption>Temperature min</Caption><input value={configForm.defaultTemperatureMin ?? ''} onChange={(e) => setConfigField('defaultTemperatureMin', e.target.value)} type="number" step="0.1" style={inputStyle} /></label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><Caption>Temperature max</Caption><input value={configForm.defaultTemperatureMax ?? ''} onChange={(e) => setConfigField('defaultTemperatureMax', e.target.value)} type="number" step="0.1" style={inputStyle} /></label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><Caption>Top P min</Caption><input value={configForm.defaultTopPMin ?? ''} onChange={(e) => setConfigField('defaultTopPMin', e.target.value)} type="number" step="0.1" style={inputStyle} /></label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><Caption>Top P max</Caption><input value={configForm.defaultTopPMax ?? ''} onChange={(e) => setConfigField('defaultTopPMax', e.target.value)} type="number" step="0.1" style={inputStyle} /></label>
+          </div>
+        </Card>
+      )}
+
+      {subSection === 'models' && (
+        <Card pad={18}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 1fr) repeat(6, minmax(120px, 1fr))', gap: 10, alignItems: 'end' }}>
+            <select value={selectedModelId} onChange={(e) => setSelectedModelId(e.target.value)} style={inputStyle}>
+              {modelPolicies.map((row) => <option key={row.modelId} value={row.modelId}>{row.name}</option>)}
+            </select>
+            <input value={modelForm.inputUsdOverride ?? ''} onChange={(e) => setModelForm((current) => ({ ...current, inputUsdOverride: e.target.value }))} placeholder="input $" type="text" inputMode="decimal" style={inputStyle} />
+            <input value={modelForm.outputUsdOverride ?? ''} onChange={(e) => setModelForm((current) => ({ ...current, outputUsdOverride: e.target.value }))} placeholder="output $" type="text" inputMode="decimal" style={inputStyle} />
+            <input value={modelForm.contextOverrideTokens ?? ''} onChange={(e) => setModelForm((current) => ({ ...current, contextOverrideTokens: e.target.value }))} placeholder="context" type="number" style={inputStyle} />
+            <input value={modelForm.maxOutputTokens ?? ''} onChange={(e) => setModelForm((current) => ({ ...current, maxOutputTokens: e.target.value }))} placeholder="max output" type="number" style={inputStyle} />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}><input type="checkbox" checked={Boolean(modelForm.allowStreaming)} onChange={(e) => setModelForm((current) => ({ ...current, allowStreaming: e.target.checked }))} />stream</label>
+            <button onClick={saveModel} disabled={saving === 'model'} style={{ padding: '10px 12px', borderRadius: 9, background: 'var(--ink)', color: '#fff', fontWeight: 600, opacity: saving === 'model' ? 0.7 : 1 }}>{saving === 'model' ? 'Kaydediliyor…' : 'Modeli kaydet'}</button>
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 10 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={Boolean(modelForm.pricingEnabled)} onChange={(e) => setModelForm((current) => ({ ...current, pricingEnabled: e.target.checked }))} />fiyat aktif</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={Boolean(modelForm.runtimeEnabled)} onChange={(e) => setModelForm((current) => ({ ...current, runtimeEnabled: e.target.checked }))} />runtime aktif</label>
+          </div>
+          <Card pad={0} style={{ overflow: 'hidden', marginTop: 14 }}>
+            {modelPolicies.map((row, index) => (
+              <div key={row.modelId} style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1.5fr) 100px 100px 120px 120px 100px', gap: 10, padding: '10px 14px', borderBottom: index < modelPolicies.length - 1 ? '1px solid var(--border)' : 'none', fontSize: 11.5, alignItems: 'center' }}>
+                <div><div style={{ fontWeight: 600 }}>{row.name}</div><div style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{row.modelId}</div></div>
+                <div>{row.inputUsdOverride === null ? '—' : usd(row.inputUsdOverride)}</div>
+                <div>{row.outputUsdOverride === null ? '—' : usd(row.outputUsdOverride)}</div>
+                <div className="tnum">{row.contextOverrideTokens || row.contextTokens || '—'}</div>
+                <div className="tnum">{row.runtimeMaxOutputTokens || row.maxOutputTokens || '—'}</div>
+                <Chip tone={row.effectiveEnabled ? 'ok' : 'neutral'}>{row.effectiveEnabled ? 'aktif' : 'pasif'}</Chip>
+              </div>
+            ))}
+          </Card>
+        </Card>
+      )}
+
+      {subSection === 'keys' && (
+        <Card pad={18}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) repeat(5, minmax(140px, 1fr)) 150px', gap: 10, alignItems: 'end' }}>
+            <select value={selectedKeyId} onChange={(e) => setSelectedKeyId(e.target.value)} style={inputStyle}>
+              {apiKeys.map((row) => <option key={row.id} value={row.id}>{row.userEmail} · {row.maskedKey}</option>)}
+            </select>
+            <input value={keyForm.perKeyPerMinute ?? ''} onChange={(e) => setKeyForm((current) => ({ ...current, perKeyPerMinute: e.target.value }))} placeholder="key/dk" type="number" style={inputStyle} />
+            <input value={keyForm.maxContextTokens ?? ''} onChange={(e) => setKeyForm((current) => ({ ...current, maxContextTokens: e.target.value }))} placeholder="max context" type="number" style={inputStyle} />
+            <input value={keyForm.maxOutputTokens ?? ''} onChange={(e) => setKeyForm((current) => ({ ...current, maxOutputTokens: e.target.value }))} placeholder="max output" type="number" style={inputStyle} />
+            <input value={keyForm.dailySpendLimitTL ?? ''} onChange={(e) => setKeyForm((current) => ({ ...current, dailySpendLimitTL: e.target.value }))} placeholder="günlük TL" type="text" inputMode="decimal" style={inputStyle} />
+            <input value={keyForm.monthlySpendLimitTL ?? ''} onChange={(e) => setKeyForm((current) => ({ ...current, monthlySpendLimitTL: e.target.value }))} placeholder="aylık TL" type="text" inputMode="decimal" style={inputStyle} />
+            <button onClick={saveKeyPolicy} disabled={saving === 'key'} style={{ padding: '10px 12px', borderRadius: 9, background: 'var(--ink)', color: '#fff', fontWeight: 600, opacity: saving === 'key' ? 0.7 : 1 }}>{saving === 'key' ? 'Kaydediliyor…' : 'Key politikasını kaydet'}</button>
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <Caption>İzinli modeller</Caption>
+            <input value={keyForm.allowedModels ?? ''} onChange={(e) => setKeyForm((current) => ({ ...current, allowedModels: e.target.value }))} placeholder="virgülle model id listesi" style={inputStyle} />
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={Boolean(keyForm.allowStreaming)} onChange={(e) => setKeyForm((current) => ({ ...current, allowStreaming: e.target.checked }))} />stream izinli</label>
+            {selectedKey && <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5 }}>{selectedKey.maskedKey}</Chip>}
+          </div>
+          {keyPolicySnapshot?.apiKey && (
+            <div style={{ marginTop: 10, fontSize: 11, color: 'var(--ink-3)' }}>
+              Kullanıcı: {keyPolicySnapshot.apiKey.userId} · aktif: {keyPolicySnapshot.apiKey.aktif ? 'evet' : 'hayır'}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {subSection === 'providers' && (
+        <div style={grid(240)}>
+          {(providerSnapshot.providers || []).map((provider) => (
+            <Card key={provider.id} pad={18}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                <div>
+                  <Caption>{provider.id}</Caption>
+                  <div style={{ fontSize: 15, fontWeight: 600, marginTop: 4 }}>{provider.label}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>{provider.baseUrlLabel} · {provider.gecikmeMs || 0}ms</div>
+                </div>
+                <Chip tone={provider.active ? 'ok' : 'neutral'}>{provider.active ? 'aktif' : provider.durum}</Chip>
+              </div>
+              {provider.not ? <div style={{ fontSize: 11.5, color: 'var(--ink-2)', marginTop: 10 }}>{provider.not}</div> : null}
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {subSection === 'security' && (
+        <Card pad={18}>
+          <div style={grid(260)}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={Boolean(configForm.insufficientBalanceBlockEnabled)} onChange={(e) => setConfigField('insufficientBalanceBlockEnabled', e.target.checked)} />Bakiye yetersizse anında blokla</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={Boolean(configForm.streamMissingUsageFallbackEnabled)} onChange={(e) => setConfigField('streamMissingUsageFallbackEnabled', e.target.checked)} />Stream usage fallback</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={Boolean(configForm.upstream402PassThroughEnabled)} onChange={(e) => setConfigField('upstream402PassThroughEnabled', e.target.checked)} />Upstream 402 passthrough</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={Boolean(configForm.enforceModelAllowlist)} onChange={(e) => setConfigField('enforceModelAllowlist', e.target.checked)} />Model allowlist zorunlu</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={Boolean(configForm.strictCanonicalModelIds)} onChange={(e) => setConfigField('strictCanonicalModelIds', e.target.checked)} />Strict canonical model kimliği</label>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+};
+
 const AdminAnnouncements = ({ announcements, token, refresh }) => {
   const [message, setMessage] = useState('');
   const [tip, setTip] = useState('bilgi');
@@ -1407,6 +1790,7 @@ const AdminTab = ({ ctx = {} }) => {
       <div key={section} className="fade-in">
         {section === 'dashboard' && <AdminDashboard dashboard={data.dashboard} config={data.config} providers={data.providers || []} auditLogs={data.auditLogs || []} />}
         {section === 'traffic' && <AdminTrafficAnalytics token={token} onOpenUser={openTrafficUser} onOpenApiKeys={openTrafficApiKeys} />}
+        {section === 'api' && <AdminApiSettings token={token} apiKeys={data.apiKeys || []} />}
         {section === 'users' && <AdminUsers users={data.users || []} token={token} refresh={refresh} focusUserId={trafficUserJump.userId} focusNonce={trafficUserJump.nonce} />}
         {section === 'overrides' && <AdminOverrides overrides={data.overrides || []} token={token} refresh={refresh} />}
         {section === 'announce' && <AdminAnnouncements announcements={data.announcements || []} token={token} refresh={refresh} />}

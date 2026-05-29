@@ -100,7 +100,7 @@ const RouteFlow = ({ tweaks }) => {
 };
 
 // === ValueBanner — 3-up değer önerisi banner =======================
-const ValueBanner = ({ tweaks }) => {
+const ValueBanner = ({ tweaks, onAction }) => {
   const animSpeed = tweaks?.animSpeed ?? 1;
   const tickerOn = tweaks?.priceTickerOn ?? true;
   const tickerMs = tweaks?.priceTickerMs ?? 700;
@@ -219,7 +219,7 @@ const ValueBanner = ({ tweaks }) => {
             <div style={{ fontSize: 11.5, color: 'var(--ink-2)', lineHeight: 1.5, marginBottom: 10 }}>
               Anthropic, OpenAI ve Google metin modelleri — hepsi tek noktadan.
             </div>
-            <button style={{
+            <button onClick={() => onAction?.({ tab: 'account', section: 'account-balance' })} style={{
               background: 'var(--accent)', color: '#fff',
               padding: '8px 14px', borderRadius: 9,
               fontSize: 12, fontWeight: 500, width: '100%',
@@ -926,7 +926,7 @@ const CLIShowcase = () => (
 );
 
 // === HomeTab =======================================================
-const HomeTab = ({ ctx, onTab }) => {
+const HomeTab = ({ ctx, onTab, onAction }) => {
   const { logs, tweaks } = ctx;
   const recentLogs = logs.slice(0, 4);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -1001,7 +1001,7 @@ const HomeTab = ({ ctx, onTab }) => {
       </div>
 
       {/* ===== VALUE BANNER ===== */}
-      <ValueBanner tweaks={tweaks} />
+      <ValueBanner tweaks={tweaks} onAction={onAction} />
 
       {/* ===== 3 FEATURE CARDS ===== */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>

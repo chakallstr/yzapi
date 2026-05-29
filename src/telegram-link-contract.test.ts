@@ -25,4 +25,16 @@ describe("telegram-site link contract", () => {
     expect(accountSource).toContain("/api/telegram/link-code");
     expect(accountSource).toContain("/api/telegram/unlink");
   });
+
+  it("renders the Telegram card above auto-recharge and sandbox cards", () => {
+    const telegramIndex = accountSource.indexOf("<TelegramLinkCard");
+    const autoRechargeIndex = accountSource.indexOf("<AutoRechargeCard");
+    const sandboxIndex = accountSource.indexOf("<SandboxKeyCard");
+
+    expect(telegramIndex).toBeGreaterThan(-1);
+    expect(autoRechargeIndex).toBeGreaterThan(-1);
+    expect(sandboxIndex).toBeGreaterThan(-1);
+    expect(telegramIndex).toBeLessThan(autoRechargeIndex);
+    expect(telegramIndex).toBeLessThan(sandboxIndex);
+  });
 });

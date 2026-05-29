@@ -10,6 +10,7 @@ import {
   getVideoTask,
   submitVideo,
 } from "./closerouter-service.js";
+import { getRuntimeApiConfig } from "./api-settings-service.js";
 
 export interface ProviderAdapter {
   readonly id: "closerouter" | "ninerouter";
@@ -60,4 +61,15 @@ export class CloseRouterAdapter implements ProviderAdapter {
   }
 }
 
-export const activeProviderAdapter: ProviderAdapter = new CloseRouterAdapter();
+const adapters = {
+  closerouter: new CloseRouterAdapter(),
+} as const;
+
+export async function getActiveProviderAdapter(): Promise<ProviderAdapter> {
+  const config = await getRuntimeApiConfig();
+  return adapters[config.activeProviderId as keyof typeof adapters] ?? adapters.closerouter;
+}
+
+export function listImplementedProviderIds(): string[] {
+  return Object.keys(adapters);
+}

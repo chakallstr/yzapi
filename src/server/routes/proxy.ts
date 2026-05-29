@@ -1,15 +1,24 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { aiProviderApiKey } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
-import { BadRequestError, InsufficientBalanceError, ModelDisabledError, ModelNotFoundError, RateLimitError } from "../lib/errors.js";
+import { AppError, BadRequestError, InsufficientBalanceError, ModelDisabledError, ModelNotFoundError, RateLimitError } from "../lib/errors.js";
 import { MASTER_MODELS, canonicalizeModelId, type MasterModel } from "../../master-models.js";
 import { checkRateLimit } from "../services/rate-limit-service.js";
 import { reserveUsageBudget, settleReservedUsage } from "../services/billing-service.js";
-import { activeProviderAdapter } from "../services/provider-adapter.js";
+import { getActiveProviderAdapter } from "../services/provider-adapter.js";
 import { db } from "../db/client.js";
 import { modelOverrides, systemConfig, users } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { buildRequestGuard, type RequestGuardResult } from "../services/request-guard-service.js";
+import {
+  getApiKeyPolicy,
+  getModelRuntimePolicy,
+  getRuntimeApiConfig,
+  getUserModelAllowlist,
+  type ApiKeyPolicySnapshot,
+  type ModelRuntimePolicySnapshot,
+  type RuntimeApiConfig,
+} from "../services/api-settings-service.js";
 
 const router = Router();
 
@@ -23,10 +32,17 @@ function requireProxy(req: Request, res: Response, next: NextFunction): void {
 }
 
 // Forward upstream error bodies back to the client, preserving status code
-function forwardUpstreamError(err: unknown, res: Response): boolean {
+function forwardUpstreamError(err: unknown, res: Response, runtimeConfig: RuntimeApiConfig): boolean {
   const e = err as Error & { status?: number; body?: unknown };
   if (e.status) {
     if (e.status === 402) {
+      if (!runtimeConfig.upstream402PassThroughEnabled) {
+        res.status(503).json({
+          error: "Upstream sağlayıcı şu an bakiye reddi veriyor. Lütfen daha sonra tekrar deneyin.",
+          code: "upstream_temporarily_unavailable",
+        });
+        return true;
+      }
       res.status(402).json({
         error: "Platform balance exhausted (AI provider upstream)",
         code: "upstream_insufficient_balance",
@@ -40,7 +56,61 @@ function forwardUpstreamError(err: unknown, res: Response): boolean {
   return false;
 }
 
-async function resolveEnabledModel(modelId: string | undefined, endpoint: string): Promise<MasterModel> {
+function endpointEnabledFor(runtimeConfig: RuntimeApiConfig, endpoint: string): boolean {
+  if (endpoint === "chat") return runtimeConfig.allowChatEndpoint;
+  if (endpoint === "messages") return runtimeConfig.allowMessagesEndpoint;
+  if (endpoint === "responses") return runtimeConfig.allowResponsesEndpoint;
+  return true;
+}
+
+function endpointSupportsStreaming(model: MasterModel, endpoint: string): boolean {
+  const detail = (model.endpointDetails ?? []).find((row) => row.type === endpoint);
+  return detail?.supportsStreaming ?? endpoint !== "responses";
+}
+
+function computeEffectiveContextLimit(
+  masterModel: MasterModel,
+  runtimeConfig: RuntimeApiConfig,
+  apiKeyPolicy: ApiKeyPolicySnapshot | null,
+  runtimePolicy: ModelRuntimePolicySnapshot | null,
+): number {
+  const candidates = [
+    runtimeConfig.defaultContextLimitTokens,
+    apiKeyPolicy?.maxContextTokens ?? null,
+    runtimePolicy?.contextOverrideTokens ?? null,
+    masterModel.contextTokens ?? null,
+  ].filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0);
+
+  return Math.min(...candidates);
+}
+
+function computeEffectiveMaxOutputTokens(
+  masterModel: MasterModel,
+  runtimeConfig: RuntimeApiConfig,
+  apiKeyPolicy: ApiKeyPolicySnapshot | null,
+  runtimePolicy: ModelRuntimePolicySnapshot | null,
+): number {
+  const candidates = [
+    runtimeConfig.defaultMaxTokensPerRequest,
+    apiKeyPolicy?.maxOutputTokens ?? null,
+    runtimePolicy?.maxOutputTokens ?? null,
+    masterModel.maxOutputTokens ?? null,
+  ].filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0);
+
+  return Math.min(...candidates);
+}
+
+function computeEffectiveOutputReserve(
+  runtimeConfig: RuntimeApiConfig,
+  effectiveMaxOutputTokens: number,
+): number {
+  return Math.min(runtimeConfig.defaultOutputReserveTokens, effectiveMaxOutputTokens);
+}
+
+async function resolveEnabledModel(
+  modelId: string | undefined,
+  endpoint: string,
+): Promise<{ masterModel: MasterModel; runtimePolicy: ModelRuntimePolicySnapshot | null }> {
   const canonicalModelId = canonicalizeModelId(modelId);
   const masterModel = MASTER_MODELS.find((m) => m.id === canonicalModelId);
   if (!masterModel) {
@@ -60,21 +130,44 @@ async function resolveEnabledModel(modelId: string | undefined, endpoint: string
     throw new ModelDisabledError(masterModel.id);
   }
 
-  return masterModel;
+  const runtimePolicy = await getModelRuntimePolicy(masterModel.id);
+  if (runtimePolicy?.enabled === false) {
+    throw new ModelDisabledError(masterModel.id);
+  }
+
+  return { masterModel, runtimePolicy };
 }
 
 async function enforceRequestGuards(opts: {
   userId: string;
   apiKeyId: string;
+  ipAddress?: string;
   modelId: string | undefined;
   endpoint: string;
   body: Record<string, unknown>;
-}): Promise<MasterModel> {
-  const masterModel = await resolveEnabledModel(opts.modelId, opts.endpoint);
+}): Promise<{
+  masterModel: MasterModel;
+  runtimePolicy: ModelRuntimePolicySnapshot | null;
+  runtimeConfig: RuntimeApiConfig;
+  apiKeyPolicy: ApiKeyPolicySnapshot | null;
+}> {
+  const [{ masterModel, runtimePolicy }, runtimeConfig, apiKeyPolicy] = await Promise.all([
+    resolveEnabledModel(opts.modelId, opts.endpoint),
+    getRuntimeApiConfig(),
+    getApiKeyPolicy(opts.apiKeyId),
+  ]);
 
-  const rl = await checkRateLimit(opts.apiKeyId, opts.userId);
+  const rl = await checkRateLimit(opts.apiKeyId, opts.userId, opts.ipAddress);
   if (!rl.allowed) {
     throw new RateLimitError("Rate limit exceeded", rl.retryAfter);
+  }
+
+  if (runtimeConfig.enforceModelAllowlist) {
+    const allowedModels = (apiKeyPolicy?.allowedModels?.length ? apiKeyPolicy.allowedModels : await getUserModelAllowlist(opts.userId))
+      .map((entry) => canonicalizeModelId(entry) ?? entry);
+    if (allowedModels.length && !allowedModels.includes(masterModel.id)) {
+      throw new BadRequestError(`Bu model bu anahtar veya plan için izinli değil: ${masterModel.id}`);
+    }
   }
 
   const balRows = await db
@@ -83,11 +176,11 @@ async function enforceRequestGuards(opts: {
     .where(eq(users.id, opts.userId))
     .limit(1);
   const balance = Number(balRows[0]?.bakiye ?? 0);
-  if (balance <= 0) {
+  if (runtimeConfig.insufficientBalanceBlockEnabled && balance <= 0) {
     throw new InsufficientBalanceError("Insufficient balance to process request");
   }
 
-  return masterModel;
+  return { masterModel, runtimePolicy, runtimeConfig, apiKeyPolicy };
 }
 
 function setBillingHeaders(res: Response, costTL: number, remainingTL: number, requestId: string): void {
@@ -146,10 +239,50 @@ async function handleTextJsonEndpoint(
   const start = Date.now();
   let masterModel: MasterModel | undefined;
   let guard: RequestGuardResult | undefined;
+  let runtimeConfig: RuntimeApiConfig | undefined;
 
   try {
-    masterModel = await enforceRequestGuards({ userId, apiKeyId, modelId: model, endpoint, body: req.body as Record<string, unknown> });
-    guard = buildRequestGuard({ endpoint, model: masterModel, body: req.body as Record<string, unknown> });
+    const enforcement = await enforceRequestGuards({
+      userId,
+      apiKeyId,
+      ipAddress: req.ip,
+      modelId: model,
+      endpoint,
+      body: req.body as Record<string, unknown>,
+    });
+    masterModel = enforcement.masterModel;
+    runtimeConfig = enforcement.runtimeConfig;
+    if (runtimeConfig.maintenanceModeForApi) {
+      throw new AppError(503, runtimeConfig.maintenanceMessage);
+    }
+    const effectiveMaxOutputTokens = computeEffectiveMaxOutputTokens(
+      enforcement.masterModel,
+      enforcement.runtimeConfig,
+      enforcement.apiKeyPolicy,
+      enforcement.runtimePolicy,
+    );
+    guard = buildRequestGuard({
+      endpoint,
+      model: {
+        maxOutputTokens: effectiveMaxOutputTokens,
+        supportsStreaming: endpointSupportsStreaming(enforcement.masterModel, endpoint),
+      },
+      body: req.body as Record<string, unknown>,
+      endpointEnabled: endpointEnabledFor(enforcement.runtimeConfig, endpoint),
+      contextLimitTokens: computeEffectiveContextLimit(
+        enforcement.masterModel,
+        enforcement.runtimeConfig,
+        enforcement.apiKeyPolicy,
+        enforcement.runtimePolicy,
+      ),
+      outputReserveTokens: computeEffectiveOutputReserve(enforcement.runtimeConfig, effectiveMaxOutputTokens),
+      maxTokensPerRequest: effectiveMaxOutputTokens,
+      allowStreaming: enforcement.runtimeConfig.allowStreaming && (enforcement.apiKeyPolicy?.allowStreaming ?? true) !== false && (enforcement.runtimePolicy?.allowStreaming ?? true) !== false,
+      temperatureMin: enforcement.runtimeConfig.defaultTemperatureMin,
+      temperatureMax: enforcement.runtimeConfig.defaultTemperatureMax,
+      topPMin: enforcement.runtimeConfig.defaultTopPMin,
+      topPMax: enforcement.runtimeConfig.defaultTopPMax,
+    });
     await reserveUsageBudget({
       userId,
       apiKeyId,
@@ -157,7 +290,11 @@ async function handleTextJsonEndpoint(
       usage: { promptTokens: guard.contextTokens, completionTokens: guard.reservedCompletionTokens },
       requestId,
     });
-    const providerBody = { ...guard.guardedBody, model: masterModel.id };
+    const providerBody = {
+      ...guard.guardedBody,
+      model: runtimeConfig.strictCanonicalModelIds ? masterModel.id : String(model || masterModel.id),
+    };
+    const activeProviderAdapter = await getActiveProviderAdapter();
     const forwarder = endpoint === "responses"
       ? activeProviderAdapter.forwardResponses.bind(activeProviderAdapter)
       : activeProviderAdapter.forwardMessages.bind(activeProviderAdapter);
@@ -198,7 +335,7 @@ async function handleTextJsonEndpoint(
       })
         .catch((e2) => logger.error({ err: e2 }, "error usage record failed"));
     }
-    if (forwardUpstreamError(err, res)) return;
+    if (runtimeConfig && forwardUpstreamError(err, res, runtimeConfig)) return;
     return next(err);
   }
 }
@@ -214,10 +351,50 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
   const isStream = stream === true;
   let masterModel: MasterModel | undefined;
   let guard: RequestGuardResult | undefined;
+  let runtimeConfig: RuntimeApiConfig | undefined;
 
   try {
-    masterModel = await enforceRequestGuards({ userId, apiKeyId, modelId: model, endpoint: "chat", body: req.body as Record<string, unknown> });
-    guard = buildRequestGuard({ endpoint: "chat", model: masterModel, body: req.body as Record<string, unknown> });
+    const enforcement = await enforceRequestGuards({
+      userId,
+      apiKeyId,
+      ipAddress: req.ip,
+      modelId: model,
+      endpoint: "chat",
+      body: req.body as Record<string, unknown>,
+    });
+    masterModel = enforcement.masterModel;
+    runtimeConfig = enforcement.runtimeConfig;
+    if (runtimeConfig.maintenanceModeForApi) {
+      throw new AppError(503, runtimeConfig.maintenanceMessage);
+    }
+    const effectiveMaxOutputTokens = computeEffectiveMaxOutputTokens(
+      enforcement.masterModel,
+      enforcement.runtimeConfig,
+      enforcement.apiKeyPolicy,
+      enforcement.runtimePolicy,
+    );
+    guard = buildRequestGuard({
+      endpoint: "chat",
+      model: {
+        maxOutputTokens: effectiveMaxOutputTokens,
+        supportsStreaming: endpointSupportsStreaming(enforcement.masterModel, "chat"),
+      },
+      body: req.body as Record<string, unknown>,
+      endpointEnabled: endpointEnabledFor(enforcement.runtimeConfig, "chat"),
+      contextLimitTokens: computeEffectiveContextLimit(
+        enforcement.masterModel,
+        enforcement.runtimeConfig,
+        enforcement.apiKeyPolicy,
+        enforcement.runtimePolicy,
+      ),
+      outputReserveTokens: computeEffectiveOutputReserve(enforcement.runtimeConfig, effectiveMaxOutputTokens),
+      maxTokensPerRequest: effectiveMaxOutputTokens,
+      allowStreaming: enforcement.runtimeConfig.allowStreaming && (enforcement.apiKeyPolicy?.allowStreaming ?? true) !== false && (enforcement.runtimePolicy?.allowStreaming ?? true) !== false,
+      temperatureMin: enforcement.runtimeConfig.defaultTemperatureMin,
+      temperatureMax: enforcement.runtimeConfig.defaultTemperatureMax,
+      topPMin: enforcement.runtimeConfig.defaultTopPMin,
+      topPMax: enforcement.runtimeConfig.defaultTopPMax,
+    });
     await reserveUsageBudget({
       userId,
       apiKeyId,
@@ -225,14 +402,21 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       usage: { promptTokens: guard.contextTokens, completionTokens: guard.reservedCompletionTokens },
       requestId,
     });
-    const providerBody = { ...guard.guardedBody, model: masterModel.id };
+    const providerBody = {
+      ...guard.guardedBody,
+      model: runtimeConfig.strictCanonicalModelIds ? masterModel.id : String(model || masterModel.id),
+    };
+    const activeProviderAdapter = await getActiveProviderAdapter();
 
     if (isStream) {
       res.setHeader("X-YZ-Request-Id", requestId);
       const usage = await activeProviderAdapter.forwardChatStream(providerBody as any, res);
       const responseMs = Date.now() - start;
 
-      const streamStatus = usage.promptTokens > 0 || usage.completionTokens > 0 ? "success" : "stream_missing_usage";
+      const hasUsage = usage.promptTokens > 0 || usage.completionTokens > 0;
+      const streamStatus = hasUsage
+        ? "success"
+        : (runtimeConfig?.streamMissingUsageFallbackEnabled === false ? "error" : "stream_missing_usage");
       await settleReservedUsage({
         userId,
         apiKeyId,
@@ -292,7 +476,7 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
         .catch((e2) => logger.error({ err: e2 }, "error usage record failed"));
     }
 
-    if (forwardUpstreamError(err, res)) return;
+    if (runtimeConfig && forwardUpstreamError(err, res, runtimeConfig)) return;
     return next(err);
   }
 });
@@ -300,6 +484,10 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
 // GET /v1/balance
 router.get("/balance", async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const runtimeConfig = await getRuntimeApiConfig();
+    if (runtimeConfig.maintenanceModeForApi) {
+      throw new AppError(503, runtimeConfig.maintenanceMessage);
+    }
     const snapshot = await getUserBalanceSnapshot(req.user!.id);
     res.json({
       object: "balance",

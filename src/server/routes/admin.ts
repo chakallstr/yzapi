@@ -19,6 +19,17 @@ import { refreshKur } from "../services/kur-service.js";
 import { getReconciliationReport } from "../services/reconciliation-service.js";
 import { encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
 import { getAdminTrafficAnalytics, type TrafficWindow } from "../services/admin-traffic-service.js";
+import {
+  getApiKeyPolicySnapshot,
+  getApiSettingsSnapshot,
+  getRuntimeApiConfig,
+  listAdminApiSettingModels,
+  listAvailableProviders,
+  upsertApiKeyPolicy,
+  upsertModelRuntimePolicy,
+  upsertSystemApiConfig,
+} from "../services/api-settings-service.js";
+import { listImplementedProviderIds } from "../services/provider-adapter.js";
 
 const router = Router();
 const SINGLE_ADMIN_EMAIL = "cix.crazy666@gmail.com";
@@ -204,6 +215,93 @@ router.post("/config", async (req, res, next) => {
       `kur: ${prev.kur} → ${updated[0].kur}, textCarpan: ${prev.textCarpan} → ${updated[0].textCarpan}`
     );
     res.json(serializeConfig(updated[0]));
+  } catch (e) { next(e); }
+});
+
+// ── API Settings ─────────────────────────────────────────────────────────────
+router.get("/api-settings", async (_req, res, next) => {
+  try {
+    res.json(await getApiSettingsSnapshot());
+  } catch (e) { next(e); }
+});
+
+router.post("/api-settings", async (req, res, next) => {
+  try {
+    const body = req.body ?? {};
+    if (body.activeProviderId && !listImplementedProviderIds().includes(String(body.activeProviderId))) {
+      return res.status(400).json({ error: "Desteklenmeyen aktif provider seçimi." });
+    }
+    const updated = await upsertSystemApiConfig(body);
+    await writeAudit("api_settings_update", "system_api_config", `activeProviderId: ${updated.activeProviderId}`);
+    res.json(updated);
+  } catch (e) { next(e); }
+});
+
+router.get("/api-settings/providers", async (_req, res, next) => {
+  try {
+    const [providers, runtimeConfig] = await Promise.all([
+      listAvailableProviders(),
+      getRuntimeApiConfig(),
+    ]);
+    res.json({
+      activeProviderId: runtimeConfig.activeProviderId,
+      providers: providers.map((provider) => ({
+        ...provider,
+        active: provider.id === runtimeConfig.activeProviderId,
+      })),
+    });
+  } catch (e) { next(e); }
+});
+
+router.get("/api-settings/models", async (_req, res, next) => {
+  try {
+    res.json(await listAdminApiSettingModels());
+  } catch (e) { next(e); }
+});
+
+router.post("/api-settings/models/:id", async (req, res, next) => {
+  try {
+    const modelId = String(req.params.id);
+    const body = req.body ?? {};
+    const updated = await upsertModelRuntimePolicy(modelId, {
+      pricingEnabled: body.pricingEnabled,
+      inputUsdOverride: body.inputUsdOverride ?? null,
+      outputUsdOverride: body.outputUsdOverride ?? null,
+      runtimeEnabled: body.runtimeEnabled,
+      contextOverrideTokens: body.contextOverrideTokens ?? null,
+      maxOutputTokens: body.maxOutputTokens ?? null,
+      allowStreaming: body.allowStreaming ?? null,
+    });
+    await writeAudit("api_model_policy_update", modelId, "API yönetimi modeli güncellendi");
+    res.json(updated);
+  } catch (e) { next(e); }
+});
+
+router.get("/api-settings/api-keys/:id/policy", async (req, res, next) => {
+  try {
+    const snapshot = await getApiKeyPolicySnapshot(String(req.params.id));
+    if (!snapshot.apiKey) {
+      return res.status(404).json({ error: "API key bulunamadı" });
+    }
+    res.json(snapshot);
+  } catch (e) { next(e); }
+});
+
+router.post("/api-settings/api-keys/:id/policy", async (req, res, next) => {
+  try {
+    const apiKeyId = String(req.params.id);
+    const body = req.body ?? {};
+    const updated = await upsertApiKeyPolicy(apiKeyId, {
+      perKeyPerMinute: body.perKeyPerMinute ?? null,
+      maxContextTokens: body.maxContextTokens ?? null,
+      maxOutputTokens: body.maxOutputTokens ?? null,
+      allowedModels: body.allowedModels ?? [],
+      dailySpendLimitTL: body.dailySpendLimitTL ?? null,
+      monthlySpendLimitTL: body.monthlySpendLimitTL ?? null,
+      allowStreaming: body.allowStreaming ?? null,
+    });
+    await writeAudit("api_key_policy_update", apiKeyId, "API key politikası güncellendi");
+    res.json(updated);
   } catch (e) { next(e); }
 });
 

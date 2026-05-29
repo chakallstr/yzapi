@@ -3,6 +3,7 @@ import { pipeline } from "stream";
 import { aiProviderApiKey, aiProviderBaseUrl } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { canonicalizeModelId } from "../../master-models.js";
+import { getRuntimeApiConfig } from "./api-settings-service.js";
 
 export interface ChatUsage {
   promptTokens: number;
@@ -138,18 +139,33 @@ function baseHeaders(): Record<string, string> {
   };
 }
 
+async function fetchWithRuntimeTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<globalThis.Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function forwardChat(
   body: ChatRequest
 ): Promise<{ raw: unknown; usage: ChatUsage }> {
   const start = Date.now();
   const url = `${aiProviderBaseUrl()}/chat/completions`;
   const providerBody = mapRequestBodyForProvider({ ...body, stream: false });
+  const runtimeConfig = await getRuntimeApiConfig();
 
-  const res = await fetch(url, {
+  const res = await fetchWithRuntimeTimeout(url, {
     method: "POST",
     headers: baseHeaders(),
     body: JSON.stringify(providerBody),
-  });
+  }, runtimeConfig.defaultRequestTimeoutMs);
 
   const responseMs = Date.now() - start;
   const json = await readProviderJson(res);
@@ -176,12 +192,13 @@ export async function forwardTextEndpoint(
   const start = Date.now();
   const url = `${aiProviderBaseUrl()}/${endpoint}`;
   const providerBody = mapRequestBodyForProvider({ ...body, stream: false });
+  const runtimeConfig = await getRuntimeApiConfig();
 
-  const res = await fetch(url, {
+  const res = await fetchWithRuntimeTimeout(url, {
     method: "POST",
     headers: baseHeaders(),
     body: JSON.stringify(providerBody),
-  });
+  }, runtimeConfig.defaultRequestTimeoutMs);
 
   const responseMs = Date.now() - start;
   const json = await readProviderJson(res);
@@ -204,12 +221,13 @@ export async function forwardChatStream(
 ): Promise<ChatUsage> {
   const url = `${aiProviderBaseUrl()}/chat/completions`;
   const providerBody = mapRequestBodyForProvider({ ...body, stream: true });
+  const runtimeConfig = await getRuntimeApiConfig();
 
-  const upstream = await fetch(url, {
+  const upstream = await fetchWithRuntimeTimeout(url, {
     method: "POST",
     headers: { ...baseHeaders(), Accept: "text/event-stream" },
     body: JSON.stringify(providerBody),
-  });
+  }, runtimeConfig.defaultStreamTimeoutMs);
 
   if (!upstream.ok) {
     const errBody = await upstream.json().catch(() => ({}));
@@ -305,12 +323,13 @@ export async function forwardImage(
 ): Promise<{ raw: unknown; imageCount: number }> {
   const start = Date.now();
   const url = `${aiProviderBaseUrl()}/images/${endpoint}`;
+  const runtimeConfig = await getRuntimeApiConfig();
 
-  const res = await fetch(url, {
+  const res = await fetchWithRuntimeTimeout(url, {
     method: "POST",
     headers: baseHeaders(),
     body: JSON.stringify(body),
-  });
+  }, runtimeConfig.defaultRequestTimeoutMs);
 
   const responseMs = Date.now() - start;
   const json = await res.json() as Record<string, unknown>;

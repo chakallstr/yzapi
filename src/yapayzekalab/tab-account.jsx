@@ -526,7 +526,8 @@ const AccountTab = ({ ctx }) => {
   // Scroll to sub-section when goto changes (driven by UserMenu items)
   useEffect(() => {
     if (!goto) return;
-    const el = document.getElementById('account-' + goto);
+    const targetId = goto.startsWith('account-') ? goto : `account-${goto}`;
+    const el = document.getElementById(targetId);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       el.classList.add('section-flash');
@@ -1106,12 +1107,6 @@ const AccountTab = ({ ctx }) => {
         </Card>
       </div>
 
-      {/* Auto-recharge + Sandbox key cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-        <AutoRechargeCard tweaks={tweaks} setTweak={setTweak} />
-        <SandboxKeyCard sandboxKey={sandboxKey} sandboxFullKey={sandboxFullKey} onCreate={createSandboxKey} busy={sandboxBusy} />
-      </div>
-
       <TelegramLinkCard
         telegram={me?.telegram}
         busy={telegramBusy}
@@ -1121,6 +1116,12 @@ const AccountTab = ({ ctx }) => {
         onRefresh={refreshTelegramLink}
         onUnlink={unlinkTelegramLink}
       />
+
+      {/* Auto-recharge + Sandbox key cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+        <AutoRechargeCard tweaks={tweaks} setTweak={setTweak} />
+        <SandboxKeyCard sandboxKey={sandboxKey} sandboxFullKey={sandboxFullKey} onCreate={createSandboxKey} busy={sandboxBusy} />
+      </div>
 
       {/* Team + Webhooks */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 18 }}>

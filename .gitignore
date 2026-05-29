@@ -29,3 +29,4 @@ agent-team/research-marathon/daemon/
 agent-team/research-marathon/live/
 agent-team/research-marathon/test-*/
 agent-team/research-marathon/test-code-*/
+.codex-backups/

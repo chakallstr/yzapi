@@ -81,6 +81,7 @@ const FALLBACK_USD_TRY = 47.084289;
 const PROTECTED_TABS = new Set(['activity', 'account', 'admin']);
 const SUPPORT_WHATSAPP_NUMBER = '905319310781';
 const SUPPORT_WHATSAPP_URL = `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}`;
+const FALLBACK_TELEGRAM_BOT_URL = 'https://t.me/YapayZekaLabAPIBot';
 
 const initialsFor = (value) => {
   const clean = String(value || '').trim();
@@ -532,10 +533,10 @@ const UserMenu = ({ onAction, profile, balanceUSD }) => {
   const balanceHint = `$${Number(balanceUSD ?? profile?.bakiyeUsd ?? 0).toFixed(2)}`;
 
   const items = [
-    { Ico: I.Wallet,   label: 'Hesabım & bakiye',     hint: balanceHint,          section: 'balance' },
-    { Ico: I.Key,      label: 'API anahtarları',       hint: 'gerçek liste',       section: 'keys' },
-    { Ico: I.Activity, label: 'Kullanım geçmişi',      hint: 'son istekler',       section: 'usage' },
-    { Ico: I.Settings, label: 'Hesap ayarları',        hint: 'profil, email',     section: 'settings' },
+    { Ico: I.Wallet,   label: 'Hesabım & bakiye',     hint: balanceHint,          section: 'account-balance' },
+    { Ico: I.Key,      label: 'API anahtarları',       hint: 'gerçek liste',       section: 'account-keys' },
+    { Ico: I.Activity, label: 'Kullanım geçmişi',      hint: 'son istekler',       section: 'account-usage' },
+    { Ico: I.Settings, label: 'Hesap ayarları',        hint: 'profil, email',     section: 'account-settings' },
   ];
 
   return (
@@ -882,6 +883,52 @@ const WhatsAppFloat = () => (
   </a>
 );
 
+const TelegramFloat = ({ href = FALLBACK_TELEGRAM_BOT_URL }) => (
+  <a
+    href={href || FALLBACK_TELEGRAM_BOT_URL}
+    target="_blank"
+    rel="noreferrer"
+    aria-label="Telegram botunu aç"
+    style={{
+      position: 'fixed',
+      left: 20,
+      bottom: 20,
+      zIndex: 70,
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 10,
+      padding: '10px 14px',
+      borderRadius: 999,
+      background: 'linear-gradient(rgba(255,255,255,0.82), rgba(255,255,255,0.82)), repeating-linear-gradient(0deg, rgba(59,130,246,0.08) 0 1px, transparent 1px 18px), repeating-linear-gradient(90deg, rgba(59,130,246,0.08) 0 1px, transparent 1px 18px)',
+      border: '1px solid rgba(59,130,246,0.22)',
+      boxShadow: 'var(--sh-3)',
+      backdropFilter: 'blur(10px)',
+      textDecoration: 'none',
+      color: 'var(--accent-ink)',
+      fontSize: 12.5,
+      fontWeight: 700,
+    }}
+  >
+    <span style={{
+      width: 22,
+      height: 22,
+      borderRadius: '50%',
+      border: '1px solid rgba(59,130,246,0.24)',
+      background: 'rgba(59,130,246,0.08)',
+      color: 'var(--accent-ink)',
+      display: 'grid',
+      placeItems: 'center',
+      flexShrink: 0,
+      fontSize: 11,
+      fontFamily: 'var(--font-mono)',
+      fontWeight: 700,
+    }}>
+      TG
+    </span>
+    Telegram
+  </a>
+);
+
 // === Footer with public status link =================================
 const SiteFooter = () => {
   const [statusOpen, setStatusOpen] = useState(false);
@@ -1186,7 +1233,7 @@ const App = ({ initialTab = 'home' }) => {
       )}
 
       <main key={tab} className="fade-in yz-main" style={{ flex: 1, padding: '24px', maxWidth: 1400, margin: '0 auto', width: '100%' }}>
-        {tab === 'home'     && <HomeTab     ctx={ctx} onTab={selectTab} />}
+        {tab === 'home'     && <HomeTab     ctx={ctx} onTab={selectTab} onAction={onUserAction} />}
         {tab === 'models'   && <ModelsTab   ctx={ctx} />}
         {tab === 'activity' && <ActivityTab ctx={ctx} />}
         {tab === 'documents' && <DocumentsTab />}
@@ -1198,6 +1245,7 @@ const App = ({ initialTab = 'home' }) => {
       <SiteFooter />
 
       {showLogin && <LoginScreen />}
+      <TelegramFloat href={profile?.telegram?.botUrl || FALLBACK_TELEGRAM_BOT_URL} />
       <WhatsAppFloat />
 
       {whatsappPendingToken && (
