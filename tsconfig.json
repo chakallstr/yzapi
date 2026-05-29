@@ -23,5 +23,16 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "include": ["src", "e2e", "vite.config.ts", "vitest.config.ts", "vitest.itest.config.ts", "playwright.config.ts", "drizzle.config.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".deploy",
+    ".backups",
+    "_backups",
+    "migration-audit",
+    "tmp-account-deploy",
+    "**/*.bak"
+  ]
 }
