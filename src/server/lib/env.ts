@@ -17,6 +17,10 @@ const schema = z.object({
   JWT_REFRESH_TTL_SEC: z.coerce.number().default(60 * 60 * 24 * 30),
   WHATSAPP_PENDING_TTL_SEC: z.coerce.number().default(10 * 60),
 
+  // Billing: minutes before an unsettled usage reservation is treated as orphan
+  // and refunded by the reaper job.
+  ORPHAN_RESERVATION_GRACE_MIN: z.coerce.number().default(15),
+
   // Google OAuth (optional — graceful degrade if missing)
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
