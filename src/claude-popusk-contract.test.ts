@@ -39,9 +39,11 @@ describe("Claude Popusk migration contract", () => {
     const byId = new Map(MASTER_MODELS.map((model) => [model.id, model]));
 
     expect(computePrice(byId.get("claude-haiku-4-5-20251001")!, pricingCfg).input?.usd).toBeCloseTo(0.62, 6);
+    expect(computePrice(byId.get("gpt-5.2")!, pricingCfg).input?.usd).toBeCloseTo(0.75, 6);
+    expect(computePrice(byId.get("gpt-5.3-chat-latest")!, pricingCfg).input?.usd).toBeCloseTo(0.8, 6);
     expect(computePrice(byId.get("gpt-5.4")!, pricingCfg).input?.usd).toBeCloseTo(1.0, 6);
     expect(computePrice(byId.get("claude-opus-4-7")!, pricingCfg).input?.usd).toBeCloseTo(1.2, 6);
-    expect(computePrice(byId.get("gpt-5.5")!, pricingCfg).input?.usd).toBeCloseTo(1.2, 6);
+    expect(computePrice(byId.get("gpt-5.5")!, pricingCfg).input?.usd).toBeCloseTo(1.15, 6);
   });
 
   it("keeps frontend model ordering and prices in parity with the backend catalog", () => {

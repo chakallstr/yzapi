@@ -46,10 +46,42 @@ const TEXT_ENDPOINT_DETAILS: MasterModelEndpoint[] = [
 const TEXT_ENDPOINTS = TEXT_ENDPOINT_DETAILS.map((endpoint) => endpoint.type);
 const TEXT_SUPPORTED_PARAMETERS = Array.from(new Set(TEXT_ENDPOINT_DETAILS.flatMap((endpoint) => endpoint.supportedParameters)));
 
+const CUSTOMER_PRICE_OVERRIDES = new Map<string, number>([
+  ["gpt-5.5", 1.15],
+  ["gpt-5.5-2026-04-23", 1.15],
+  ["gpt-5.4", 1.0],
+  ["gpt-5.4-2026-03-05", 1.0],
+  ["gpt-5.4-mini", 0.9],
+  ["gpt-5.4-mini-2026-03-17", 0.9],
+  ["gpt-5.4-nano", 0.85],
+  ["gpt-5.4-nano-2026-03-17", 0.85],
+  ["gpt-5.3-chat-latest", 0.8],
+  ["gpt-5.2", 0.75],
+  ["gpt-5.2-2025-12-11", 0.75],
+  ["gpt-5.2-chat-latest", 0.75],
+  ["o3", 0.75],
+  ["o3-2025-04-16", 0.75],
+  ["gpt-5.1", 0.72],
+  ["gpt-5.1-2025-11-13", 0.72],
+  ["gpt-5.1-chat-latest", 0.72],
+  ["o4-mini", 0.72],
+  ["o4-mini-2025-04-16", 0.72],
+  ["gpt-5", 0.69],
+  ["gpt-5-2025-08-07", 0.69],
+  ["o3-mini", 0.68],
+  ["o3-mini-2025-01-31", 0.68],
+  ["gpt-5-search-api", 0.66],
+  ["gpt-5-search-api-2025-10-14", 0.66],
+  ["gpt-5-chat-latest", 0.65],
+  ["gpt-5-mini", 0.64],
+  ["gpt-5-mini-2025-08-07", 0.64],
+  ["gpt-5-nano", 0.62],
+  ["gpt-5-nano-2025-08-07", 0.62],
+]);
+
 function familyPrice(id: string): number {
-  if (id === "claude-opus-4-7" || id === "gpt-5.5" || id === "gpt-5.5-2026-04-23") return 1.2;
-  if (id.startsWith("gpt-") || id.startsWith("o")) return 1.0;
-  return 0.62;
+  if (id === "claude-opus-4-7") return 1.2;
+  return CUSTOMER_PRICE_OVERRIDES.get(id) ?? 0.62;
 }
 
 const MODEL_DISPLAY_ORDER = [
@@ -142,8 +174,8 @@ export const MASTER_MODELS: MasterModel[] = [
   textModel({ id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000 }),
   textModel({ id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000 }),
   textModel({ id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", provider: "Anthropic", providerSlug: "anthropic", context: "200K", contextTokens: 200000, aliases: ["anthropic/claude-haiku-4.5", "anthropic/claude-haiku-4-5", "anthropic/claude-haiku-4-5-20251001"] }),
-  textModel({ id: "gpt-5.5", name: "GPT-5.5", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000, price: 1.2 }),
-  textModel({ id: "gpt-5.5-2026-04-23", name: "GPT-5.5 2026-04-23", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000, price: 1.2 }),
+  textModel({ id: "gpt-5.5", name: "GPT-5.5", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000 }),
+  textModel({ id: "gpt-5.5-2026-04-23", name: "GPT-5.5 2026-04-23", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000 }),
   textModel({ id: "gpt-5.4", name: "GPT-5.4", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000, aliases: ["openai/gpt-5.4"] }),
   textModel({ id: "gpt-5.4-2026-03-05", name: "GPT-5.4 2026-03-05", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000 }),
   textModel({ id: "gpt-5.4-mini", name: "GPT-5.4 mini", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000, aliases: ["openai/gpt-5.4-mini"] }),

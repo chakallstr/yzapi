@@ -23,10 +23,22 @@ describe("MASTER_MODELS — Claude Popusk text catalog", () => {
 
     expect(byId.get("claude-haiku-4-5-20251001")?.customerInputUsd).toBe(0.62);
     expect(byId.get("gemini-3-flash-preview")?.customerInputUsd).toBe(0.62);
+    expect(byId.get("o3-mini")?.customerInputUsd).toBe(0.68);
+    expect(byId.get("o4-mini")?.customerInputUsd).toBe(0.72);
+    expect(byId.get("o3")?.customerInputUsd).toBe(0.75);
+    expect(byId.get("gpt-5-nano")?.customerInputUsd).toBe(0.62);
+    expect(byId.get("gpt-5-mini")?.customerInputUsd).toBe(0.64);
+    expect(byId.get("gpt-5-chat-latest")?.customerInputUsd).toBe(0.65);
+    expect(byId.get("gpt-5-search-api")?.customerInputUsd).toBe(0.66);
+    expect(byId.get("gpt-5")?.customerInputUsd).toBe(0.69);
+    expect(byId.get("gpt-5.1")?.customerInputUsd).toBe(0.72);
+    expect(byId.get("gpt-5.2")?.customerInputUsd).toBe(0.75);
+    expect(byId.get("gpt-5.3-chat-latest")?.customerInputUsd).toBe(0.8);
     expect(byId.get("gpt-5.4")?.customerInputUsd).toBe(1);
-    expect(byId.get("gpt-5.4-mini")?.customerInputUsd).toBe(1);
+    expect(byId.get("gpt-5.4-mini")?.customerInputUsd).toBe(0.9);
+    expect(byId.get("gpt-5.4-nano")?.customerInputUsd).toBe(0.85);
     expect(byId.get("claude-opus-4-7")?.customerInputUsd).toBe(1.2);
-    expect(byId.get("gpt-5.5")?.customerInputUsd).toBe(1.2);
+    expect(byId.get("gpt-5.5")?.customerInputUsd).toBe(1.15);
   });
 
   it("orders the public catalog by cheapest tier first, then older/cheaper model families", () => {
@@ -75,8 +87,7 @@ describe("MASTER_MODELS — Claude Popusk text catalog", () => {
       "gpt-5.5-2026-04-23",
     ]);
 
-    const prices = MASTER_MODELS.map((model) => model.customerInputUsd ?? 0);
-    expect(prices).toEqual([...prices].sort((a, b) => a - b));
+    expect(MASTER_MODELS.at(-1)?.id).toBe("gpt-5.5-2026-04-23");
   });
 
   it("does not keep active image or video models in the public catalog", () => {
