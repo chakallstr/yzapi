@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const schemaSource = readFileSync("src/server/db/schema.ts", "utf8");
 const authSource = readFileSync("src/server/routes/auth.ts", "utf8");
-const indexSource = readFileSync("src/server/index.ts", "utf8");
+const indexSource = readFileSync("src/server/app.ts", "utf8");
 const loggerSource = readFileSync("src/server/lib/logger.ts", "utf8");
 const appSource = readFileSync("src/yapayzekalab/App.jsx", "utf8");
 const authClientSource = readFileSync("src/yapayzekalab/auth-client.js", "utf8");

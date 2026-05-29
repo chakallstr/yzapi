@@ -91,7 +91,7 @@ describe("public /v1 catalog contract", () => {
   });
 
   it("mounts catalog before authenticated proxy routes and keeps proxy auth after the allowlist", () => {
-    const indexSource = readFileSync("src/server/index.ts", "utf8");
+    const indexSource = readFileSync("src/server/app.ts", "utf8");
 
     const catalogMount = indexSource.indexOf('app.use("/v1", v1CatalogRouter);');
     const allowlist = indexSource.indexOf("const knownRoutes = [");
