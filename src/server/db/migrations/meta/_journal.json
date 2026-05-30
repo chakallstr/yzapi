@@ -85,6 +85,13 @@
       "when": 1780262400000,
       "tag": "0011_api_management_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1780348800000,
+      "tag": "0012_provider_config_added_models",
+      "breakpoints": true
     }
   ]
 }

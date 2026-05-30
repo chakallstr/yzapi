@@ -2,9 +2,9 @@ import { Router } from "express";
 import { db } from "../db/client.js";
 import { announcements, modelOverrides, modelRuntimePolicies } from "../db/schema.js";
 import { and, eq, lte, gte } from "drizzle-orm";
-import { MASTER_MODELS } from "../../master-models.js";
 import { computePrice } from "../../pricing.js";
 import { buildPricingConfig } from "../services/pricing-service.js";
+import { getMergedCatalogModels } from "../services/added-model-service.js";
 
 const router = Router();
 
@@ -13,12 +13,13 @@ router.get("/models", async (_req, res, next) => {
   try {
     const cfg = await buildPricingConfig();
 
+    const mergedModels = await getMergedCatalogModels();
     const overrides = await db.select().from(modelOverrides);
     const runtimePolicies = await db.select().from(modelRuntimePolicies);
     const overrideMap = new Map(overrides.map((o) => [o.modelId, o]));
     const runtimeMap = new Map(runtimePolicies.map((o) => [o.modelId, o]));
 
-    const result = MASTER_MODELS.map((m) => {
+    const result = mergedModels.map((m) => {
       const ovr = overrideMap.get(m.id);
       const runtime = runtimeMap.get(m.id);
       const patched = { ...m };

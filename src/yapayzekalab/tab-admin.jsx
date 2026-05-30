@@ -717,6 +717,122 @@ const AdminOverrides = ({ overrides, token, refresh }) => {
   );
 };
 
+const AdminAddedModels = ({ token }) => {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [form, setForm] = useState({ modelId: '', name: '', providerLabel: '', inputUsd: '', outputUsd: '' });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const list = await adminRequest('/api/admin/added-models', token);
+      setRows(Array.isArray(list) ? list : []);
+    } catch (loadError) {
+      setError(loadError.message || 'Ek modeller alınamadı.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, [token]);
+
+  const setField = (key, value) => {
+    setSaved('');
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const create = async () => {
+    const modelId = form.modelId.trim();
+    const name = form.name.trim();
+    const providerLabel = form.providerLabel.trim();
+    if (!modelId || !name || !providerLabel) {
+      setError('Model id, ad ve sağlayıcı etiketi zorunlu.');
+      setSaved('');
+      return;
+    }
+    const inputUsd = Number(normalizeDecimalInput(form.inputUsd));
+    const outputUsd = Number(normalizeDecimalInput(form.outputUsd));
+    if (!Number.isFinite(inputUsd) || !Number.isFinite(outputUsd)) {
+      setError('Fiyat alanlarına geçerli sayı gir.');
+      setSaved('');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    setSaved('');
+    try {
+      await adminRequest('/api/admin/added-models', token, {
+        method: 'POST',
+        body: { modelId, name, providerLabel, inputUsd, outputUsd },
+      });
+      setForm({ modelId: '', name: '', providerLabel: '', inputUsd: '', outputUsd: '' });
+      setSaved('Ek model eklendi.');
+      await load();
+    } catch (createError) {
+      // 409 (yinelenen id) ve 400 (master id) hataları aynı kutuda gösterilir.
+      setError(createError.message || 'Ek model eklenemedi.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (row) => {
+    if (!window.confirm(`${row.modelId} ek modeli silinsin mi?`)) return;
+    setError('');
+    setSaved('');
+    try {
+      await adminRequest(`/api/admin/added-models/${encodeURIComponent(row.modelId)}`, token, { method: 'DELETE' });
+      await load();
+    } catch (deleteError) {
+      setError(deleteError.message || 'Ek model silinemedi.');
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <Card pad={18}>
+        <Caption>Ek modeller</Caption>
+        <div style={{ fontSize: 11.5, color: 'var(--ink-2)', marginTop: 4, marginBottom: 12 }}>
+          Master kataloğa dokunmadan eklenen modeller. Yinelenen veya master id reddedilir.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1.2fr) minmax(160px, 1fr) minmax(140px, 1fr) minmax(110px, 0.7fr) minmax(110px, 0.7fr) 130px', gap: 10, alignItems: 'end' }}>
+          <input value={form.modelId} onChange={(e) => setField('modelId', e.target.value)} placeholder="model id" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+          <input value={form.name} onChange={(e) => setField('name', e.target.value)} placeholder="ad" style={inputStyle} />
+          <input value={form.providerLabel} onChange={(e) => setField('providerLabel', e.target.value)} placeholder="sağlayıcı" style={inputStyle} />
+          <input value={form.inputUsd} onChange={(e) => setField('inputUsd', e.target.value)} placeholder="input $/M" type="text" inputMode="decimal" style={inputStyle} />
+          <input value={form.outputUsd} onChange={(e) => setField('outputUsd', e.target.value)} placeholder="output $/M" type="text" inputMode="decimal" style={inputStyle} />
+          <button onClick={create} disabled={saving} style={{ padding: '10px 12px', borderRadius: 9, background: 'var(--ink)', color: '#fff', fontWeight: 600, opacity: saving ? 0.7 : 1 }}>{saving ? 'Ekleniyor…' : 'Ekle'}</button>
+        </div>
+        {saved && <div style={{ marginTop: 10 }}><Chip tone="ok">{saved}</Chip></div>}
+        {error && <div style={{ marginTop: 10 }}><ErrorBox>{error}</ErrorBox></div>}
+      </Card>
+      <Card pad={0} style={{ overflow: 'hidden' }}>
+        {loading ? <div style={{ padding: 16, fontSize: 12, color: 'var(--ink-3)' }}>Ek modeller yükleniyor…</div> : null}
+        {!loading && rows.length === 0 ? <div style={{ padding: 16 }}><EmptyState>Ek model yok.</EmptyState></div> : null}
+        {!loading && rows.map((row, i) => (
+          <div key={row.modelId} style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1.4fr) minmax(140px, 1fr) 110px 110px 80px 100px', gap: 12, padding: '13px 16px', borderBottom: i < rows.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center', fontSize: 12 }}>
+            <div>
+              <div style={{ fontWeight: 600 }}>{row.name}</div>
+              <div style={{ fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{row.modelId}</div>
+            </div>
+            <span>{row.providerLabel}</span>
+            <span className="tnum">{usd(row.inputUsd)}</span>
+            <span className="tnum">{usd(row.outputUsd)}</span>
+            <Chip tone={row.enabled ? 'ok' : 'neutral'}>{row.enabled ? 'aktif' : 'pasif'}</Chip>
+            <button onClick={() => remove(row)} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid #fecaca', background: '#fff1f2', color: '#b91c1c', fontSize: 11 }}>Sil</button>
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+};
+
 const API_SUB_SECTIONS = [
   { id: 'general', label: 'Genel API' },
   { id: 'limits', label: 'Limitler' },
@@ -741,6 +857,13 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
   const [selectedKeyId, setSelectedKeyId] = useState('');
   const [keyPolicySnapshot, setKeyPolicySnapshot] = useState(null);
   const [keyForm, setKeyForm] = useState({});
+  const [providerForm, setProviderForm] = useState({ providerBaseUrl: '', providerApiKey: '' });
+  const [providerSaving, setProviderSaving] = useState(false);
+  const [providerSaved, setProviderSaved] = useState('');
+  const [providerError, setProviderError] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [testError, setTestError] = useState('');
 
   const selectedModel = useMemo(
     () => modelPolicies.find((row) => row.modelId === selectedModelId) || modelPolicies[0] || null,
@@ -768,6 +891,12 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
         ...settings.limits,
         ...settings.behavior,
       });
+      setProviderForm({
+        providerBaseUrl: settings.provider?.providerBaseUrl || '',
+        providerApiKey: '',
+      });
+      setTestResult(null);
+      setTestError('');
       if (!selectedModelId && models[0]?.modelId) setSelectedModelId(models[0].modelId);
       if (!selectedKeyId && apiKeys[0]?.id) setSelectedKeyId(apiKeys[0].id);
     } catch (loadError) {
@@ -892,6 +1021,45 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
       setError(saveError.message || 'API key politikası kaydedilemedi.');
     } finally {
       setSaving('');
+    }
+  };
+
+  const saveProvider = async () => {
+    setProviderSaving(true);
+    setProviderSaved('');
+    setProviderError('');
+    try {
+      const trimmedKey = String(providerForm.providerApiKey || '').trim();
+      const body = { providerBaseUrl: String(providerForm.providerBaseUrl || '').trim() };
+      // Boş key alanı = mevcut anahtar korunur (providerApiKey gönderilmez).
+      if (trimmedKey) body.providerApiKey = trimmedKey;
+      await adminRequest('/api/admin/api-settings', token, { method: 'POST', body });
+      await load();
+      setProviderSaved('Sağlayıcı bağlantısı kaydedildi.');
+    } catch (saveError) {
+      setProviderError(saveError.message || 'Sağlayıcı bağlantısı kaydedilemedi.');
+    } finally {
+      setProviderSaving(false);
+    }
+  };
+
+  const testProviderConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    setTestError('');
+    try {
+      const trimmedKey = String(providerForm.providerApiKey || '').trim();
+      const baseUrl = String(providerForm.providerBaseUrl || '').trim();
+      const body = {};
+      // Kaydedilmemiş (pending) değerlerle test; anahtar asla geri gösterilmez.
+      if (baseUrl) body.providerBaseUrl = baseUrl;
+      if (trimmedKey) body.providerApiKey = trimmedKey;
+      const result = await adminRequest('/api/admin/provider/test-connection', token, { method: 'POST', body });
+      setTestResult(result);
+    } catch (testErr) {
+      setTestError(testErr.message || 'Bağlantı testi başarısız.');
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -1067,20 +1235,84 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
       )}
 
       {subSection === 'providers' && (
-        <div style={grid(240)}>
-          {(providerSnapshot.providers || []).map((provider) => (
-            <Card key={provider.id} pad={18}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                <div>
-                  <Caption>{provider.id}</Caption>
-                  <div style={{ fontSize: 15, fontWeight: 600, marginTop: 4 }}>{provider.label}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>{provider.baseUrlLabel} · {provider.gecikmeMs || 0}ms</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <Card pad={18}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              <div>
+                <Caption>Sağlayıcı bağlantısı</Caption>
+                <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 4 }}>
+                  Upstream base URL ve API anahtarı. Anahtar yalnızca yazılır; panelde maskeli gösterilir.
                 </div>
-                <Chip tone={provider.active ? 'ok' : 'neutral'}>{provider.active ? 'aktif' : provider.durum}</Chip>
               </div>
-              {provider.not ? <div style={{ fontSize: 11.5, color: 'var(--ink-2)', marginTop: 10 }}>{provider.not}</div> : null}
-            </Card>
-          ))}
+              <Chip tone="neutral" style={{ fontSize: 10 }}>
+                {apiSettings?.provider?.providerBaseUrlSource === 'db' ? 'DB kaydı' : 'env varsayılanı'}
+              </Chip>
+            </div>
+            <div style={{ ...grid(260), marginTop: 14 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <Caption>Base URL</Caption>
+                <input
+                  value={providerForm.providerBaseUrl}
+                  onChange={(e) => { setProviderForm((current) => ({ ...current, providerBaseUrl: e.target.value })); setProviderSaved(''); }}
+                  placeholder={apiSettings?.provider?.providerBaseUrlSource === 'env' ? 'env varsayılanı kullanılıyor' : 'https://upstream.example.com/v1'}
+                  style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }}
+                />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <Caption>API anahtarı (yazılır, gösterilmez)</Caption>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={providerForm.providerApiKey}
+                  onChange={(e) => { setProviderForm((current) => ({ ...current, providerApiKey: e.target.value })); setProviderSaved(''); }}
+                  placeholder={apiSettings?.provider?.providerApiKeyMasked || 'sk-… (boş bırakılırsa değişmez)'}
+                  style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }}
+                />
+                <div style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>
+                  {apiSettings?.provider?.providerApiKeyMasked
+                    ? `Mevcut: ${apiSettings.provider.providerApiKeyMasked} · son güncelleme ${safeDate(apiSettings.provider.providerApiKeyUpdatedAt)}`
+                    : 'Henüz DB anahtarı yok (env varsayılanı geçerli).'}
+                  {' '}Boş alan = anahtar değişmez.
+                </div>
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
+              <button onClick={saveProvider} disabled={providerSaving} style={{ padding: '9px 12px', borderRadius: 9, background: 'var(--ink)', color: '#fff', fontWeight: 600, fontSize: 12, opacity: providerSaving ? 0.7 : 1 }}>
+                {providerSaving ? 'Kaydediliyor…' : 'Kaydet'}
+              </button>
+              <button onClick={testProviderConnection} disabled={testing} style={{ padding: '9px 12px', borderRadius: 9, border: '1px solid var(--border)', fontSize: 12, opacity: testing ? 0.7 : 1 }}>
+                {testing ? 'Test ediliyor…' : 'Bağlantıyı Test Et'}
+              </button>
+              {providerSaved && <Chip tone="ok">{providerSaved}</Chip>}
+            </div>
+            {providerError && <div style={{ marginTop: 10 }}><ErrorBox>{providerError}</ErrorBox></div>}
+            {testError && <div style={{ marginTop: 10 }}><ErrorBox>{testError}</ErrorBox></div>}
+            {testResult && (
+              <div style={{ marginTop: 12, padding: 12, borderRadius: 10, border: '1px solid var(--border)', background: testResult.ok ? 'var(--ok-bg)' : '#fef2f2', color: testResult.ok ? '#047857' : '#b91c1c', fontSize: 12 }}>
+                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 600 }}>{testResult.ok ? 'Bağlantı başarılı' : 'Bağlantı başarısız'}</span>
+                  <span className="tnum">upstream: {testResult.upstreamStatus ?? '—'}</span>
+                  <span className="tnum">gecikme: {testResult.latencyMs ?? '—'}ms</span>
+                  {testResult.errorCategory && <span style={{ fontFamily: 'var(--font-mono)' }}>{testResult.errorCategory}</span>}
+                </div>
+              </div>
+            )}
+          </Card>
+          <div style={grid(240)}>
+            {(providerSnapshot.providers || []).map((provider) => (
+              <Card key={provider.id} pad={18}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                  <div>
+                    <Caption>{provider.id}</Caption>
+                    <div style={{ fontSize: 15, fontWeight: 600, marginTop: 4 }}>{provider.label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>{provider.baseUrlLabel} · {provider.gecikmeMs || 0}ms</div>
+                  </div>
+                  <Chip tone={provider.active ? 'ok' : 'neutral'}>{provider.active ? 'aktif' : provider.durum}</Chip>
+                </div>
+                {provider.not ? <div style={{ fontSize: 11.5, color: 'var(--ink-2)', marginTop: 10 }}>{provider.not}</div> : null}
+              </Card>
+            ))}
+          </div>
         </div>
       )}
 
@@ -1792,7 +2024,12 @@ const AdminTab = ({ ctx = {} }) => {
         {section === 'traffic' && <AdminTrafficAnalytics token={token} onOpenUser={openTrafficUser} onOpenApiKeys={openTrafficApiKeys} />}
         {section === 'api' && <AdminApiSettings token={token} apiKeys={data.apiKeys || []} />}
         {section === 'users' && <AdminUsers users={data.users || []} token={token} refresh={refresh} focusUserId={trafficUserJump.userId} focusNonce={trafficUserJump.nonce} />}
-        {section === 'overrides' && <AdminOverrides overrides={data.overrides || []} token={token} refresh={refresh} />}
+        {section === 'overrides' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <AdminOverrides overrides={data.overrides || []} token={token} refresh={refresh} />
+            <AdminAddedModels token={token} />
+          </div>
+        )}
         {section === 'announce' && <AdminAnnouncements announcements={data.announcements || []} token={token} refresh={refresh} />}
         {section === 'providers' && <AdminProviders providers={data.providers || []} token={token} refresh={refresh} />}
         {section === 'kur' && <AdminKur config={data.config} kurHistory={data.kurHistory || []} token={token} refresh={refresh} />}

@@ -2,9 +2,10 @@ import { Router, Request, Response, NextFunction } from "express";
 import { aiProviderApiKey } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { AppError, BadRequestError, InsufficientBalanceError, ModelDisabledError, ModelNotFoundError, RateLimitError } from "../lib/errors.js";
-import { MASTER_MODELS, canonicalizeModelId, type MasterModel } from "../../master-models.js";
+import { canonicalizeModelId, type MasterModel } from "../../master-models.js";
 import { checkRateLimit } from "../services/rate-limit-service.js";
 import { reserveUsageBudget, settleReservedUsage } from "../services/billing-service.js";
+import { resolveCatalogModel } from "../services/added-model-service.js";
 import { getActiveProviderAdapter } from "../services/provider-adapter.js";
 import { db } from "../db/client.js";
 import { modelOverrides, systemConfig, users } from "../db/schema.js";
@@ -112,7 +113,7 @@ async function resolveEnabledModel(
   endpoint: string,
 ): Promise<{ masterModel: MasterModel; runtimePolicy: ModelRuntimePolicySnapshot | null }> {
   const canonicalModelId = canonicalizeModelId(modelId);
-  const masterModel = MASTER_MODELS.find((m) => m.id === canonicalModelId);
+  const masterModel = await resolveCatalogModel(canonicalModelId ?? modelId ?? "");
   if (!masterModel) {
     throw new ModelNotFoundError(modelId ?? "(none)");
   }

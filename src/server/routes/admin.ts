@@ -30,6 +30,16 @@ import {
   upsertSystemApiConfig,
 } from "../services/api-settings-service.js";
 import { listImplementedProviderIds } from "../services/provider-adapter.js";
+import {
+  getProviderConfigAdminView,
+  saveProviderConfig,
+  testProviderConnection,
+} from "../services/provider-config-service.js";
+import {
+  createAddedModel,
+  deleteAddedModel,
+  listAddedModels,
+} from "../services/added-model-service.js";
 
 const router = Router();
 const SINGLE_ADMIN_EMAIL = "cix.crazy666@gmail.com";
@@ -221,7 +231,13 @@ router.post("/config", async (req, res, next) => {
 // ── API Settings ─────────────────────────────────────────────────────────────
 router.get("/api-settings", async (_req, res, next) => {
   try {
-    res.json(await getApiSettingsSnapshot());
+    const [snapshot, provider] = await Promise.all([
+      getApiSettingsSnapshot(),
+      getProviderConfigAdminView(),
+    ]);
+    // provider view exposes only the masked key + base URL + timestamp;
+    // never the cipher or plaintext (Requirements 1.2, 2.2, 2.3, 9.1).
+    res.json({ ...snapshot, provider });
   } catch (e) { next(e); }
 });
 
@@ -231,9 +247,84 @@ router.post("/api-settings", async (req, res, next) => {
     if (body.activeProviderId && !listImplementedProviderIds().includes(String(body.activeProviderId))) {
       return res.status(400).json({ error: "Desteklenmeyen aktif provider seçimi." });
     }
+
+    // Provider_Config write-only fields (Requirements 1.1, 2.1, 2.4, 2.6).
+    // saveProviderConfig validates the base URL (400) and rejects empty-string
+    // keys (400); a write attempt is always audited (Requirement 1.4).
+    const hasProviderBaseUrl = Object.prototype.hasOwnProperty.call(body, "providerBaseUrl");
+    const hasProviderApiKey = Object.prototype.hasOwnProperty.call(body, "providerApiKey");
+    let providerView: Awaited<ReturnType<typeof getProviderConfigAdminView>> | undefined;
+    if (hasProviderBaseUrl || hasProviderApiKey) {
+      try {
+        providerView = await saveProviderConfig({
+          ...(hasProviderBaseUrl ? { providerBaseUrl: body.providerBaseUrl } : {}),
+          ...(hasProviderApiKey ? { providerApiKey: body.providerApiKey } : {}),
+        });
+        await writeAudit(
+          "provider_config_update",
+          "system_api_config",
+          `baseUrlChanged: ${hasProviderBaseUrl}, apiKeyChanged: ${hasProviderApiKey}`,
+        );
+      } catch (providerErr) {
+        // Audit the attempt even when validation fails (Requirement 1.4).
+        await writeAudit(
+          "provider_config_update",
+          "system_api_config",
+          `rejected: ${providerErr instanceof Error ? providerErr.message : "invalid input"}`,
+        );
+        throw providerErr;
+      }
+    }
+
     const updated = await upsertSystemApiConfig(body);
     await writeAudit("api_settings_update", "system_api_config", `activeProviderId: ${updated.activeProviderId}`);
-    res.json(updated);
+    res.json(providerView ? { ...updated, provider: providerView } : updated);
+  } catch (e) { next(e); }
+});
+
+// ── Provider config: connection test (read-only probe, persists nothing) ───────
+router.post("/provider/test-connection", async (req, res, next) => {
+  try {
+    const body = req.body ?? {};
+    const result = await testProviderConnection({
+      ...(body.providerBaseUrl !== undefined ? { providerBaseUrl: body.providerBaseUrl } : {}),
+      ...(body.providerApiKey !== undefined ? { providerApiKey: body.providerApiKey } : {}),
+    });
+    res.json(result);
+  } catch (e) { next(e); }
+});
+
+// ── Added models (additive catalog layer) ──────────────────────────────────────
+router.get("/added-models", async (_req, res, next) => {
+  try {
+    res.json(await listAddedModels());
+  } catch (e) { next(e); }
+});
+
+router.post("/added-models", async (req, res, next) => {
+  try {
+    const body = req.body ?? {};
+    // ConflictError (409) on duplicate id is surfaced by the central error handler.
+    const created = await createAddedModel({
+      modelId: String(body.modelId ?? ""),
+      name: String(body.name ?? ""),
+      providerLabel: String(body.providerLabel ?? ""),
+      inputUsd: Number(body.inputUsd ?? 0),
+      outputUsd: Number(body.outputUsd ?? 0),
+      enabled: body.enabled,
+    });
+    await writeAudit("added_model_create", created.modelId, `name: ${created.name}`);
+    res.status(201).json(created);
+  } catch (e) { next(e); }
+});
+
+router.delete("/added-models/:modelId", async (req, res, next) => {
+  try {
+    const { modelId } = req.params;
+    // BadRequestError (400) when targeting a MASTER id is surfaced by the error handler.
+    await deleteAddedModel(modelId);
+    await writeAudit("added_model_delete", modelId, "Ek model silindi");
+    res.json({ success: true });
   } catch (e) { next(e); }
 });
 

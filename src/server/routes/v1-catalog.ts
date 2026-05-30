@@ -4,6 +4,7 @@ import { computePrice, type ComputedPrice } from "../../pricing.js";
 import { db } from "../db/client.js";
 import { modelOverrides, modelRuntimePolicies } from "../db/schema.js";
 import { buildPricingConfig } from "../services/pricing-service.js";
+import { getMergedCatalogModels } from "../services/added-model-service.js";
 
 type V1ModelPricing = {
   unit: ComputedPrice["unit"];
@@ -65,14 +66,15 @@ function buildPricing(computed: ComputedPrice | undefined): V1ModelPricing | nul
 
 async function buildCatalogEntries(): Promise<V1CatalogEntry[]> {
   const cfg = await buildPricingConfig();
-  const [overrides, runtimePolicies] = await Promise.all([
+  const [mergedModels, overrides, runtimePolicies] = await Promise.all([
+    getMergedCatalogModels(),
     db.select().from(modelOverrides),
     db.select().from(modelRuntimePolicies),
   ]);
   const overrideMap = new Map(overrides.map((override) => [override.modelId, override]));
   const runtimeMap = new Map(runtimePolicies.map((policy) => [policy.modelId, policy]));
 
-  return MASTER_MODELS.map((model) => {
+  return mergedModels.map((model) => {
     const override = overrideMap.get(model.id);
     const runtime = runtimeMap.get(model.id);
     const patched = { ...model };

@@ -27,6 +27,13 @@ export class UnauthorizedError extends AppError {
   }
 }
 
+export class ConflictError extends AppError {
+  constructor(msg = "Conflict", d?: unknown) {
+    super(409, msg, d);
+    this.name = "ConflictError";
+  }
+}
+
 export class InsufficientBalanceError extends AppError {
   constructor(msg = "Insufficient balance") {
     super(402, msg);

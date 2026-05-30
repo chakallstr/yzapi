@@ -1,9 +1,10 @@
 import { Response } from "express";
 import { pipeline } from "stream";
-import { aiProviderApiKey, aiProviderBaseUrl } from "../lib/env.js";
+import { aiProviderBaseUrl } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { canonicalizeModelId } from "../../master-models.js";
 import { getRuntimeApiConfig } from "./api-settings-service.js";
+import { resolveProviderBaseUrl, resolveProviderApiKey } from "./provider-config-service.js";
 
 export interface ChatUsage {
   promptTokens: number;
@@ -74,9 +75,12 @@ export function mapModelForProvider(model: string, baseUrl = aiProviderBaseUrl()
   return OMNIROUTE_MODEL_MAP[canonical] ?? OMNIROUTE_MODEL_MAP[model] ?? canonical;
 }
 
-function mapRequestBodyForProvider<T extends Record<string, unknown>>(body: T): T {
+function mapRequestBodyForProvider<T extends Record<string, unknown>>(
+  body: T,
+  baseUrl: string = aiProviderBaseUrl(),
+): T {
   if (typeof body.model !== "string") return body;
-  const mapped = mapModelForProvider(body.model);
+  const mapped = mapModelForProvider(body.model, baseUrl);
   if (mapped === body.model) return body;
   return { ...body, model: mapped };
 }
@@ -131,9 +135,10 @@ async function readProviderJson(res: globalThis.Response): Promise<Record<string
   return JSON.parse(text) as Record<string, unknown>;
 }
 
-function baseHeaders(): Record<string, string> {
+async function baseHeaders(): Promise<Record<string, string>> {
+  const apiKey = await resolveProviderApiKey();
   return {
-    Authorization: `Bearer ${aiProviderApiKey()}`,
+    Authorization: `Bearer ${apiKey ?? ""}`,
     "Content-Type": "application/json",
     Accept: "application/json",
   };
@@ -157,13 +162,14 @@ export async function forwardChat(
   body: ChatRequest
 ): Promise<{ raw: unknown; usage: ChatUsage }> {
   const start = Date.now();
-  const url = `${aiProviderBaseUrl()}/chat/completions`;
-  const providerBody = mapRequestBodyForProvider({ ...body, stream: false });
+  const baseUrl = await resolveProviderBaseUrl();
+  const url = `${baseUrl}/chat/completions`;
+  const providerBody = mapRequestBodyForProvider({ ...body, stream: false }, baseUrl);
   const runtimeConfig = await getRuntimeApiConfig();
 
   const res = await fetchWithRuntimeTimeout(url, {
     method: "POST",
-    headers: baseHeaders(),
+    headers: await baseHeaders(),
     body: JSON.stringify(providerBody),
   }, runtimeConfig.defaultRequestTimeoutMs);
 
@@ -190,13 +196,14 @@ export async function forwardTextEndpoint(
   body: TextRequest
 ): Promise<{ raw: unknown; usage: ChatUsage }> {
   const start = Date.now();
-  const url = `${aiProviderBaseUrl()}/${endpoint}`;
-  const providerBody = mapRequestBodyForProvider({ ...body, stream: false });
+  const baseUrl = await resolveProviderBaseUrl();
+  const url = `${baseUrl}/${endpoint}`;
+  const providerBody = mapRequestBodyForProvider({ ...body, stream: false }, baseUrl);
   const runtimeConfig = await getRuntimeApiConfig();
 
   const res = await fetchWithRuntimeTimeout(url, {
     method: "POST",
-    headers: baseHeaders(),
+    headers: await baseHeaders(),
     body: JSON.stringify(providerBody),
   }, runtimeConfig.defaultRequestTimeoutMs);
 
@@ -219,13 +226,14 @@ export async function forwardChatStream(
   body: ChatRequest,
   res: Response
 ): Promise<ChatUsage> {
-  const url = `${aiProviderBaseUrl()}/chat/completions`;
-  const providerBody = mapRequestBodyForProvider({ ...body, stream: true });
+  const baseUrl = await resolveProviderBaseUrl();
+  const url = `${baseUrl}/chat/completions`;
+  const providerBody = mapRequestBodyForProvider({ ...body, stream: true }, baseUrl);
   const runtimeConfig = await getRuntimeApiConfig();
 
   const upstream = await fetchWithRuntimeTimeout(url, {
     method: "POST",
-    headers: { ...baseHeaders(), Accept: "text/event-stream" },
+    headers: { ...(await baseHeaders()), Accept: "text/event-stream" },
     body: JSON.stringify(providerBody),
   }, runtimeConfig.defaultStreamTimeoutMs);
 
@@ -322,12 +330,13 @@ export async function forwardImage(
   body: Record<string, unknown>
 ): Promise<{ raw: unknown; imageCount: number }> {
   const start = Date.now();
-  const url = `${aiProviderBaseUrl()}/images/${endpoint}`;
+  const baseUrl = await resolveProviderBaseUrl();
+  const url = `${baseUrl}/images/${endpoint}`;
   const runtimeConfig = await getRuntimeApiConfig();
 
   const res = await fetchWithRuntimeTimeout(url, {
     method: "POST",
-    headers: baseHeaders(),
+    headers: await baseHeaders(),
     body: JSON.stringify(body),
   }, runtimeConfig.defaultRequestTimeoutMs);
 
@@ -350,11 +359,12 @@ export async function forwardImage(
 export async function submitVideo(
   body: Record<string, unknown>
 ): Promise<{ taskId: string }> {
-  const url = `${aiProviderBaseUrl()}/videos/submit`;
+  const baseUrl = await resolveProviderBaseUrl();
+  const url = `${baseUrl}/videos/submit`;
 
   const res = await fetch(url, {
     method: "POST",
-    headers: baseHeaders(),
+    headers: await baseHeaders(),
     body: JSON.stringify(body),
   });
 
@@ -371,12 +381,14 @@ export async function submitVideo(
 }
 
 export async function getVideoTask(taskId: string): Promise<Record<string, unknown>> {
-  const url = `${aiProviderBaseUrl()}/videos/tasks/${taskId}`;
+  const baseUrl = await resolveProviderBaseUrl();
+  const url = `${baseUrl}/videos/tasks/${taskId}`;
+  const apiKey = await resolveProviderApiKey();
 
   const res = await fetch(url, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${aiProviderApiKey()}`,
+      Authorization: `Bearer ${apiKey ?? ""}`,
       Accept: "application/json",
     },
   });

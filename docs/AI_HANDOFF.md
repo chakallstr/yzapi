@@ -74,23 +74,24 @@ Ops (`/Users/ufuk/yeniapi/_ops`, git dışı): `backup-full.sh` sertleştirildi.
 
 ## 5. Devam eden / kalan görevler
 
-- **Master plan Faz 7** admin API runtime testi
-- **Faz 8** Telegram opsiyonel akış (büyük ölçüde yapıldı, doğrulama kaldı)
-- **Faz 9** otomatik backup + bildirim cron (HİÇ kurulmadı — `crontab` boş)
-- **Faz 10** operasyon dokümanı (bu dosya + steering kısmen karşılıyor)
-- **Faz 11** final satış-öncesi gate
+- **Master plan Faz 7** admin API runtime testi — ✅ DOĞRULANDI (28 admin testi, single-admin allowlist, tüm `/api/admin/*` adminAuth+whatsapp arkasında)
+- **Faz 8** Telegram opsiyonel akış — ✅ DOĞRULANDI (34 telegram testi; token boşsa 503/no-crash, prod webhook secret guard). Bağsız kullanıcı canlı uçtan-uca akışı funded key (BLOCKER-1) gerektirir.
+- **Faz 9** otomatik backup cron — ✅ HAZIR ama KURULMADI: `_ops/backup-cron.sh` (wrapper+retention+log) + `docs/backup-cron.md`. Crontab girdisi operatörce kurulacak (NEEDS_USER_INSTALL).
+- **Faz 10** operasyon dokümanı — ✅ YAPILDI: `docs/OPERATIONS.md` (tam operatör el kitabı) + `docs/backup-cron.md`.
+- **Faz 11** final satış-öncesi gate — KISMİ: yerel build/test/lint yeşil + canlı health/status yeşil; gerçek `/v1` 200+bakiye kanıtı BLOCKER-1'e bağlı (henüz "satışa hazır" DENMEZ).
 
 ## 6. AÇIK BUGLAR / BLOCKER
 
-### 🔴 BLOCKER-1: Canlı upstream yanlış yere bağlı (EN KRİTİK)
-- Canlı `.env.production`: `CLOSEROUTER_BASE_URL=http://127.0.0.1:20128/v1` (yerel **OmniRoute** docker container'ı, imaj `diegosouzapw/omniroute:latest`).
-- **Proje TASARIMI CloseRouter** (`closerouter.dev` / `claude-popusk.shop`) — OmniRoute proje kararı DEĞİL, canlıda env override ile (bu session'dan ÖNCE) yapılmış.
-- Sonuç: gerçek model çağrıları çoğunlukla başarısız:
-  - OpenAI (`cx/gpt-5.5`) → 402 `deactivated_workspace`
-  - Claude (`cc/claude-...`) → 400 `No credentials for provider: claude`
-  - `seslab-auto` → 200 ÇALIŞIYOR (claude-sonnet-4-6 döndü)
-- **Faturalama GÜVENLİ**: hatalı çağrıda ücret kesilmiyor (K1 doğrulandı), drift=0.
-- **KARAR BEKLİYOR (kullanıcıda):** ya canlı env CloseRouter'a geri çevrilecek (gerçek key+base gerekli), ya OmniRoute'a sağlayıcı credential'ları girilecek + `OMNIROUTE_MODEL_MAP` doldurulacak.
+### ✅ BLOCKER-1: ÇÖZÜLDÜ (2026-05-30) — yeni sağlayıcı Claude Popusk
+- **Kök neden:** CloseRouter kapandı; canlı `.env.production` geçici olarak yerel OmniRoute'a (`127.0.0.1:20128`) yönlendirilmişti, o da provider credential'sızdı → tüm modeller 400/502.
+- **Çözüm (kullanıcı onayıyla A-B-C uygulandı):**
+  - Yeni sağlayıcı **Claude Popusk** (`https://api.claude-popusk.shop/v1`, OpenAI-uyumlu, Bearer). Doküman: https://docs.claude-popusk.shop/
+  - Canlı env: `AI_PROVIDER_BASE_URL=https://api.claude-popusk.shop/v1` + `AI_PROVIDER_API_KEY=sk-****UHNk`; eski `CLOSEROUTER_*` satırları boşaltıldı. Yedek: `.env.production.bak.20260530T111925Z`.
+  - Katalog 42 modelin 41'i sağlayıcıda birebir var; tek istisna `gemini-3-pro-preview` sağlayıcıda yok (404) → `model_overrides` tablosunda `enabled=false` yapıldı (kod/fiyat/test değişmedi).
+  - `OMNIROUTE_MODEL_MAP` zaten yalnız `127.0.0.1:20128`/`api.seslab.tr` için aktif → yeni base URL'de kendiliğinden devre dışı (koda dokunulmadı).
+- **CANLI KANIT (funded key `yzk_live_****6cda`):** `/v1/chat/completions` → **200**, bakiye 925.2764 → 925.2759 (−0.0005 TL), `usage_records.status=success`. 6 model ailesi (Claude/GPT-5.4-mini/GPT-5.5/o4-mini/Gemini-3.1) hepsi 200+düşüm. `gemini-3-pro-preview` → 403 "Model disabled". **Ledger drift=0.**
+- **Fiyatlar DEĞİŞMEDİ** (talimat + DOKUNULMAZ kuralı): `pricing-service`, `pricing/`, `customerInputUsd` aynı.
+- **GÜVENLİK:** sohbette geçen yeni sağlayıcı key'i (`sk-****UHNk`) rote edilmeli.
 
 ### Katalog ↔ upstream isim uyuşmazlığı
 - Public katalog `gpt-5.4`, `claude-sonnet-4-...` gösteriyor; OmniRoute `cx/`, `cc/`, `seslab-auto` prefix bekliyor.
@@ -98,10 +99,11 @@ Ops (`/Users/ufuk/yeniapi/_ops`, git dışı): `backup-full.sh` sertleştirildi.
 
 ## 7. Son çalıştırılan testler
 
-- Yerel: `npm test` → **278 passed (64 dosya)**, `npx tsc --noEmit` temiz, `npm run build` temiz
+- Yerel: `npm test` → **278 passed (64 dosya)**, `npx tsc --noEmit` temiz, `npm run build` temiz (dist/server.js 336kb)
+- Faz 7-11 turu (2026-05-30): `npm test -- admin` 28 passed, `npm test -- telegram` 34 passed, lint temiz, build temiz
 - itest: `npm run itest` → 3 passed (K1/K2 gerçek DB, gerektirir: `npm run db:up` + migrate)
 - e2e: `npm run e2e` → 17 passed (önceki turda; Playwright)
-- Canlı: `/health` 200 (db=ok, aiProvider=ok), `/status` 200, `/api/models` 42, ledger drift=0
+- Canlı: `/health` 200 (db=ok, aiProvider=ok), `/status` 200 (modelCount=42, deploy.id sync-...-d6ca658), ledger drift=0
 
 ## 8. Başarısız denemeler (tekrarlama)
 

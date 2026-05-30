@@ -165,6 +165,21 @@ export const systemApiConfig = pgTable("system_api_config", {
   maintenanceModeForApi: boolean("maintenance_mode_for_api").notNull().default(false),
   maintenanceMessage: text("maintenance_message").notNull().default("API geçici olarak bakım modunda."),
   strictCanonicalModelIds: boolean("strict_canonical_model_ids").notNull().default(true),
+  providerBaseUrl: text("provider_base_url"),
+  providerApiKeyCipher: text("provider_api_key_cipher"),
+  providerApiKeyUpdatedAt: timestamp("provider_api_key_updated_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+});
+
+// ── added_models (additive catalog layer on top of MASTER_MODELS) ─────────────
+export const addedModels = pgTable("added_models", {
+  modelId: text("model_id").primaryKey(),
+  name: text("name").notNull(),
+  providerLabel: text("provider_label").notNull().default(""),
+  inputUsd: numeric("input_usd", { precision: 14, scale: 8 }).notNull().default("0"),
+  outputUsd: numeric("output_usd", { precision: 14, scale: 8 }).notNull().default("0"),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });
 
