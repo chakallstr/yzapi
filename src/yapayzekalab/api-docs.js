@@ -4,7 +4,7 @@ export const API_DOC_SECTIONS = [
     label: "Hızlı başlangıç",
     title: "API bağlantısını 5 dakikada kur",
     intro:
-      "YapayZekaLab, Claude Popusk model kataloğunu tek API anahtarıyla sunar. Kendi hesabından `yzk_live_` anahtarını üret, bakiyeni yükle ve doğrudan üretim endpointlerine bağlan.",
+      "YapayZekaLab, geniş bir model kataloğunu tek API anahtarıyla sunar. Kendi hesabından `yzk_live_` anahtarını üret, bakiyeni yükle ve doğrudan üretim endpointlerine bağlan.",
     bullets: [
       "Base URL: `https://yapayzekalab.org/v1`",
       "Yetkilendirme: `Authorization: Bearer yzk_live_YOUR_KEY`",
@@ -119,7 +119,7 @@ export const API_DOC_SECTIONS = [
         type: "Desktop · OpenAI-compatible",
         steps: [
           "Model sağlayıcısı olarak OpenAI-compatible profil aç.",
-          "Base URL `https://yapayzekalab.org/v1` olsun.",
+          "API adresine `https://yapayzekalab.org/v1` yaz. (Cherry `/v1` çoğaltırsa adresi `https://yapayzekalab.org` kök bırak ya da tam yolu `#` ile bitir: `.../v1/chat/completions#`.)",
           "API Key olarak `yzk_live_...` kullan.",
           "İlk denemede `/v1/models` üzerinden gördüğün canonical model adını seç.",
         ],
@@ -309,13 +309,14 @@ X-YZ-Request-Id: req_123456789`,
   {
     key: "models",
     label: "Model kataloğu",
-    title: "Öne çıkan aktif modeller",
+    title: "Aktif modeller",
     intro:
-      "Tam canlı katalog için `/v1/models` kullanılmalı. Aşağıdaki liste, YapayZekaLab içinde öne çıkarılan Claude Popusk uyumlu metin modellerini gösterir.",
+      "Aşağıdaki liste şu an aktif sağlayıcıda kullanılabilen modelleri gösterir. Tam ve güncel liste için her zaman `/v1/models` ucunu kullan — aktif sağlayıcı değişirse liste de değişir.",
     modelGroups: [
       {
-        family: "Claude",
+        family: "Claude (Anthropic)",
         models: [
+          "claude-opus-4.8",
           "claude-opus-4-7",
           "claude-opus-4-6",
           "claude-sonnet-4-6",
@@ -323,31 +324,17 @@ X-YZ-Request-Id: req_123456789`,
         ],
       },
       {
-        family: "GPT",
+        family: "GPT (OpenAI)",
         models: [
           "gpt-5.5",
-          "gpt-5.5-2026-04-23",
           "gpt-5.4",
-          "gpt-5.4-mini",
-          "gpt-5.4-nano",
-          "gpt-5.3-chat-latest",
         ],
       },
       {
-        family: "o-series",
-        models: [
-          "o4-mini",
-          "o3",
-          "o3-mini",
-        ],
-      },
-      {
-        family: "Gemini",
+        family: "Gemini (Google)",
         models: [
           "gemini-3.1-pro-preview",
-          "gemini-3.1-pro-preview-customtools",
-          "gemini-3-pro-preview",
-          "gemini-3-flash-preview",
+          "gemini-3.5-flash",
         ],
       },
     ],
