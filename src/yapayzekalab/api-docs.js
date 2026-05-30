@@ -56,7 +56,7 @@ export const API_DOC_SECTIONS = [
     label: "Desteklenen istemciler",
     title: "Desteklenen istemciler ve bağlantı parametreleri",
     intro:
-      "Tüm OpenAI-uyumlu istemciler base URL + `yzk_live_` anahtarıyla çalışır (Codex CLI, Cline, Roo Code, Kilo Code, OpenCode, Cherry Studio, OpenAI SDK). Claude Code için Anthropic-uyumlu `/v1/messages` endpointi açıktır; `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ile bağlanılır.",
+      "Tüm OpenAI-uyumlu istemciler base URL + `yzk_live_` anahtarıyla çalışır (Codex CLI, Cline, Roo Code, Kilo Code, OpenCode, Cherry Studio, OpenAI SDK). Claude Code için Anthropic-uyumlu `/v1/messages` endpointi açıktır; `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ile bağlanılır. İpucu: doğru araç–model eşleşmesi → OpenAI modelleri (`gpt-5.5`, `gpt-5.4`) için OpenAI-uyumlu istemciler/Codex CLI, Claude modelleri (`claude-opus-4-7` vb.) için Claude Code.",
     clientCards: [
       {
         name: "Cline",
@@ -133,11 +133,12 @@ export const API_DOC_SECTIONS = [
           "Kurulum: `npm install -g @openai/codex`.",
           "Ortam: `export OPENAI_BASE_URL=\"https://yapayzekalab.org/v1\"` ve `export OPENAI_API_KEY=\"yzk_live_...\"`.",
           "Veya `~/.codex/config.toml` içinde `model_provider` olarak base_url `https://yapayzekalab.org/v1` tanımla.",
-          "Model olarak katalogdaki bir ID kullan: `gpt-5.4`, `claude-sonnet-4-6`, `gpt-5.5`.",
+          "Model olarak bir OpenAI ID kullan: `gpt-5.5` veya `gpt-5.4`. Codex bir OpenAI aracıdır; OpenAI modelleriyle sorunsuz çalışır.",
+          "Claude/Gemini modeli (örn. `claude-opus-4-7`) Codex içinde önerilmez: Codex bu modellerin metadata'sını tanımaz (\"Model metadata not found\" uyarısı) ve oturum kararsız olabilir. Claude modelleri için aşağıdaki Claude Code kartını kullan.",
           "`codex` komutuyla başlat.",
         ],
         code: `# ~/.codex/config.toml
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_provider = "yapayzekalab"
 
 [model_providers.yapayzekalab]
