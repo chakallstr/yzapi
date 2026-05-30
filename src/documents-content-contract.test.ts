@@ -6,10 +6,10 @@ const dataSource = readFileSync("src/yapayzekalab/api-docs.js", "utf8");
 const combined = `${docsSource}\n${dataSource}`;
 
 describe("documents tab content contract", () => {
-  it("adapts the Claude Popusk docs flow to YapayZekaLab", () => {
-    expect(combined).toContain("Claude Popusk akışı");
+  it("provides a clear step-by-step getting-started doc surface", () => {
+    expect(combined).toContain("API Dokümantasyonu");
+    expect(combined).toContain("sıfırdan adım adım");
     expect(combined).toContain("API bağlantısını 5 dakikada kur");
-    expect(combined).toContain("docs.claude-popusk.shop");
   });
 
   it("uses YapayZekaLab production endpoint and live key format", () => {

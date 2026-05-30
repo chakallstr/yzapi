@@ -38,12 +38,14 @@ const DocumentsTab = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <Caption>Documents</Caption>
+          <Caption>Dokümantasyon</Caption>
           <h2 style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.8, margin: '6px 0 6px' }}>
-            Claude Popusk akışı, <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: 'var(--ink-3)' }}>YapayZekaLab’e uyarlanmış</span>
+            API Dokümantasyonu — <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: 'var(--ink-3)' }}>sıfırdan adım adım</span>
           </h2>
           <p style={{ fontSize: 12.5, color: 'var(--ink-2)', margin: 0, lineHeight: 1.55, maxWidth: 720 }}>
-            `docs.claude-popusk.shop` içeriğinin ürününe uyarlanmış sürümü burada yer alır. Araç bağlantıları, model kimlikleri, v1 endpoint yüzeyi ve bakiye davranışı YapayZekaLab canlı akışına göre yazılmıştır.
+            Hiç API kullanmamış biri için baştan sona kurulum. Sırayla ilerle: anahtarını al, bakiye yükle,
+            ilk isteğini gönder, sonra aracını (Codex, Claude Code, Roo Code, OpenAI SDK) bağla. Soldaki
+            içindekilerden istediğin adıma atlayabilirsin.
           </p>
         </div>
         <button onClick={copyAll} style={{
@@ -61,38 +63,47 @@ const DocumentsTab = () => {
       <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr)', gap: 18, alignItems: 'start' }}>
         <Card pad={18} style={{ position: 'sticky', top: 84 }}>
           <Caption>İçindekiler</Caption>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
             {docs.map((doc, index) => (
               <button
                 key={doc.key}
                 onClick={() => navigateToDoc(doc.key)}
                 type="button"
                 style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  gap: 10, padding: '10px 12px', borderRadius: 10,
-                  background: 'var(--surface-2)', border: '1px solid var(--border)',
-                  color: 'var(--ink)', textDecoration: 'none', textAlign: 'left', width: '100%',
+                  display: 'flex', alignItems: 'center',
+                  gap: 11, padding: '9px 11px', borderRadius: 10,
+                  background: 'transparent', border: '1px solid transparent',
+                  color: 'var(--ink)', textAlign: 'left', width: '100%', cursor: 'pointer',
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; }}
               >
-                <div>
-                  <div style={{ fontSize: 12.5, fontWeight: 600 }}>{doc.title}</div>
-                  <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 2 }}>{doc.label}</div>
-                </div>
-                <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5 }}>{index + 1}</Chip>
+                <span style={{
+                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'var(--accent)', color: '#fff', fontSize: 11, fontWeight: 700,
+                  fontFamily: 'var(--font-mono)',
+                }}>{index + 1}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.3 }}>{doc.title}</span>
               </button>
             ))}
           </div>
         </Card>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {docs.map((doc) => (
+          {docs.map((doc, index) => (
             <Card key={doc.key} pad={22} id={`doc-${doc.key}`} style={{ scrollMarginTop: 84 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
+                <span style={{
+                  width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'var(--accent)', color: '#fff', fontSize: 15, fontWeight: 700,
+                  fontFamily: 'var(--font-mono)',
+                }}>{index + 1}</span>
                 <div>
-                  <Caption>{doc.label}</Caption>
-                  <div style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>{doc.title}</div>
+                  <Caption>{`Adım ${index + 1} · ${doc.label}`}</Caption>
+                  <div style={{ fontSize: 18, fontWeight: 600, marginTop: 2 }}>{doc.title}</div>
                 </div>
-                <Chip tone="accent" style={{ fontSize: 9.5 }}>{doc.key.toUpperCase()}</Chip>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.72 }}>
@@ -100,10 +111,19 @@ const DocumentsTab = () => {
                 </p>
 
                 {doc.bullets?.length ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                     {doc.bullets.map((bullet, index) => (
-                      <div key={index} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', marginTop: 7, flexShrink: 0 }} />
+                      <div key={index} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                        {doc.ordered ? (
+                          <span style={{
+                            width: 20, height: 20, borderRadius: '50%', flexShrink: 0, marginTop: 1,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: 'var(--accent)', color: '#fff', fontSize: 10.5, fontWeight: 700,
+                            fontFamily: 'var(--font-mono)',
+                          }}>{index + 1}</span>
+                        ) : (
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', marginTop: 7, flexShrink: 0 }} />
+                        )}
                         <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.68 }}>{bullet}</p>
                       </div>
                     ))}
@@ -111,20 +131,24 @@ const DocumentsTab = () => {
                 ) : null}
 
                 {doc.clientCards?.length ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
                     {doc.clientCards.map((card) => (
-                      <div key={card.name} style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', borderRadius: 12, padding: 14 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 600 }}>{card.name}</div>
-                            <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 2 }}>{card.type}</div>
-                          </div>
+                      <div key={card.name} style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', borderRadius: 12, padding: 16 }}>
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ fontSize: 13.5, fontWeight: 700 }}>{card.name}</div>
+                          <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 2 }}>{card.type}</div>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                           {card.steps.map((step, index) => (
-                            <p key={index} style={{ margin: 0, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.62 }}>
-                              {index + 1}. {step}
-                            </p>
+                            <div key={index} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+                              <span style={{
+                                width: 18, height: 18, borderRadius: '50%', flexShrink: 0, marginTop: 1,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                background: 'var(--ink)', color: '#fff', fontSize: 10, fontWeight: 700,
+                                fontFamily: 'var(--font-mono)',
+                              }}>{index + 1}</span>
+                              <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.55 }}>{step}</p>
+                            </div>
                           ))}
                         </div>
                         {card.code ? (
