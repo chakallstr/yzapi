@@ -1,5 +1,5 @@
 import postgres from "postgres";
-import { drizzle } from "drizzle-orm/postgres-js";
+import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { eq } from "drizzle-orm";
 import dotenv from "dotenv";
 dotenv.config();
@@ -11,7 +11,39 @@ const {
   plans,
   providerDurumlari,
   announcements,
+  addedModels,
 } = schema;
+
+// ── Metro yeni modelleri (additive katman) ──────────────────────────────────
+// claude-opus-4.8 ve gemini-3.5-flash MASTER_MODELS'e EKLENMEZ (42-kilit korunur);
+// added_models katmanından gelirler. Fiyatlar onaylı kilitli tablodan (USD/1M,
+// input=output). added-model-service.addedModelToMasterModel bunları okuma anında
+// type "Metin" + chat/messages uçlarıyla sentezler — burada sadece ham satır + id +
+// fiyat tutulur, yeni fiyat matematiği yok. Yalnızca aktif sağlayıcı (metro) bu
+// id'leri supported_model_ids ile listelediğinde görünür olurlar (Task 5).
+const METRO_ADDED_MODELS = [
+  { modelId: "claude-opus-4.8", name: "Claude Opus 4.8", providerLabel: "Anthropic", inputUsd: "1.20", outputUsd: "1.20" },
+  { modelId: "gemini-3.5-flash", name: "Gemini 3.5 Flash", providerLabel: "Google", inputUsd: "0.90", outputUsd: "0.90" },
+] as const;
+
+// Idempotent seed: iki metro modelini added_models'a ekler (enabled=true). modelId
+// primary key olduğundan onConflictDoNothing tekrar çalıştırmada no-op'tur; mevcut
+// satırların fiyatını/etiketini EZMEZ.
+export async function seedMetroAddedModels(db: PostgresJsDatabase<typeof schema>): Promise<void> {
+  for (const m of METRO_ADDED_MODELS) {
+    await db
+      .insert(addedModels)
+      .values({
+        modelId: m.modelId,
+        name: m.name,
+        providerLabel: m.providerLabel,
+        inputUsd: m.inputUsd,
+        outputUsd: m.outputUsd,
+        enabled: true,
+      })
+      .onConflictDoNothing();
+  }
+}
 
 async function main() {
   const connectionString = process.env.DATABASE_URL;
@@ -127,6 +159,10 @@ async function main() {
     })
     .onConflictDoNothing();
   console.log("  announcements upserted");
+
+  // ── added_models (metro yeni modelleri) ─────────────────────────────────────
+  await seedMetroAddedModels(db);
+  console.log("  added_models (metro) upserted");
 
   console.log("  api_keys skipped");
   console.log("  transactions skipped");

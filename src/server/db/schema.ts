@@ -183,6 +183,19 @@ export const addedModels = pgTable("added_models", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });
 
+// ── provider_profiles (multi-provider switch: metro ⇄ closerouter) ────────────
+export const providerProfiles = pgTable("provider_profiles", {
+  id: text("id").primaryKey(), // e.g. "metro", "closerouter"
+  label: text("label").notNull().default(""),
+  baseUrl: text("base_url").notNull().default(""),
+  apiKeyCipher: text("api_key_cipher"), // AES-GCM ciphertext, nullable
+  enabled: boolean("enabled").notNull().default(true),
+  supportedModelIds: jsonb("supported_model_ids").notNull().default(sql`'[]'::jsonb`),
+  modelMap: jsonb("model_map").notNull().default(sql`'{}'::jsonb`), // catalog id -> upstream id
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+});
+
 // ── api_key_policies ──────────────────────────────────────────────────────────
 export const apiKeyPolicies = pgTable(
   "api_key_policies",

@@ -5,7 +5,7 @@ import { AppError, BadRequestError, InsufficientBalanceError, ModelDisabledError
 import { canonicalizeModelId, type MasterModel } from "../../master-models.js";
 import { checkRateLimit } from "../services/rate-limit-service.js";
 import { reserveUsageBudget, settleReservedUsage } from "../services/billing-service.js";
-import { resolveCatalogModel } from "../services/added-model-service.js";
+import { resolveActiveCatalogModel } from "../services/added-model-service.js";
 import { getActiveProviderAdapter } from "../services/provider-adapter.js";
 import { db } from "../db/client.js";
 import { modelOverrides, systemConfig, users } from "../db/schema.js";
@@ -113,7 +113,7 @@ async function resolveEnabledModel(
   endpoint: string,
 ): Promise<{ masterModel: MasterModel; runtimePolicy: ModelRuntimePolicySnapshot | null }> {
   const canonicalModelId = canonicalizeModelId(modelId);
-  const masterModel = await resolveCatalogModel(canonicalModelId ?? modelId ?? "");
+  const masterModel = await resolveActiveCatalogModel(canonicalModelId ?? modelId ?? "");
   if (!masterModel) {
     throw new ModelNotFoundError(modelId ?? "(none)");
   }

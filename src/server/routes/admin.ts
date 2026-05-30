@@ -34,6 +34,9 @@ import {
   getProviderConfigAdminView,
   saveProviderConfig,
   testProviderConnection,
+  listProviderProfiles,
+  upsertProviderProfile,
+  setActiveProvider,
 } from "../services/provider-config-service.js";
 import {
   createAddedModel,
@@ -291,6 +294,67 @@ router.post("/provider/test-connection", async (req, res, next) => {
       ...(body.providerApiKey !== undefined ? { providerApiKey: body.providerApiKey } : {}),
     });
     res.json(result);
+  } catch (e) { next(e); }
+});
+
+// ── Provider profiles: metro ⇄ closerouter active-provider switch (R-panel) ────
+// Each view exposes only the masked key — never the cipher or plaintext.
+router.get("/provider-profiles", async (_req, res, next) => {
+  try {
+    res.json(await listProviderProfiles());
+  } catch (e) { next(e); }
+});
+
+router.post("/provider-profiles", async (req, res, next) => {
+  try {
+    const body = req.body ?? {};
+    // upsertProviderProfile validates the base URL (400) and rejects empty-string
+    // keys (400); the apiKey is write-only (omitted → cipher unchanged).
+    try {
+      const view = await upsertProviderProfile({
+        id: String(body.id ?? ""),
+        ...(body.label !== undefined ? { label: String(body.label) } : {}),
+        ...(body.baseUrl !== undefined ? { baseUrl: String(body.baseUrl) } : {}),
+        ...(Object.prototype.hasOwnProperty.call(body, "apiKey") ? { apiKey: body.apiKey } : {}),
+        ...(body.enabled !== undefined ? { enabled: Boolean(body.enabled) } : {}),
+        ...(body.supportedModelIds !== undefined ? { supportedModelIds: body.supportedModelIds } : {}),
+        ...(body.modelMap !== undefined ? { modelMap: body.modelMap } : {}),
+      });
+      await writeAudit(
+        "provider_profile_upsert",
+        view.id,
+        `baseUrlChanged: ${body.baseUrl !== undefined}, apiKeyChanged: ${Boolean(body.apiKey)}`,
+      );
+      res.json(view);
+    } catch (upsertErr) {
+      // Audit the attempt even when validation fails.
+      await writeAudit(
+        "provider_profile_upsert",
+        String(body.id ?? "unknown"),
+        `rejected: ${upsertErr instanceof Error ? upsertErr.message : "invalid input"}`,
+      );
+      throw upsertErr;
+    }
+  } catch (e) { next(e); }
+});
+
+router.post("/provider-profiles/activate", async (req, res, next) => {
+  try {
+    const body = req.body ?? {};
+    const id = String(body.id ?? "");
+    try {
+      const view = await setActiveProvider(id);
+      await writeAudit("provider_profile_activate", view.id, `activeProviderId: ${view.id}`);
+      res.json(view);
+    } catch (activateErr) {
+      // Audit the attempt even when it is rejected (unknown/disabled provider).
+      await writeAudit(
+        "provider_profile_activate",
+        id || "unknown",
+        `rejected: ${activateErr instanceof Error ? activateErr.message : "invalid input"}`,
+      );
+      throw activateErr;
+    }
   } catch (e) { next(e); }
 });
 

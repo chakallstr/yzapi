@@ -865,6 +865,16 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
   const [testResult, setTestResult] = useState(null);
   const [testError, setTestError] = useState('');
 
+  // ── Aktif sağlayıcı (provider_profiles): metro ⇄ closerouter switch ──────────
+  const [profiles, setProfiles] = useState([]);
+  const [profilesError, setProfilesError] = useState('');
+  const [profileDrafts, setProfileDrafts] = useState({}); // id -> { baseUrl, apiKey, supportedModelIds }
+  const [activatingId, setActivatingId] = useState('');
+  const [savingProfileId, setSavingProfileId] = useState('');
+  const [testingProfileId, setTestingProfileId] = useState('');
+  const [profileTestResult, setProfileTestResult] = useState({}); // id -> result
+  const [profileNotice, setProfileNotice] = useState('');
+
   const selectedModel = useMemo(
     () => modelPolicies.find((row) => row.modelId === selectedModelId) || modelPolicies[0] || null,
     [modelPolicies, selectedModelId],
@@ -897,6 +907,7 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
       });
       setTestResult(null);
       setTestError('');
+      await loadProfiles();
       if (!selectedModelId && models[0]?.modelId) setSelectedModelId(models[0].modelId);
       if (!selectedKeyId && apiKeys[0]?.id) setSelectedKeyId(apiKeys[0].id);
     } catch (loadError) {
@@ -1060,6 +1071,108 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
       setTestError(testErr.message || 'Bağlantı testi başarısız.');
     } finally {
       setTesting(false);
+    }
+  };
+
+  // ── Aktif sağlayıcı (provider_profiles) yönetimi ─────────────────────────────
+  const loadProfiles = async () => {
+    setProfilesError('');
+    try {
+      const list = await adminRequest('/api/admin/provider-profiles', token);
+      const rows = Array.isArray(list) ? list : [];
+      setProfiles(rows);
+      // Düzenleme taslaklarını yükle (anahtar asla geri gösterilmez → boş).
+      setProfileDrafts((current) => {
+        const next = { ...current };
+        for (const p of rows) {
+          if (!next[p.id]) {
+            next[p.id] = {
+              baseUrl: p.baseUrl || '',
+              apiKey: '',
+              supportedModelIds: (p.supportedModelIds || []).join(', '),
+            };
+          }
+        }
+        return next;
+      });
+    } catch (loadErr) {
+      setProfilesError(loadErr.message || 'Sağlayıcı profilleri alınamadı.');
+    }
+  };
+
+  const setProfileDraftField = (id, key, value) => {
+    setProfileNotice('');
+    setProfileDrafts((current) => ({ ...current, [id]: { ...current[id], [key]: value } }));
+  };
+
+  const activateProfile = async (profile) => {
+    setActivatingId(profile.id);
+    setProfilesError('');
+    setProfileNotice('');
+    try {
+      await adminRequest('/api/admin/provider-profiles/activate', token, {
+        method: 'POST',
+        body: { id: profile.id },
+      });
+      await load();
+      setProfileNotice(`Aktif sağlayıcı: ${profile.label || profile.id}`);
+    } catch (activateErr) {
+      setProfilesError(activateErr.message || 'Sağlayıcı aktifleştirilemedi.');
+    } finally {
+      setActivatingId('');
+    }
+  };
+
+  const saveProfile = async (profile) => {
+    const draft = profileDrafts[profile.id] || {};
+    setSavingProfileId(profile.id);
+    setProfilesError('');
+    setProfileNotice('');
+    try {
+      const trimmedKey = String(draft.apiKey || '').trim();
+      const body = {
+        id: profile.id,
+        baseUrl: String(draft.baseUrl || '').trim(),
+        supportedModelIds: String(draft.supportedModelIds || '')
+          .split(',')
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+      };
+      // Boş key alanı = mevcut anahtar korunur (apiKey gönderilmez).
+      if (trimmedKey) body.apiKey = trimmedKey;
+      await adminRequest('/api/admin/provider-profiles', token, { method: 'POST', body });
+      // Kaydedilen anahtarı taslaktan temizle (write-only).
+      setProfileDrafts((current) => ({ ...current, [profile.id]: { ...current[profile.id], apiKey: '' } }));
+      await load();
+      setProfileNotice(`${profile.label || profile.id} kaydedildi.`);
+    } catch (saveErr) {
+      setProfilesError(saveErr.message || 'Sağlayıcı profili kaydedilemedi.');
+    } finally {
+      setSavingProfileId('');
+    }
+  };
+
+  const testProfile = async (profile) => {
+    const draft = profileDrafts[profile.id] || {};
+    setTestingProfileId(profile.id);
+    setProfilesError('');
+    setProfileTestResult((current) => ({ ...current, [profile.id]: null }));
+    try {
+      const trimmedKey = String(draft.apiKey || '').trim();
+      const baseUrl = String(draft.baseUrl || '').trim();
+      const body = {};
+      // Kaydedilmemiş (pending) base/key ile test; anahtar asla geri gösterilmez.
+      if (baseUrl) body.providerBaseUrl = baseUrl;
+      if (trimmedKey) body.providerApiKey = trimmedKey;
+      const result = await adminRequest('/api/admin/provider/test-connection', token, { method: 'POST', body });
+      setProfileTestResult((current) => ({ ...current, [profile.id]: result }));
+    } catch (testErr) {
+      setProfileTestResult((current) => ({
+        ...current,
+        [profile.id]: { ok: false, upstreamStatus: null, latencyMs: null, errorCategory: testErr.message || 'test başarısız' },
+      }));
+    } finally {
+      setTestingProfileId('');
     }
   };
 
@@ -1236,6 +1349,126 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
 
       {subSection === 'providers' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <Card pad={18}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              <div>
+                <Caption>Aktif sağlayıcı</Caption>
+                <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 4 }}>
+                  Tek tıkla aktif sağlayıcıyı değiştir (metro ⇄ closerouter). Değişiklik anında geçerli olur, restart gerekmez.
+                </div>
+              </div>
+              {profileNotice && <Chip tone="ok">{profileNotice}</Chip>}
+            </div>
+            {profilesError && <div style={{ marginTop: 10 }}><ErrorBox>{profilesError}</ErrorBox></div>}
+            {profiles.length === 0 ? (
+              <div style={{ marginTop: 14 }}><EmptyState>Sağlayıcı profili yok.</EmptyState></div>
+            ) : (
+              <div style={{ ...grid(300), marginTop: 14 }}>
+                {profiles.map((profile) => {
+                  const draft = profileDrafts[profile.id] || { baseUrl: '', apiKey: '', supportedModelIds: '' };
+                  const pTest = profileTestResult[profile.id];
+                  return (
+                    <Card key={profile.id} pad={16} style={profile.isActive ? { border: '1.5px solid var(--ok-bg)', boxShadow: '0 0 0 1px #a7f3d0' } : undefined}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                        <div>
+                          <Caption>{profile.id}</Caption>
+                          <div style={{ fontSize: 15, fontWeight: 600, marginTop: 4 }}>{profile.label || profile.id}</div>
+                          <div style={{ fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
+                            {profile.apiKeyMasked ? `anahtar: ${profile.apiKeyMasked}` : 'anahtar yok'}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
+                          <Chip tone={profile.isActive ? 'ok' : 'neutral'}>{profile.isActive ? 'aktif' : (profile.enabled ? 'pasif' : 'kapalı')}</Chip>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => activateProfile(profile)}
+                        disabled={profile.isActive || !profile.enabled || activatingId === profile.id}
+                        style={{
+                          marginTop: 12,
+                          width: '100%',
+                          padding: '9px 12px',
+                          borderRadius: 9,
+                          background: profile.isActive ? 'var(--surface-2)' : 'var(--ink)',
+                          color: profile.isActive ? 'var(--ink-3)' : '#fff',
+                          fontWeight: 600,
+                          fontSize: 12,
+                          border: profile.isActive ? '1px solid var(--border)' : 'none',
+                          opacity: (profile.isActive || !profile.enabled || activatingId === profile.id) ? 0.7 : 1,
+                          cursor: profile.isActive ? 'default' : 'pointer',
+                        }}
+                      >
+                        {profile.isActive ? 'Şu an aktif' : (activatingId === profile.id ? 'Aktifleştiriliyor…' : 'Aktifleştir')}
+                      </button>
+
+                      <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <Caption>Base URL</Caption>
+                          <input
+                            value={draft.baseUrl}
+                            onChange={(e) => setProfileDraftField(profile.id, 'baseUrl', e.target.value)}
+                            placeholder="https://upstream.example.com/v1"
+                            style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }}
+                          />
+                        </label>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <Caption>API anahtarı (yazılır, gösterilmez)</Caption>
+                          <input
+                            type="password"
+                            autoComplete="new-password"
+                            value={draft.apiKey}
+                            onChange={(e) => setProfileDraftField(profile.id, 'apiKey', e.target.value)}
+                            placeholder={profile.apiKeyMasked || 'sk-… (boş bırakılırsa değişmez)'}
+                            style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }}
+                          />
+                        </label>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <Caption>Desteklenen model id (virgülle)</Caption>
+                          <textarea
+                            value={draft.supportedModelIds}
+                            onChange={(e) => setProfileDraftField(profile.id, 'supportedModelIds', e.target.value)}
+                            rows={2}
+                            placeholder="gpt-5, claude-opus-4.8, gemini-3.5-flash"
+                            style={{ ...inputStyle, resize: 'vertical', minHeight: 56, fontFamily: 'var(--font-mono)', fontSize: 11 }}
+                          />
+                        </label>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                        <button
+                          onClick={() => saveProfile(profile)}
+                          disabled={savingProfileId === profile.id}
+                          style={{ padding: '8px 11px', borderRadius: 9, background: 'var(--ink)', color: '#fff', fontWeight: 600, fontSize: 12, opacity: savingProfileId === profile.id ? 0.7 : 1 }}
+                        >
+                          {savingProfileId === profile.id ? 'Kaydediliyor…' : 'Kaydet'}
+                        </button>
+                        <button
+                          onClick={() => testProfile(profile)}
+                          disabled={testingProfileId === profile.id}
+                          style={{ padding: '8px 11px', borderRadius: 9, border: '1px solid var(--border)', fontSize: 12, opacity: testingProfileId === profile.id ? 0.7 : 1 }}
+                        >
+                          {testingProfileId === profile.id ? 'Test ediliyor…' : 'Test'}
+                        </button>
+                      </div>
+
+                      {pTest && (
+                        <div style={{ marginTop: 10, padding: 10, borderRadius: 9, border: '1px solid var(--border)', background: pTest.ok ? 'var(--ok-bg)' : '#fef2f2', color: pTest.ok ? '#047857' : '#b91c1c', fontSize: 11.5 }}>
+                          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 600 }}>{pTest.ok ? 'Bağlantı başarılı' : 'Bağlantı başarısız'}</span>
+                            <span className="tnum">upstream: {pTest.upstreamStatus ?? '—'}</span>
+                            <span className="tnum">gecikme: {pTest.latencyMs ?? '—'}ms</span>
+                            {pTest.errorCategory && <span style={{ fontFamily: 'var(--font-mono)' }}>{pTest.errorCategory}</span>}
+                          </div>
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+
           <Card pad={18}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
               <div>

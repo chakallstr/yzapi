@@ -4,7 +4,7 @@ import { computePrice, type ComputedPrice } from "../../pricing.js";
 import { db } from "../db/client.js";
 import { modelOverrides, modelRuntimePolicies } from "../db/schema.js";
 import { buildPricingConfig } from "../services/pricing-service.js";
-import { getMergedCatalogModels } from "../services/added-model-service.js";
+import { getActiveCatalogModels } from "../services/added-model-service.js";
 
 type V1ModelPricing = {
   unit: ComputedPrice["unit"];
@@ -67,7 +67,7 @@ function buildPricing(computed: ComputedPrice | undefined): V1ModelPricing | nul
 async function buildCatalogEntries(): Promise<V1CatalogEntry[]> {
   const cfg = await buildPricingConfig();
   const [mergedModels, overrides, runtimePolicies] = await Promise.all([
-    getMergedCatalogModels(),
+    getActiveCatalogModels(),
     db.select().from(modelOverrides),
     db.select().from(modelRuntimePolicies),
   ]);

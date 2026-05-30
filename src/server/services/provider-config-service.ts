@@ -11,7 +11,7 @@
 
 import { eq } from "drizzle-orm";
 import { db } from "../db/client.js";
-import { systemApiConfig } from "../db/schema.js";
+import { systemApiConfig, providerProfiles } from "../db/schema.js";
 import { aiProviderBaseUrl, aiProviderApiKey } from "../lib/env.js";
 import { encryptApiKey, decryptApiKey } from "./api-key-service.js";
 import { BadRequestError } from "../lib/errors.js";
@@ -37,9 +37,20 @@ export interface EffectiveProviderConfig {
   baseUrl: string;            // never returned to clients
   apiKey: string | undefined; // never returned to clients
   source: {
-    baseUrl: "db" | "env";
-    apiKey: "db" | "env" | "none";
+    // "profile" => active provider_profiles row, "db" => system_api_config,
+    // "env" => process env bootstrap fallback (Task 4 / R-resolve).
+    baseUrl: "profile" | "db" | "env";
+    apiKey: "profile" | "db" | "env" | "none";
   };
+}
+
+// The active provider profile, parsed safely from provider_profiles. Used by the
+// Task 5 catalog filter (supportedModelIds) and the closerouter model mapping
+// (modelMap). NEVER carries the cipher or the plaintext key.
+export interface ActiveProfile {
+  id: string;
+  supportedModelIds: string[];          // [] => parsed empty / malformed jsonb
+  modelMap: Record<string, string>;     // {} => parsed empty / malformed jsonb
 }
 
 // Admin-facing (authenticated) view — base URL + masked key + timestamp.
@@ -49,6 +60,19 @@ export interface ProviderConfigAdminView {
   providerBaseUrlSource: "db" | "env";
   providerApiKeyMasked: string | null;  // null => no DB key (env fallback)
   providerApiKeyUpdatedAt: string | null;
+}
+
+// Admin-facing (authenticated) view of one provider_profiles row (Task 6 /
+// R-panel). Carries only the masked key — NEVER the cipher or the plaintext.
+export interface ProviderProfileAdminView {
+  id: string;
+  label: string;
+  baseUrl: string;
+  apiKeyMasked: string | null;          // null => no key stored on this profile
+  enabled: boolean;
+  supportedModelIds: string[];
+  modelMap: Record<string, string>;
+  isActive: boolean;                    // id === system_api_config.activeProviderId
 }
 
 export interface ConnectionTestResult {
@@ -98,43 +122,128 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+// ── Active provider profile read helpers ──────────────────────────────────────
+
+// Reads the active provider_profiles row: the row whose id == activeProviderId
+// and which is enabled. Returns null when there is no system_api_config row, no
+// active id, no matching/enabled profile, or when the provider_profiles table is
+// not reachable yet (e.g. before migration 0013, or unit tests without a live
+// DB). The null result keeps resolution on the existing system_api_config → env
+// path, preserving backward compatibility (Task 4 / R-resolve).
+async function readActiveProfileRow(): Promise<typeof providerProfiles.$inferSelect | null> {
+  const configRow = await readConfigRow();
+  const activeProviderId = configRow?.activeProviderId;
+  if (!isNonEmptyString(activeProviderId)) return null;
+
+  try {
+    const rows = await db
+      .select()
+      .from(providerProfiles)
+      .where(eq(providerProfiles.id, activeProviderId))
+      .limit(1);
+    const row = rows[0] ?? null;
+    if (!row || row.enabled !== true) return null;
+    return row;
+  } catch {
+    // provider_profiles unreachable (pre-migration / no live DB / fake-db without
+    // the table seeded): behave exactly as before — system_api_config → env.
+    return null;
+  }
+}
+
+// Parse a jsonb value expected to hold string[]. Tolerates missing/malformed
+// data (returns []), and arrays already materialised by Drizzle as JS values.
+function parseStringArray(value: unknown): string[] {
+  let candidate: unknown = value;
+  if (typeof candidate === "string") {
+    try {
+      candidate = JSON.parse(candidate);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(candidate)) return [];
+  return candidate.filter((item): item is string => typeof item === "string");
+}
+
+// Parse a jsonb value expected to hold Record<string, string>. Tolerates
+// missing/malformed data (returns {}), drops non-string values defensively.
+function parseStringRecord(value: unknown): Record<string, string> {
+  let candidate: unknown = value;
+  if (typeof candidate === "string") {
+    try {
+      candidate = JSON.parse(candidate);
+    } catch {
+      return {};
+    }
+  }
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(candidate as Record<string, unknown>)) {
+    if (typeof v === "string") out[k] = v;
+  }
+  return out;
+}
+
 // ── Resolution (DB-first, env fallback) ──────────────────────────────────────
 
 // Combined resolve (single DB read), used by the connection test and forwarders.
+//
+// Resolution order (Task 4 / R-resolve):
+//   1. Active provider profile (provider_profiles where id = activeProviderId AND
+//      enabled) — base URL when non-empty; key from decrypting api_key_cipher.
+//   2. Existing system_api_config (id = 1) — provider_base_url / cipher.
+//   3. Process env (aiProviderBaseUrl / aiProviderApiKey) — bootstrap fallback.
+//
+// Backward compatibility: when no active/enabled provider_profiles row exists
+// (e.g. before the profiles seed/migration, or a live DB without profiles), the
+// resolver behaves exactly as before — system_api_config → env.
 export async function resolveEffectiveProviderConfig(): Promise<EffectiveProviderConfig> {
   if (cache && Date.now() - cache.at < CACHE_TTL_MS) {
     return cache.config;
   }
 
   const row = await readConfigRow();
+  const profile = await readActiveProfileRow();
 
-  // Base URL: DB-first (Requirement 3.1), else env (Requirement 3.2).
+  // ── Base URL ────────────────────────────────────────────────────────────────
   let baseUrl: string;
-  let baseUrlSource: "db" | "env";
-  if (row && isNonEmptyString(row.providerBaseUrl)) {
+  let baseUrlSource: "profile" | "db" | "env";
+  if (profile && isNonEmptyString(profile.baseUrl)) {
+    // 1. Active provider profile.
+    baseUrl = profile.baseUrl;
+    baseUrlSource = "profile";
+  } else if (row && isNonEmptyString(row.providerBaseUrl)) {
+    // 2. system_api_config (Requirement 3.1).
     baseUrl = row.providerBaseUrl;
     baseUrlSource = "db";
   } else {
+    // 3. env (Requirement 3.2).
     baseUrl = aiProviderBaseUrl();
     baseUrlSource = "env";
   }
 
-  // API key: DB cipher → decrypt (rotation fallback) (Requirement 3.3 / 13.2),
-  // else env (Requirement 3.4).
+  // ── API key ───────────────────────────────────────────────────────────────
+  // Each cipher is decrypted with the rotation fallback order (Requirement 13.2);
+  // a cipher that cannot be decrypted under any active secret falls through to the
+  // next source rather than forwarding upstream with a broken credential.
   let apiKey: string | undefined;
-  let apiKeySource: "db" | "env" | "none";
-  if (row && isNonEmptyString(row.providerApiKeyCipher)) {
-    const decrypted = decryptApiKey(row.providerApiKeyCipher);
-    if (decrypted) {
-      apiKey = decrypted;
-      apiKeySource = "db";
-    } else {
-      // Cipher could not be decrypted under any active secret — fall back to env
-      // rather than forwarding upstream with a broken credential.
-      apiKey = aiProviderApiKey();
-      apiKeySource = apiKey ? "env" : "none";
-    }
+  let apiKeySource: "profile" | "db" | "env" | "none";
+  const profileKey =
+    profile && isNonEmptyString(profile.apiKeyCipher) ? decryptApiKey(profile.apiKeyCipher) : null;
+  const dbKey =
+    row && isNonEmptyString(row.providerApiKeyCipher) ? decryptApiKey(row.providerApiKeyCipher) : null;
+
+  if (profileKey) {
+    // 1. Active provider profile.
+    apiKey = profileKey;
+    apiKeySource = "profile";
+  } else if (dbKey) {
+    // 2. system_api_config (Requirement 3.3).
+    apiKey = dbKey;
+    apiKeySource = "db";
   } else {
+    // 3. env (Requirement 3.4).
     apiKey = aiProviderApiKey();
     apiKeySource = apiKey ? "env" : "none";
   }
@@ -146,6 +255,36 @@ export async function resolveEffectiveProviderConfig(): Promise<EffectiveProvide
   };
   cache = { config, at: Date.now() };
   return config;
+}
+
+// ── Active profile resolution (catalog filter + closerouter model mapping) ────
+
+// Returns the active provider profile parsed safely from provider_profiles, or
+// null when no active/enabled profile exists (no profile restriction). Used by
+// the Task 5 catalog filter and the profile-based closerouter model mapping.
+export async function resolveActiveProfile(): Promise<ActiveProfile | null> {
+  const profile = await readActiveProfileRow();
+  if (!profile) return null;
+  return {
+    id: profile.id,
+    supportedModelIds: parseStringArray(profile.supportedModelIds),
+    modelMap: parseStringRecord(profile.modelMap),
+  };
+}
+
+// The active profile's catalog-id → upstream-id model map. Empty object when
+// there is no active profile (closerouter passes model ids through unchanged).
+export async function resolveActiveModelMap(): Promise<Record<string, string>> {
+  const profile = await resolveActiveProfile();
+  return profile ? profile.modelMap : {};
+}
+
+// The active profile's supported catalog ids, or null when there is no active
+// profile. null means "no profile restriction → show all" (backward compat); an
+// empty array means the profile explicitly supports no models.
+export async function resolveSupportedModelIds(): Promise<string[] | null> {
+  const profile = await resolveActiveProfile();
+  return profile ? profile.supportedModelIds : null;
 }
 
 // DB-first resolution with env fallback. Reads system_api_config (id = 1).
@@ -258,6 +397,177 @@ export async function saveProviderConfig(input: {
   );
 
   return getProviderConfigAdminView();
+}
+
+// ── Provider profiles (Task 6 / R-panel: metro ⇄ closerouter switch) ──────────
+
+// Builds the admin-safe view of a provider_profiles row. The key is masked via
+// maskProviderApiKey(decrypt(cipher)); the cipher/plaintext are NEVER exposed.
+// A cipher that cannot be decrypted under any active secret masks to null
+// (rather than throwing) so the panel still renders.
+function toProviderProfileAdminView(
+  row: typeof providerProfiles.$inferSelect,
+  activeProviderId: string | null,
+): ProviderProfileAdminView {
+  let apiKeyMasked: string | null = null;
+  if (isNonEmptyString(row.apiKeyCipher)) {
+    const plaintext = decryptApiKey(row.apiKeyCipher);
+    apiKeyMasked = plaintext ? maskProviderApiKey(plaintext) : null;
+  }
+  return {
+    id: row.id,
+    label: row.label ?? "",
+    baseUrl: row.baseUrl ?? "",
+    apiKeyMasked,
+    enabled: row.enabled === true,
+    supportedModelIds: parseStringArray(row.supportedModelIds),
+    modelMap: parseStringRecord(row.modelMap),
+    isActive: activeProviderId !== null && row.id === activeProviderId,
+  };
+}
+
+// Lists every provider_profiles row as an admin-safe view. NEVER returns the
+// cipher or plaintext (only the masked key). isActive marks the row whose id
+// equals system_api_config.activeProviderId.
+export async function listProviderProfiles(): Promise<ProviderProfileAdminView[]> {
+  const configRow = await readConfigRow();
+  const activeProviderId = isNonEmptyString(configRow?.activeProviderId)
+    ? configRow!.activeProviderId
+    : null;
+
+  const rows = await db.select().from(providerProfiles);
+  return rows.map((row) => toProviderProfileAdminView(row, activeProviderId));
+}
+
+// Upserts a provider_profiles row. The apiKey is write-only: a non-empty value
+// is encrypted (AES-GCM) and stored; an omitted key leaves the cipher unchanged;
+// an empty-string key is rejected (400). The base URL, when present, must be a
+// valid absolute http/https URL (400). Invalidates the resolver cache so the
+// change is visible immediately (no restart). Returns the admin-safe view.
+export async function upsertProviderProfile(input: {
+  id: string;
+  label?: string;
+  baseUrl?: string;
+  apiKey?: string | undefined;
+  enabled?: boolean;
+  supportedModelIds?: string[];
+  modelMap?: Record<string, string>;
+}): Promise<ProviderProfileAdminView> {
+  const id = typeof input.id === "string" ? input.id.trim() : "";
+  if (!id) {
+    throw new BadRequestError("Sağlayıcı profili id zorunlu.");
+  }
+
+  // Base URL validation (mirrors saveProviderConfig) — reject 400, value unchanged.
+  let baseUrl: string | undefined;
+  if (input.baseUrl !== undefined) {
+    const trimmed = input.baseUrl.trim();
+    if (!isValidProviderBaseUrl(trimmed)) {
+      throw new BadRequestError("Geçersiz sağlayıcı base URL — mutlak http/https adresi gerekli.");
+    }
+    baseUrl = trimmed;
+  }
+
+  // Empty-string key rejected; omitted key leaves cipher unchanged (write-only).
+  if (input.apiKey === "") {
+    throw new BadRequestError("Sağlayıcı API anahtarı boş olamaz.");
+  }
+
+  const existingRows = await db
+    .select()
+    .from(providerProfiles)
+    .where(eq(providerProfiles.id, id))
+    .limit(1);
+  const existing = existingRows[0] ?? null;
+
+  if (existing) {
+    // ── Update: only patch provided fields; cipher untouched unless a non-empty key. ──
+    const patch: Partial<typeof providerProfiles.$inferInsert> = { updatedAt: new Date() };
+    if (input.label !== undefined) patch.label = input.label;
+    if (baseUrl !== undefined) patch.baseUrl = baseUrl;
+    if (input.enabled !== undefined) patch.enabled = input.enabled;
+    if (input.supportedModelIds !== undefined) patch.supportedModelIds = input.supportedModelIds;
+    if (input.modelMap !== undefined) patch.modelMap = input.modelMap;
+    if (isNonEmptyString(input.apiKey)) patch.apiKeyCipher = encryptApiKey(input.apiKey);
+
+    await db.update(providerProfiles).set(patch).where(eq(providerProfiles.id, id));
+  } else {
+    // ── Insert: a brand-new profile. ──
+    const values: typeof providerProfiles.$inferInsert = {
+      id,
+      label: input.label ?? "",
+      baseUrl: baseUrl ?? "",
+      enabled: input.enabled ?? true,
+      supportedModelIds: input.supportedModelIds ?? [],
+      modelMap: input.modelMap ?? {},
+    };
+    if (isNonEmptyString(input.apiKey)) values.apiKeyCipher = encryptApiKey(input.apiKey);
+
+    await db.insert(providerProfiles).values(values);
+  }
+
+  invalidateProviderConfigCache();
+
+  logger.info(
+    {
+      profileId: id,
+      baseUrlChanged: baseUrl !== undefined,
+      apiKeyChanged: isNonEmptyString(input.apiKey),
+    },
+    "provider profile upserted",
+  );
+
+  const configRow = await readConfigRow();
+  const activeProviderId = isNonEmptyString(configRow?.activeProviderId)
+    ? configRow!.activeProviderId
+    : null;
+  const savedRows = await db
+    .select()
+    .from(providerProfiles)
+    .where(eq(providerProfiles.id, id))
+    .limit(1);
+  const saved = savedRows[0];
+  if (!saved) {
+    // Should not happen (we just wrote it); defensive guard.
+    throw new BadRequestError("Sağlayıcı profili kaydedilemedi.");
+  }
+  return toProviderProfileAdminView(saved, activeProviderId);
+}
+
+// Sets the active provider. Verifies a provider_profiles row with that id exists
+// and is enabled (else 400 — you cannot activate an unknown/disabled provider),
+// writes system_api_config.activeProviderId, and invalidates the resolver cache
+// so the switch takes effect immediately (no restart). This is the metro ⇄
+// closerouter switch.
+export async function setActiveProvider(id: string): Promise<ProviderProfileAdminView> {
+  const targetId = typeof id === "string" ? id.trim() : "";
+  if (!targetId) {
+    throw new BadRequestError("Aktifleştirilecek sağlayıcı id zorunlu.");
+  }
+
+  const rows = await db
+    .select()
+    .from(providerProfiles)
+    .where(eq(providerProfiles.id, targetId))
+    .limit(1);
+  const profile = rows[0] ?? null;
+  if (!profile) {
+    throw new BadRequestError("Sağlayıcı profili bulunamadı.");
+  }
+  if (profile.enabled !== true) {
+    throw new BadRequestError("Pasif sağlayıcı aktifleştirilemez.");
+  }
+
+  await db
+    .update(systemApiConfig)
+    .set({ activeProviderId: targetId, updatedAt: new Date() })
+    .where(eq(systemApiConfig.id, 1));
+
+  invalidateProviderConfigCache();
+
+  logger.info({ activeProviderId: targetId }, "active provider switched");
+
+  return toProviderProfileAdminView(profile, targetId);
 }
 
 // ── Connection test ──────────────────────────────────────────────────────────

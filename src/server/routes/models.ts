@@ -4,7 +4,7 @@ import { announcements, modelOverrides, modelRuntimePolicies } from "../db/schem
 import { and, eq, lte, gte } from "drizzle-orm";
 import { computePrice } from "../../pricing.js";
 import { buildPricingConfig } from "../services/pricing-service.js";
-import { getMergedCatalogModels } from "../services/added-model-service.js";
+import { getActiveCatalogModels } from "../services/added-model-service.js";
 
 const router = Router();
 
@@ -13,7 +13,7 @@ router.get("/models", async (_req, res, next) => {
   try {
     const cfg = await buildPricingConfig();
 
-    const mergedModels = await getMergedCatalogModels();
+    const mergedModels = await getActiveCatalogModels();
     const overrides = await db.select().from(modelOverrides);
     const runtimePolicies = await db.select().from(modelRuntimePolicies);
     const overrideMap = new Map(overrides.map((o) => [o.modelId, o]));

@@ -21,6 +21,7 @@ import {
 import { db } from "../db/client.js";
 import { addedModels } from "../db/schema.js";
 import { BadRequestError, ConflictError } from "../lib/errors.js";
+import { resolveSupportedModelIds } from "./provider-config-service.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -186,4 +187,35 @@ export async function resolveCatalogModel(modelId: string): Promise<MasterModel 
   const merged = await getMergedCatalogModels();
   const canonical = canonicalizeModelId(modelId) ?? modelId;
   return merged.find((model) => model.id === modelId || model.id === canonical);
+}
+
+// ── Active-profile catalog filter (Task 5 / R-catalog) ─────────────────────────
+
+// The merged catalog restricted to the active provider profile's supported model
+// ids. When there is no active/enabled provider profile, resolveSupportedModelIds()
+// returns null ("no restriction") and the full merged catalog is returned
+// unchanged — preserving backward compatibility (existing tests have no
+// provider_profiles row → null → full 42-model catalog). When a non-null array is
+// returned, the catalog is filtered to models whose id is in that set, preserving
+// the merged order (master models first, then added models).
+export async function getActiveCatalogModels(): Promise<MasterModel[]> {
+  const merged = await getMergedCatalogModels();
+  const supportedModelIds = await resolveSupportedModelIds();
+  if (supportedModelIds === null) {
+    // No active profile restriction → show the full merged catalog (back-compat).
+    return merged;
+  }
+  const supportedSet = new Set(supportedModelIds);
+  return merged.filter((model) => supportedSet.has(model.id));
+}
+
+// Resolve a single model id against the active-profile-filtered catalog. Behaves
+// like resolveCatalogModel but only returns a model that passes the active-profile
+// filter — so a model not supported by the active provider is treated as not-found
+// (the /v1 forwarders map this to ModelNotFoundError). When there is no active
+// profile (null), this is equivalent to resolveCatalogModel (back-compat).
+export async function resolveActiveCatalogModel(modelId: string): Promise<MasterModel | undefined> {
+  const active = await getActiveCatalogModels();
+  const canonical = canonicalizeModelId(modelId) ?? modelId;
+  return active.find((model) => model.id === modelId || model.id === canonical);
 }
