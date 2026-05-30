@@ -31,7 +31,33 @@ import {
   listProviderProfiles,
 } from "../src/server/services/provider-config-service.js";
 import { aiProviderBaseUrl } from "../src/server/lib/env.js";
-import { dbSql } from "../src/server/db/client.js";
+import { db, dbSql } from "../src/server/db/client.js";
+import { addedModels } from "../src/server/db/schema.js";
+
+// Metro added models (additive layer; MASTER_MODELS 42-kilit korunur). Seeded
+// inline (NOT imported from db/seed.ts, whose top-level main() would run as an
+// import side-effect). Idempotent via onConflictDoNothing — never overwrites an
+// existing row's price/label. Prices from the approved locked table (USD/1M).
+const METRO_ADDED_MODELS = [
+  { modelId: "claude-opus-4.8", name: "Claude Opus 4.8", providerLabel: "Anthropic", inputUsd: "1.20", outputUsd: "1.20" },
+  { modelId: "gemini-3.5-flash", name: "Gemini 3.5 Flash", providerLabel: "Google", inputUsd: "0.90", outputUsd: "0.90" },
+] as const;
+
+async function seedAddedModelsInline() {
+  for (const m of METRO_ADDED_MODELS) {
+    await db
+      .insert(addedModels)
+      .values({
+        modelId: m.modelId,
+        name: m.name,
+        providerLabel: m.providerLabel,
+        inputUsd: m.inputUsd,
+        outputUsd: m.outputUsd,
+        enabled: true,
+      })
+      .onConflictDoNothing();
+  }
+}
 
 // Metro upstream base URL (OpenAI-compatible, Bearer). The provider serves
 // /v1/chat/completions, so the base URL keeps the /v1 suffix.
@@ -75,6 +101,13 @@ async function main() {
   const activeProvider = (process.env.ACTIVE_PROVIDER || "metro").trim();
 
   console.log("Seeding provider profiles...");
+
+  // ── added_models (metro yeni modelleri) ─────────────────────────────────────
+  // claude-opus-4.8 + gemini-3.5-flash added_models katmanından gelir (MASTER_MODELS
+  // 42-kilit korunur). deploy seed.ts'i çalıştırmadığı için burada idempotent seed
+  // edilir; metro profili bu id'leri supported_model_ids ile görünür kılar.
+  await seedAddedModelsInline();
+  console.log("  added_models (metro) seeded (claude-opus-4.8, gemini-3.5-flash)");
 
   // ── metro (active upstream) ─────────────────────────────────────────────────
   await upsertProviderProfile({
