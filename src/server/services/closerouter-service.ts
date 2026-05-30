@@ -1,5 +1,5 @@
 import { Response } from "express";
-import { pipeline } from "stream";
+import { Readable } from "stream";
 import { aiProviderBaseUrl } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { canonicalizeModelId } from "../../master-models.js";
@@ -280,7 +280,6 @@ export async function forwardChatStream(
     const usage: ChatUsage = { promptTokens: 0, completionTokens: 0 };
     let assistantText = "";
     let settled = false;
-    const { Readable } = require("stream") as typeof import("stream");
     const nodeStream = Readable.fromWeb(upstream.body as import("stream/web").ReadableStream);
 
     let buffer = "";
