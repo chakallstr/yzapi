@@ -1719,6 +1719,47 @@ const AdminPaymentSettings = ({ config, token, refresh }) => {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  // ── Yeni üye deneme bonusu ayarları ──────────────────────────────────────────
+  const [bonusForm, setBonusForm] = useState({
+    signupBonusEnabled: false,
+    signupBonusTL: 10,
+    signupBonusMaxPerIp: 3,
+  });
+  const [bonusSaving, setBonusSaving] = useState(false);
+  const [bonusSaved, setBonusSaved] = useState(false);
+
+  useEffect(() => {
+    setBonusForm({
+      signupBonusEnabled: Boolean(config?.signupBonusEnabled),
+      signupBonusTL: Number(config?.signupBonusTL ?? 10),
+      signupBonusMaxPerIp: Number(config?.signupBonusMaxPerIp ?? 3),
+    });
+  }, [config]);
+
+  const setBonusField = (key, value) => {
+    setBonusSaved(false);
+    setBonusForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const saveBonus = async () => {
+    setBonusSaving(true);
+    setBonusSaved(false);
+    try {
+      await adminRequest('/api/admin/config', token, {
+        method: 'POST',
+        body: {
+          signupBonusEnabled: bonusForm.signupBonusEnabled,
+          signupBonusTL: Number(bonusForm.signupBonusTL) || 0,
+          signupBonusMaxPerIp: Number(bonusForm.signupBonusMaxPerIp) || 0,
+        },
+      });
+      setBonusSaved(true);
+      await refresh();
+    } finally {
+      setBonusSaving(false);
+    }
+  };
+
   // ── Bekleyen havale (IBAN) onay kuyruğu ──────────────────────────────────────
   const [pendingIban, setPendingIban] = useState([]);
   const [pendingLoading, setPendingLoading] = useState(true);
@@ -1881,6 +1922,57 @@ const AdminPaymentSettings = ({ config, token, refresh }) => {
             </div>
           </div>
         ))}
+      </Card>
+
+      <Card pad={20}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+          <div>
+            <Caption>Yeni üye bonusu</Caption>
+            <div style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>Deneme bonusu</div>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-2)', lineHeight: 1.6, marginTop: 6 }}>
+              Açıkken her yeni üyeye hesap başına TAM bir kez bonus bakiye eklenir. Kötüye kullanım koruması:
+              hesap başına 1 kez, e-posta tekilliği ve IP başına azami hesap sınırı uygulanır.
+            </div>
+          </div>
+          <button onClick={() => setBonusField('signupBonusEnabled', !bonusForm.signupBonusEnabled)} style={{
+            width: 48, height: 26, borderRadius: 999, flexShrink: 0,
+            background: bonusForm.signupBonusEnabled ? 'var(--accent)' : 'var(--ink-5)',
+            position: 'relative',
+          }}>
+            <span style={{ position: 'absolute', top: 3, left: bonusForm.signupBonusEnabled ? 25 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 14 }}>
+          <div>
+            <Caption style={{ marginBottom: 6 }}>Bonus tutarı (TL)</Caption>
+            <input
+              type="number" min="0" step="1"
+              value={bonusForm.signupBonusTL}
+              onChange={(e) => setBonusField('signupBonusTL', e.target.value)}
+              placeholder="10"
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <Caption style={{ marginBottom: 6 }}>IP başına azami hesap</Caption>
+            <input
+              type="number" min="0" step="1"
+              value={bonusForm.signupBonusMaxPerIp}
+              onChange={(e) => setBonusField('signupBonusMaxPerIp', e.target.value)}
+              placeholder="3"
+              style={inputStyle}
+            />
+          </div>
+        </div>
+        <button onClick={saveBonus} disabled={bonusSaving} style={{ marginTop: 14, width: '100%', padding: '10px 12px', borderRadius: 10, background: 'var(--ink)', color: '#fff', fontWeight: 600, opacity: bonusSaving ? 0.7 : 1 }}>
+          {bonusSaving ? 'Kaydediliyor…' : 'Bonus ayarlarını kaydet'}
+        </button>
+        {bonusSaved && (
+          <div style={{ marginTop: 10, fontSize: 11.5, color: '#047857', background: 'var(--ok-bg)', border: '1px solid #a7f3d0', borderRadius: 9, padding: '8px 10px' }}>
+            Bonus ayarları kaydedildi.{!bonusForm.signupBonusEnabled ? ' (Şu an kapalı — bonus verilmez.)' : ` Her yeni üyeye ₺${Number(bonusForm.signupBonusTL).toFixed(2)} eklenecek.`}
+          </div>
+        )}
       </Card>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 0.9fr) minmax(320px, 1.1fr)', gap: 18 }}>

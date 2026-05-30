@@ -15,6 +15,7 @@ export interface TokenPayload {
 export interface WhatsappPendingPayload {
   sub: string;
   email: string;
+  isNew?: boolean;
   type: "whatsapp_pending";
 }
 
@@ -30,7 +31,7 @@ export function signAccessToken(payload: { sub: string; role: "admin" | "user" }
   return jwt.sign(payload, env.JWT_SECRET, { expiresIn: env.JWT_ACCESS_TTL_SEC });
 }
 
-export function signWhatsappPendingToken(payload: { sub: string; email: string }): string {
+export function signWhatsappPendingToken(payload: { sub: string; email: string; isNew?: boolean }): string {
   return jwt.sign({ ...payload, type: "whatsapp_pending" }, env.JWT_SECRET, {
     expiresIn: env.WHATSAPP_PENDING_TTL_SEC,
   });
@@ -41,7 +42,7 @@ export function verifyWhatsappPendingToken(token: string): WhatsappPendingPayloa
   if (payload.type !== "whatsapp_pending" || !payload.sub || !payload.email) {
     throw new Error("Invalid WhatsApp pending token");
   }
-  return { sub: payload.sub, email: payload.email, type: "whatsapp_pending" };
+  return { sub: payload.sub, email: payload.email, isNew: payload.isNew === true, type: "whatsapp_pending" };
 }
 
 export async function signRefreshToken(userId: string): Promise<string> {

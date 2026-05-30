@@ -16,6 +16,7 @@ import {
   verifyWhatsappPendingToken,
 } from "../services/auth-service.js";
 import { welcomeEmail } from "../services/email-service.js";
+import { grantSignupBonusIfEligible } from "../services/signup-bonus-service.js";
 import {
   hasActiveVerifiedWhatsappForUser,
   isWhatsappOtpEnabled,
@@ -123,9 +124,20 @@ router.get("/google/callback", async (req, res, next) => {
         ozet: `WhatsApp OTP bekliyor: ${profile.email}`,
         actorId: userId,
       });
-      const pendingToken = signWhatsappPendingToken({ sub: userId, email: profile.email });
+      const pendingToken = signWhatsappPendingToken({ sub: userId, email: profile.email, isNew });
       res.redirect(buildFrontendReturnUrl({ wv: "required", wpt: pendingToken }));
       return;
+    }
+
+    // Deneme bonusu: SADECE GERÇEKTEN YENİ kullanıcıya (isNew). Mevcut kullanıcı
+    // tekrar giriş yaptığında bonus ALMAZ. WhatsApp OTP kapalıyken (telefon gate'i
+    // yok) burada IP sinyaliyle verilir. OTP açıkken bonus, telefon doğrulaması
+    // başarılı olunca whatsapp-otp/verify ucunda verilir (1 telefon = 1 bonus).
+    // grantSignupBonusIfEligible idempotent + abuse-korumalı; auth akışını bloklamaz.
+    if (isNew && !isWhatsappOtpEnabled()) {
+      await grantSignupBonusIfEligible(userId, { ip: req.ip }).catch((e) =>
+        logger.error({ err: e, userId }, "[auth] signup bonus failed"),
+      );
     }
 
     const accessToken = signAccessToken({ sub: userId, role: "user" });
@@ -238,6 +250,17 @@ router.post("/whatsapp-otp/verify", async (req, res, next) => {
       ozet: `WhatsApp doğrulandı: ${pending.email}`,
       actorId: pending.sub,
     });
+
+    // Deneme bonusu: SADECE GERÇEKTEN YENİ üyeye (pending token'daki isNew). OTP
+    // açık yolda telefon doğrulaması BAŞARILI olunca verilir — verifyWhatsappOtp
+    // phone_hash UNIQUE guard'ı (1 telefon=1 doğrulama) en güçlü abuse gate'idir.
+    // Mevcut kullanıcı (isNew=false) WhatsApp doğrulasa bile bonus ALMAZ.
+    // Idempotent (hesap başına 1 kez); auth akışını bloklamaz.
+    if (pending.isNew) {
+      await grantSignupBonusIfEligible(pending.sub, { ip: req.ip }).catch((e) =>
+        logger.error({ err: e, userId: pending.sub }, "[auth] signup bonus (whatsapp) failed"),
+      );
+    }
 
     const accessToken = signAccessToken({ sub: pending.sub, role: "user" });
     const refreshToken = await signRefreshToken(pending.sub);

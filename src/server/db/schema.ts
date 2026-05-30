@@ -36,6 +36,9 @@ export const systemConfig = pgTable("system_config", {
   maxBakiyeTL: numeric("max_bakiye_tl", { precision: 14, scale: 4 }).notNull().default("50000"),
   minBakiyeTL: numeric("min_bakiye_tl", { precision: 14, scale: 4 }).notNull().default("250"),
   anomaliEsikTL: numeric("anomali_esik_tl", { precision: 14, scale: 4 }).notNull().default("500"),
+  signupBonusEnabled: boolean("signup_bonus_enabled").notNull().default(false),
+  signupBonusTL: numeric("signup_bonus_tl", { precision: 14, scale: 4 }).notNull().default("10"),
+  signupBonusMaxPerIp: integer("signup_bonus_max_per_ip").notNull().default(3),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });
 
@@ -280,6 +283,25 @@ export const transactions = pgTable(
     idempotencyKey: text("idempotency_key").unique(),
   },
   (t) => [index("transactions_user_ts_idx").on(t.userId, t.timestamp)]
+);
+
+// ── signup_bonus_grants (yeni üye deneme bonusu, hesap başına TAM 1 kez) ─────────
+export const signupBonusGrants = pgTable(
+  "signup_bonus_grants",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    amountTL: numeric("amount_tl", { precision: 14, scale: 4 }).notNull(),
+    ipHash: text("ip_hash").notNull().default(""),
+    phoneHash: text("phone_hash").notNull().default(""),
+    transactionId: uuid("transaction_id").references(() => transactions.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [
+    index("signup_bonus_grants_ip_idx").on(t.ipHash),
+    index("signup_bonus_grants_phone_idx").on(t.phoneHash),
+  ]
 );
 
 // ── usage_records ──────────────────────────────────────────────────────────────

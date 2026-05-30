@@ -117,6 +117,9 @@ function serializeConfig(cfg: typeof systemConfig.$inferSelect) {
     maxBakiyeTL: Number(cfg.maxBakiyeTL),
     minBakiyeTL: Number(cfg.minBakiyeTL),
     anomaliEsikTL: Number(cfg.anomaliEsikTL),
+    signupBonusEnabled: cfg.signupBonusEnabled,
+    signupBonusTL: Number(cfg.signupBonusTL),
+    signupBonusMaxPerIp: cfg.signupBonusMaxPerIp,
   };
 }
 
@@ -217,6 +220,9 @@ router.post("/config", async (req, res, next) => {
     if (body.maxBakiyeTL !== undefined) updates.maxBakiyeTL = String(body.maxBakiyeTL);
     if (body.minBakiyeTL !== undefined) updates.minBakiyeTL = String(body.minBakiyeTL);
     if (body.anomaliEsikTL !== undefined) updates.anomaliEsikTL = String(body.anomaliEsikTL);
+    if (body.signupBonusEnabled !== undefined) updates.signupBonusEnabled = Boolean(body.signupBonusEnabled);
+    if (body.signupBonusTL !== undefined) updates.signupBonusTL = String(Math.max(0, Number(body.signupBonusTL) || 0));
+    if (body.signupBonusMaxPerIp !== undefined) updates.signupBonusMaxPerIp = Math.max(0, Math.floor(Number(body.signupBonusMaxPerIp) || 0));
     updates.updatedAt = new Date();
 
     await db.update(systemConfig).set(updates).where(eq(systemConfig.id, 1));
