@@ -20,6 +20,8 @@ export interface StatusSnapshot {
   lastKurRefresh: string | null;
   deploy: {
     id: string | null;
+    commit: string | null;
+    deployedAt: string | null;
     previousRev: string | null;
     backupFile: string | null;
     smoke: unknown | null;
@@ -65,26 +67,46 @@ async function readLastKurRefresh(): Promise<string | null> {
   }
 }
 
-async function readLatestDeployRecord(): Promise<StatusSnapshot["deploy"]> {
+export async function readLatestDeployRecord(): Promise<StatusSnapshot["deploy"]> {
   const deployDir = process.env.DEPLOY_STATE_DIR ?? ".deploy";
+  const empty = { id: null, commit: null, deployedAt: null, previousRev: null, backupFile: null, smoke: null };
+
+  // Prefer the single deterministic pointer written by sync-deploy.sh.
+  try {
+    const raw = await readFile(join(deployDir, "current-release.json"), "utf8");
+    const parsed = JSON.parse(raw);
+    return {
+      id: parsed.deploy_id ?? parsed.deployId ?? null,
+      commit: parsed.local_commit ?? parsed.commit ?? null,
+      deployedAt: parsed.timestamp_utc ?? parsed.created_at_utc ?? parsed.deployedAt ?? null,
+      previousRev: parsed.previous_rev ?? parsed.previousRev ?? null,
+      backupFile: parsed.backup_file ?? parsed.db_backup ?? parsed.backupFile ?? null,
+      smoke: parsed.smoke ?? null,
+    };
+  } catch {
+    // No pointer — fall through to scanning release files.
+  }
+
   try {
     const rootFiles = (await readdir(deployDir))
-      .filter((name) => name.endsWith(".txt") || name.endsWith(".json"))
+      .filter((name) => (name.endsWith(".txt") || name.endsWith(".json")) && name.length > 5)
       .map((name) => ({ dir: deployDir, name }));
     const releaseFiles = await readdir(join(deployDir, "releases"))
       .then((files) => files
-        .filter((name) => name.endsWith(".json"))
+        .filter((name) => name.endsWith(".json") && name.length > 5)
         .map((name) => ({ dir: join(deployDir, "releases"), name })))
       .catch(() => []);
     const latest = [...rootFiles, ...releaseFiles]
       .sort((a, b) => b.name.localeCompare(a.name))[0];
-    if (!latest) throw new Error("no deploy record");
+    if (!latest) return empty;
 
     const raw = await readFile(join(latest.dir, latest.name), "utf8");
     if (latest.name.endsWith(".json")) {
       const parsed = JSON.parse(raw);
       return {
         id: parsed.deploy_id ?? parsed.deployId ?? latest.name.replace(/\.json$/, ""),
+        commit: parsed.local_commit ?? parsed.commit ?? null,
+        deployedAt: parsed.timestamp_utc ?? parsed.created_at_utc ?? null,
         previousRev: parsed.previous_rev ?? parsed.previousRev ?? null,
         backupFile: parsed.backup_file ?? parsed.db_backup ?? parsed.backupFile ?? null,
         smoke: parsed.smoke ?? null,
@@ -102,12 +124,14 @@ async function readLatestDeployRecord(): Promise<StatusSnapshot["deploy"]> {
 
     return {
       id: fields.deploy_id ?? latest.name.replace(/\.txt$/, ""),
+      commit: fields.local_commit ?? null,
+      deployedAt: fields.created_at_utc ?? null,
       previousRev: fields.previous_rev ?? null,
       backupFile: fields.db_backup ?? null,
       smoke: null,
     };
   } catch {
-    return { id: null, previousRev: null, backupFile: null, smoke: null };
+    return empty;
   }
 }
 
