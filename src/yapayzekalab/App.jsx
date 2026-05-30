@@ -987,7 +987,27 @@ const App = ({ initialTab = 'home' }) => {
     const accessToken = query.get('at');
     const refreshToken = query.get('rt');
     const whatsappToken = query.get('wpt');
+    const telegramConnect = query.get('telegramConnect') === '1';
     const telegramLinkPayload = readTelegramLinkPayloadFromQuery(query);
+
+    if (telegramConnect) {
+      // User arrived from the Telegram bot's "bağla" button. Remember the intent,
+      // strip the param, and route them into the account Telegram section (login
+      // first if needed) where the working deep-link connect flow lives.
+      try { sessionStorage.setItem('yz_telegram_connect', '1'); } catch { /* ignore */ }
+      query.delete('telegramConnect');
+      const cleanQuery = query.toString();
+      const cleanUrl = `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ''}${window.location.hash || ''}`;
+      window.history.replaceState(window.history.state, document.title, cleanUrl);
+      if (hasStoredAuth()) {
+        setTab('account');
+        setGoto('telegram');
+      } else {
+        setPendingTab('account');
+        setShowLogin(true);
+      }
+      if (!accessToken && !refreshToken && !whatsappToken && !telegramLinkPayload) return;
+    }
 
     if (telegramLinkPayload) {
       storeTelegramLinkPayload(telegramLinkPayload);
@@ -1038,7 +1058,14 @@ const App = ({ initialTab = 'home' }) => {
     setIsAuthenticated(true);
     setWhatsappPendingToken('');
     setShowLogin(false);
-    setTab(pendingTab || (PROTECTED_TABS.has(initialTab) ? initialTab : 'account'));
+    let telegramConnectIntent = false;
+    try { telegramConnectIntent = sessionStorage.getItem('yz_telegram_connect') === '1'; } catch { /* ignore */ }
+    if (telegramConnectIntent) {
+      setTab('account');
+      setGoto('telegram');
+    } else {
+      setTab(pendingTab || (PROTECTED_TABS.has(initialTab) ? initialTab : 'account'));
+    }
     setPendingTab(null);
   }, [initialTab, pendingTab]);
 

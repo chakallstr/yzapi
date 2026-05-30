@@ -180,7 +180,7 @@ const TelegramLinkCard = ({ telegram, busy, message, onLink, onOpenBot, onRefres
   const statusTone = linked ? 'ok' : 'neutral';
 
   return (
-    <Card pad={22}>
+    <Card pad={22} id="account-telegram" style={{ scrollMarginTop: 80 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12 }}>
         <div>
           <Caption>Telegram</Caption>
@@ -755,6 +755,26 @@ const AccountTab = ({ ctx }) => {
       setTelegramBusy(false);
     }
   };
+
+  // Arrived from the Telegram bot "bağla" button (App stored the intent): once the
+  // account panel is open and not yet linked, surface the connect step clearly.
+  useEffect(() => {
+    let intent = false;
+    try { intent = sessionStorage.getItem('yz_telegram_connect') === '1'; } catch { /* ignore */ }
+    if (!intent) return;
+    try { sessionStorage.removeItem('yz_telegram_connect'); } catch { /* ignore */ }
+    if (me?.telegram?.linked) {
+      setTelegramMessage('Telegram hesabın zaten bağlı.');
+      return;
+    }
+    setTelegramMessage('Telegram hesabını bağlamak için "Telegram bağla" butonuna bas; bot otomatik açılıp bağlamayı tamamlayacak.');
+    const el = document.getElementById('account-telegram');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      el.classList.add('section-flash');
+      setTimeout(() => el.classList.remove('section-flash'), 1500);
+    }
+  }, [me?.telegram?.linked]);
 
   const openTelegramBot = () => {
     if (me?.telegram?.botUrl) window.open(me.telegram.botUrl, '_blank', 'noopener,noreferrer');

@@ -95,7 +95,7 @@ function telegramTopupWebAppUrl(): string {
 }
 
 function telegramDashboardUrl(): string {
-  return `${appBaseUrl()}/dashboard?telegramLink=1`;
+  return `${appBaseUrl()}/account?telegramConnect=1`;
 }
 
 function telegramDeepLink(code: string): string | null {
