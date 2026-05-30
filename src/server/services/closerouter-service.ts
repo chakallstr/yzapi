@@ -4,7 +4,7 @@ import { aiProviderBaseUrl } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { canonicalizeModelId } from "../../master-models.js";
 import { getRuntimeApiConfig } from "./api-settings-service.js";
-import { resolveProviderBaseUrl, resolveProviderApiKey } from "./provider-config-service.js";
+import { resolveProviderBaseUrl, resolveProviderApiKey, resolveActiveModelMap } from "./provider-config-service.js";
 
 export interface ChatUsage {
   promptTokens: number;
@@ -82,6 +82,22 @@ function mapRequestBodyForProvider<T extends Record<string, unknown>>(
   if (typeof body.model !== "string") return body;
   const mapped = mapModelForProvider(body.model, baseUrl);
   if (mapped === body.model) return body;
+  return { ...body, model: mapped };
+}
+
+// Applies the active provider profile's model_map (catalog-id → upstream-id) to
+// the outgoing request body's model. An empty map (no active profile, or no
+// mapping for this model) leaves the model unchanged — fully backward compatible.
+// This runs IN ADDITION to the legacy OmniRoute map so each provider profile can
+// declare its own upstream model naming (e.g. metro expects "claude-sonnet-4.6"
+// while our canonical catalog id is "claude-sonnet-4-6"). Does NOT touch billing:
+// the master model / cost is already resolved upstream in proxy.ts from the
+// canonical id; only the wire name sent to the provider changes here.
+async function applyProfileModelMap<T extends Record<string, unknown>>(body: T): Promise<T> {
+  if (typeof body.model !== "string") return body;
+  const map = await resolveActiveModelMap();
+  const mapped = map[body.model];
+  if (!mapped || mapped === body.model) return body;
   return { ...body, model: mapped };
 }
 
@@ -164,7 +180,9 @@ export async function forwardChat(
   const start = Date.now();
   const baseUrl = await resolveProviderBaseUrl();
   const url = `${baseUrl}/chat/completions`;
-  const providerBody = mapRequestBodyForProvider({ ...body, stream: false }, baseUrl);
+  const providerBody = await applyProfileModelMap(
+    mapRequestBodyForProvider({ ...body, stream: false }, baseUrl),
+  );
   const runtimeConfig = await getRuntimeApiConfig();
 
   const res = await fetchWithRuntimeTimeout(url, {
@@ -198,7 +216,9 @@ export async function forwardTextEndpoint(
   const start = Date.now();
   const baseUrl = await resolveProviderBaseUrl();
   const url = `${baseUrl}/${endpoint}`;
-  const providerBody = mapRequestBodyForProvider({ ...body, stream: false }, baseUrl);
+  const providerBody = await applyProfileModelMap(
+    mapRequestBodyForProvider({ ...body, stream: false }, baseUrl),
+  );
   const runtimeConfig = await getRuntimeApiConfig();
 
   const res = await fetchWithRuntimeTimeout(url, {
@@ -228,7 +248,9 @@ export async function forwardChatStream(
 ): Promise<ChatUsage> {
   const baseUrl = await resolveProviderBaseUrl();
   const url = `${baseUrl}/chat/completions`;
-  const providerBody = mapRequestBodyForProvider({ ...body, stream: true }, baseUrl);
+  const providerBody = await applyProfileModelMap(
+    mapRequestBodyForProvider({ ...body, stream: true }, baseUrl),
+  );
   const runtimeConfig = await getRuntimeApiConfig();
 
   const upstream = await fetchWithRuntimeTimeout(url, {

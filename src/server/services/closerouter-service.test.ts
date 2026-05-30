@@ -1,6 +1,25 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import nock from "nock";
+
+// Mutable holder for the active-profile model_map the mocked provider-config
+// service returns. Other tests keep it empty ({} => no rewrite, backward compat).
+const modelMapHolder = vi.hoisted(() => ({ map: {} as Record<string, string> }));
+
+// Mock ONLY resolveActiveModelMap; everything else (resolveProviderBaseUrl /
+// resolveProviderApiKey) keeps its real env-fallback behavior used by all tests.
+vi.mock("./provider-config-service.js", async (importActual) => {
+  const actual = await importActual<typeof import("./provider-config-service.js")>();
+  return {
+    ...actual,
+    resolveActiveModelMap: vi.fn(async () => modelMapHolder.map),
+  };
+});
+
 import { forwardChat, forwardTextEndpoint, mapModelForProvider, parseSseCompletion } from "./closerouter-service.js";
+
+beforeEach(() => {
+  modelMapHolder.map = {};
+});
 
 afterEach(() => {
   nock.cleanAll();
@@ -45,6 +64,23 @@ describe("forwardTextEndpoint", () => {
     expect(result.usage).toEqual({ promptTokens: 60, completionTokens: 15 });
   });
 
+  it("applies the active-profile model_map to /messages upstream wire name", async () => {
+    modelMapHolder.map = { "claude-sonnet-4-6": "claude-sonnet-4.6" };
+
+    nock("https://api.closerouter.dev", {
+      reqheaders: { authorization: "Bearer closerouter_test_key" },
+    })
+      // upstream MUST receive the mapped nokta-form id
+      .post("/v1/messages", (body) => body.model === "claude-sonnet-4.6")
+      .reply(200, { id: "msg_mapped", usage: { prompt_tokens: 7, completion_tokens: 2 } });
+
+    const result = await forwardTextEndpoint("messages", {
+      model: "claude-sonnet-4-6",
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    expect(result.raw).toMatchObject({ id: "msg_mapped" });
+  });
   it("throws upstream status and body when the AI provider returns an error", async () => {
     nock("https://api.closerouter.dev", {
       reqheaders: { authorization: "Bearer closerouter_test_key" },
@@ -112,5 +148,57 @@ describe("OmniRoute compatibility", () => {
     });
     expect(result.usage.promptTokens).toBeGreaterThan(0);
     expect(result.usage.completionTokens).toBeGreaterThan(0);
+  });
+});
+
+describe("active-profile model_map applied to upstream wire name", () => {
+  it("sends the profile-mapped upstream model id (catalog id stays canonical in our system)", async () => {
+    // The active provider profile maps our canonical catalog id (tire form) to
+    // the upstream wire name the provider expects (nokta form). The metro
+    // provider, e.g., serves "claude-sonnet-4.6" while our catalog id is
+    // "claude-sonnet-4-6". Proves applyProfileModelMap rewrites the wire model.
+    modelMapHolder.map = { "claude-sonnet-4-6": "claude-sonnet-4.6" };
+
+    const scope = nock("https://api.closerouter.dev", {
+      reqheaders: { authorization: "Bearer closerouter_test_key" },
+    })
+      // upstream MUST receive the mapped nokta-form id, not the canonical tire-form
+      .post("/v1/chat/completions", (body) => body.model === "claude-sonnet-4.6")
+      .reply(200, {
+        id: "chatcmpl_mapped",
+        usage: { prompt_tokens: 10, completion_tokens: 3 },
+        choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+      });
+
+    const result = await forwardChat({
+      model: "claude-sonnet-4-6",
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    expect(scope.isDone()).toBe(true); // upstream got the mapped id
+    expect(result.raw).toMatchObject({ id: "chatcmpl_mapped" });
+  });
+
+  it("leaves the model unchanged when the active profile has no mapping for it", async () => {
+    modelMapHolder.map = { "claude-sonnet-4-6": "claude-sonnet-4.6" };
+
+    const scope = nock("https://api.closerouter.dev", {
+      reqheaders: { authorization: "Bearer closerouter_test_key" },
+    })
+      // gpt-5.4 is not in the map → forwarded verbatim
+      .post("/v1/chat/completions", (body) => body.model === "gpt-5.4")
+      .reply(200, {
+        id: "chatcmpl_passthrough",
+        usage: { prompt_tokens: 5, completion_tokens: 2 },
+        choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+      });
+
+    const result = await forwardChat({
+      model: "gpt-5.4",
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    expect(scope.isDone()).toBe(true);
+    expect(result.raw).toMatchObject({ id: "chatcmpl_passthrough" });
   });
 });

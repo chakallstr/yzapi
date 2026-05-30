@@ -1,0 +1,123 @@
+// scripts/seed-provider-profiles.ts
+//
+// One-shot operator script: seeds the two provider profiles for the
+// metro-provider-switch feature and (optionally) activates one.
+//
+//   metro       — ACTIVE upstream (api.stepanovikov.uno/v1). Serves a subset of
+//                 the catalog; some catalog ids need a wire-name rewrite
+//                 (model_map) because metro expects the nokta-form id.
+//   closerouter — STANDBY upstream. base_url = current env AI_PROVIDER_BASE_URL
+//                 (the working Claude Popusk endpoint); api key left empty so the
+//                 resolver falls back to the env key. Supports the full master
+//                 catalog minus gemini-3-pro-preview (disabled upstream).
+//
+// The metro API key is read from env METRO_API_KEY (never hard-coded / committed).
+// The active profile is set from env ACTIVE_PROVIDER (default "metro").
+//
+// Run on the server (reads .env.production for DATABASE_URL + secrets):
+//   ENV_FILE_PATH=.env.production NODE_ENV=production METRO_API_KEY='***' \
+//     ACTIVE_PROVIDER=metro npx tsx scripts/seed-provider-profiles.ts
+//
+// Idempotent: re-running updates the rows in place (upsert) and re-applies the
+// active provider. Prints a masked summary; NEVER prints the plaintext key.
+
+import { config as loadEnv } from "dotenv";
+loadEnv({ path: process.env.ENV_FILE_PATH || ".env" });
+
+import { MASTER_MODELS } from "../src/master-models.js";
+import {
+  upsertProviderProfile,
+  setActiveProvider,
+  listProviderProfiles,
+} from "../src/server/services/provider-config-service.js";
+import { aiProviderBaseUrl } from "../src/server/lib/env.js";
+import { dbSql } from "../src/server/db/client.js";
+
+// Metro upstream base URL (OpenAI-compatible, Bearer). The provider serves
+// /v1/chat/completions, so the base URL keeps the /v1 suffix.
+const METRO_BASE_URL = process.env.METRO_BASE_URL || "https://api.stepanovikov.uno/v1";
+
+// Metro's supported catalog ids (canonical). Verified live against metro's
+// chat/completions allow-list. Two of these are added_models (gemini-3.5-flash,
+// claude-opus-4.8); the rest are master ids.
+const METRO_SUPPORTED_MODEL_IDS = [
+  "gpt-5.5",
+  "gpt-5.4",
+  "claude-opus-4-7",
+  "claude-opus-4-6",
+  "claude-sonnet-4-6",
+  "claude-haiku-4-5-20251001",
+  "gemini-3.1-pro-preview",
+  "gemini-3.5-flash", // added model
+  "claude-opus-4.8", // added model
+];
+
+// Canonical catalog id → metro upstream wire name. Only ids whose canonical
+// (tire) form differs from metro's expected (nokta) form need an entry; the rest
+// are forwarded verbatim.
+const METRO_MODEL_MAP: Record<string, string> = {
+  "claude-opus-4-6": "claude-opus-4.6",
+  "claude-sonnet-4-6": "claude-sonnet-4.6",
+  "claude-haiku-4-5-20251001": "claude-haiku-4.5",
+};
+
+// Standby (closerouter) supported ids = full master catalog minus the upstream-
+// disabled gemini-3-pro-preview. The standby uses the env base/key (Claude Popusk).
+const STANDBY_SUPPORTED_MODEL_IDS = MASTER_MODELS.map((m) => m.id).filter(
+  (id) => id !== "gemini-3-pro-preview",
+);
+
+async function main() {
+  const metroKey = process.env.METRO_API_KEY;
+  if (!metroKey || !metroKey.trim()) {
+    throw new Error("METRO_API_KEY env zorunlu (metro profili anahtarı). Script key'i dosyaya yazmaz.");
+  }
+  const activeProvider = (process.env.ACTIVE_PROVIDER || "metro").trim();
+
+  console.log("Seeding provider profiles...");
+
+  // ── metro (active upstream) ─────────────────────────────────────────────────
+  await upsertProviderProfile({
+    id: "metro",
+    label: "Metro",
+    baseUrl: METRO_BASE_URL,
+    apiKey: metroKey,
+    enabled: true,
+    supportedModelIds: METRO_SUPPORTED_MODEL_IDS,
+    modelMap: METRO_MODEL_MAP,
+  });
+  console.log(`  metro upserted (base=${METRO_BASE_URL}, ${METRO_SUPPORTED_MODEL_IDS.length} models, ${Object.keys(METRO_MODEL_MAP).length} mapped)`);
+
+  // ── closerouter (standby upstream; env base/key fallback) ───────────────────
+  const standbyBase = aiProviderBaseUrl();
+  await upsertProviderProfile({
+    id: "closerouter",
+    label: "CloseRouter (standby / Claude Popusk)",
+    baseUrl: standbyBase,
+    // apiKey omitted → cipher stays null → resolver falls back to the env key.
+    enabled: true,
+    supportedModelIds: STANDBY_SUPPORTED_MODEL_IDS,
+    modelMap: {},
+  });
+  console.log(`  closerouter upserted (base=${standbyBase}, ${STANDBY_SUPPORTED_MODEL_IDS.length} models, env key fallback)`);
+
+  // ── activate ─────────────────────────────────────────────────────────────────
+  await setActiveProvider(activeProvider);
+  console.log(`  active provider => ${activeProvider}`);
+
+  // ── masked summary ──────────────────────────────────────────────────────────
+  const profiles = await listProviderProfiles();
+  for (const p of profiles) {
+    console.log(
+      `    [${p.isActive ? "ACTIVE" : "standby"}] ${p.id} base=${p.baseUrl} key=${p.apiKeyMasked ?? "(env)"} models=${p.supportedModelIds.length} mapped=${Object.keys(p.modelMap).length}`,
+    );
+  }
+
+  console.log("Provider profiles seed complete.");
+  await dbSql.end();
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
