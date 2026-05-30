@@ -27,14 +27,15 @@ describe("telegram-bot-service pure helpers", () => {
     expect(serialized).not.toMatch(/stars/i);
   });
 
-  it("builds a Telegram WebApp top-up panel menu", async () => {
+  it("builds a Telegram top-up panel menu with a plain url button (no BotFather domain needed)", async () => {
     const { buildTelegramTopupPanelMenu } = await import("./telegram-bot-service.js");
 
     const menu = buildTelegramTopupPanelMenu("https://yapayzekalab.org/telegram/topup");
     const serialized = JSON.stringify(menu);
 
     expect(serialized).toContain("Paneli Aç");
-    expect(serialized).toContain("\"web_app\"");
+    expect(serialized).toContain("\"url\"");
+    expect(serialized).not.toContain("web_app");
     expect(serialized).toContain("https://yapayzekalab.org/telegram/topup");
     expect(serialized).toContain("tg:menu");
   });

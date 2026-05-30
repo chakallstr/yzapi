@@ -148,10 +148,7 @@ export function buildTelegramOnboardingMenu(loginUrl: string) {
       [
         {
           text: "Mevcut hesabımı bağla",
-          login_url: {
-            url: loginUrl,
-            request_write_access: true,
-          },
+          url: loginUrl,
         },
       ],
       [
@@ -167,7 +164,7 @@ export function buildTelegramOnboardingMenu(loginUrl: string) {
 export function buildTelegramTopupPanelMenu(webAppUrl: string) {
   return {
     inline_keyboard: [
-      [{ text: "Paneli Aç", web_app: { url: webAppUrl } }],
+      [{ text: "Paneli Aç", url: webAppUrl }],
       [{ text: "Geri", callback_data: "tg:menu" }],
     ],
   };

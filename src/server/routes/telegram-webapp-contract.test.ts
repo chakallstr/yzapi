@@ -94,7 +94,7 @@ vi.mock("../services/telegram-bot-service.js", () => ({
   })),
   buildTelegramTopupPanelMenu: vi.fn((url: string) => ({
     inline_keyboard: [
-      [{ text: "Paneli Aç", web_app: { url } }],
+      [{ text: "Paneli Aç", url }],
       [{ text: "Geri", callback_data: "tg:menu" }],
     ],
   })),
@@ -393,7 +393,7 @@ describe("telegram WebApp route contract", () => {
         messageId: 42,
         replyMarkup: {
           inline_keyboard: [
-            [{ text: "Paneli Aç", web_app: { url: "https://yapayzekalab.example/telegram/topup" } }],
+            [{ text: "Paneli Aç", url: "https://yapayzekalab.example/telegram/topup" }],
             [{ text: "Geri", callback_data: "tg:menu" }],
           ],
         },
@@ -428,7 +428,7 @@ describe("telegram WebApp route contract", () => {
         expect.stringContaining("Yükleme paneli hazır"),
         expect.objectContaining({
           inline_keyboard: expect.arrayContaining([
-            [{ text: "Paneli Aç", web_app: { url: "https://yapayzekalab.example/telegram/topup" } }],
+            [{ text: "Paneli Aç", url: "https://yapayzekalab.example/telegram/topup" }],
           ]),
         }),
       );
