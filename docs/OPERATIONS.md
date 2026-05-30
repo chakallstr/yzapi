@@ -19,12 +19,17 @@ TypeScript (ESM), frontend React 19 + Vite SPA, DB PostgreSQL 14 + Drizzle.
 - Dev: `kaynak/.env`. Canlı: `/opt/turkapiprojesi/.env.production` (izin 600).
 - **Zorunlu (prod):** `DATABASE_URL`, `JWT_SECRET` (≥32), `API_KEY_ENCRYPTION_SECRET`
   (≥32, JWT_SECRET'tan FARKLI), WhatsApp OTP açıksa `WHATSAPP_OTP_HASH_SECRET`.
-- **Upstream:** `AI_PROVIDER_BASE_URL` (varsayılan `https://api.claude-popusk.shop/v1`) →
-  yoksa `CLOSEROUTER_BASE_URL` → yoksa kod-içi varsayılan. `AI_PROVIDER_API_KEY`/`CLOSEROUTER_API_KEY` boşsa `/v1` 503 döner.
+- **Upstream (aktif sağlayıcı profili öncelikli):** çözüm sırası: aktif `provider_profiles` profili
+  (`system_api_config.active_provider_id`) → `system_api_config` DB değeri → env `AI_PROVIDER_BASE_URL`
+  (varsayılan `https://api.claude-popusk.shop/v1`) → `CLOSEROUTER_BASE_URL` → kod-içi varsayılan.
+  Anahtar aynı sırayla profil cipher → DB cipher → env. Hepsi boşsa `/v1` 503 döner.
+  **Şu an AKTİF: metro** (`https://api.stepanovikov.uno/v1`); closerouter (Claude Popusk env'i) yedekte.
 - **Opsiyonel:** Telegram, Shopier, Cryptomus, Crypto Pay, email — hepsi boşken ilgili uç 503 verir, app çökmez.
 
 > ⚠️ Canlı `.env.production` upstream satırı yanlış değişirse tüm `/v1` kesilir.
 > Değiştirmeden önce mevcut satırı yedekle, sonra hemen smoke test (bkz §9).
+> Sağlayıcı değiştirmenin GÜVENLİ yolu env değil: admin panel → Sağlayıcı sekmesi metro⇄closerouter
+> tek-tık (restart yok) veya `scripts/seed-provider-profiles.ts` (bkz §18).
 
 ## 3. Yerel başlatma
 
@@ -134,17 +139,19 @@ bash scripts/sync-deploy.sh             # rsync→ci→lint→test→build→mig
 
 ## 16. Satış-öncesi kontrol listesi
 
-- [ ] BLOCKER-1: canlı upstream gerçek model çağrısında 200 + doğru bakiye düşümü (bkz AI_HANDOFF).
-- [x] App build/test yeşil (278 test, tsc temiz).
+- [x] BLOCKER-1 ÇÖZÜLDÜ: canlı upstream gerçek model çağrısında 200 + doğru bakiye düşümü kanıtlandı
+  (metro, funded `yzk_live_****6cda`; 5 model türü 200+düşüm, drift=0 — bkz §18 + AI_HANDOFF).
+- [x] App build/test yeşil (299 unit + 14 itest, tsc temiz).
 - [x] Admin runtime doğrulandı (28 test, single-admin).
 - [x] Telegram opsiyonel davranış doğrulandı (34 test).
 - [x] Backup script + verify + cron wrapper + docs hazır.
 - [ ] Backup cron operatörce kuruldu (onay bekliyor).
 - [x] `.env.example` tam ve güncel.
 - [x] Ledger drift=0, `/health`+`/status` yeşil.
-- [ ] Sohbette açık geçen sırlar (VPS/cPanel/upstream key) rote edildi.
+- [ ] **Sohbette açık geçen sırlar rote edildi** (VPS/cPanel + metro key `sk-ant-api01-...BH5` +
+  Claude Popusk key `sk-****UHNk`) — AÇIK, operatörce yapılacak.
 
-## 17. Live /v1 funded smoke test (BLOCKER-1 doğrulama)
+## 17. Live /v1 funded smoke test
 
 `scripts/live-v1-funded-smoke-test.mjs` — funded bir API key ile gerçek `/v1/chat/completions`
 çağrısının 200 döndüğünü ve bakiyenin gerçekten düştüğünü kanıtlar. Key plaintext ASLA
@@ -163,20 +170,41 @@ API_KEY_ID=<uuid> node scripts/live-v1-funded-smoke-test.mjs
 Çıktı JSON: `status_code`, `masked_api_key`, `before/after_balance_tl`, `deducted_tl`,
 `usage`, `usage_record`. **PASS şartı: status_code=200 VE deducted_tl>0.**
 
-> 2026-05-30 ölçümü: tüm katalog modelleri upstream'de `No credentials for provider: ...`
-> nedeniyle 400/502 döndü (BLOCKER-1). Hata çağrılarında `cost_tl=0` (K1), ledger drift=0.
-> Upstream doğru hedefe bağlanınca bu test 200+düşüm kanıtı verecek.
+> 2026-05-30 metro ölçümü (PASS): claude-sonnet-4-6 (map'li, upstream'e claude-sonnet-4.6) →200 −0.0023TL,
+> gpt-5.4 →200, claude-opus-4.8 →200, gemini-3.5-flash →200, claude-opus-4-7 →200 (hepsi usage=success).
+> Desteklenmeyen gpt-5.4-mini →404 (0 tahsil). Ledger drift=0.
 
-## 18. Upstream sağlayıcı: Claude Popusk (2026-05-30 migrasyonu)
+## 18. Upstream sağlayıcı profilleri: metro (aktif) + closerouter (yedek) — 2026-05-30
 
-Aktif upstream **Claude Popusk** (OpenAI-uyumlu). CloseRouter kapandı; eski yerel
-OmniRoute override'ı kaldırıldı.
+İki sağlayıcı profili `provider_profiles` tablosunda; aktif olan `system_api_config.active_provider_id`
+ile seçilir. Geçiş admin panelden tek-tık (restart yok — cache invalidate).
 
-- Base URL: `https://api.claude-popusk.shop/v1` · Auth: `Authorization: Bearer <key>` · Doküman: https://docs.claude-popusk.shop/
-- Canlı env: `AI_PROVIDER_BASE_URL` + `AI_PROVIDER_API_KEY` (`/opt/turkapiprojesi/.env.production`).
-  `CLOSEROUTER_*` boş bırakılır (sadece fallback). **127.0.0.1:20128'e geri döndürme.**
-- Model isimleri katalogla birebir (prefix yok). `gemini-3-pro-preview` sağlayıcıda yok →
-  `model_overrides` tablosunda `enabled=false` (kod/fiyat değişmeden kapalı).
+**metro (AKTİF):**
+- Base URL: `https://api.stepanovikov.uno/v1` · Auth: `Bearer <key>` (OpenAI-uyumlu).
+- 9 model destekler: gpt-5.5, gpt-5.4, claude-opus-4-7, claude-opus-4-6, claude-sonnet-4-6,
+  claude-haiku-4-5-20251001, gemini-3.1-pro-preview, gemini-3.5-flash (eklenen), claude-opus-4.8 (eklenen).
+- **model_map (3):** metro bazı modelleri nokta-form bekler → `claude-opus-4-6`→`claude-opus-4.6`,
+  `claude-sonnet-4-6`→`claude-sonnet-4.6`, `claude-haiku-4-5-20251001`→`claude-haiku-4.5`.
+  Map `closerouter-service.applyProfileModelMap()` ile upstream'e uygulanır; billing'e dokunmaz
+  (cost canonical id'den çözülür, yalnız wire ismi değişir).
+
+**closerouter (YEDEK):**
+- Base URL: `https://api.claude-popusk.shop/v1` (Claude Popusk) · env key fallback (`AI_PROVIDER_API_KEY`).
+- 41 master model (`gemini-3-pro-preview` hariç — sağlayıcıda yok, `model_overrides` enabled=false).
+
+**Sağlayıcı değiştirme / yeniden seed:**
+```bash
+# Tek-tık: admin panel → Sağlayıcı sekmesi → metro ⇄ closerouter.
+# Veya script (METRO_API_KEY env'den; key dosyaya/loga yazılmaz, maskeli özet):
+ssh yzapi-vps
+cd /opt/turkapiprojesi
+ENV_FILE_PATH=.env.production NODE_ENV=production METRO_API_KEY='<key>' \
+  ACTIVE_PROVIDER=metro npx tsx scripts/seed-provider-profiles.ts
+```
+
+> Yeni sağlayıcı eklerken: model adı formatını GERÇEK endpoint'te doğrula (`curl .../v1/models` +
+> birkaç `chat/completions` denemesi). Canonical katalog id ≠ upstream wire id ise `model_map` doldur.
+> **127.0.0.1:20128 (OmniRoute) yerel ölü uçtur — geri döndürme.**
 - Sağlayıcı değişiminde: env'i güncelle → `systemctl restart turkapiprojesi` → §17 funded smoke test → ledger drift=0.
 - e2e: `E2E_BASE_URL=https://yapayzekalab.org E2E_FUNDED_KEY=<key> npx playwright test e2e/provider-migration.e2e.ts`
   (key env'den verilir, koda yazılmaz).
