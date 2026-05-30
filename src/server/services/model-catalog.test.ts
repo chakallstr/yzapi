@@ -21,27 +21,27 @@ describe("MASTER_MODELS — Claude Popusk text catalog", () => {
   it("uses the approved customer-facing price tiers", () => {
     const byId = new Map(MASTER_MODELS.map((model) => [model.id, model]));
 
-    expect(byId.get("claude-haiku-4-5-20251001")?.customerInputUsd).toBe(0.62);
-    expect(byId.get("gemini-3-flash-preview")?.customerInputUsd).toBe(0.69);
-    expect(byId.get("gemini-3-pro-preview")?.customerInputUsd).toBe(0.69);
-    expect(byId.get("gemini-3.1-pro-preview")?.customerInputUsd).toBe(0.85);
-    expect(byId.get("gemini-3.1-pro-preview-customtools")?.customerInputUsd).toBe(0.85);
-    expect(byId.get("o3-mini")?.customerInputUsd).toBe(0.68);
-    expect(byId.get("o4-mini")?.customerInputUsd).toBe(0.72);
-    expect(byId.get("o3")?.customerInputUsd).toBe(0.75);
-    expect(byId.get("gpt-5-nano")?.customerInputUsd).toBe(0.62);
-    expect(byId.get("gpt-5-mini")?.customerInputUsd).toBe(0.64);
-    expect(byId.get("gpt-5-chat-latest")?.customerInputUsd).toBe(0.65);
-    expect(byId.get("gpt-5-search-api")?.customerInputUsd).toBe(0.66);
-    expect(byId.get("gpt-5")?.customerInputUsd).toBe(0.69);
-    expect(byId.get("gpt-5.1")?.customerInputUsd).toBe(0.72);
-    expect(byId.get("gpt-5.2")?.customerInputUsd).toBe(0.75);
-    expect(byId.get("gpt-5.3-chat-latest")?.customerInputUsd).toBe(0.8);
-    expect(byId.get("gpt-5.4")?.customerInputUsd).toBe(1);
-    expect(byId.get("gpt-5.4-mini")?.customerInputUsd).toBe(0.9);
-    expect(byId.get("gpt-5.4-nano")?.customerInputUsd).toBe(0.85);
-    expect(byId.get("claude-opus-4-7")?.customerInputUsd).toBe(1.2);
-    expect(byId.get("gpt-5.5")?.customerInputUsd).toBe(1.15);
+    expect(byId.get("claude-haiku-4-5-20251001")?.customerInputUsd).toBe(0.52);
+    expect(byId.get("gemini-3-flash-preview")?.customerInputUsd).toBe(0.58);
+    expect(byId.get("gemini-3-pro-preview")?.customerInputUsd).toBe(0.58);
+    expect(byId.get("gemini-3.1-pro-preview")?.customerInputUsd).toBe(0.71);
+    expect(byId.get("gemini-3.1-pro-preview-customtools")?.customerInputUsd).toBe(0.71);
+    expect(byId.get("o3-mini")?.customerInputUsd).toBe(0.57);
+    expect(byId.get("o4-mini")?.customerInputUsd).toBe(0.6);
+    expect(byId.get("o3")?.customerInputUsd).toBe(0.63);
+    expect(byId.get("gpt-5-nano")?.customerInputUsd).toBe(0.52);
+    expect(byId.get("gpt-5-mini")?.customerInputUsd).toBe(0.53);
+    expect(byId.get("gpt-5-chat-latest")?.customerInputUsd).toBe(0.54);
+    expect(byId.get("gpt-5-search-api")?.customerInputUsd).toBe(0.55);
+    expect(byId.get("gpt-5")?.customerInputUsd).toBe(0.58);
+    expect(byId.get("gpt-5.1")?.customerInputUsd).toBe(0.6);
+    expect(byId.get("gpt-5.2")?.customerInputUsd).toBe(0.63);
+    expect(byId.get("gpt-5.3-chat-latest")?.customerInputUsd).toBe(0.67);
+    expect(byId.get("gpt-5.4")?.customerInputUsd).toBe(0.83);
+    expect(byId.get("gpt-5.4-mini")?.customerInputUsd).toBe(0.75);
+    expect(byId.get("gpt-5.4-nano")?.customerInputUsd).toBe(0.71);
+    expect(byId.get("claude-opus-4-7")?.customerInputUsd).toBe(1);
+    expect(byId.get("gpt-5.5")?.customerInputUsd).toBe(0.96);
   });
 
   it("orders the public catalog by cheapest tier first, then older/cheaper model families", () => {
