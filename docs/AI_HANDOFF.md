@@ -3,7 +3,8 @@
 > Bu belge bir AI/geliştirici session'ından diğerine devir içindir. Mevcut durumun
 > tek doğruluk kaynağı. Yeni session BURADAN başlar.
 >
-> Son güncelleme commit: `d6ca658` · dal: `phase/release-vps-beta`
+> Son güncelleme commit: `e58029a` · dal: `phase/release-vps-beta`
+> Canlı deploy: `sync-20260530T194227Z-e58029a` · aktif sağlayıcı: **metro**
 
 ---
 
@@ -13,7 +14,9 @@ YapayZekaLab, OpenAI-uyumlu bir **API gateway + panel**. Müşteri TL bakiye yü
 `yzk_live_*` API key ile model bazlı "kullandıkça öde" mantığıyla LLM çağrısı yapar.
 Satış/bakiye/ödeme/KDV/usage/API key/admin kontrolü tamamen kendi backend'inde.
 
-Upstream akış (TASARIM KARARI): `Müşteri → YapayZekaLab /v1 → CloseRouter → sağlayıcılar`.
+Upstream akış (TASARIM KARARI): `Müşteri → YapayZekaLab /v1 → aktif sağlayıcı profili → upstream`.
+Aktif sağlayıcı `provider_profiles` + `system_api_config.active_provider_id` ile seçilir; admin panelden
+tek-tık metro⇄closerouter geçişi (restart yok). Şu an AKTİF: **metro** (`api.stepanovikov.uno/v1`).
 
 ## 2. Şu ana kadar yapılan işler (bu ve önceki session'lar)
 
@@ -82,6 +85,30 @@ Ops (`/Users/ufuk/yeniapi/_ops`, git dışı): `backup-full.sh` sertleştirildi.
 
 ## 6. AÇIK BUGLAR / BLOCKER
 
+### ✅ metro-provider-switch + repricing: TAMAMLANDI (2026-05-30) — CANLIDA
+
+- **Ne yapıldı:** İki sağlayıcı profili (metro AKTİF, closerouter yedek) + aktif-profile göre katalog
+  görünürlüğü + 2 yeni model (added_models katmanı) + onaylı yeniden fiyatlama (×5/6 kilitli tablo).
+- **Spec:** `.kiro/specs/metro-provider-switch/` (8 görev, hepsi `[x]`, agent ekibi + 3 QA/görev).
+- **Commit'ler:** `69b2d55` (repricing), `c6606fc` (feature), `e58029a` (model_map fix + seed).
+  Deploy: `sync-20260530T194227Z-e58029a`.
+- **KRİTİK ÖĞRENİM (model_map):** Profil `model_map` (katalog-id → upstream-wire-id) tanımlıydı ama
+  upstream çağrıda UYGULANMIYORDU; itest nock kullandığı için bunu yakalamadı — ancak deploy sırasında
+  GERÇEK metro endpoint testi ortaya çıkardı. Metro bazı modelleri farklı isimle bekliyor (canonical
+  `claude-sonnet-4-6` → metro `claude-sonnet-4.6`). `closerouter-service.applyProfileModelMap()` ile
+  kapatıldı (forwardChat/forwardTextEndpoint/forwardChatStream). **Billing'e dokunulmadı:** master model
+  + cost canonical id'den proxy.ts'de çözülür; model_map yalnız upstream'e giden wire ismini değiştirir.
+  → DERS: yeni sağlayıcı eklerken model adı formatını GERÇEK endpoint'te doğrula (mock yetmez).
+- **Canlı profiller:** metro (AKTİF, key `sk-****GBH5`, 9 model, 3 map), closerouter (yedek,
+  `api.claude-popusk.shop/v1`, env key fallback, 41 model). Seed: `scripts/seed-provider-profiles.ts`
+  (METRO_API_KEY env'den; key hardcoded DEĞİL; added_models inline idempotent seed).
+- **CANLI KANIT (funded `yzk_live_****6cda`):** claude-sonnet-4-6 (map'li)→200 −0.0023TL · gpt-5.4→200 ·
+  claude-opus-4.8→200 · gemini-3.5-flash→200 · claude-opus-4-7→200 (hepsi usage=success). Desteklenmeyen
+  gpt-5.4-mini→404 (0 tahsil). `/api/models` tam 9 metro modeli. **Ledger drift=0.** aiProvider=ok.
+- **Fiyatlar:** onaylı kilitli tabloya göre yeniden ayarlandı (claude-opus-4.8=1.20, claude-opus-4.7=1.0,
+  gemini-3.5-flash=0.90, diğerleri ×5/6). DOKUNULMAZ billing FORMÜLÜ değişmedi; sadece müşteri fiyat sabitleri.
+- **GÜVENLİK:** metro key (`sk-ant-api01-...BH5`) ve Claude Popusk key (`sk-****UHNk`) sohbette açık geçti → ROTE EDİLMELİ.
+
 ### ✅ BLOCKER-1: ÇÖZÜLDÜ (2026-05-30) — yeni sağlayıcı Claude Popusk
 - **Kök neden:** CloseRouter kapandı; canlı `.env.production` geçici olarak yerel OmniRoute'a (`127.0.0.1:20128`) yönlendirilmişti, o da provider credential'sızdı → tüm modeller 400/502.
 - **Çözüm (kullanıcı onayıyla A-B-C uygulandı):**
@@ -93,17 +120,18 @@ Ops (`/Users/ufuk/yeniapi/_ops`, git dışı): `backup-full.sh` sertleştirildi.
 - **Fiyatlar DEĞİŞMEDİ** (talimat + DOKUNULMAZ kuralı): `pricing-service`, `pricing/`, `customerInputUsd` aynı.
 - **GÜVENLİK:** sohbette geçen yeni sağlayıcı key'i (`sk-****UHNk`) rote edilmeli.
 
-### Katalog ↔ upstream isim uyuşmazlığı
-- Public katalog `gpt-5.4`, `claude-sonnet-4-...` gösteriyor; OmniRoute `cx/`, `cc/`, `seslab-auto` prefix bekliyor.
-- `closerouter-service.ts:30` `OMNIROUTE_MODEL_MAP` sadece 1 model map'liyor.
+### Katalog ↔ upstream isim uyuşmazlığı — ✅ profil model_map ile çözüldü
+- Aktif profil `model_map` (katalog-id → upstream-wire-id) artık upstream'e uygulanıyor
+  (`closerouter-service.applyProfileModelMap`). Metro için 3 map aktif (claude-opus-4-6/sonnet-4-6/haiku-4-5).
+- Eski `OMNIROUTE_MODEL_MAP` (`closerouter-service.ts`) yalnız 127.0.0.1:20128/api.seslab.tr için; metro/popusk'ta devre dışı.
 
 ## 7. Son çalıştırılan testler
 
-- Yerel: `npm test` → **278 passed (64 dosya)**, `npx tsc --noEmit` temiz, `npm run build` temiz (dist/server.js 336kb)
-- Faz 7-11 turu (2026-05-30): `npm test -- admin` 28 passed, `npm test -- telegram` 34 passed, lint temiz, build temiz
-- itest: `npm run itest` → 3 passed (K1/K2 gerçek DB, gerektirir: `npm run db:up` + migrate)
+- Yerel: `npm test` → **299 passed**, `npx tsc --noEmit` temiz, `npm run build` temiz (dist/server.js ~358kb)
+- itest: `npm run itest` → **14 passed** (K1/K2 + metro-provider-switch gerçek DB; gerektirir: `npm run db:up` + migrate 0013)
 - e2e: `npm run e2e` → 17 passed (önceki turda; Playwright)
-- Canlı: `/health` 200 (db=ok, aiProvider=ok), `/status` 200 (modelCount=42, deploy.id sync-...-d6ca658), ledger drift=0
+- Canlı (deploy `sync-20260530T194227Z-e58029a`): `/health` 200, `/status` 200 (aiProvider=ok), ledger drift=0,
+  funded `/v1` metro 200 + bakiye düşümü (5 model türü), desteklenmeyen model 404 (0 tahsil).
 
 ## 8. Başarısız denemeler (tekrarlama)
 
@@ -126,12 +154,18 @@ Ops (`/Users/ufuk/yeniapi/_ops`, git dışı): `backup-full.sh` sertleştirildi.
 - `billing-service.ts` settle/charge transaction mantığı — para güvenliği, K1/Y2 kritik.
 - `rejected-template-guard.test.ts` fingerprint listesi — frontend tema sözleşmesi.
 - 501 görsel/video uçları — bilinçli kapalı, kapsam dışı.
+- `MASTER_MODELS` 42-kilit (master-models.ts) — yeni model EKLENMEZ; `added_models` katmanında tutulur.
+- `provider_profiles` aktif profil mantığı — metro AKTİF, closerouter yedek; switch admin panelden.
 
 ## 11. Yeni session'da İLK yapılacak net görev
 
-**BLOCKER-1'i çöz:** Kullanıcıya canlı upstream kararını sor:
-(a) `.env.production` `CLOSEROUTER_BASE_URL`/`CLOSEROUTER_API_KEY`'i gerçek CloseRouter'a geri çevir, VEYA
-(b) OmniRoute'a sağlayıcı credential gir + `OMNIROUTE_MODEL_MAP`'i 42 model için doldur.
-Karar alındıktan sonra funded test key ile gerçek `/v1/chat/completions` çağrısının 200 + doğru bakiye düşümü yaptığını canlıda kanıtla. Bu olmadan "satışa hazır" DENMEZ.
+**Satışa hazırlık doğrulaması (BLOCKER kalmadı).** metro aktif + canlı kanıtlandı (funded /v1 200, drift=0).
+Yeni session başlarken:
+1. `/status` + `/health` yeşil mi, aktif sağlayıcı beklenen mi (`provider_profiles`'tan kontrol).
+2. Sağlayıcı değiştirmek gerekirse: admin panel → Sağlayıcı sekmesi → metro⇄closerouter tek-tık
+   (veya `scripts/seed-provider-profiles.ts` ACTIVE_PROVIDER env'i ile). Restart gerekmez.
+3. Yeni sağlayıcı eklenirken model adı formatını **gerçek endpoint'te** doğrula; gerekirse `model_map` doldur.
+4. **GÜVENLİK:** metro key (`sk-ant-api01-...BH5`) + Claude Popusk key (`sk-****UHNk`) sohbette açık geçti → ROTE EDİLMELİ.
 
-Çalışma kuralları: kod düzeltmeleri `kaynak`'ta + `npm test`/`tsc` yeşil + `sync-deploy.sh` ile deploy.
+Çalışma kuralları: kod düzeltmeleri `kaynak`'ta + `npm test`/`tsc`/`itest` yeşil + `sync-deploy.sh` ile deploy.
+Agent ekibi modeli (`.kiro/steering/agent-team-workflow.md`): her görev → uygulama ajanı → 3 QA (2/3 PASS).
