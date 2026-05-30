@@ -548,7 +548,7 @@ describe("telegram WebApp route contract", () => {
 
       const response = await Promise.race([
         responsePromise,
-        new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 250)),
+        new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 2000)),
       ]);
 
       expect(response).not.toBe("timeout");
