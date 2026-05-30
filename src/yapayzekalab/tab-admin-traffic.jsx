@@ -216,7 +216,7 @@ const AdminTrafficAnalytics = ({ token, onOpenUser, onOpenApiKeys }) => {
             Kullanım, <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: 'var(--ink-3)' }}>maliyet ve hata akışı</span>
           </h3>
           <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
-            Son yenileme: {lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleString('tr-TR') : '—'} · 60 sn otomatik yenileme
+            Son yenileme: {lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' }) : '—'} · 60 sn otomatik yenileme
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>

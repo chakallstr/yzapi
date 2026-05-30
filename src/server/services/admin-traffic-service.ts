@@ -39,11 +39,17 @@ function getWindowStart(window: TrafficWindow, now: Date) {
   return new Date(now.getTime() - WINDOW_MS[window]);
 }
 
+// Bucket etiketleri Türkiye saatiyle (Europe/Istanbul) gösterilir. Sunucu UTC
+// çalıştığı için timeZone belirtilmezse etiketler TR'den 3 saat geri çıkardı.
+// NOT: yalnız GÖSTERİM etiketini etkiler; bucket sınırları/gruplama epoch-ms
+// üzerinden yapılır, billing/gruplama mantığına dokunmaz.
+const DISPLAY_TIME_ZONE = "Europe/Istanbul";
+
 function bucketLabel(date: Date, window: TrafficWindow) {
   if (window === "24h") {
-    return date.toLocaleString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+    return date.toLocaleString("tr-TR", { hour: "2-digit", minute: "2-digit", timeZone: DISPLAY_TIME_ZONE });
   }
-  return date.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" });
+  return date.toLocaleDateString("tr-TR", { day: "2-digit", month: "short", timeZone: DISPLAY_TIME_ZONE });
 }
 
 function round2(value: number) {

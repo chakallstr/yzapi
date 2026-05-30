@@ -30,7 +30,7 @@ function buildReportHtml(stats: DailyStats): string {
 
   return `
 <div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:24px;background:#f9fafb;border-radius:8px">
-  <h2 style="color:#1d4ed8">Günlük Rapor — ${new Date().toLocaleDateString("tr-TR")}</h2>
+  <h2 style="color:#1d4ed8">Günlük Rapor — ${new Date().toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" })}</h2>
   <table style="width:100%;border-collapse:collapse;margin:16px 0;background:#fff;border-radius:6px">
     <tr style="background:#1d4ed8;color:#fff"><th style="padding:8px">Metrik</th><th style="padding:8px">Değer</th></tr>
     <tr><td style="padding:8px">Toplam Yükleme</td><td style="padding:8px;text-align:right">${stats.totalTransactions}</td></tr>

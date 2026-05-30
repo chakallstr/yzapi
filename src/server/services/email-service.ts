@@ -191,7 +191,7 @@ export async function adminPaymentNotificationEmail(event: {
 }
 
 export async function sendDailyReport(adminEmail: string, html: string): Promise<void> {
-  await sendEmail(adminEmail, `YapayZekaLab — Günlük Rapor ${new Date().toLocaleDateString("tr-TR")}`, html);
+  await sendEmail(adminEmail, `YapayZekaLab — Günlük Rapor ${new Date().toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" })}`, html);
 }
 
 export async function kurChangeEmail(
@@ -210,7 +210,7 @@ export async function kurChangeEmail(
     <tr><td style="color:#6b7280;padding:4px 0">Yeni Kur</td><td style="text-align:right">₺${newKur.toFixed(4)}</td></tr>
     <tr><td style="color:#dc2626;font-weight:bold;padding:4px 0">Değişim</td><td style="text-align:right;color:#dc2626;font-weight:bold">%${(delta * 100).toFixed(2)}</td></tr>
   </table>
-  <p style="color:#6b7280;font-size:12px">Tarih: ${new Date().toLocaleString("tr-TR")}</p>
+  <p style="color:#6b7280;font-size:12px">Tarih: ${new Date().toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}</p>
 </div>`;
   await sendEmail(adminEmail, "YapayZekaLab — KUR Anomalisi", html);
 }
