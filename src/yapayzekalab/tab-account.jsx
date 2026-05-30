@@ -173,7 +173,7 @@ const SandboxKeyCard = ({ sandboxKey, sandboxFullKey, onCreate, busy }) => {
   );
 };
 
-const TelegramLinkCard = ({ telegram, busy, message, onLink, onOpenBot, onRefresh, onUnlink }) => {
+const TelegramLinkCard = ({ telegram, busy, message, deepLink, onLink, onOpenBot, onRefresh, onUnlink }) => {
   const linked = Boolean(telegram?.linked);
   const username = telegram?.username ? `@${telegram.username}` : 'Telegram hesabı';
   const linkedAt = telegram?.linkedAt ? shortDate(telegram.linkedAt) : '—';
@@ -277,6 +277,26 @@ const TelegramLinkCard = ({ telegram, busy, message, onLink, onOpenBot, onRefres
           ? 'Telegram tarafından üretilen veya değiştirilen API keyler bu hesapta aynı anda görünür.'
           : 'Önce site üzerinden bağla. Bot içindeki Mevcut hesabımı bağla akışı aynı üyelikte tamamlanır.')}
       </div>
+      {deepLink && !linked && (
+        <a
+          href={deepLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-block',
+            marginTop: 10,
+            padding: '9px 14px',
+            borderRadius: 9,
+            background: '#229ED9',
+            color: '#fff',
+            fontSize: 12,
+            fontWeight: 600,
+            textDecoration: 'none',
+          }}
+        >
+          Botu aç ve bağla
+        </a>
+      )}
     </Card>
   );
 };
@@ -560,6 +580,7 @@ const AccountTab = ({ ctx }) => {
   const [settingsMessage, setSettingsMessage] = useState('');
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [telegramMessage, setTelegramMessage] = useState('');
+  const [telegramDeepLink, setTelegramDeepLink] = useState('');
   const telegramPollRef = useRef(null);
 
   const balanceUSD = asNumber(me?.bakiyeUsd, fallbackBalanceUSD);
@@ -742,12 +763,22 @@ const AccountTab = ({ ctx }) => {
   const startTelegramLink = async () => {
     setTelegramBusy(true);
     setTelegramMessage('');
+    setTelegramDeepLink('');
     try {
       const result = await apiJson('/api/telegram/link-code', { method: 'POST' });
-      if (result?.deepLinkUrl) {
-        window.open(result.deepLinkUrl, '_blank', 'noopener,noreferrer');
+      const url = result?.deepLinkUrl || '';
+      if (url) {
+        setTelegramDeepLink(url);
+        const win = window.open(url, '_blank', 'noopener,noreferrer');
+        if (!win) {
+          // Popup blocked (common when opened automatically without a click).
+          setTelegramMessage('Bağlamayı tamamlamak için aşağıdaki "Botu aç ve bağla" bağlantısına dokun.');
+        } else {
+          setTelegramMessage('Bot açıldı. Telegram içindeki bağlama adımını tamamla; panel bu durumu otomatik yenileyecek.');
+        }
+      } else {
+        setTelegramMessage('Bot bağlantısı hazırlanamadı, tekrar dene.');
       }
-      setTelegramMessage('Bot açıldı. Telegram içindeki bağlama adımını tamamla; panel bu durumu otomatik yenileyecek.');
       startTelegramPolling();
     } catch (error) {
       setTelegramMessage(error instanceof Error ? error.message : 'Telegram link kodu üretilemedi.');
@@ -757,24 +788,27 @@ const AccountTab = ({ ctx }) => {
   };
 
   // Arrived from the Telegram bot "bağla" button (App stored the intent): once the
-  // account panel is open and not yet linked, surface the connect step clearly.
+  // account panel is open and not yet linked, AUTO-start the deep-link connect so
+  // the user does not have to find/press another button.
   useEffect(() => {
     let intent = false;
     try { intent = sessionStorage.getItem('yz_telegram_connect') === '1'; } catch { /* ignore */ }
     if (!intent) return;
+    if (me === undefined || me === null) return; // wait until account loaded
     try { sessionStorage.removeItem('yz_telegram_connect'); } catch { /* ignore */ }
-    if (me?.telegram?.linked) {
-      setTelegramMessage('Telegram hesabın zaten bağlı.');
-      return;
-    }
-    setTelegramMessage('Telegram hesabını bağlamak için "Telegram bağla" butonuna bas; bot otomatik açılıp bağlamayı tamamlayacak.');
     const el = document.getElementById('account-telegram');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       el.classList.add('section-flash');
       setTimeout(() => el.classList.remove('section-flash'), 1500);
     }
-  }, [me?.telegram?.linked]);
+    if (me?.telegram?.linked) {
+      setTelegramMessage('Telegram hesabın zaten bağlı.');
+      return;
+    }
+    // Auto-trigger the working deep-link connect flow.
+    void startTelegramLink();
+  }, [me]);
 
   const openTelegramBot = () => {
     if (me?.telegram?.botUrl) window.open(me.telegram.botUrl, '_blank', 'noopener,noreferrer');
@@ -1131,6 +1165,7 @@ const AccountTab = ({ ctx }) => {
         telegram={me?.telegram}
         busy={telegramBusy}
         message={telegramMessage}
+        deepLink={telegramDeepLink}
         onLink={startTelegramLink}
         onOpenBot={openTelegramBot}
         onRefresh={refreshTelegramLink}
