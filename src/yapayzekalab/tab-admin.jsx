@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   I, Card, Chip, Caption, PulseDot,
   PROVIDERS, MODELS, modelMeta, fmt, useCountUp,
@@ -1719,6 +1719,66 @@ const AdminPaymentSettings = ({ config, token, refresh }) => {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  // ── Bekleyen havale (IBAN) onay kuyruğu ──────────────────────────────────────
+  const [pendingIban, setPendingIban] = useState([]);
+  const [pendingLoading, setPendingLoading] = useState(true);
+  const [pendingError, setPendingError] = useState('');
+  const [actionId, setActionId] = useState('');
+  const [rejectNotes, setRejectNotes] = useState({});
+
+  const loadPending = useCallback(async () => {
+    setPendingLoading(true);
+    setPendingError('');
+    try {
+      const rows = await adminRequest('/api/payments/admin/pending-iban', token);
+      const list = Array.isArray(rows) ? rows : [];
+      setPendingIban(list.filter((r) => r.durum === 'bekliyor'));
+    } catch (e) {
+      setPendingError(e?.message || 'Bekleyen havaleler alınamadı.');
+    } finally {
+      setPendingLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => { loadPending(); }, [loadPending]);
+
+  const approveIban = async (row) => {
+    setActionId(row.id);
+    try {
+      await adminRequest(`/api/payments/admin/pending-iban/${row.id}/approve`, token, {
+        method: 'POST',
+        body: { not: rejectNotes[row.id] || undefined },
+      });
+      await loadPending();
+      await refresh();
+    } catch (e) {
+      setPendingError(e?.message || 'Onaylama başarısız.');
+    } finally {
+      setActionId('');
+    }
+  };
+
+  const rejectIban = async (row) => {
+    const not = (rejectNotes[row.id] || '').trim();
+    if (!not) {
+      setPendingError('Red için neden (not) yazın.');
+      return;
+    }
+    setActionId(row.id);
+    try {
+      await adminRequest(`/api/payments/admin/pending-iban/${row.id}/reject`, token, {
+        method: 'POST',
+        body: { not },
+      });
+      await loadPending();
+      await refresh();
+    } catch (e) {
+      setPendingError(e?.message || 'Reddetme başarısız.');
+    } finally {
+      setActionId('');
+    }
+  };
+
   useEffect(() => {
     setForm({
       paymentWhatsappNumber: config?.paymentWhatsappNumber || '',
@@ -1748,61 +1808,137 @@ const AdminPaymentSettings = ({ config, token, refresh }) => {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 0.9fr) minmax(320px, 1.1fr)', gap: 18 }}>
-      <Card pad={20}>
-        <Caption>Ödeme bildirimi</Caption>
-        <div style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>WhatsApp yönlendirme</div>
-        <div style={{ fontSize: 11.5, color: 'var(--ink-2)', lineHeight: 1.6, marginTop: 6 }}>
-          IBAN ve manuel kripto ödemelerinde müşteriye ödeme bilgileri gösterilir; bildirim butonu bu numaraya hazır mesaj açar.
-        </div>
-        <div style={{ marginTop: 14 }}>
-          <Caption style={{ marginBottom: 6 }}>WhatsApp numarası</Caption>
-          <input
-            value={form.paymentWhatsappNumber}
-            onChange={(e) => setField('paymentWhatsappNumber', e.target.value)}
-            placeholder="905000000000"
-            style={inputStyle}
-          />
-        </div>
-      </Card>
-
-      <Card pad={20}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <Card pad={0} style={{ overflow: 'hidden' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <Caption>Manuel kripto cüzdanı</Caption>
-            <div style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>USDT adresi</div>
-            <div style={{ fontSize: 11.5, color: 'var(--ink-2)', lineHeight: 1.6, marginTop: 6 }}>
-              Cryptomus kapalıysa bu alan aktif olduğunda kullanıcıya cüzdan, ağ, referans ve WhatsApp bildirimi gösterilir. Bakiye otomatik eklenmez.
+            <div style={{ fontSize: 14, fontWeight: 600 }}>Bekleyen havale onayları</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+              Müşterinin havale/EFT bildirimleri · onaylayınca bakiye otomatik yüklenir
             </div>
           </div>
-          <button onClick={() => setField('cryptoWalletEnabled', !form.cryptoWalletEnabled)} style={{
-            width: 48, height: 26, borderRadius: 999,
-            background: form.cryptoWalletEnabled ? 'var(--accent)' : 'var(--ink-5)',
-            position: 'relative',
+          <button onClick={loadPending} disabled={pendingLoading} style={{
+            padding: '7px 12px', borderRadius: 9, border: '1px solid var(--border)',
+            background: 'var(--surface-2)', fontSize: 12, fontWeight: 600, opacity: pendingLoading ? 0.6 : 1,
           }}>
-            <span style={{ position: 'absolute', top: 3, left: form.cryptoWalletEnabled ? 25 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+            {pendingLoading ? 'Yükleniyor…' : `Yenile${pendingIban.length ? ` (${pendingIban.length})` : ''}`}
           </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: 10, marginTop: 14 }}>
-          <input value={form.cryptoWalletAsset} onChange={(e) => setField('cryptoWalletAsset', e.target.value)} placeholder="USDT" style={inputStyle} />
-          <input value={form.cryptoWalletNetwork} onChange={(e) => setField('cryptoWalletNetwork', e.target.value)} placeholder="TRC20" style={inputStyle} />
-        </div>
-        <div style={{ marginTop: 10 }}>
-          <input value={form.cryptoWalletAddress} onChange={(e) => setField('cryptoWalletAddress', e.target.value)} placeholder="Cüzdan adresi" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
-        </div>
-        <div style={{ marginTop: 10 }}>
-          <input value={form.cryptoWalletMemo} onChange={(e) => setField('cryptoWalletMemo', e.target.value)} placeholder="Memo / tag / ek not (opsiyonel)" style={inputStyle} />
-        </div>
-        <button onClick={save} disabled={saving} style={{ marginTop: 14, width: '100%', padding: '10px 12px', borderRadius: 10, background: 'var(--ink)', color: '#fff', fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
-          {saving ? 'Kaydediliyor…' : 'Ödeme ayarlarını kaydet'}
-        </button>
-        {saved && (
-          <div style={{ marginTop: 10, fontSize: 11.5, color: '#047857', background: 'var(--ok-bg)', border: '1px solid #a7f3d0', borderRadius: 9, padding: '8px 10px' }}>
-            Ödeme ayarları kaydedildi.
+        {pendingError && (
+          <div style={{ margin: '12px 20px 0', fontSize: 11.5, color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 9, padding: '8px 10px' }}>
+            {pendingError}
           </div>
         )}
+
+        {!pendingLoading && pendingIban.length === 0 && !pendingError && (
+          <div style={{ padding: '24px 20px', fontSize: 12.5, color: 'var(--ink-3)', textAlign: 'center' }}>
+            Bekleyen havale bildirimi yok.
+          </div>
+        )}
+
+        {pendingIban.map((row, i) => (
+          <div key={row.id} style={{
+            padding: '14px 20px',
+            borderBottom: i < pendingIban.length - 1 ? '1px solid var(--border)' : 'none',
+            display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'center',
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>
+                {money(row.creditTL ?? row.miktarTL)}
+                <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 400, marginLeft: 8 }}>
+                  tahsilat {money(row.payableTL ?? row.miktarTL)}
+                </span>
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-2)' }}>
+                {row.userAdSoyad || '—'} · {row.userEmail || row.userId}
+              </div>
+              <div style={{ fontSize: 10.5, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)' }}>
+                ref {row.referansKodu} · {safeDate(row.olusturma)}
+              </div>
+              <input
+                value={rejectNotes[row.id] || ''}
+                onChange={(e) => setRejectNotes((cur) => ({ ...cur, [row.id]: e.target.value }))}
+                placeholder="Not (red için zorunlu, onayda opsiyonel)"
+                style={{ ...inputStyle, marginTop: 6, fontSize: 11.5 }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={() => approveIban(row)}
+                disabled={actionId === row.id}
+                style={{ padding: '9px 16px', borderRadius: 9, background: '#047857', color: '#fff', fontWeight: 600, fontSize: 12.5, opacity: actionId === row.id ? 0.6 : 1 }}
+              >
+                {actionId === row.id ? '…' : 'Onayla + yükle'}
+              </button>
+              <button
+                onClick={() => rejectIban(row)}
+                disabled={actionId === row.id}
+                style={{ padding: '9px 16px', borderRadius: 9, border: '1px solid #fecaca', background: '#fef2f2', color: '#b91c1c', fontWeight: 600, fontSize: 12.5, opacity: actionId === row.id ? 0.6 : 1 }}
+              >
+                Reddet
+              </button>
+            </div>
+          </div>
+        ))}
       </Card>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 0.9fr) minmax(320px, 1.1fr)', gap: 18 }}>
+        <Card pad={20}>
+          <Caption>Ödeme bildirimi</Caption>
+          <div style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>WhatsApp yönlendirme</div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-2)', lineHeight: 1.6, marginTop: 6 }}>
+            IBAN ve manuel kripto ödemelerinde müşteriye ödeme bilgileri gösterilir; bildirim butonu bu numaraya hazır mesaj açar.
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <Caption style={{ marginBottom: 6 }}>WhatsApp numarası</Caption>
+            <input
+              value={form.paymentWhatsappNumber}
+              onChange={(e) => setField('paymentWhatsappNumber', e.target.value)}
+              placeholder="905000000000"
+              style={inputStyle}
+            />
+          </div>
+        </Card>
+
+        <Card pad={20}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+            <div>
+              <Caption>Manuel kripto cüzdanı</Caption>
+              <div style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>USDT adresi</div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-2)', lineHeight: 1.6, marginTop: 6 }}>
+                Cryptomus kapalıysa bu alan aktif olduğunda kullanıcıya cüzdan, ağ, referans ve WhatsApp bildirimi gösterilir. Bakiye otomatik eklenmez.
+              </div>
+            </div>
+            <button onClick={() => setField('cryptoWalletEnabled', !form.cryptoWalletEnabled)} style={{
+              width: 48, height: 26, borderRadius: 999,
+              background: form.cryptoWalletEnabled ? 'var(--accent)' : 'var(--ink-5)',
+              position: 'relative',
+            }}>
+              <span style={{ position: 'absolute', top: 3, left: form.cryptoWalletEnabled ? 25 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: 10, marginTop: 14 }}>
+            <input value={form.cryptoWalletAsset} onChange={(e) => setField('cryptoWalletAsset', e.target.value)} placeholder="USDT" style={inputStyle} />
+            <input value={form.cryptoWalletNetwork} onChange={(e) => setField('cryptoWalletNetwork', e.target.value)} placeholder="TRC20" style={inputStyle} />
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <input value={form.cryptoWalletAddress} onChange={(e) => setField('cryptoWalletAddress', e.target.value)} placeholder="Cüzdan adresi" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <input value={form.cryptoWalletMemo} onChange={(e) => setField('cryptoWalletMemo', e.target.value)} placeholder="Memo / tag / ek not (opsiyonel)" style={inputStyle} />
+          </div>
+          <button onClick={save} disabled={saving} style={{ marginTop: 14, width: '100%', padding: '10px 12px', borderRadius: 10, background: 'var(--ink)', color: '#fff', fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
+            {saving ? 'Kaydediliyor…' : 'Ödeme ayarlarını kaydet'}
+          </button>
+          {saved && (
+            <div style={{ marginTop: 10, fontSize: 11.5, color: '#047857', background: 'var(--ok-bg)', border: '1px solid #a7f3d0', borderRadius: 9, padding: '8px 10px' }}>
+              Ödeme ayarları kaydedildi.
+            </div>
+          )}
+        </Card>
+      </div>
     </div>
   );
 };

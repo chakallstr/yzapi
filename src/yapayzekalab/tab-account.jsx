@@ -1415,8 +1415,11 @@ const AccountTab = ({ ctx }) => {
           const methodLabel = { iban: 'IBAN', shopier: 'Shopier', cryptomus: 'Cryptomus' }[method] || method;
           const statusTone = {
             tamamlandi: { bg: 'var(--ok-bg)', fg: '#047857', label: 'tamamlandı' },
+            basarili:   { bg: 'var(--ok-bg)', fg: '#047857', label: 'tamamlandı' },
+            onaylandi:  { bg: 'var(--ok-bg)', fg: '#047857', label: 'tamamlandı' },
             bekliyor:   { bg: '#fffbeb',      fg: '#a16207', label: 'bekliyor'    },
             iptal:      { bg: '#fef2f2',      fg: '#b91c1c', label: 'iptal'       },
+            reddedildi: { bg: '#fef2f2',      fg: '#b91c1c', label: 'reddedildi'  },
             basarisiz:  { bg: '#fef2f2',      fg: '#b91c1c', label: 'başarısız'   },
           }[p.durum || p.status] || { bg: 'var(--surface-2)', fg: 'var(--ink-2)', label: p.durum || p.status || '—' };
           const collectedTL = asNumber(p.payableTL ?? p.miktarTL ?? p.gross, 0);

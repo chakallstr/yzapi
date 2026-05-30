@@ -56,7 +56,7 @@ export const API_DOC_SECTIONS = [
     label: "Desteklenen istemciler",
     title: "Desteklenen istemciler ve bağlantı parametreleri",
     intro:
-      "Claude Popusk dökümanındaki istemci akışını YapayZekaLab için uyarladık. Kararlı yol OpenAI-uyumlu istemcilerdir; Anthropic uyumlu kullanım için `/v1/messages` endpointi ayrıca açıktır.",
+      "Tüm OpenAI-uyumlu istemciler base URL + `yzk_live_` anahtarıyla çalışır (Codex CLI, Cline, Roo Code, Kilo Code, OpenCode, Cherry Studio, OpenAI SDK). Claude Code için Anthropic-uyumlu `/v1/messages` endpointi açıktır; `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ile bağlanılır.",
     clientCards: [
       {
         name: "Cline",
@@ -125,13 +125,39 @@ export const API_DOC_SECTIONS = [
         ],
       },
       {
-        name: "Claude Code",
-        type: "CLI · not",
+        name: "Codex CLI",
+        type: "CLI · OpenAI-compatible",
         steps: [
-          "Claude Code için Anthropic-native oturum akışı gerekir.",
-          "Bu yayındaki kararlı dokümantasyon OpenAI-uyumlu istemcilere odaklanır.",
-          "Anthropic uyumlu iş akışlarında `/v1/messages` endpointini destekleyen istemciler kullanılabilir.",
+          "Kurulum: `npm install -g @openai/codex`.",
+          "Ortam: `export OPENAI_BASE_URL=\"https://yapayzekalab.org/v1\"` ve `export OPENAI_API_KEY=\"yzk_live_...\"`.",
+          "Veya `~/.codex/config.toml` içinde `model_provider` olarak base_url `https://yapayzekalab.org/v1` tanımla.",
+          "Model olarak katalogdaki bir ID kullan: `gpt-5.4`, `claude-sonnet-4-6`, `gpt-5.5`.",
+          "`codex` komutuyla başlat.",
         ],
+        code: `# ~/.codex/config.toml
+model = "gpt-5.4"
+model_provider = "yapayzekalab"
+
+[model_providers.yapayzekalab]
+name = "YapayZekaLab"
+base_url = "https://yapayzekalab.org/v1"
+env_key = "OPENAI_API_KEY"`,
+      },
+      {
+        name: "Claude Code",
+        type: "CLI · Anthropic-compatible",
+        steps: [
+          "Kurulum: `npm install -g @anthropic-ai/claude-code`.",
+          "`export ANTHROPIC_BASE_URL=\"https://yapayzekalab.org\"` (kök — `/v1` EKLEME, Claude Code kendisi ekler).",
+          "`export ANTHROPIC_AUTH_TOKEN=\"yzk_live_...\"` (senin API anahtarın, Bearer olarak gider).",
+          "`export ANTHROPIC_MODEL=\"claude-sonnet-4-6\"` ve `ANTHROPIC_SMALL_FAST_MODEL=\"claude-sonnet-4-6\"`.",
+          "`claude` komutuyla başlat. Not: `/v1/messages` akışsız (non-streaming) yanıt döner.",
+        ],
+        code: `export ANTHROPIC_BASE_URL="https://yapayzekalab.org"
+export ANTHROPIC_AUTH_TOKEN="yzk_live_YOUR_KEY"
+export ANTHROPIC_MODEL="claude-sonnet-4-6"
+export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
+claude`,
       },
     ],
   },
@@ -353,7 +379,7 @@ X-YZ-Request-Id: req_123456789`,
       "4. `/v1/balance` ile kalan bakiyeni doğrula.",
       "5. `/v1/models` ile aktif modeli seç.",
       "6. `/v1/chat/completions` ile ilk küçük metin çağrını yap.",
-      "7. Gerekirse sonra istemcini `Cline`, `Kilo Code`, `OpenCode` veya `Roo Code` ile kalıcı kur.",
+      "7. Gerekirse istemcini kalıcı kur: Codex CLI veya Claude Code (CLI), ya da `Cline`, `Kilo Code`, `OpenCode`, `Roo Code` (VS Code/CLI).",
     ],
   },
   {

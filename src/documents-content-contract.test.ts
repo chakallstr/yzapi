@@ -19,13 +19,16 @@ describe("documents tab content contract", () => {
     expect(combined).toContain("/v1/messages");
   });
 
-  it("documents supported coding clients and the Claude Code limitation note", () => {
+  it("documents supported coding clients including Codex CLI and Claude Code", () => {
     expect(combined).toContain("Cline");
     expect(combined).toContain("Kilo Code");
     expect(combined).toContain("OpenCode");
     expect(combined).toContain("Roo Code");
+    expect(combined).toContain("Codex CLI");
     expect(combined).toContain("Claude Code");
-    expect(combined).toContain("Bu yayındaki kararlı dokümantasyon OpenAI-uyumlu istemcilere odaklanır.");
+    // Claude Code artık desteklenir: Anthropic-uyumlu /v1/messages + env akışı.
+    expect(combined).toContain("ANTHROPIC_BASE_URL");
+    expect(combined).toContain("ANTHROPIC_AUTH_TOKEN");
   });
 
   it("contains deeper sdk, error and billing documentation blocks", () => {
