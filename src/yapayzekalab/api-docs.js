@@ -72,10 +72,10 @@ export const API_DOC_SECTIONS = [
         name: "Kilo Code",
         type: "VS Code · OpenAI-compatible",
         steps: [
-          "Authentication yöntemi `API Key` olmalı.",
+          "API Provider olarak `OpenAI Compatible` seç (yeni arayüzde `Custom provider`).",
           "Base URL `https://yapayzekalab.org/v1`.",
           "API Key senin `yzk_live_...` anahtarın.",
-          "Model alanına aktif katalogdaki metin modellerinden birini yaz.",
+          "Model olarak aktif katalogdan bir ID seç (örn. `claude-sonnet-4-6`, `gpt-5.5`).",
         ],
       },
       {
@@ -109,9 +109,10 @@ export const API_DOC_SECTIONS = [
         type: "VS Code · OpenAI-compatible",
         steps: [
           "Settings → Providers içine gir.",
-          "Provider tipi `OpenAI Compatible` olsun.",
+          "API Provider tipi `OpenAI Compatible` olsun.",
           "Base URL `https://yapayzekalab.org/v1`.",
           "API Key olarak `yzk_live_...` kullan.",
+          "Model olarak `/v1/models` listesinden bir ID seç (örn. `claude-sonnet-4-6`, `gpt-5.5`, `claude-opus-4-7`).",
         ],
       },
       {
@@ -119,9 +120,10 @@ export const API_DOC_SECTIONS = [
         type: "Desktop · OpenAI-compatible",
         steps: [
           "Model sağlayıcısı olarak OpenAI-compatible profil aç.",
-          "API adresine `https://yapayzekalab.org/v1` yaz. (Cherry `/v1` çoğaltırsa adresi `https://yapayzekalab.org` kök bırak ya da tam yolu `#` ile bitir: `.../v1/chat/completions#`.)",
+          "API adresine KÖK adresi yaz: `https://yapayzekalab.org` — Cherry `/v1/chat/completions` yolunu kendisi ekler.",
+          "Alternatif: tam yolu `#` ile bitir → `https://yapayzekalab.org/v1/chat/completions#` (Cherry adresi aynen kullanır).",
           "API Key olarak `yzk_live_...` kullan.",
-          "İlk denemede `/v1/models` üzerinden gördüğün canonical model adını seç.",
+          "Model olarak `/v1/models`'tan gördüğün bir ID seç (örn. `claude-sonnet-4-6`).",
         ],
       },
       {
