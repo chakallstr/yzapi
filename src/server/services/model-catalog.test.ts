@@ -18,6 +18,18 @@ describe("MASTER_MODELS — Claude Popusk text catalog", () => {
     expect(canonicalizeModelId("google/gemini-3.1-pro-preview")).toBe("gemini-3.1-pro-preview");
   });
 
+  it("accepts Claude Code / Anthropic-SDK dotted model ids (ANTHROPIC_MODEL) as aliases", () => {
+    // Claude Code & opencode send the unprefixed dotted form (ANTHROPIC_MODEL),
+    // e.g. claude-sonnet-4.6. These must canonicalize to our tire-form catalog id
+    // so /v1/messages + /v1/chat/completions resolve them (otherwise 404).
+    expect(canonicalizeModelId("claude-sonnet-4.6")).toBe("claude-sonnet-4-6");
+    expect(canonicalizeModelId("claude-opus-4.7")).toBe("claude-opus-4-7");
+    expect(canonicalizeModelId("claude-opus-4.6")).toBe("claude-opus-4-6");
+    // gpt/gemini families already use the dotted form as their canonical id.
+    expect(canonicalizeModelId("gpt-5.4")).toBe("gpt-5.4");
+    expect(canonicalizeModelId("gemini-3.1-pro-preview")).toBe("gemini-3.1-pro-preview");
+  });
+
   it("uses the approved customer-facing price tiers", () => {
     const byId = new Map(MASTER_MODELS.map((model) => [model.id, model]));
 
