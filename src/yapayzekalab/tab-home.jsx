@@ -1005,8 +1005,8 @@ const HomeTab = ({ ctx, onTab, onAction }) => {
 
       {/* ===== 3 FEATURE CARDS ===== */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-        <FeatureCard tone="teal" Ico={I.Layers} title={`${MODELS.length} Text Model`}
-        body="Claude Opus & Sonnet & Haiku, GPT 5.x & o-serisi, Gemini 3.x metin modelleri. Tek API key, tek bakiye, sıfır karmaşıklık." />
+        <FeatureCard tone="teal" Ico={I.Layers} title="Claude Model Ailesi"
+        body="Claude Opus 4.8/4.7/4.6, Sonnet 4.6 ve Haiku 4.5 metin modelleri. Tek API key, tek bakiye, sıfır karmaşıklık." />
         <FeatureCard tone="indigo" Ico={I.Wallet} title="Saydam Fiyatlama"
         body="Katalogda görünen satış fiyatı kullanılır. Tüm ücretlendirme USD bazındadır — TL karşılığı yalnızca bilgi amaçlı gösterilir." />
         <FeatureCard tone="purple" Ico={I.Zap} title="5 Dakikada Başla"

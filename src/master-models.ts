@@ -84,7 +84,10 @@ const CUSTOMER_PRICE_OVERRIDES = new Map<string, number>([
 ]);
 
 function familyPrice(id: string): number {
-  if (id === "claude-opus-4-7") return 1.0;
+  if (id === "claude-opus-4-7") return 1.25;
+  if (id === "claude-opus-4-6") return 0.90;
+  if (id === "claude-sonnet-4-6") return 0.78;
+  if (id === "claude-haiku-4-5-20251001") return 0.70;
   return CUSTOMER_PRICE_OVERRIDES.get(id) ?? 0.52;
 }
 

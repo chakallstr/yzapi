@@ -56,7 +56,7 @@ export const API_DOC_SECTIONS = [
     label: "Desteklenen istemciler",
     title: "Desteklenen istemciler ve bağlantı parametreleri",
     intro:
-      "Tüm OpenAI-uyumlu istemciler base URL + `yzk_live_` anahtarıyla çalışır (Codex CLI, Cline, Roo Code, Kilo Code, OpenCode, Cherry Studio, OpenAI SDK). Claude Code için Anthropic-uyumlu `/v1/messages` endpointi açıktır; `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ile bağlanılır. İpucu: doğru araç–model eşleşmesi → OpenAI modelleri (`gpt-5.5`, `gpt-5.4`) için OpenAI-uyumlu istemciler/Codex CLI, Claude modelleri (`claude-opus-4-7` vb.) için Claude Code.",
+      "Tüm OpenAI-uyumlu istemciler base URL + `yzk_live_` anahtarıyla çalışır (Codex CLI, Cline, Roo Code, Kilo Code, OpenCode, Cherry Studio, OpenAI SDK). Claude Code için Anthropic-uyumlu `/v1/messages` endpointi açıktır; `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ile bağlanılır. Aktif katalog Claude modelleridir (`claude-opus-4-7`, `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`); en sorunsuz deneyim Claude Code iledir.",
     clientCards: [
       {
         name: "Cline",
@@ -65,7 +65,7 @@ export const API_DOC_SECTIONS = [
           "API Provider olarak `OpenAI Compatible` seç.",
           "Base URL alanına `https://yapayzekalab.org/v1` yaz.",
           "API Key alanına `yzk_live_...` anahtarını gir.",
-          "Model ID olarak `claude-opus-4-7`, `claude-sonnet-4-6`, `gpt-5.5` veya `gemini-3.1-pro-preview` seç.",
+          "Model ID olarak `claude-opus-4-7`, `claude-opus-4-6`, `claude-sonnet-4-6` veya `claude-haiku-4-5-20251001` seç.",
         ],
       },
       {
@@ -75,7 +75,7 @@ export const API_DOC_SECTIONS = [
           "API Provider olarak `OpenAI Compatible` seç (yeni arayüzde `Custom provider`).",
           "Base URL `https://yapayzekalab.org/v1`.",
           "API Key senin `yzk_live_...` anahtarın.",
-          "Model olarak aktif katalogdan bir ID seç (örn. `claude-sonnet-4-6`, `gpt-5.5`).",
+          "Model olarak aktif katalogdan bir ID seç (örn. `claude-opus-4-7`, `claude-sonnet-4-6`).",
         ],
       },
       {
@@ -84,7 +84,7 @@ export const API_DOC_SECTIONS = [
         steps: [
           "Provider `@ai-sdk/openai-compatible` ile tanımlanır.",
           "Base URL `https://yapayzekalab.org/v1`.",
-          "Model listene `claude-opus-4-7`, `claude-sonnet-4-6`, `gpt-5.5` gibi aktif modelleri ekle.",
+          "Model listene `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-opus-4-6` gibi aktif modelleri ekle.",
         ],
         code: `{
   "$schema": "https://opencode.ai/config.json",
@@ -98,7 +98,7 @@ export const API_DOC_SECTIONS = [
       "models": {
         "claude-opus-4-7": { "name": "claude-opus-4-7" },
         "claude-sonnet-4-6": { "name": "claude-sonnet-4-6" },
-        "gpt-5.5": { "name": "gpt-5.5" }
+        "claude-opus-4-6": { "name": "claude-opus-4-6" }
       }
     }
   }
@@ -112,7 +112,7 @@ export const API_DOC_SECTIONS = [
           "API Provider tipi `OpenAI Compatible` olsun.",
           "Base URL `https://yapayzekalab.org/v1`.",
           "API Key olarak `yzk_live_...` kullan.",
-          "Model olarak `/v1/models` listesinden bir ID seç (örn. `claude-sonnet-4-6`, `gpt-5.5`, `claude-opus-4-7`).",
+          "Model olarak `/v1/models` listesinden bir ID seç (örn. `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`).",
         ],
       },
       {
@@ -133,12 +133,12 @@ export const API_DOC_SECTIONS = [
           "Kurulum: `npm install -g @openai/codex`.",
           "Ortam: `export OPENAI_BASE_URL=\"https://yapayzekalab.org/v1\"` ve `export OPENAI_API_KEY=\"yzk_live_...\"`.",
           "Veya `~/.codex/config.toml` içinde `model_provider` olarak base_url `https://yapayzekalab.org/v1` tanımla.",
-          "Model olarak bir OpenAI ID kullan: `gpt-5.5` veya `gpt-5.4`. Codex bir OpenAI aracıdır; OpenAI modelleriyle sorunsuz çalışır.",
-          "Claude/Gemini modeli (örn. `claude-opus-4-7`) Codex içinde önerilmez: Codex bu modellerin metadata'sını tanımaz (\"Model metadata not found\" uyarısı) ve oturum kararsız olabilir. Claude modelleri için aşağıdaki Claude Code kartını kullan.",
+          "Model olarak aktif katalogdan bir Claude ID kullan: `claude-opus-4-7`, `claude-sonnet-4-6` veya `claude-haiku-4-5-20251001`.",
+          "Not: Codex bir OpenAI aracıdır; Claude modellerinde metadata uyarısı verebilir. Claude ile en sorunsuz deneyim için aşağıdaki Claude Code kartını tercih et.",
           "`codex` komutuyla başlat.",
         ],
         code: `# ~/.codex/config.toml
-model = "gpt-5.5"
+model = "claude-opus-4-7"
 model_provider = "yapayzekalab"
 
 [model_providers.yapayzekalab]
@@ -178,7 +178,7 @@ claude`,
   -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "gpt-5.5",
+    "model": "claude-opus-4-7",
     "messages": [
       { "role": "system", "content": "Kısa ve net yanıt ver." },
       { "role": "user", "content": "Bir satırlık selam ver." }
@@ -217,7 +217,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="gemini-3.1-pro-preview",
+    model="claude-haiku-4-5-20251001",
     messages=[
         {"role": "user", "content": "3 maddelik özet çıkar."}
     ],
@@ -324,20 +324,6 @@ X-YZ-Request-Id: req_123456789`,
           "claude-opus-4-6",
           "claude-sonnet-4-6",
           "claude-haiku-4-5-20251001",
-        ],
-      },
-      {
-        family: "GPT (OpenAI)",
-        models: [
-          "gpt-5.5",
-          "gpt-5.4",
-        ],
-      },
-      {
-        family: "Gemini (Google)",
-        models: [
-          "gemini-3.1-pro-preview",
-          "gemini-3.5-flash",
         ],
       },
     ],

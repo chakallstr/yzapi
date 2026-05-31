@@ -33,7 +33,10 @@ describe("MASTER_MODELS — Claude Popusk text catalog", () => {
   it("uses the approved customer-facing price tiers", () => {
     const byId = new Map(MASTER_MODELS.map((model) => [model.id, model]));
 
-    expect(byId.get("claude-haiku-4-5-20251001")?.customerInputUsd).toBe(0.52);
+    expect(byId.get("claude-haiku-4-5-20251001")?.customerInputUsd).toBe(0.70);
+    expect(byId.get("claude-opus-4-7")?.customerInputUsd).toBe(1.25);
+    expect(byId.get("claude-opus-4-6")?.customerInputUsd).toBe(0.90);
+    expect(byId.get("claude-sonnet-4-6")?.customerInputUsd).toBe(0.78);
     expect(byId.get("gemini-3-flash-preview")?.customerInputUsd).toBe(0.58);
     expect(byId.get("gemini-3-pro-preview")?.customerInputUsd).toBe(0.58);
     expect(byId.get("gemini-3.1-pro-preview")?.customerInputUsd).toBe(0.71);
@@ -52,7 +55,6 @@ describe("MASTER_MODELS — Claude Popusk text catalog", () => {
     expect(byId.get("gpt-5.4")?.customerInputUsd).toBe(0.83);
     expect(byId.get("gpt-5.4-mini")?.customerInputUsd).toBe(0.75);
     expect(byId.get("gpt-5.4-nano")?.customerInputUsd).toBe(0.71);
-    expect(byId.get("claude-opus-4-7")?.customerInputUsd).toBe(1);
     expect(byId.get("gpt-5.5")?.customerInputUsd).toBe(0.96);
   });
 
