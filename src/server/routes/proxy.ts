@@ -11,6 +11,15 @@ import { db } from "../db/client.js";
 import { modelOverrides, systemConfig, users } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { buildRequestGuard, resolveBilledPromptTokens, type RequestGuardResult } from "../services/request-guard-service.js";
+import { performWebSearch, clampSearchNum, WEB_SEARCH_DEFAULT_NUM } from "../services/web-search-service.js";
+import {
+  extractLatestUserText,
+  shouldSearch,
+  buildSearchQuery,
+  buildAugmentedMessages,
+  type WebSearchMode,
+} from "../services/web-search-augment.js";
+import { chargeWebSearch } from "../services/web-search-billing-service.js";
 import {
   getApiKeyPolicy,
   getModelRuntimePolicy,
@@ -227,6 +236,23 @@ function upstreamErrorCode(err: unknown): string {
   return e.status ? `upstream_${e.status}` : "upstream_error";
 }
 
+// chat/completions gövdesinden web_search opsiyonunu çözer. Kabul edilen biçimler:
+//   web_search: true                      → { enabled:true, mode:"auto", num:default }
+//   web_search: { enabled, mode, num }     → alanlar (mode auto|always|off)
+//   (yok / false)                          → { enabled:false }
+// Bu alan upstream'e GÖNDERİLMEZ (çağıran strip eder).
+function parseWebSearchOption(body: Record<string, unknown>): { enabled: boolean; mode: WebSearchMode; num: number } {
+  const raw = body.web_search;
+  if (raw === true) return { enabled: true, mode: "auto", num: WEB_SEARCH_DEFAULT_NUM };
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    const enabled = o.enabled !== false; // {mode:...} verildiyse varsayılan açık
+    const mode: WebSearchMode = o.mode === "always" ? "always" : o.mode === "off" ? "off" : "auto";
+    return { enabled, mode, num: clampSearchNum(o.num ?? WEB_SEARCH_DEFAULT_NUM) };
+  }
+  return { enabled: false, mode: "off", num: WEB_SEARCH_DEFAULT_NUM };
+}
+
 async function handleTextJsonEndpoint(
   req: Request,
   res: Response,
@@ -358,6 +384,8 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
   let masterModel: MasterModel | undefined;
   let guard: RequestGuardResult | undefined;
   let runtimeConfig: RuntimeApiConfig | undefined;
+  let webSearchPerformed = false;
+  let webSearchResultCount = 0;
 
   try {
     const enforcement = await enforceRequestGuards({
@@ -373,6 +401,34 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
     if (runtimeConfig.maintenanceModeForApi) {
       throw new AppError(503, runtimeConfig.maintenanceMessage);
     }
+
+    // ── Web Search auto-augment ───────────────────────────────────────────────
+    // web_search:true (mode:auto) → "güncel" soru sezilirse arka planda arama yapılır,
+    // sonuçlar prompt'a enjekte edilir (artan input token normal faturalanır) + arama
+    // başına sabit $0.001 izole ücret (billing reserve/settle'a DOKUNMAZ). web_search
+    // alanı upstream'e GÖNDERİLMEZ (her durumda strip edilir).
+    const wsOption = parseWebSearchOption(req.body as Record<string, unknown>);
+    if ("web_search" in (req.body as Record<string, unknown>)) {
+      delete (req.body as Record<string, unknown>).web_search;
+    }
+    if (wsOption.enabled && !isStream) {
+      const userText = extractLatestUserText((req.body as { messages?: unknown }).messages);
+      if (shouldSearch(userText, wsOption.mode)) {
+        const wsQuery = buildSearchQuery(userText);
+        const { results } = await performWebSearch(wsQuery, wsOption.num);
+        if (results.length > 0) {
+          (req.body as Record<string, unknown>).messages = buildAugmentedMessages(
+            (req.body as { messages?: unknown[] }).messages ?? [],
+            results,
+            wsQuery,
+            new Date(),
+          );
+          webSearchPerformed = true;
+          webSearchResultCount = results.length;
+        }
+      }
+    }
+
     const effectiveMaxOutputTokens = computeEffectiveMaxOutputTokens(
       enforcement.masterModel,
       enforcement.runtimeConfig,
@@ -448,7 +504,7 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       // Bkz resolveBilledPromptTokens. Faturalanan değer asla sağlayıcı normalize'ın altına düşmez.
       const billedPromptTokens = resolveBilledPromptTokens(usage.promptTokens, guard.contextTokens);
 
-      const { costTL, remainingTL } = await settleReservedUsage({
+      const { costTL } = await settleReservedUsage({
         userId,
         apiKeyId,
         model: masterModel,
@@ -459,8 +515,28 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
         status: "success",
       });
 
-      const { remainingUSD } = await getUserBalanceSnapshot(userId);
-      setExtendedBillingHeaders(res, costTL, remainingTL, remainingUSD, requestId);
+      // Web-search auto-augment yapıldıysa: arama başına sabit $0.001 izole ücret
+      // (billing reserve/settle'a DOKUNMAZ; kendi idempotent tahsil yolu, drift=0).
+      if (webSearchPerformed) {
+        try {
+          await chargeWebSearch({
+            userId,
+            apiKeyId,
+            webSearchRequestId: `ws_${requestId}`,
+            resultCount: webSearchResultCount,
+            responseMs,
+            status: "success",
+            source: "auto_augment",
+          });
+        } catch (e2) {
+          // Ücret tahsili hizmeti BLOKLAMAZ (chat zaten teslim edildi). Sadece logla.
+          logger.error({ err: e2 }, "[web-search] auto-augment fee charge failed");
+        }
+      }
+
+      // Bakiye anlık görüntüsü web-search ücreti SONRASI alınır (header güncel kalsın).
+      const { remainingTL: finalRemainingTL, remainingUSD } = await getUserBalanceSnapshot(userId);
+      setExtendedBillingHeaders(res, costTL, finalRemainingTL, remainingUSD, requestId);
       res.json(raw);
     }
   } catch (err) {
@@ -530,6 +606,76 @@ router.post("/responses", requireProxy, (req: Request, res: Response, next: Next
 // POST /v1/messages
 router.post("/messages", requireProxy, (req: Request, res: Response, next: NextFunction) => {
   void handleTextJsonEndpoint(req, res, next, "messages");
+});
+
+// POST /v1/web-search — standalone güncel web araması (sabit ücret $0.001/arama).
+// apiKeyAuth + requireWhatsappVerified arkasında. Billing reserve/settle'a DOKUNMAZ;
+// izole sabit-ücret tahsili (web-search-billing-service). Upstream maliyeti $0.
+router.post("/web-search", requireProxy, async (req: Request, res: Response, next: NextFunction) => {
+  const userId = req.user!.id;
+  const apiKeyId = req.apiKey!.id;
+  const requestId = (req as any).id as string;
+  const start = Date.now();
+  try {
+    const runtimeConfig = await getRuntimeApiConfig();
+    if (runtimeConfig.maintenanceModeForApi) {
+      throw new AppError(503, runtimeConfig.maintenanceMessage);
+    }
+
+    const { query, num } = req.body as { query?: unknown; num?: unknown };
+    const q = typeof query === "string" ? query.trim() : "";
+    if (!q) {
+      throw new BadRequestError("query alanı zorunludur (string).");
+    }
+
+    // Rate limit (chat ile aynı kova).
+    const rl = await checkRateLimit(apiKeyId, userId, req.ip);
+    if (!rl.allowed) {
+      throw new RateLimitError("Rate limit exceeded", rl.retryAfter);
+    }
+
+    // Bakiye guard: ücretli (sabit) işlem → reserve mantığı gibi önce balance>0.
+    const balRows = await db.select({ bakiye: users.bakiyeTL }).from(users).where(eq(users.id, userId)).limit(1);
+    const balance = Number(balRows[0]?.bakiye ?? 0);
+    if (runtimeConfig.insufficientBalanceBlockEnabled && balance <= 0) {
+      throw new InsufficientBalanceError("Insufficient balance to process web search");
+    }
+
+    const searchNum = clampSearchNum(num ?? WEB_SEARCH_DEFAULT_NUM);
+    const { results } = await performWebSearch(q, searchNum);
+    const responseMs = Date.now() - start;
+
+    // Sonuç bulunduysa ücret kes; bulunmadıysa (upstream boş/hata) ÜCRET KESME (no_charge).
+    const charge = await chargeWebSearch({
+      userId,
+      apiKeyId,
+      webSearchRequestId: `ws_${requestId}`,
+      resultCount: results.length,
+      responseMs,
+      status: results.length > 0 ? "success" : "no_charge",
+      source: "standalone",
+    });
+
+    const { remainingUSD } = await getUserBalanceSnapshot(userId);
+    setExtendedBillingHeaders(res, charge.costTL, charge.remainingTL, remainingUSD, requestId);
+    res.json({
+      object: "web_search",
+      query: q,
+      results,
+      cost: { tl: charge.costTL.toFixed(4), usd: charge.costUsd.toFixed(8) },
+    });
+  } catch (err) {
+    if (
+      err instanceof InsufficientBalanceError ||
+      err instanceof RateLimitError ||
+      err instanceof BadRequestError ||
+      err instanceof AppError
+    ) {
+      return next(err);
+    }
+    logger.error({ err }, "[web-search] standalone endpoint error");
+    return next(err);
+  }
 });
 
 // POST /v1/images/generations

@@ -45,6 +45,7 @@ const NON_CONTEXT_KEYS = new Set([
   "frequency_penalty",
   "metadata",
   "user",
+  "web_search",
 ]);
 
 export function estimateTextTokens(value: unknown): number {

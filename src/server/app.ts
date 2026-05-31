@@ -144,6 +144,7 @@ export function createApp(): express.Express {
       /^\/chat\/completions$/,
       /^\/responses$/,
       /^\/messages$/,
+      /^\/web-search$/,
       /^\/images\/generations$/,
       /^\/images\/edits$/,
       /^\/videos\/submit$/,
