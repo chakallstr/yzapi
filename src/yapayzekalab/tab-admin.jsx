@@ -4,6 +4,7 @@ import {
   PROVIDERS, MODELS, modelMeta, fmt, useCountUp,
 } from './shared.jsx';
 import { AdminTrafficAnalytics } from './tab-admin-traffic.jsx';
+import { AdminMaliIzleme } from './tab-admin-mali-izleme.jsx';
 
 const LAUNCH_ADMIN_EMAIL = 'cix.crazy666@gmail.com';
 const ACCESS_TOKEN_KEY = 'yz_access_token';
@@ -12,6 +13,7 @@ const LEGACY_ACCESS_TOKEN_KEY = 'userAccessToken';
 const ADMIN_SECTIONS = [
   { id: 'dashboard', label: 'Dashboard', Ico: I.Activity },
   { id: 'traffic', label: 'Trafik Analitiği', Ico: I.TrendUp },
+  { id: 'mali-izleme', label: 'Mali İzleme', Ico: I.Wallet },
   { id: 'api', label: 'API Yönetimi', Ico: I.Server },
   { id: 'users', label: 'Kullanıcılar', Ico: I.Users },
   { id: 'overrides', label: 'Modeller', Ico: I.Layers },
@@ -2483,6 +2485,7 @@ const AdminTab = ({ ctx = {} }) => {
       <div key={section} className="fade-in">
         {section === 'dashboard' && <AdminDashboard dashboard={data.dashboard} config={data.config} providers={data.providers || []} auditLogs={data.auditLogs || []} />}
         {section === 'traffic' && <AdminTrafficAnalytics token={token} onOpenUser={openTrafficUser} onOpenApiKeys={openTrafficApiKeys} />}
+        {section === 'mali-izleme' && <AdminMaliIzleme token={token} />}
         {section === 'api' && <AdminApiSettings token={token} apiKeys={data.apiKeys || []} />}
         {section === 'users' && <AdminUsers users={data.users || []} token={token} refresh={refresh} focusUserId={trafficUserJump.userId} focusNonce={trafficUserJump.nonce} />}
         {section === 'overrides' && (

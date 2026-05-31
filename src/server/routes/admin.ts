@@ -17,6 +17,7 @@ import {
 import { writeAudit } from "../services/audit-service.js";
 import { refreshKur } from "../services/kur-service.js";
 import { getReconciliationReport } from "../services/reconciliation-service.js";
+import { runScan, persistScan, getLatestScan } from "../services/mali-izleme-service.js";
 import { encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
 import { getAdminTrafficAnalytics, type TrafficWindow } from "../services/admin-traffic-service.js";
 import {
@@ -1040,6 +1041,71 @@ router.post("/api-keys/:userId/create", async (req, res, next) => {
       ...serializeApiKey(inserted[0], userRows[0].email),
       key: fullKey,
     });
+  } catch (e) { next(e); }
+});
+
+// ── Canlı Mali İzleme (canli-mali-izleme spec) ────────────────────────────────
+// Tümü adminAuth + requireWhatsappVerified arkasında (app.ts mount). Tek-admin
+// allowlist adminAuth'ta zorlanır. Upstream maliyet/marj yalnız bu admin uçlarında;
+// public/v1'e sızmaz. Secret kolon döndürülmez. Servis salt-okunur (yalnız izleme tablosu yazar).
+router.get("/mali-izleme/son", async (_req, res, next) => {
+  try {
+    const latest = await getLatestScan();
+    res.json(latest ?? { verdict: null, checks: [], findings: [], message: "Henüz tarama yok." });
+  } catch (e) { next(e); }
+});
+
+router.get("/mali-izleme/canli-akis", async (_req, res, next) => {
+  try {
+    const rows = await dbSql<{
+      istek: string; tin: string; tout: string; gelir_tl: string; satis_usd: string;
+    }[]>`
+      SELECT count(*)::text AS istek,
+        COALESCE(SUM(input_usage),0)::text AS tin,
+        COALESCE(SUM(output_usage),0)::text AS tout,
+        COALESCE(SUM(cost_tl::numeric),0)::text AS gelir_tl,
+        COALESCE(SUM(cost_usd::numeric),0)::text AS satis_usd
+      FROM usage_records WHERE timestamp >= now() - interval '15 minutes' AND status='success'
+    `;
+    const r = rows[0] ?? { istek: "0", tin: "0", tout: "0", gelir_tl: "0", satis_usd: "0" };
+    res.json({
+      pencere: "son 15 dakika",
+      istek: Number(r.istek),
+      inputToken: Number(r.tin),
+      outputToken: Number(r.tout),
+      gelirTL: Number(r.gelir_tl),
+      satisUsd: Number(r.satis_usd),
+      not: "Marj ≈ TAHMİNİ; upstream API gideri admin-only (maliyet tabanı sabiti).",
+    });
+  } catch (e) { next(e); }
+});
+
+router.post("/mali-izleme/tara", async (_req, res, next) => {
+  try {
+    const result = await runScan("on_demand");
+    await persistScan(result);
+    await writeAudit("mali_izleme_tara", "on_demand", `verdict: ${result.verdict}, bulgu: ${result.findings.length}`);
+    res.json(result);
+  } catch (e) {
+    // On-demand hata → 500; son özet bozulmaz (persist çağrılmadı).
+    next(e);
+  }
+});
+
+router.get("/mali-izleme/gecmis", async (_req, res, next) => {
+  try {
+    const rows = await dbSql<{ scan_at: string; verdict: string; finding_count: string; duration_ms: string; trigger: string }[]>`
+      SELECT scan_at::text, verdict, jsonb_array_length(findings_json)::text AS finding_count,
+        duration_ms::text, scan_trigger AS trigger
+      FROM mali_izleme_taramalari ORDER BY scan_at DESC LIMIT 50
+    `;
+    res.json(rows.map((r) => ({
+      scanAt: r.scan_at,
+      verdict: r.verdict,
+      findingCount: Number(r.finding_count),
+      durationMs: Number(r.duration_ms),
+      trigger: r.trigger,
+    })));
   } catch (e) { next(e); }
 });
 

@@ -3,6 +3,7 @@ import { startLowBalanceScanJob } from "./low-balance-scan-job.js";
 import { startDailyReportJob } from "./daily-report-job.js";
 import { startTelegramDeliveryRecoveryJob } from "./telegram-delivery-recovery-job.js";
 import { startOrphanReservationReaperJob } from "./orphan-reservation-reaper-job.js";
+import { startMaliIzlemeJob } from "./mali-izleme-job.js";
 
 export function startAllJobs(): void {
   startKurRefreshJob();
@@ -10,4 +11,5 @@ export function startAllJobs(): void {
   startDailyReportJob();
   startTelegramDeliveryRecoveryJob();
   startOrphanReservationReaperJob();
+  startMaliIzlemeJob();
 }

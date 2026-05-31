@@ -471,3 +471,25 @@ export const telegramDeliveries = pgTable(
     index("telegram_deliveries_status_idx").on(t.status),
   ],
 );
+
+// ── mali_izleme_taramalari (Canlı Mali İzleme — append-only tarama özeti) ──────
+// Deterministik mali denetim servisinin TEK yazdığı tablo. Her tarama bir satır:
+// verdict + kontrol değerleri (checks_json) + bulgular (findings_json) + son işlenen
+// zaman damgaları (aktivite kapısı için). Servis para tablolarından yalnız SELECT okur;
+// buraya yalnız INSERT eder (append-only — güncelleme/silme yok). Secret kolon İÇERMEZ.
+export const maliIzlemeTaramalari = pgTable(
+  "mali_izleme_taramalari",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    scanAt: timestamp("scan_at", { withTimezone: true }).notNull().default(sql`now()`),
+    verdict: text("verdict").notNull(), // SORUN_YOK | DIKKAT | SORUN_VAR
+    checksJson: jsonb("checks_json").notNull(),
+    findingsJson: jsonb("findings_json").notNull().default(sql`'[]'::jsonb`),
+    lastProcessedUsageTs: timestamp("last_processed_usage_ts", { withTimezone: true }),
+    lastProcessedTxTs: timestamp("last_processed_tx_ts", { withTimezone: true }),
+    scanTrigger: text("scan_trigger").notNull().default("cron"), // cron | on_demand
+    durationMs: integer("duration_ms").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [index("mali_izleme_scan_at_idx").on(t.scanAt)]
+);
