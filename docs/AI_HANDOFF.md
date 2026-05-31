@@ -22,9 +22,12 @@
 >    modeline düştü (supportedModelIds filtresi). Wellflow ~109K token büyük promptu işledi; dinamik rate limit
 >    (`org_queue_full` 429) yük anlarında görülür, 429'da 0 tahsil (K1).
 > 5. **Yeni fiyatlar (USD/1M, input=output) — CANLIDA:** opus-4.8=1.40 (DB added_model), opus-4.7=1.25,
->    opus-4.6=0.90 (açık), sonnet-4.6=0.78, haiku-4.5=0.70. `familyPrice` (master-models.ts) + `shared.jsx`
+>    opus-4.6=**1.05** (açık), sonnet-4.6=0.78, haiku-4.5=0.70. `familyPrice` (master-models.ts) + `shared.jsx`
 >    MODELS (frontend parity) + `model_overrides`/`added_models` DB + 2 fiyat contract testi güncellendi.
 >    Billing FORMÜLÜ DEĞİŞMEDİ; yalnız müşteri fiyat sabitleri.
+> 5b. **Plan limitleri:** pro günlük 200→**1000 TL**, aylık 2000→**10000 TL** (seed.ts + canlı DB). ücretsiz
+>     5/50 AYNI kaldı. NOT: plan `aylikLimitTL` rate-limit'te ENFORCE EDİLMİYOR (sadece günlük + api_key spend cap
+>     enforce; aylık plan limiti gösterim/kayıt). 429 `retryAfter:3600` = günlük TL limiti veya key spend cap dolması.
 > 6. **Doküman (api-docs.js):** GPT/Gemini örnek/katalogları kaldırıldı, 5 Claude modeline hizalandı
 >    (SDK curl/python, client kartları, Codex Claude'a yönlendirildi). tab-home pazarlama metni güncellendi.
 > 7. **Doğrulama:** 312 test + build yeşil; canlı `/api/models` 5 model + tüm hedef fiyatlar DOĞRU;
