@@ -3,8 +3,35 @@
 > Bu belge bir AI/geliştirici session'ından diğerine devir içindir. Mevcut durumun
 > tek doğruluk kaynağı. Yeni session BURADAN başlar.
 >
-> Son güncelleme commit: `e58029a` · dal: `phase/release-vps-beta`
-> Canlı deploy: `sync-20260530T194227Z-e58029a` · aktif sağlayıcı: **metro**
+> Son güncelleme commit: `ef88630` · dal: `phase/release-vps-beta`
+> Canlı deploy: `sync-20260531T001945Z-ef88630` · aktif sağlayıcı: **wellflow**
+>
+> ## SON OTURUM ÖZETİ (2026-05-31) — Wellflow geçişi + RooCode/timeout/saat fix + yeni fiyatlar
+> Bu oturumda yapılan ve CANLIDA doğrulanan işler (tek-doğruluk):
+> 1. **RooCode 500 / stream fix:** `closerouter-service.ts` `forwardChatStream` içindeki dinamik
+>    `require("stream")` esbuild ESM bundle'da patlıyordu → her `stream:true` isteği 500/`upstream_error`.
+>    Statik `import { Readable } from "stream"` ile çözüldü. Deploy sonrası RooCode 200, "Dynamic require" 0.
+> 2. **Saat (trafik analizi):** sunucu UTC; `admin-traffic-service.bucketLabel` + email/günlük rapor
+>    `toLocale*`'a `timeZone: "Europe/Istanbul"` eklendi (yalnız GÖSTERİM; bucket/billing değişmedi).
+> 3. **Upstream timeout:** `default_request_timeout_ms` 60s→**180s**, `default_stream_timeout_ms` 120s→180s
+>    (DEFAULT_API_SETTINGS + schema DDL + canlı DB satırı). Büyük promptlarda 60s AbortError kalktı.
+> 4. **Sağlayıcı = Wellflow (BİRİNCİL):** `api.wellflow.dev/v1`, OpenAI+Anthropic uyumlu, reseller key (`wf_`).
+>    `provider_profiles`'a `wellflow` profili eklendi (5 Claude modeli, model_map BOŞ — canonical tire-id'leri
+>    doğrudan kabul ediyor) ve aktif yapıldı. metro + closerouter standby kaldı (silinmedi). Switch sırasında
+>    `maintenance_mode_for_api` açıldı, bitince kapatıldı. **GPT/Gemini Wellflow'da YOK** → aktif katalog 5 Claude
+>    modeline düştü (supportedModelIds filtresi). Wellflow ~109K token büyük promptu işledi; dinamik rate limit
+>    (`org_queue_full` 429) yük anlarında görülür, 429'da 0 tahsil (K1).
+> 5. **Yeni fiyatlar (USD/1M, input=output) — CANLIDA:** opus-4.8=1.40 (DB added_model), opus-4.7=1.25,
+>    opus-4.6=0.90 (açık), sonnet-4.6=0.78, haiku-4.5=0.70. `familyPrice` (master-models.ts) + `shared.jsx`
+>    MODELS (frontend parity) + `model_overrides`/`added_models` DB + 2 fiyat contract testi güncellendi.
+>    Billing FORMÜLÜ DEĞİŞMEDİ; yalnız müşteri fiyat sabitleri.
+> 6. **Doküman (api-docs.js):** GPT/Gemini örnek/katalogları kaldırıldı, 5 Claude modeline hizalandı
+>    (SDK curl/python, client kartları, Codex Claude'a yönlendirildi). tab-home pazarlama metni güncellendi.
+> 7. **Doğrulama:** 312 test + build yeşil; canlı `/api/models` 5 model + tüm hedef fiyatlar DOĞRU;
+>    sağlayıcı adı sızıntısı YOK; ledger drift=0; gerçek trafik 7×200 + 3×429.
+> 8. **GÜVENLİK (ROTE EDİLMELİ):** Wellflow key (`wf_...fpI2`) + metro key (`sk-ant-...GBH5`) sohbette açık geçti.
+> **NOT:** `user.ts` + `report-service.ts` (aylık rapor) paralel oturum işi olarak bulundu, deploy temiz-tree
+> için `ef88630`'da commit'lendi; bu oturumda yazılmadı, sadece test+build yeşil doğrulandı.
 
 ---
 
@@ -105,8 +132,11 @@ Ops (`/Users/ufuk/yeniapi/_ops`, git dışı): `backup-full.sh` sertleştirildi.
 - **CANLI KANIT (funded `yzk_live_****6cda`):** claude-sonnet-4-6 (map'li)→200 −0.0023TL · gpt-5.4→200 ·
   claude-opus-4.8→200 · gemini-3.5-flash→200 · claude-opus-4-7→200 (hepsi usage=success). Desteklenmeyen
   gpt-5.4-mini→404 (0 tahsil). `/api/models` tam 9 metro modeli. **Ledger drift=0.** aiProvider=ok.
-- **Fiyatlar:** onaylı kilitli tabloya göre yeniden ayarlandı (claude-opus-4.8=1.20, claude-opus-4.7=1.0,
-  gemini-3.5-flash=0.90, diğerleri ×5/6). DOKUNULMAZ billing FORMÜLÜ değişmedi; sadece müşteri fiyat sabitleri.
+- **Fiyatlar:** onaylı kilitli tabloya göre ayarlandı. **GÜNCELLEME (2026-05-31):** Claude ailesi
+  yeniden fiyatlandı → claude-opus-4.8=1.40, claude-opus-4.7=1.25, claude-opus-4.6=1.05,
+  claude-sonnet-4.6=0.78, claude-haiku-4.5=0.70 (USD/1M, input=output; her yerde aynı: master-models
+  familyPrice + added_models seed + shared.jsx + contract testleri). DOKUNULMAZ billing FORMÜLÜ
+  değişmedi; sadece müşteri fiyat sabitleri (USD bazlı, billing otomatik bu sabitleri okur).
 - **GÜVENLİK:** metro key (`sk-ant-api01-...BH5`) ve Claude Popusk key (`sk-****UHNk`) sohbette açık geçti → ROTE EDİLMELİ.
 
 ### ✅ BLOCKER-1: ÇÖZÜLDÜ (2026-05-30) — yeni sağlayıcı Claude Popusk
