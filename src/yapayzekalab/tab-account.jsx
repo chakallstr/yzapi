@@ -1063,6 +1063,14 @@ const AccountTab = ({ ctx }) => {
             })}
           </div>
 
+          {/* Otomatik ödeme uyarısı */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', borderRadius: 10, background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', marginBottom: 18 }}>
+            <I.Bolt size={13} stroke="var(--accent-ink)" style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ fontSize: 11, color: 'var(--accent-ink)', lineHeight: 1.5 }}>
+              <strong>Otomatik ödeme yalnızca Telegram kripto kısmında mevcuttur.</strong> Buradaki yöntemler (IBAN, Shopier, Cryptomus) ödeme bildirimi ile manuel onaylanır.
+            </div>
+          </div>
+
           {/* Breakdown */}
           <div style={{ padding: 14, borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--border)', marginBottom: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0' }}>
