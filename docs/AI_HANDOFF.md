@@ -3,10 +3,32 @@
 > Bu belge bir AI/geliştirici session'ından diğerine devir içindir. Mevcut durumun
 > tek doğruluk kaynağı. Yeni session BURADAN başlar.
 >
-> Son güncelleme commit: `84e7b94` · dal: `phase/release-vps-beta`
-> Canlı deploy: `sync-20260531T015939Z-84e7b94` · aktif sağlayıcı: **wellflow**
+> Son güncelleme commit: `c732666` · dal: `phase/release-vps-beta`
+> Canlı deploy: `sync-20260531T115533Z-c732666` · aktif sağlayıcı: **wellflow**
 >
-> ## SON OTURUM ÖZETİ (2026-05-31 #2) — KRİTİK: giriş token kaçağı kapatıldı (cache token + floor)
+> ## SON OTURUM ÖZETİ (2026-05-31 #3) — Floor fazla-faturalama düzeltmesi + Claude Code haiku-akını çözümü
+> **İŞ HAFIZASI:** Detaylı adım-adım kayıt `.kiro/CALISMA-GUNLUGU.md`'de (her yeni sekme ÖNCE onu okur — bkz
+> steering `calisma-gunlugu.md` "OTURUM BAŞLANGIÇ PROTOKOLÜ"). Spec: `.kiro/specs/cache-read-token-overcharge-fix/`.
+>
+> 1. **Floor fazla-faturalama (ÇÖZÜLDÜ, canlı):** Eski `max(sağlayıcı, char/4)` floor'u Claude Code büyük-JSON
+>    isteklerinde char/4 gerçeğin ~3-4 katına şiştiği için sağlayıcı doğru raporlasa bile FAZLA faturalıyordu
+>    (canlı: ussafak 5 kayıt, 39.122 fazla token ≈ ~1.29 TL). Çözüm: `resolveBilledPromptTokens(provider, guard)`
+>    (request-guard-service.ts, eşik `PROVIDER_MIN_VALID_TOKENS=50`): sağlayıcı normalize > 50 ise ONA GÜVEN
+>    (şişirme); ≤ 50 ise floor (kaçak koruması korunur). proxy.ts 3 success-settle noktası. **billing-service +
+>    error-path DOKUNULMADI.** Commit `c732666`, deploy `sync-20260531T115533Z-c732666`. 332 unit + 26 itest +
+>    build yeşil, 3/3 QA PASS, ledger drift=0.
+> 2. **"Opus 4.7 ama Haiku" gizemi (BUG DEĞİL):** Müşteri Claude Code + agent teams kullanıyor; WellFlow doküman
+>    config'i `ANTHROPIC_SMALL_FAST_MODEL=claude-haiku-4.5` + `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` öneriyor →
+>    yüzlerce haiku subagent çağrısı (farklı x-claude-code-agent-id). Ana model Opus 4.7 olsa da trafik çoğu haiku.
+>    Sistem doğru, faturalama doğru. Doküman + canlı log + DB üçlü teyit.
+> 3. **WellFlow gelecekteki denetim araçları (CALISMA-GUNLUGU'da detay):** `/v1/messages/count_tokens` (char/4
+>    yerine kesin input), `/reseller/v1/usage/events` (`cost_your_cost_cents` = gerçek upstream maliyetimiz →
+>    margin mutabakatı), `X-Wellflow-Reseller:true` (SSE'de kesin cost), `/v1/models/info` (cache_read/write fiyat).
+> 4. **Admin panel detay özeti (ÇÖZÜLDÜ, canlı):** `/users/:id/detail` özet kutuları son-50 yerine ömür-boyu
+>    aggregate'ten (limit(50) bug). Commit içinde deploy edildi. itest kilitliyor.
+> 5. **AÇIK:** ussafak ~1.29 TL geçmiş fazla-faturalama telafisi (ayrı karar, henüz yapılmadı).
+>
+> ## ÖNCEKİ OTURUM ÖZETİ (2026-05-31 #2) — KRİTİK: giriş token kaçağı kapatıldı (cache token + floor)
 > **Sorun (kök neden, kesin kanıtlı):** WellFlow giriş token'ını EKSİK raporluyordu. Anthropic
 > `/v1/messages` şemasında gerçek giriş `cache_read_input_tokens` (ör. 67394) alanındaydı ama
 > `input_tokens=2` geliyordu; `/v1/chat/completions`'ta dev promptta bile `prompt_tokens=2`. Eski
