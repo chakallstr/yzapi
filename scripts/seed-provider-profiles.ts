@@ -39,7 +39,7 @@ import { addedModels } from "../src/server/db/schema.js";
 // import side-effect). Idempotent via onConflictDoNothing — never overwrites an
 // existing row's price/label. Prices from the approved locked table (USD/1M).
 const METRO_ADDED_MODELS = [
-  { modelId: "claude-opus-4.8", name: "Claude Opus 4.8", providerLabel: "Anthropic", inputUsd: "1.20", outputUsd: "1.20" },
+  { modelId: "claude-opus-4.8", name: "Claude Opus 4.8", providerLabel: "Anthropic", inputUsd: "1.40", outputUsd: "1.40" },
   { modelId: "gemini-3.5-flash", name: "Gemini 3.5 Flash", providerLabel: "Google", inputUsd: "0.90", outputUsd: "0.90" },
 ] as const;
 

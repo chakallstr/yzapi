@@ -22,7 +22,7 @@ const {
 // fiyat tutulur, yeni fiyat matematiği yok. Yalnızca aktif sağlayıcı (metro) bu
 // id'leri supported_model_ids ile listelediğinde görünür olurlar (Task 5).
 const METRO_ADDED_MODELS = [
-  { modelId: "claude-opus-4.8", name: "Claude Opus 4.8", providerLabel: "Anthropic", inputUsd: "1.20", outputUsd: "1.20" },
+  { modelId: "claude-opus-4.8", name: "Claude Opus 4.8", providerLabel: "Anthropic", inputUsd: "1.40", outputUsd: "1.40" },
   { modelId: "gemini-3.5-flash", name: "Gemini 3.5 Flash", providerLabel: "Google", inputUsd: "0.90", outputUsd: "0.90" },
 ] as const;
 
@@ -107,8 +107,8 @@ async function main() {
     {
       id: "pro",
       ad: "Pro",
-      gunlukLimitTL: "200",
-      aylikLimitTL: "2000",
+      gunlukLimitTL: "1000",
+      aylikLimitTL: "10000",
       izinliModeller: [],
       aciklama: "Tüm modeller + öncelikli routing.",
     },

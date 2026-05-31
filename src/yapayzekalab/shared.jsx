@@ -114,7 +114,7 @@ const MODEL_DISPLAY_INDEX = Object.fromEntries(MODEL_DISPLAY_ORDER.map((id, inde
 
 const MODELS = [
   { id: 'claude-opus-4-7', label: 'Claude Opus 4.7', provider: 'anthropic', type: 'text', input: 1.25, output: 1.25, ctx: '1M' },
-  { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic', type: 'text', input: 0.90, output: 0.90, ctx: '1M' },
+  { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic', type: 'text', input: 1.05, output: 1.05, ctx: '1M' },
   { id: 'claude-opus-4-5-20251101', label: 'Claude Opus 4.5', provider: 'anthropic', type: 'text', input: 0.52, output: 0.52, ctx: '1M' },
   { id: 'claude-opus-4-1-20250805', label: 'Claude Opus 4.1', provider: 'anthropic', type: 'text', input: 0.52, output: 0.52, ctx: '1M' },
   { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'anthropic', type: 'text', input: 0.78, output: 0.78, ctx: '1M' },

@@ -35,7 +35,7 @@ describe("MASTER_MODELS — Claude Popusk text catalog", () => {
 
     expect(byId.get("claude-haiku-4-5-20251001")?.customerInputUsd).toBe(0.70);
     expect(byId.get("claude-opus-4-7")?.customerInputUsd).toBe(1.25);
-    expect(byId.get("claude-opus-4-6")?.customerInputUsd).toBe(0.90);
+    expect(byId.get("claude-opus-4-6")?.customerInputUsd).toBe(1.05);
     expect(byId.get("claude-sonnet-4-6")?.customerInputUsd).toBe(0.78);
     expect(byId.get("gemini-3-flash-preview")?.customerInputUsd).toBe(0.58);
     expect(byId.get("gemini-3-pro-preview")?.customerInputUsd).toBe(0.58);
