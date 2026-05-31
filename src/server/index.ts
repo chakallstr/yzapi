@@ -37,8 +37,8 @@ async function startServer() {
     });
   }
 
-  app.listen(env.PORT, "0.0.0.0", () => {
-    logger.info({ port: env.PORT }, "Server up");
+  app.listen(env.PORT, env.HOST, () => {
+    logger.info({ port: env.PORT, host: env.HOST }, "Server up");
   });
 }
 

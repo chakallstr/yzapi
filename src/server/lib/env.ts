@@ -6,6 +6,12 @@ dotenv.config();
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().default(4567),
+  // Listen interface. Default 127.0.0.1: the app is reached only via the nginx
+  // reverse proxy (which proxies to 127.0.0.1), so binding to loopback keeps the
+  // Node port off the public interface. This prevents bypassing nginx and the
+  // X-Forwarded-For trust-proxy assumption (no public access to the raw port).
+  // Set HOST=0.0.0.0 only if the app must be reached directly (not recommended).
+  HOST: z.string().default("127.0.0.1"),
   DATABASE_URL: z.string(),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
 
