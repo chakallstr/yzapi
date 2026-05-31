@@ -6,6 +6,11 @@ import { encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-s
 import { writeAudit } from "../services/audit-service.js";
 import { getTelegramAccountSummary } from "../services/telegram-bot-service.js";
 import { getWhatsappVerificationSummary } from "../services/whatsapp-otp-service.js";
+import {
+  getMonthlyReport,
+  buildMonthlyReportCsv,
+  buildMonthlyReportPdf,
+} from "../services/report-service.js";
 
 const router = Router();
 
@@ -149,7 +154,41 @@ router.get("/usage-records", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// POST /api/user/api-keys
+// GET /api/user/reports/monthly?month=YYYY-MM[&format=csv|pdf]
+router.get("/reports/monthly", async (req, res, next) => {
+  try {
+    const month = String(req.query.month ?? "").trim() || new Date().toISOString().slice(0, 7);
+    const format = String(req.query.format ?? "json").trim().toLowerCase();
+
+    let report;
+    try {
+      report = await getMonthlyReport(req.user!.id, month);
+    } catch (err) {
+      if (err instanceof Error && err.message === "invalid_month") {
+        res.status(400).json({ error: "month parametresi YYYY-MM biçiminde olmalı." });
+        return;
+      }
+      throw err;
+    }
+
+    if (format === "csv") {
+      res.setHeader("content-type", "text/csv; charset=utf-8");
+      res.setHeader("content-disposition", `attachment; filename="yapayzekalab-${month}.csv"`);
+      res.send(buildMonthlyReportCsv(report));
+      return;
+    }
+
+    if (format === "pdf") {
+      const pdf = buildMonthlyReportPdf(report);
+      res.setHeader("content-type", "application/pdf");
+      res.setHeader("content-disposition", `attachment; filename="yapayzekalab-${month}.pdf"`);
+      res.send(pdf);
+      return;
+    }
+
+    res.json(report);
+  } catch (e) { next(e); }
+});
 router.post("/api-keys", async (req, res, next) => {
   try {
     const { ad } = req.body as { ad?: string };
