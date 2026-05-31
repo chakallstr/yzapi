@@ -239,4 +239,59 @@ describe("admin traffic analytics service", () => {
     expect(analytics.timeseries.every((row) => row.requestCount === 0)).toBe(true);
     expect(analytics.timeseries.every((row) => row.label.length > 0)).toBe(true);
   });
+
+  it("labels added_models (e.g. claude-opus-4.8) via catalogModels instead of unknown", () => {
+    const now = new Date("2026-05-29T09:00:00.000Z");
+    const baseUsageRow = {
+      id: "ux",
+      userId: "user-1",
+      apiKeyId: null,
+      type: "messages",
+      inputUsage: 100,
+      outputUsage: 20,
+      unitsUsage: "120.0",
+      costUsd: "0.10",
+      costTL: "4.50",
+      remainingTL: "0.00",
+      requestId: "req-x",
+      upstreamRequestId: null,
+      rawUsageJson: null,
+      pricingSnapshotJson: null,
+      errorCode: null,
+      responseMs: 500,
+      status: "success",
+      timestamp: new Date("2026-05-29T08:00:00.000Z"),
+    } as any;
+
+    // Without catalogModels the added model is unknown (regression baseline).
+    const withoutCatalog = computeAdminTrafficAnalytics({
+      window: "24h",
+      now,
+      userRows: [],
+      apiKeyRows: [],
+      transactionRows: [],
+      usageRows: [{ ...baseUsageRow, modelId: "claude-opus-4.8" }],
+    });
+    expect(withoutCatalog.models[0]).toMatchObject({ id: "claude-opus-4.8", providerSlug: "unknown" });
+
+    // With catalogModels (merged catalog incl. added_models) the label resolves.
+    const withCatalog = computeAdminTrafficAnalytics({
+      window: "24h",
+      now,
+      userRows: [],
+      apiKeyRows: [],
+      transactionRows: [],
+      usageRows: [{ ...baseUsageRow, modelId: "claude-opus-4.8" }],
+      catalogModels: [
+        { id: "claude-opus-4.8", name: "Claude Opus 4.8", provider: "Anthropic", providerSlug: "anthropic" },
+      ],
+    });
+    expect(withCatalog.models[0]).toMatchObject({
+      id: "claude-opus-4.8",
+      name: "Claude Opus 4.8",
+      provider: "Anthropic",
+      providerSlug: "anthropic",
+    });
+    expect(withCatalog.providers.find((row) => row.id === "anthropic")).toMatchObject({ requestCount: 1 });
+  });
 });

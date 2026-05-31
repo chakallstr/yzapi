@@ -14,6 +14,7 @@ import { logger } from "../lib/logger.js";
 import {
   classifyDrift,
   classifyK1,
+  round4,
   classifyOrphan,
   classifyStreamMissing,
   recomputeCostTL,
@@ -326,9 +327,21 @@ export async function runScan(trigger: "cron" | "on_demand" = "cron"): Promise<S
 
   const driftCheck = checks.find((c) => c.name === "ledger_drift");
   const streamCheck = checks.find((c) => c.name === "stream_missing");
+  // stream_missing.measured formatı: "%<oran> (<smu>/<total>)" → baştaki yüzdeyi ayıkla.
+  const streamPct = (c: CheckResult | undefined): number | undefined => {
+    if (!c) return undefined;
+    const m = String(c.measured).match(/-?\d+(\.\d+)?/);
+    return m ? Number(m[0]) : undefined;
+  };
+  const curStreamPct = streamPct(streamCheck);
+  const prevStreamPct = streamPct(son?.checksJson.find((c) => c.name === "stream_missing"));
   const baselineDiff = son
     ? {
         driftTL: driftCheck ? num(driftCheck.measured) - num(son.checksJson.find((c) => c.name === "ledger_drift")?.measured) : undefined,
+        streamMissingPct:
+          curStreamPct !== undefined && prevStreamPct !== undefined
+            ? round4(curStreamPct - prevStreamPct)
+            : undefined,
       }
     : undefined;
 

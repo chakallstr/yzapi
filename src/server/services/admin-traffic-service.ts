@@ -2,6 +2,13 @@ import { desc, gte } from "drizzle-orm";
 import { MASTER_MODELS, canonicalizeModelId } from "../../master-models.js";
 import { db } from "../db/client.js";
 import { apiKeys, transactions, usageRecords, users } from "../db/schema.js";
+import { getMergedCatalogModels } from "./added-model-service.js";
+
+type ModelMetaEntry = { label: string; provider: string; providerSlug: string };
+// Minimal catalog shape used to extend the model-meta lookup with added_models
+// (e.g. claude-opus-4.8) so traffic labels resolve instead of showing
+// "Bilinmiyor". Yalnız GÖSTERİM etiketini etkiler; aggregate/billing dokunulmaz.
+type CatalogModelMeta = { id: string; name: string; provider: string; providerSlug?: string };
 
 export type TrafficWindow = "24h" | "7d" | "30d";
 
@@ -17,9 +24,26 @@ const BUCKET_MS: Record<TrafficWindow, number> = {
   "30d": 24 * 60 * 60 * 1000,
 };
 
-const MODEL_META = new Map(
+const MODEL_META = new Map<string, ModelMetaEntry>(
   MASTER_MODELS.map((model) => [model.id, { label: model.name, provider: model.provider, providerSlug: model.providerSlug ?? model.provider.toLowerCase() }]),
 );
+
+// Birleşik model-meta haritası: MASTER_MODELS tabanı + (varsa) added_models
+// katmanı. catalogModels verilmezse yalnız MASTER_MODELS kullanılır (mevcut
+// davranış korunur; testler değişmez).
+function buildModelMeta(catalogModels?: CatalogModelMeta[]): Map<string, ModelMetaEntry> {
+  if (!catalogModels?.length) return MODEL_META;
+  const merged = new Map(MODEL_META);
+  for (const model of catalogModels) {
+    if (merged.has(model.id)) continue;
+    merged.set(model.id, {
+      label: model.name,
+      provider: model.provider,
+      providerSlug: model.providerSlug ?? model.provider.toLowerCase(),
+    });
+  }
+  return merged;
+}
 
 function toDate(value: Date | string | null | undefined) {
   if (value instanceof Date) return value;
@@ -56,18 +80,18 @@ function round2(value: number) {
   return Number(value.toFixed(2));
 }
 
-function modelInfo(modelId: string) {
+function modelInfo(modelId: string, metaMap: Map<string, ModelMetaEntry> = MODEL_META) {
   const canonical = canonicalizeModelId(modelId) ?? modelId;
-  return MODEL_META.get(canonical) ?? { label: canonical, provider: "unknown", providerSlug: "unknown" };
+  return metaMap.get(canonical) ?? { label: canonical, provider: "unknown", providerSlug: "unknown" };
 }
 
-function buildTopModels(modelUsage: Map<string, number>, limit = 3) {
+function buildTopModels(modelUsage: Map<string, number>, metaMap: Map<string, ModelMetaEntry>, limit = 3) {
   return [...modelUsage.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([modelId, requestCount]) => ({
       modelId,
-      label: modelInfo(modelId).label,
+      label: modelInfo(modelId, metaMap).label,
       requestCount,
     }));
 }
@@ -86,11 +110,13 @@ export function computeAdminTrafficAnalytics(
     apiKeyRows: Array<typeof apiKeys.$inferSelect>;
     window: TrafficWindow;
     now?: Date;
+    catalogModels?: CatalogModelMeta[];
   },
 ) {
   const now = input.now ?? new Date();
   const start = getWindowStart(input.window, now);
   const bucketMs = BUCKET_MS[input.window];
+  const metaMap = buildModelMeta(input.catalogModels);
 
   const userMap = new Map(input.userRows.map((row) => [row.id, row]));
   const apiKeyMap = new Map(input.apiKeyRows.map((row) => [row.id, row]));
@@ -171,7 +197,7 @@ export function computeAdminTrafficAnalytics(
     const totalTokens = inputTokens + outputTokens;
     const success = row.status === "success";
     const modelId = canonicalizeModelId(row.modelId) ?? row.modelId;
-    const info = modelInfo(modelId);
+    const info = modelInfo(modelId, metaMap);
     const providerKey = info.providerSlug;
 
     overview.totalRequests += 1;
@@ -418,7 +444,7 @@ export function computeAdminTrafficAnalytics(
       errorCount: row.errorCount,
       errorRate: row.requestCount ? round2((row.errorCount / row.requestCount) * 100) : 0,
       lastSeenAt: row.lastSeenAt,
-      topModels: buildTopModels(row.modelUsage),
+      topModels: buildTopModels(row.modelUsage, metaMap),
       topProvider: buildTopProvider(row.providerUsage),
     }))
     .sort((a, b) => b.requestCount - a.requestCount || b.totalCostTL - a.totalCostTL);
@@ -439,7 +465,7 @@ export function computeAdminTrafficAnalytics(
       errorCount: row.errorCount,
       errorRate: row.requestCount ? round2((row.errorCount / row.requestCount) * 100) : 0,
       lastSeenAt: row.lastSeenAt,
-      topModels: buildTopModels(row.modelUsage),
+      topModels: buildTopModels(row.modelUsage, metaMap),
       topProvider: buildTopProvider(row.providerUsage),
     }))
     .sort((a, b) => b.requestCount - a.requestCount || b.totalCostTL - a.totalCostTL);
@@ -455,7 +481,7 @@ export function computeAdminTrafficAnalytics(
 
   for (const row of errorRows) {
     const modelId = canonicalizeModelId(row.modelId) ?? row.modelId;
-    const info = modelInfo(modelId);
+    const info = modelInfo(modelId, metaMap);
     errorCodes.set(row.errorCode || row.status || "unknown", (errorCodes.get(row.errorCode || row.status || "unknown") ?? 0) + 1);
     errorModels.set(modelId, (errorModels.get(modelId) ?? 0) + 1);
     errorProviders.set(info.providerSlug, (errorProviders.get(info.providerSlug) ?? 0) + 1);
@@ -471,7 +497,7 @@ export function computeAdminTrafficAnalytics(
       const user = userMap.get(row.userId);
       const key = row.apiKeyId ? apiKeyMap.get(row.apiKeyId) : null;
       const modelId = canonicalizeModelId(row.modelId) ?? row.modelId;
-      const info = modelInfo(modelId);
+      const info = modelInfo(modelId, metaMap);
       return {
         id: row.id,
         requestId: row.requestId,
@@ -492,7 +518,7 @@ export function computeAdminTrafficAnalytics(
       };
     }),
     errorCodes: [...errorCodes.entries()].map(([code, count]) => ({ code, count })).sort((a, b) => b.count - a.count),
-    models: [...errorModels.entries()].map(([modelId, count]) => ({ modelId, label: modelInfo(modelId).label, count })).sort((a, b) => b.count - a.count),
+    models: [...errorModels.entries()].map(([modelId, count]) => ({ modelId, label: modelInfo(modelId, metaMap).label, count })).sort((a, b) => b.count - a.count),
     providers: [...errorProviders.entries()].map(([provider, count]) => ({ provider, count })).sort((a, b) => b.count - a.count),
     anomalies: {
       requestSpikes: timeseries.filter((row) => row.requestCount >= Math.max(10, averageBucketRequests * 2)),
@@ -523,11 +549,12 @@ export async function getAdminTrafficAnalytics(window: TrafficWindow) {
   const now = new Date();
   const start = getWindowStart(window, now);
 
-  const [usageRows, transactionRows, userRows, apiKeyRows] = await Promise.all([
+  const [usageRows, transactionRows, userRows, apiKeyRows, catalogModels] = await Promise.all([
     db.select().from(usageRecords).where(gte(usageRecords.timestamp, start)).orderBy(desc(usageRecords.timestamp)),
     db.select().from(transactions).where(gte(transactions.timestamp, start)).orderBy(desc(transactions.timestamp)),
     db.select().from(users),
     db.select().from(apiKeys),
+    getMergedCatalogModels(),
   ]);
 
   return computeAdminTrafficAnalytics({
@@ -537,5 +564,6 @@ export async function getAdminTrafficAnalytics(window: TrafficWindow) {
     apiKeyRows,
     window,
     now,
+    catalogModels,
   });
 }
