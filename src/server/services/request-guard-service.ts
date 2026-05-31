@@ -60,6 +60,28 @@ export function estimateRequestContextTokens(body: Record<string, unknown>): num
   return estimateTextTokens(contextPayload);
 }
 
+// Faturalanacak giriş token'ı eşiği. Sağlayıcının normalize edilmiş giriş token'ı bu
+// eşiğin ÜSTÜNDEYSE "geçerli rapor" sayılır ve doğrudan kullanılır (char/4 sunucu
+// tahminiyle ŞİŞİRİLMEZ). Eşiğin ALTINDAYSA (sağlayıcı bariz-bozuk/≈0 raporladı) floor
+// devreye girer. Gerçek kaçak imzası: sağlayıcı ≤6 token + cache yok (WellFlow prompt_tokens=2/6).
+// 50 eşiği bu bozuk-raporları yakalar; geçerli en küçük istek bile normalize sonrası
+// bunun çok üstündedir (canlı veri simülasyonuyla doğrulandı: iki küme arasında geniş pay).
+export const PROVIDER_MIN_VALID_TOKENS = 50;
+
+// Faturalanacak giriş token sayısını belirler (billing FORMÜLÜNE dokunmaz; yalnız hangi
+// token sayısının settle'a gideceğini seçer).
+//   • providerNormalizedPrompt > eşik → sağlayıcıya GÜVEN (char/4 ile şişirme). Bu, Claude Code
+//     gibi büyük-JSON isteklerinde char/4'ün gerçeğin ~3-4 katına şişip FAZLA faturalamasını engeller.
+//   • providerNormalizedPrompt ≤ eşik → floor: max(sağlayıcı, sunucu char/4 sayımı). Bu, sağlayıcı
+//     girişi eksik/bozuk raporladığında (WellFlow prompt_tokens=2) EKSİK tahsili (bizim zararımız) engeller.
+// Sonuç her durumda providerNormalizedPrompt'tan küçük olamaz (eksik tahsil yok).
+export function resolveBilledPromptTokens(providerNormalizedPrompt: number, serverContextTokens: number): number {
+  if (providerNormalizedPrompt > PROVIDER_MIN_VALID_TOKENS) {
+    return providerNormalizedPrompt;
+  }
+  return Math.max(providerNormalizedPrompt, serverContextTokens);
+}
+
 function numericOrNull(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value) && value > 0) return Math.floor(value);
   if (typeof value === "string" && value.trim()) {

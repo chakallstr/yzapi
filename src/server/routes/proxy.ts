@@ -10,7 +10,7 @@ import { getActiveProviderAdapter } from "../services/provider-adapter.js";
 import { db } from "../db/client.js";
 import { modelOverrides, systemConfig, users } from "../db/schema.js";
 import { eq } from "drizzle-orm";
-import { buildRequestGuard, type RequestGuardResult } from "../services/request-guard-service.js";
+import { buildRequestGuard, resolveBilledPromptTokens, type RequestGuardResult } from "../services/request-guard-service.js";
 import {
   getApiKeyPolicy,
   getModelRuntimePolicy,
@@ -303,8 +303,10 @@ async function handleTextJsonEndpoint(
     const { raw, usage } = await forwarder(providerBody);
     const responseMs = Date.now() - start;
 
-    // Giriş token floor'u (cache/eksik raporlama koruması — bkz chat/completions).
-    const billedPromptTokens = Math.max(usage.promptTokens, guard.contextTokens);
+    // Giriş token floor'u: yalnız sağlayıcı bozuk-düşük raporladığında devreye girer.
+    // Sağlayıcı geçerli raporlarsa (normalize > eşik) char/4 ile şişirilmez (Claude Code
+    // büyük-JSON fazla-faturalama düzeltmesi). Bkz resolveBilledPromptTokens.
+    const billedPromptTokens = resolveBilledPromptTokens(usage.promptTokens, guard.contextTokens);
 
     const { costTL, remainingTL } = await settleReservedUsage({
       userId,
@@ -421,8 +423,9 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       const streamStatus = hasUsage
         ? "success"
         : (runtimeConfig?.streamMissingUsageFallbackEnabled === false ? "error" : "stream_missing_usage");
-      // Giriş token floor'u (cache/eksik raporlama koruması — bkz chat/completions).
-      const billedPromptTokens = Math.max(usage.promptTokens, guard.contextTokens);
+      // Giriş token floor'u: yalnız sağlayıcı bozuk-düşük raporladığında devreye girer
+      // (geçerli raporda char/4 ile şişirmez). Bkz resolveBilledPromptTokens.
+      const billedPromptTokens = resolveBilledPromptTokens(usage.promptTokens, guard.contextTokens);
       await settleReservedUsage({
         userId,
         apiKeyId,
@@ -438,11 +441,12 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       const { raw, usage } = await activeProviderAdapter.forwardChat(providerBody as any);
       const responseMs = Date.now() - start;
 
-      // Giriş token floor'u: sağlayıcı giriş token'ını eksik raporlarsa (ör. cache
-      // alanı / prompt_tokens=2), kendi sunucu-tarafı giriş sayımımızı (guard.contextTokens)
-      // taban al. max() olduğu için sağlıklı çağrıda sağlayıcı değeri korunur; yalnız
-      // sağlayıcı saçma-düşük raporladığında devreye girer (eksik tahsil = zarar engeli).
-      const billedPromptTokens = Math.max(usage.promptTokens, guard.contextTokens);
+      // Giriş token floor'u: yalnız sağlayıcı bozuk-düşük raporladığında (ör. cache alanı /
+      // prompt_tokens=2) devreye girip kendi sunucu-tarafı giriş sayımımızı (guard.contextTokens)
+      // taban alır → EKSİK tahsil (zarar) engellenir. Sağlayıcı GEÇERLİ raporladığında (normalize
+      // > eşik) char/4 ile ŞİŞİRİLMEZ → Claude Code büyük-JSON FAZLA-faturalaması engellenir.
+      // Bkz resolveBilledPromptTokens. Faturalanan değer asla sağlayıcı normalize'ın altına düşmez.
+      const billedPromptTokens = resolveBilledPromptTokens(usage.promptTokens, guard.contextTokens);
 
       const { costTL, remainingTL } = await settleReservedUsage({
         userId,

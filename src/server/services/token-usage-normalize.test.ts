@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeProviderUsage, extractTokenUsageForTest } from "./closerouter-service.js";
+import { resolveBilledPromptTokens, PROVIDER_MIN_VALID_TOKENS } from "./request-guard-service.js";
 
 // Giriş token normalleştirme matematiğinin %100 doğruluğunu kilitleyen testler.
 // Para alanı: cache token'ları faturalanmalı, OpenAI'de çift sayım olmamalı,
@@ -104,5 +105,53 @@ describe("extractTokenUsage — providerRaw denetim izi", () => {
     const r = extractTokenUsageForTest({});
     expect(r.providerRaw).toBeUndefined();
     expect(r.promptTokens).toBe(0);
+  });
+});
+
+// Floor karar tablosu: resolveBilledPromptTokens — sağlayıcı GEÇERLİ raporlarsa char/4 ile
+// ŞİŞİRMEZ (Claude Code büyük-JSON fazla-faturalama düzeltmesi); BOZUK-düşük raporlarsa floor
+// (sunucu char/4 sayımı) devreye girer (WellFlow prompt_tokens=2 kaçak koruması korunur).
+describe("resolveBilledPromptTokens — floor karar tablosu", () => {
+  it("eşik sabiti 50", () => {
+    expect(PROVIDER_MIN_VALID_TOKENS).toBe(50);
+  });
+
+  it("Grup B (Claude Code): sağlayıcı geçerli (7342>50) → char/4 (24396) ile ŞİŞİRMEZ", () => {
+    // GERÇEK canlı vaka: norm=7342 (cache_read 7335 dahil), guard char/4=24396.
+    // Eski max() 24396 faturalardı (3.32× fazla). Yeni mantık 7342 faturalar.
+    expect(resolveBilledPromptTokens(7342, 24396)).toBe(7342);
+  });
+
+  it("Grup A (WellFlow kaçak): sağlayıcı bozuk-düşük (2≤50) → floor max(2,14000)=14000", () => {
+    // Sağlayıcı prompt_tokens=2 (cache yok), gerçek prompt büyük → guard 14000 floor olur.
+    expect(resolveBilledPromptTokens(2, 14000)).toBe(14000);
+  });
+
+  it("cache vakası: normalize 67396 (>50) → değişmez (floor gereksiz)", () => {
+    expect(resolveBilledPromptTokens(67396, 30)).toBe(67396);
+  });
+
+  it("eşik sınırı: tam 50 → floor (≤ eşik), 51 → güven (> eşik)", () => {
+    expect(resolveBilledPromptTokens(50, 9999)).toBe(9999); // 50 ≤ 50 → floor
+    expect(resolveBilledPromptTokens(51, 9999)).toBe(51);   // 51 > 50 → güven
+  });
+
+  it("küçük değer güvenliği: sağlayıcı 6, guard 5 → max(6,5)=6 (eksik tahsil yok)", () => {
+    expect(resolveBilledPromptTokens(6, 5)).toBe(6);
+  });
+
+  it("Property 1 (eksik tahsil yok): sonuç asla sağlayıcı normalize'ın altına düşmez", () => {
+    // Hem floor hem güven kolunda billed >= provider.
+    for (const [prov, guard] of [[7342, 24396], [2, 14000], [67396, 30], [6, 5], [100, 0]] as const) {
+      expect(resolveBilledPromptTokens(prov, guard)).toBeGreaterThanOrEqual(prov);
+    }
+  });
+
+  it("Property 4 (monotonluk): yeni billed eski max()'tan büyük olamaz", () => {
+    for (const [prov, guard] of [[7342, 24396], [2, 14000], [67396, 30], [6, 5]] as const) {
+      const yeni = resolveBilledPromptTokens(prov, guard);
+      const eski = Math.max(prov, guard);
+      expect(yeni).toBeLessThanOrEqual(eski);
+    }
   });
 });

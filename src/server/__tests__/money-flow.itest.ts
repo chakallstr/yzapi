@@ -311,4 +311,31 @@ describe("token muhasebesi: giriş token kaçağı düzeltmeleri (KN-A cache + K
     // Küçük prompt'ta guard << 1000, sağlayıcı 1000 baskın → tam 1000 (fazla yakma yok).
     expect(rows[0].input_usage).toBe(1000);
   });
+
+  it("KN-B-FIX (Claude Code fazla-faturalama): sağlayıcı GEÇERLİ raporlar + BÜYÜK prompt → char/4 ŞİŞİRMEZ", async () => {
+    // Claude Code senaryosu: sağlayıcı 8000 (geçerli, >50) raporluyor ama prompt char/4 ile ~35K.
+    // Eski floor max(8000, ~35K) = ~35K fazla faturalardı. Yeni mantık 8000 faturalar (sağlayıcıya güven).
+    nock(new URL(UPSTREAM).origin)
+      .post(/\/chat\/completions$/)
+      .reply(200, {
+        id: "chatcmpl_claudecode",
+        object: "chat.completion",
+        choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 8000, completion_tokens: 120 },
+      });
+
+    const res = await request(app)
+      .post("/v1/chat/completions")
+      .set("Authorization", `Bearer ${FULL_KEY}`)
+      .send({ model: MODEL.id, messages: [{ role: "user", content: BIG_PROMPT }] });
+
+    expect(res.status).toBe(200);
+    const requestId = res.headers["x-yz-request-id"];
+    await waitForUsageRecord(requestId);
+    const rows = await dbSql<{ input_usage: number }[]>`
+      SELECT input_usage FROM usage_records WHERE request_id = ${requestId} LIMIT 1
+    `;
+    // Sağlayıcı 8000 geçerli → char/4 (~35K) ile şişmez. input_usage TAM 8000 olmalı.
+    expect(rows[0].input_usage).toBe(8000);
+  });
 });
