@@ -578,6 +578,8 @@ const AccountTab = ({ ctx }) => {
   const [settingsName, setSettingsName] = useState('');
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState('');
+  const [usageModelFilter, setUsageModelFilter] = useState('all');
+  const [usageRangeFilter, setUsageRangeFilter] = useState('all');
   const [telegramBusy, setTelegramBusy] = useState(false);
   const [telegramMessage, setTelegramMessage] = useState('');
   const [telegramDeepLink, setTelegramDeepLink] = useState('');
@@ -587,6 +589,31 @@ const AccountTab = ({ ctx }) => {
   const userCode = me?.userCode || (me?.id ? `u-${String(me.id).replace(/-/g, '').slice(0, 8)}` : 'profil');
   const monthCostUsd = asNumber(monthlyReport?.summary?.costUsd, usageRows.reduce((sum, row) => sum + asNumber(row.costUsd, asNumber(row.costTL, 0) / tlRate), 0));
   const monthRequests = asNumber(monthlyReport?.summary?.requestCount, usageRows.length);
+
+  // Kullanım geçmişi filtreleri (saf frontend — billing'e dokunmaz).
+  // "Opus istedim ama hep Haiku görünüyor" yanılgısını çözer: arka plan (Claude Code
+  // SMALL_FAST_MODEL = Haiku) mikro-istekleri model/tarih ile ayrıştırılabilir.
+  const usageModelOptions = useMemo(() => {
+    const ids = new Set();
+    for (const row of usageRows) {
+      const id = row.modelId || row.model;
+      if (id) ids.add(id);
+    }
+    return [...ids].sort();
+  }, [usageRows]);
+
+  const filteredUsageRows = useMemo(() => {
+    const rangeMs = { '24h': 86400000, '7d': 604800000, '30d': 2592000000 }[usageRangeFilter];
+    const cutoff = rangeMs ? Date.now() - rangeMs : null;
+    return usageRows.filter((row) => {
+      if (usageModelFilter !== 'all' && (row.modelId || row.model) !== usageModelFilter) return false;
+      if (cutoff !== null) {
+        const ts = row.timestamp ? Date.parse(row.timestamp) : NaN;
+        if (Number.isFinite(ts) && ts < cutoff) return false;
+      }
+      return true;
+    });
+  }, [usageRows, usageModelFilter, usageRangeFilter]);
 
   const applyMeData = (meData) => {
     setMe(meData);
@@ -1293,12 +1320,38 @@ const AccountTab = ({ ctx }) => {
 
       {/* Usage records (USD primary) */}
       <Card pad={0} id="account-usage" style={{ overflow: 'hidden', scrollMarginTop: 80 }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 600 }}>Kullanım geçmişi</div>
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>Son istekler · maliyet & kalan bakiye USD bazında</div>
           </div>
-          <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)' }}>son {usageRows.length}</Chip>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <select
+              value={usageModelFilter}
+              onChange={(e) => setUsageModelFilter(e.target.value)}
+              style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}
+            >
+              <option value="all">Tüm modeller</option>
+              {usageModelOptions.map((id) => (
+                <option key={id} value={id}>{(modelMeta(id)?.label) || id}</option>
+              ))}
+            </select>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {[['all','Tümü'],['24h','24s'],['7d','7g'],['30d','30g']].map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setUsageRangeFilter(val)}
+                  style={{
+                    padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                    border: '1px solid var(--border)',
+                    background: usageRangeFilter === val ? 'var(--ink)' : 'var(--surface)',
+                    color: usageRangeFilter === val ? '#fff' : 'var(--ink-3)',
+                  }}
+                >{label}</button>
+              ))}
+            </div>
+            <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)' }}>{filteredUsageRows.length} / {usageRows.length}</Chip>
+          </div>
         </div>
         <div style={{
           display: 'grid', gridTemplateColumns: '120px 1.4fr 80px 1.2fr 90px 110px 70px 70px',
@@ -1308,7 +1361,11 @@ const AccountTab = ({ ctx }) => {
             <Caption key={h} style={{ fontSize: 9 }}>{h}</Caption>
           ))}
         </div>
-        {usageRows.map((u, i) => {
+        {filteredUsageRows.length === 0 ? (
+          <div style={{ padding: '24px 20px', textAlign: 'center', fontSize: 12, color: 'var(--ink-3)' }}>
+            Bu filtreye uyan kullanım kaydı yok.
+          </div>
+        ) : filteredUsageRows.map((u, i) => {
           const m = modelMeta(u.modelId || u.model);
           const costUsd = asNumber(u.costUsd, asNumber(u.costTL, 0) / tlRate);
           const balanceAfterUsd = asNumber(u.remainingUsd, asNumber(u.remainingTL, 0) / tlRate);
@@ -1316,7 +1373,7 @@ const AccountTab = ({ ctx }) => {
             <div key={u.id} style={{
               display: 'grid', gridTemplateColumns: '120px 1.4fr 80px 1.2fr 90px 110px 70px 70px',
               gap: 10, padding: '11px 20px',
-              borderBottom: i < usageRows.length - 1 ? '1px solid var(--border)' : 'none',
+              borderBottom: i < filteredUsageRows.length - 1 ? '1px solid var(--border)' : 'none',
               alignItems: 'center', fontSize: 12,
             }}>
               <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 10.5 }}>{u.requestId || u.id}</span>
