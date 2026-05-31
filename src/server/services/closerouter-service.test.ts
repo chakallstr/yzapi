@@ -42,7 +42,9 @@ describe("forwardTextEndpoint", () => {
     });
 
     expect(result.raw).toMatchObject({ id: "resp_123" });
-    expect(result.usage).toEqual({ promptTokens: 100, completionTokens: 25 });
+    expect(result.usage).toMatchObject({ promptTokens: 100, completionTokens: 25 });
+    // Denetim izi: sağlayıcının HAM usage'ı providerRaw'da korunur (billing'i etkilemez).
+    expect(result.usage.providerRaw).toEqual({ input_tokens: 100, output_tokens: 25 });
   });
 
   it("forwards /messages requests and reads prompt/completion token usage", async () => {
@@ -61,7 +63,9 @@ describe("forwardTextEndpoint", () => {
     });
 
     expect(result.raw).toMatchObject({ id: "msg_123" });
-    expect(result.usage).toEqual({ promptTokens: 60, completionTokens: 15 });
+    expect(result.usage).toMatchObject({ promptTokens: 60, completionTokens: 15 });
+    // Denetim izi: sağlayıcının HAM usage'ı providerRaw'da korunur (billing'i etkilemez).
+    expect(result.usage.providerRaw).toEqual({ prompt_tokens: 60, completion_tokens: 15 });
   });
 
   it("applies the active-profile model_map to /messages upstream wire name", async () => {

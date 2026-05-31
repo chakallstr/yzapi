@@ -9,6 +9,12 @@ import { resolveProviderBaseUrl, resolveProviderApiKey, resolveActiveModelMap } 
 export interface ChatUsage {
   promptTokens: number;
   completionTokens: number;
+  // DENETİM İZİ (opsiyonel, billing'i ETKİLEMEZ): sağlayıcının HAM usage objesi
+  // (Anthropic cache_read_input_tokens / cache_creation_input_tokens dahil).
+  // Faturalama yalnız promptTokens/completionTokens'ı kullanır; bu alan sadece
+  // usage_records.raw_usage_json'a yazılır ki gelecekte "sağlayıcı ne raporladı"
+  // sorusu kanıtla cevaplanabilsin (geçmiş kaçak teşhisinde bu alan YOKtu).
+  providerRaw?: unknown;
 }
 
 export interface ImageUsage {
@@ -80,7 +86,16 @@ export function normalizeProviderUsage(usageRaw: unknown): ChatUsage {
 }
 
 function extractTokenUsage(json: Record<string, unknown>): ChatUsage {
-  return normalizeProviderUsage(json.usage);
+  const usage = normalizeProviderUsage(json.usage);
+  // Denetim izi: sağlayıcının HAM usage objesini sakla (billing'i etkilemez).
+  if (json.usage !== undefined && json.usage !== null) usage.providerRaw = json.usage;
+  return usage;
+}
+
+// Test-only export: extractTokenUsage dosya-içi private; denetim izi davranışını
+// (providerRaw) test edebilmek için ince sarmalayıcı. Üretim mantığı aynen kullanılır.
+export function extractTokenUsageForTest(json: Record<string, unknown>): ChatUsage {
+  return extractTokenUsage(json);
 }
 
 export function estimateTextTokens(value: unknown): number {
@@ -366,6 +381,8 @@ export async function forwardChatStream(
             const n = normalizeProviderUsage(parsed.usage);
             if (n.promptTokens > 0) usage.promptTokens = n.promptTokens;
             if (n.completionTokens > 0) usage.completionTokens = n.completionTokens;
+            // Denetim izi: son usage chunk'ının HAM halini sakla (billing'i etkilemez).
+            usage.providerRaw = parsed.usage;
           }
           const choice = (parsed.choices as Array<Record<string, unknown>> | undefined)?.[0];
           const delta = choice?.delta as Record<string, unknown> | undefined;

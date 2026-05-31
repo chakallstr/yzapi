@@ -241,12 +241,18 @@ describe("token muhasebesi: giriş token kaçağı düzeltmeleri (KN-A cache + K
     expect(usage?.status).toBe("success");
 
     // input_usage cache dahil ~50002 olmalı (asla 2 değil). DB'den teyit.
-    const rows = await dbSql<{ input_usage: number; output_usage: number }[]>`
-      SELECT input_usage, output_usage FROM usage_records WHERE request_id = ${requestId} LIMIT 1
+    const rows = await dbSql<{ input_usage: number; output_usage: number; raw_usage_json: any }[]>`
+      SELECT input_usage, output_usage, raw_usage_json FROM usage_records WHERE request_id = ${requestId} LIMIT 1
     `;
     // Küçük "hi" promptu için guard düşük; cache 50000 baskın → >= 50000.
     expect(rows[0].input_usage).toBeGreaterThanOrEqual(50000);
     expect(rows[0].output_usage).toBe(100);
+    // DENETİM İZİ: raw_usage_json sağlayıcının HAM cache alanlarını saklamalı
+    // (gelecekte "sağlayıcı ne raporladı" kanıtı). providerRaw içinde cache_read görünür.
+    const rawJson = rows[0].raw_usage_json;
+    const providerRaw = rawJson?.providerRaw ?? rawJson;
+    expect(providerRaw?.cache_read_input_tokens).toBe(50000);
+    expect(providerRaw?.input_tokens).toBe(2);
     // Maliyet pozitif ve giriş token'ı yansıtıyor (asla ~0 değil).
     expect(Number(res.headers["x-yz-cost-tl"])).toBeGreaterThan(0);
   });

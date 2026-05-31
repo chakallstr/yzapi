@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeProviderUsage } from "./closerouter-service.js";
+import { normalizeProviderUsage, extractTokenUsageForTest } from "./closerouter-service.js";
 
 // Giriş token normalleştirme matematiğinin %100 doğruluğunu kilitleyen testler.
 // Para alanı: cache token'ları faturalanmalı, OpenAI'de çift sayım olmamalı,
@@ -76,5 +76,33 @@ describe("normalizeProviderUsage — giriş token matematiği", () => {
     const r = normalizeProviderUsage({ input_tokens: 2, cache_read_input_tokens: 67394, output_tokens: 85 });
     expect(r.promptTokens).toBe(67396);
     expect(r.promptTokens).toBeGreaterThan(1000); // asla 2 değil
+  });
+});
+
+// Denetim izi: extractTokenUsage sağlayıcının HAM usage'ını providerRaw'da saklamalı
+// (billing'i ETKİLEMEDEN). Bu, gelecekte "sağlayıcı ne raporladı" sorusunu kanıtla
+// cevaplamak için. normalizeProviderUsage pür kalır; providerRaw yalnız sarmalayıcıda.
+describe("extractTokenUsage — providerRaw denetim izi", () => {
+  it("Anthropic cache alanlarını HAM olarak providerRaw'da saklar (billing değeri ayrı)", () => {
+    const raw = { input_tokens: 2, cache_read_input_tokens: 67394, output_tokens: 85 };
+    const r = extractTokenUsageForTest({ usage: raw });
+    // Faturalanan değer cache dahil normalize edilmiş (67396)
+    expect(r.promptTokens).toBe(67396);
+    // HAM usage aynen saklanmış (denetim için cache alanları görünür)
+    expect(r.providerRaw).toEqual(raw);
+    expect((r.providerRaw as Record<string, number>).cache_read_input_tokens).toBe(67394);
+  });
+
+  it("OpenAI usage'ını HAM olarak saklar (cached_tokens detayı dahil)", () => {
+    const raw = { prompt_tokens: 1000, completion_tokens: 200, prompt_tokens_details: { cached_tokens: 800 } };
+    const r = extractTokenUsageForTest({ usage: raw });
+    expect(r.promptTokens).toBe(1000); // billing: çift saymaz
+    expect(r.providerRaw).toEqual(raw); // denetim: ham detay korunur
+  });
+
+  it("usage yoksa providerRaw set EDİLMEZ (gürültü yok)", () => {
+    const r = extractTokenUsageForTest({});
+    expect(r.providerRaw).toBeUndefined();
+    expect(r.promptTokens).toBe(0);
   });
 });
