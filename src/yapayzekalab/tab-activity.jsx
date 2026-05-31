@@ -188,7 +188,7 @@ const LiveLogTable = ({ records }) => (
           display: 'grid', gridTemplateColumns: '70px 1.4fr 1fr 70px 70px 80px 60px',
           gap: 12, padding: '0 0 8px', borderBottom: '1px solid var(--border)',
         }}>
-          {['Zaman', 'Model', 'Sağlayıcı', 'Tip', 'Gecikme', 'Token', 'Durum'].map((h) => (
+          {['Zaman', 'Model', 'Sağlayıcı', 'Tip', 'Gecikme', 'Token (g+ç)', 'Durum'].map((h) => (
             <Caption key={h} style={{ fontSize: 9 }}>{h}</Caption>
           ))}
         </div>
@@ -219,7 +219,16 @@ const LiveLogTable = ({ records }) => (
               </span>
               <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 11 }}>{record.type || 'text'}</span>
               <span style={{ fontFamily: 'var(--font-mono)' }} className="tnum">{record.responseMs ? `${record.responseMs}ms` : '—'}</span>
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }} className="tnum">{fmt.num(record.unitsUsage || 0)}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }} className="tnum">{
+                (() => {
+                  const inTok = Number(record.inputUsage || 0);
+                  const outTok = Number(record.outputUsage || 0);
+                  const units = Number(record.unitsUsage || 0);
+                  // Metin modellerinde gerçek token = giriş+çıkış; görsel/video'da units (adet/saniye).
+                  if (inTok > 0 || outTok > 0) return `${fmt.num(inTok)}+${fmt.num(outTok)}`;
+                  return fmt.num(units);
+                })()
+              }</span>
               <span>
                 <span style={{
                   width: 20, height: 20, borderRadius: '50%',

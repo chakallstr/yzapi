@@ -248,8 +248,16 @@ export async function forwardChatStream(
 ): Promise<ChatUsage> {
   const baseUrl = await resolveProviderBaseUrl();
   const url = `${baseUrl}/chat/completions`;
+  // stream_options.include_usage: OpenAI-uyumlu sağlayıcının SON SSE chunk'ında
+  // gerçek token usage'ını döndürmesini ister. Bu olmadan bazı sağlayıcılar stream'de
+  // usage vermez ve biz char/4 TAHMİNİNE düşeriz — tahmin gerçek token'ın altında
+  // kalırsa EKSİK TAHSİL (bizim zararımız) olur. Bu flag gerçek token'ı garantiye
+  // alır; billing mantığına dokunmaz (yalnız sağlayıcıdan kesin usage talep eder).
   const providerBody = await applyProfileModelMap(
-    mapRequestBodyForProvider({ ...body, stream: true }, baseUrl),
+    mapRequestBodyForProvider(
+      { ...body, stream: true, stream_options: { include_usage: true } },
+      baseUrl,
+    ),
   );
   const runtimeConfig = await getRuntimeApiConfig();
 
