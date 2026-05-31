@@ -33,12 +33,54 @@ const OMNIROUTE_MODEL_MAP: Record<string, string> = {
   "openai/gpt-5.4-mini": "cx/gpt-5.4-mini",
 };
 
+// ── Token usage normalleştirme (PÜR + TEST EDİLEBİLİR) ───────────────────────
+//
+// Sağlayıcının (WellFlow/OpenAI/Anthropic-uyumlu) usage objesinden GERÇEK giriş
+// token'ını çıkarır. KRİTİK: bazı sağlayıcılar Anthropic /messages şemasında
+// gerçek girişi cache_read_input_tokens / cache_creation_input_tokens alanlarında
+// verir ve input_tokens'ı düşük (ör. 2) bırakır. Cache token'ları ÜCRETLİDİR
+// (Anthropic: cache-read base'in 0.1×'i; cache-write 1.25×–2×) → faturalanan
+// giriş token'ına DAHİL edilmelidir, yoksa giriş maliyeti tahsil edilmez (zarar).
+//
+// İki şema, çift sayım OLMADAN:
+//   • OpenAI:    prompt_tokens girişin TAMAMINI (cache dahil) içerir → onu kullan,
+//                cached_tokens AYRICA EKLENMEZ (alt küme; eklersek çift sayarız).
+//   • Anthropic: input_tokens cache'i HARİÇ tutar → input + cache_read + cache_create
+//                toplanır (resmi formül: total_input = input + cache_read + cache_create).
+//
+// Karar kuralı: prompt_tokens (OpenAI-tarzı toplam) varsa onu taban al; yoksa
+// Anthropic alanlarını topla. completionTokens için de cache-dışı çıkış toplanır.
+function num(v: unknown): number {
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0;
+}
+
+export function normalizeProviderUsage(usageRaw: unknown): ChatUsage {
+  const u = (usageRaw ?? {}) as Record<string, unknown>;
+
+  const promptTokens = num(u.prompt_tokens); // OpenAI: kural olarak cache DAHİL toplam
+  const inputTokens = num(u.input_tokens);   // Anthropic: cache HARİÇ
+  const cacheRead = num(u.cache_read_input_tokens);
+  const cacheCreate = num(u.cache_creation_input_tokens);
+  const cacheTotal = cacheRead + cacheCreate;
+
+  // GERÇEK giriş token'ı — iki sağlayıcı şeması, ÇİFT SAYIM olmadan:
+  //   • OpenAI: prompt_tokens girişin TAMAMINI (cache dahil) içerir. cache_*_input_tokens
+  //     alanları OpenAI'de YAYILMAZ (cache detayı prompt_tokens_details.cached_tokens'tadır,
+  //     onu OKUMUYORUZ). Dolayısıyla prompt_tokens'a cache EKLENMEZ → çift sayım yok.
+  //   • Anthropic: input_tokens cache'i HARİÇ tutar; gerçek giriş = input + cache_read + cache_create.
+  // prompt_tokens raporlanmışsa OpenAI şeması kabul edilir (cache eklenmez); aksi halde
+  // Anthropic şeması (input + cache) uygulanır. Bu, hibrit proxy'de bile çift saymaz.
+  const prompt = promptTokens > 0
+    ? promptTokens                       // OpenAI: toplam zaten dahil
+    : inputTokens + cacheTotal;          // Anthropic: input + cache_read + cache_create
+
+  const completionTokens = num(u.completion_tokens) || num(u.output_tokens);
+
+  return { promptTokens: prompt, completionTokens };
+}
+
 function extractTokenUsage(json: Record<string, unknown>): ChatUsage {
-  const u = (json.usage ?? {}) as Record<string, number>;
-  return {
-    promptTokens: u.prompt_tokens ?? u.input_tokens ?? 0,
-    completionTokens: u.completion_tokens ?? u.output_tokens ?? 0,
-  };
+  return normalizeProviderUsage(json.usage);
 }
 
 export function estimateTextTokens(value: unknown): number {
@@ -318,10 +360,12 @@ export async function forwardChatStream(
         if (payload === "[DONE]") continue;
         try {
           const parsed = JSON.parse(payload) as Record<string, unknown>;
-          const u = parsed.usage as Record<string, number> | undefined;
-          if (u) {
-            usage.promptTokens = u.prompt_tokens ?? usage.promptTokens;
-            usage.completionTokens = u.completion_tokens ?? usage.completionTokens;
+          // Stream'de de cache token'larını dahil eden ortak normalleştirmeyi
+          // kullan (non-stream ile aynı matematik). Son usage chunk'ı kazanır.
+          if (parsed.usage) {
+            const n = normalizeProviderUsage(parsed.usage);
+            if (n.promptTokens > 0) usage.promptTokens = n.promptTokens;
+            if (n.completionTokens > 0) usage.completionTokens = n.completionTokens;
           }
           const choice = (parsed.choices as Array<Record<string, unknown>> | undefined)?.[0];
           const delta = choice?.delta as Record<string, unknown> | undefined;

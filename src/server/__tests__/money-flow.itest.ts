@@ -214,3 +214,95 @@ describe("money flow: /v1/chat/completions billing", () => {
     expect(before - after).toBeCloseTo(single * 2, 2);
   });
 });
+
+describe("token muhasebesi: giriş token kaçağı düzeltmeleri (KN-A cache + KN-B floor)", () => {
+  // Büyük ama kısa görünen prompt: char/4 sunucu sayımı (guard.contextTokens) yüksek olur.
+  const BIG_PROMPT = "kelime ".repeat(20000); // ~140K char → guard ~35K token
+
+  it("KN-A: sağlayıcı girişi cache_read_input_tokens'ta verirse onu da faturalar", async () => {
+    // Anthropic-tarzı: input_tokens=2 ama gerçek giriş cache_read'de (50000).
+    nock(new URL(UPSTREAM).origin)
+      .post(/\/chat\/completions$/)
+      .reply(200, {
+        id: "chatcmpl_cache",
+        object: "chat.completion",
+        choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+        usage: { input_tokens: 2, cache_read_input_tokens: 50000, output_tokens: 100 },
+      });
+
+    const res = await request(app)
+      .post("/v1/chat/completions")
+      .set("Authorization", `Bearer ${FULL_KEY}`)
+      .send({ model: MODEL.id, messages: [{ role: "user", content: "hi" }] });
+
+    expect(res.status).toBe(200);
+    const requestId = res.headers["x-yz-request-id"];
+    const usage = await waitForUsageRecord(requestId);
+    expect(usage?.status).toBe("success");
+
+    // input_usage cache dahil ~50002 olmalı (asla 2 değil). DB'den teyit.
+    const rows = await dbSql<{ input_usage: number; output_usage: number }[]>`
+      SELECT input_usage, output_usage FROM usage_records WHERE request_id = ${requestId} LIMIT 1
+    `;
+    // Küçük "hi" promptu için guard düşük; cache 50000 baskın → >= 50000.
+    expect(rows[0].input_usage).toBeGreaterThanOrEqual(50000);
+    expect(rows[0].output_usage).toBe(100);
+    // Maliyet pozitif ve giriş token'ı yansıtıyor (asla ~0 değil).
+    expect(Number(res.headers["x-yz-cost-tl"])).toBeGreaterThan(0);
+  });
+
+  it("KN-B: sağlayıcı prompt_tokens=2 derse, sunucu-sayımı floor devreye girer (büyük prompt)", async () => {
+    // Sağlayıcı bozuk düşük (2) raporluyor, cache alanı da yok.
+    nock(new URL(UPSTREAM).origin)
+      .post(/\/chat\/completions$/)
+      .reply(200, {
+        id: "chatcmpl_low",
+        object: "chat.completion",
+        choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 2, completion_tokens: 50 },
+      });
+
+    const res = await request(app)
+      .post("/v1/chat/completions")
+      .set("Authorization", `Bearer ${FULL_KEY}`)
+      .send({ model: MODEL.id, messages: [{ role: "user", content: BIG_PROMPT }] });
+
+    expect(res.status).toBe(200);
+    const requestId = res.headers["x-yz-request-id"];
+    await waitForUsageRecord(requestId);
+
+    const rows = await dbSql<{ input_usage: number }[]>`
+      SELECT input_usage FROM usage_records WHERE request_id = ${requestId} LIMIT 1
+    `;
+    // Sağlayıcı 2 dedi ama sunucu floor'u (guard.contextTokens, ~35K) baskın →
+    // input_usage binlerce olmalı, asla 2 değil. Giriş token kaçağı kapandı.
+    expect(rows[0].input_usage).toBeGreaterThan(1000);
+  });
+
+  it("temiz OpenAI yanıtı (cache yok, makul prompt_tokens): floor BOZMAZ", async () => {
+    // Sağlayıcı makul prompt_tokens=1000 veriyor; küçük prompt → guard düşük.
+    // max(1000, guard_küçük) = 1000 olmalı (sağlayıcı değeri korunur, fazla yakma yok).
+    nock(new URL(UPSTREAM).origin)
+      .post(/\/chat\/completions$/)
+      .reply(200, {
+        id: "chatcmpl_clean",
+        object: "chat.completion",
+        choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 1000, completion_tokens: 200 },
+      });
+
+    const res = await request(app)
+      .post("/v1/chat/completions")
+      .set("Authorization", `Bearer ${FULL_KEY}`)
+      .send({ model: MODEL.id, messages: [{ role: "user", content: "kısa soru" }] });
+
+    expect(res.status).toBe(200);
+    const requestId = res.headers["x-yz-request-id"];
+    await waitForUsageRecord(requestId);
+    const rows = await dbSql<{ input_usage: number }[]>`
+      SELECT input_usage FROM usage_records WHERE request_id = ${requestId} LIMIT 1
+    `;
+    // Küçük prompt'ta guard << 1000, sağlayıcı 1000 baskın → tam 1000 (fazla yakma yok).
+    expect(rows[0].input_usage).toBe(1000);
+  });
+});

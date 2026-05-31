@@ -303,11 +303,14 @@ async function handleTextJsonEndpoint(
     const { raw, usage } = await forwarder(providerBody);
     const responseMs = Date.now() - start;
 
+    // Giriş token floor'u (cache/eksik raporlama koruması — bkz chat/completions).
+    const billedPromptTokens = Math.max(usage.promptTokens, guard.contextTokens);
+
     const { costTL, remainingTL } = await settleReservedUsage({
       userId,
       apiKeyId,
       model: masterModel,
-      usage: { promptTokens: usage.promptTokens, completionTokens: usage.completionTokens },
+      usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens },
       requestId,
       rawUsageJson: usage,
       responseMs,
@@ -418,11 +421,13 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       const streamStatus = hasUsage
         ? "success"
         : (runtimeConfig?.streamMissingUsageFallbackEnabled === false ? "error" : "stream_missing_usage");
+      // Giriş token floor'u (cache/eksik raporlama koruması — bkz chat/completions).
+      const billedPromptTokens = Math.max(usage.promptTokens, guard.contextTokens);
       await settleReservedUsage({
         userId,
         apiKeyId,
         model: masterModel,
-        usage: { promptTokens: usage.promptTokens, completionTokens: usage.completionTokens },
+        usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens },
         requestId,
         rawUsageJson: usage,
         errorCode: streamStatus === "stream_missing_usage" ? "stream_missing_usage" : undefined,
@@ -433,11 +438,17 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       const { raw, usage } = await activeProviderAdapter.forwardChat(providerBody as any);
       const responseMs = Date.now() - start;
 
+      // Giriş token floor'u: sağlayıcı giriş token'ını eksik raporlarsa (ör. cache
+      // alanı / prompt_tokens=2), kendi sunucu-tarafı giriş sayımımızı (guard.contextTokens)
+      // taban al. max() olduğu için sağlıklı çağrıda sağlayıcı değeri korunur; yalnız
+      // sağlayıcı saçma-düşük raporladığında devreye girer (eksik tahsil = zarar engeli).
+      const billedPromptTokens = Math.max(usage.promptTokens, guard.contextTokens);
+
       const { costTL, remainingTL } = await settleReservedUsage({
         userId,
         apiKeyId,
         model: masterModel,
-        usage: { promptTokens: usage.promptTokens, completionTokens: usage.completionTokens },
+        usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens },
         requestId,
         rawUsageJson: usage,
         responseMs,
