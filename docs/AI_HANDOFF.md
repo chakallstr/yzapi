@@ -3,10 +3,38 @@
 > Bu belge bir AI/geliştirici session'ından diğerine devir içindir. Mevcut durumun
 > tek doğruluk kaynağı. Yeni session BURADAN başlar.
 >
-> Son güncelleme commit: `ef88630` · dal: `phase/release-vps-beta`
-> Canlı deploy: `sync-20260531T001945Z-ef88630` · aktif sağlayıcı: **wellflow**
+> Son güncelleme commit: `84e7b94` · dal: `phase/release-vps-beta`
+> Canlı deploy: `sync-20260531T015939Z-84e7b94` · aktif sağlayıcı: **wellflow**
 >
-> ## SON OTURUM ÖZETİ (2026-05-31) — Wellflow geçişi + RooCode/timeout/saat fix + yeni fiyatlar
+> ## SON OTURUM ÖZETİ (2026-05-31 #2) — KRİTİK: giriş token kaçağı kapatıldı (cache token + floor)
+> **Sorun (kök neden, kesin kanıtlı):** WellFlow giriş token'ını EKSİK raporluyordu. Anthropic
+> `/v1/messages` şemasında gerçek giriş `cache_read_input_tokens` (ör. 67394) alanındaydı ama
+> `input_tokens=2` geliyordu; `/v1/chat/completions`'ta dev promptta bile `prompt_tokens=2`. Eski
+> `extractTokenUsage` yalnız `prompt_tokens ?? input_tokens` okuyup cache alanlarını ATLIYOR + kendi
+> sunucu sayımımızı (`guard.contextTokens`) floor olarak kullanMIYORduk → giriş token'ı ~hiç
+> faturalanmıyordu = ZARAR. Canlıda ~468 çağrı etkilenmiş (çoğu `ahmet.soylu341@gmail.com`),
+> ~1500 TL tahmini gelir kaybı. **Drift=0** (az-tahsildi, kayıp-para/çift-tahsil DEĞİL).
+>
+> **Düzeltme (billing FORMÜLÜNE DOKUNULMADAN — yalnız token SAYISI):**
+> 1. `closerouter-service.ts` → yeni pür+export `normalizeProviderUsage()`: OpenAI'de `prompt_tokens`
+>    taban (cache zaten dahil → çift saymaz); Anthropic'te `input + cache_read + cache_create` toplanır.
+>    `extractTokenUsage` + stream SSE parser ortak bu fonksiyonu kullanır. `stream_options.include_usage`
+>    eklendi (stream'de kesin usage talep eder).
+> 2. `proxy.ts` → 3 success settle çağrısında `billedPromptTokens = max(usage.promptTokens,
+>    guard.contextTokens)` FLOOR. Hata-path settle'ları DEĞİŞMEDİ (K1 cost=0 korundu).
+>
+> **Doğrulama:** 3 QA PASS (matematik 7 senaryo elle-hesap=kod=test; DOKUNULMAZ billing diff boş; regresyon).
+> `token-usage-normalize.test.ts` (9 test) + `money-flow.itest.ts` (KN-A cache / KN-B floor / temiz-bozulmaz).
+> 321 unit + build + tsc yeşil. **CANLI KANIT:** 56000-char prompt → `input_usage=14013` (eskiden 2!),
+> `cost_tl=0.5201`, raw `promptTokens:3` ama floor 14013 faturaladı → **FLOOR_CALISTI=true**.
+> Commit `84e7b94`, deploy `sync-20260531T015939Z-84e7b94`.
+>
+> **AÇIK NOTLAR:** (a) Geçmiş 468 çağrının kaybı GERİ ALINAMAZ (raw_usage_json'da cache alanı saklanmamıştı).
+> (b) ÖNERİ (henüz YAPILMADI): `raw_usage_json`'a sağlayıcının TAM usage objesini (cache dahil) kaydet →
+> gelecekte denetim. (c) WellFlow suçlanmaz — hata BİZİM kodumuzdaydı (cache atlama + floor eksikliği).
+> (d) Kalıcı denetim aracı: `scripts/token-accounting-probe.mjs`.
+>
+> ## ÖNCEKİ OTURUM ÖZETİ (2026-05-31 #1) — Wellflow geçişi + RooCode/timeout/saat fix + yeni fiyatlar
 > Bu oturumda yapılan ve CANLIDA doğrulanan işler (tek-doğruluk):
 > 1. **RooCode 500 / stream fix:** `closerouter-service.ts` `forwardChatStream` içindeki dinamik
 >    `require("stream")` esbuild ESM bundle'da patlıyordu → her `stream:true` isteği 500/`upstream_error`.
@@ -189,6 +217,10 @@ Ops (`/Users/ufuk/yeniapi/_ops`, git dışı): `backup-full.sh` sertleştirildi.
 - 501 görsel/video uçları — bilinçli kapalı, kapsam dışı.
 - `MASTER_MODELS` 42-kilit (master-models.ts) — yeni model EKLENMEZ; `added_models` katmanında tutulur.
 - `provider_profiles` aktif profil mantığı — metro AKTİF, closerouter yedek; switch admin panelden.
+- **`normalizeProviderUsage()` (closerouter-service.ts) + proxy.ts success-settle FLOOR** — giriş token
+  kaçağını kapatan mantık. OpenAI'de cache EKLENMEZ (çift sayım), Anthropic'te cache TOPLANIR; success
+  settle'da `max(usage, guard.contextTokens)`. Hata-path floor uygulaMAZ (K1 cost=0). Token SAYISI mantığı;
+  billing FORMÜLÜ değil. `token-usage-normalize.test.ts` 9 test + money-flow.itest KN-A/KN-B kilitler.
 
 ## 11. Yeni session'da İLK yapılacak net görev
 
