@@ -1,14 +1,14 @@
 import { Router, Response } from "express";
 import express from "express";
 import { db } from "../db/client.js";
-import { payments, pendingIbanPayments, systemConfig, users, transactions } from "../db/schema.js";
+import { payments, pendingIbanPayments, systemConfig, users, transactions, shopierOsbDeadLetters } from "../db/schema.js";
 import { eq, desc, and } from "drizzle-orm";
 import { env } from "../lib/env.js";
 import { userAuth } from "../middleware/user-auth.js";
 import { requireWhatsappVerified } from "../middleware/whatsapp-verified.js";
 import { adminAuth } from "../middleware/admin-auth.js";
 import { calcKdv, creditUserBalance } from "../services/payment-common.js";
-import { buildCheckoutForm, verifyCallback } from "../services/shopier-service.js";
+import { buildCheckoutForm, verifyCallback, verifyOsbNotification, isOsbTestOrder, resolveOsbProduct } from "../services/shopier-service.js";
 import { createInvoice, verifyWebhook } from "../services/cryptomus-service.js";
 import { writeAudit } from "../services/audit-service.js";
 import { logger } from "../lib/logger.js";
@@ -341,6 +341,186 @@ async function handleShopierCallbackBody(
   });
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// Shopier OSB (Sipariş Bildirimi / notificationaccess.php) — sabit-link otomatik
+// kredilendirme (Paket 3). Müşteri sabit Shopier ürün linkinden öder; bizim
+// init akışımızdan GEÇMEZ → önceden payments satırı YOKTUR. Eşleştirme yalnız
+// imzalı payload'daki email + productId ile yapılır. Shopier'in beklediği yanıt:
+// başarıda gövdede "success" metni (HTTP 200). Çift-credit DB UNIQUE ile engellenir.
+// ════════════════════════════════════════════════════════════════════════════
+
+/** OSB'de log/saklamada güvenli alanlar — imza/hash ve PII-ağırlıklı ham gövde sızdırılmaz. */
+function safeOsbLog(payload: Record<string, unknown> | undefined) {
+  if (!payload) return {};
+  const { orderid, productid, currency, istest } = payload;
+  return { orderid, productid, currency, istest };
+}
+
+/** payloadJson'a yazılırken imza/hash ve teknik gürültüyü çıkar (PII minimumda tutulur). */
+function safeOsbPayload(payload: Record<string, unknown>) {
+  const blocked = new Set(["res", "hash", "signature", "sign", "0", "1", "0[value]", "1[value]"]);
+  return Object.fromEntries(Object.entries(payload).filter(([k]) => !blocked.has(k.toLowerCase())));
+}
+
+async function recordOsbDeadLetter(
+  orderId: string,
+  reason: string,
+  payload: OsbPayloadLike,
+): Promise<void> {
+  try {
+    await db.insert(shopierOsbDeadLetters).values({
+      shopierOrderId: orderId,
+      reason,
+      buyerEmail: payload.email ? String(payload.email) : null,
+      productId: payload.productid ? String(payload.productid) : null,
+      priceTL: payload.price !== undefined && Number.isFinite(Number(payload.price)) ? String(Number(payload.price)) : null,
+      payloadJson: safeOsbPayload(payload) as any,
+    }).onConflictDoNothing({ target: shopierOsbDeadLetters.shopierOrderId });
+  } catch (e) {
+    logger.error({ err: e, orderId, reason }, "OSB dead-letter insert failed");
+  }
+  adminPaymentNotificationEmail({
+    title: "Shopier OSB otomatik kredilendirilemedi",
+    method: "shopier_osb",
+    reference: orderId,
+    status: reason,
+    reason: "Geçerli imzalı OSB bildirimi eşleştirilemedi — admin manuel kontrol gerekir.",
+  }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
+}
+
+type OsbPayloadLike = Record<string, unknown> & {
+  email?: unknown; orderid?: unknown; productid?: unknown; price?: unknown; currency?: unknown; istest?: unknown;
+};
+
+/**
+ * Shopier OSB bildirimini işle. Shopier başarıyı gövdedeki "success" metni ile bekler,
+ * bu yüzden eşleşmeyen/işlenemeyen GEÇERLİ-imzalı bildirimlere de 200 + "success" döneriz
+ * (Shopier retry fırtınasını önlemek için), ama dead-letter'a yazıp admin'i uyarırız.
+ * Yalnızca GERÇEK kredilendirme hatası (DB down vb.) HTTP 500 → Shopier retry eder.
+ */
+async function handleShopierOsbBody(body: unknown, res: Response): Promise<void> {
+  const verifyResult = verifyOsbNotification(body);
+  if (!verifyResult.valid) {
+    logger.warn({ reason: verifyResult.reason }, "Shopier OSB verify failed");
+    res.status(401).send("unauthorized");
+    return;
+  }
+
+  const payload = verifyResult.payload as OsbPayloadLike;
+  logger.info({ osb: safeOsbLog(payload as Record<string, unknown>) }, "Shopier OSB notification received");
+
+  // Z3 — test siparişleri asla kredilendirmez.
+  if (isOsbTestOrder(payload.istest)) {
+    res.status(200).send("success");
+    return;
+  }
+
+  // Z4 — orderid zorunlu (idempotency ankrajı; boşsa osb_undefined çakışması olur).
+  const orderId = String(payload.orderid ?? "").trim();
+  if (!orderId) {
+    logger.warn({ osb: safeOsbLog(payload as Record<string, unknown>) }, "Shopier OSB missing orderid");
+    res.status(200).send("success");
+    return;
+  }
+
+  // Z2 — yalnız TL/TRY kredilenir.
+  const currency = String(payload.currency ?? "").trim().toUpperCase();
+  if (currency && !["TL", "TRY", "0"].includes(currency)) {
+    await recordOsbDeadLetter(orderId, "currency_mismatch", payload);
+    res.status(200).send("success");
+    return;
+  }
+
+  // Ürün eşlemesi + tutar guard'ı.
+  const product = resolveOsbProduct(payload.productid);
+  if (!product) {
+    await recordOsbDeadLetter(orderId, "unknown_product", payload);
+    res.status(200).send("success");
+    return;
+  }
+  const paidPrice = Number(payload.price);
+  if (!Number.isFinite(paidPrice) || Math.abs(paidPrice - product.priceTL) > 0.01) {
+    await recordOsbDeadLetter(orderId, "amount_mismatch", payload);
+    res.status(200).send("success");
+    return;
+  }
+
+  // Email → kullanıcı eşleştirme (tek eşleşme şart).
+  const email = String(payload.email ?? "").trim().toLowerCase();
+  const matchedUsers = email
+    ? await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(2)
+    : [];
+  if (matchedUsers.length !== 1) {
+    await recordOsbDeadLetter(orderId, matchedUsers.length > 1 ? "ambiguous_email" : "unknown_email", payload);
+    res.status(200).send("success");
+    return;
+  }
+  const userId = matchedUsers[0].id;
+
+  // Z1 — kredilendirmeden ÖNCE payments satırını oluştur/bul. creditUserBalance
+  // satırı yalnız UPDATE eder (INSERT etmez) ve idempotency'i payments.id (uuid) ile
+  // kontrol eder. Sabit-linkte önceden satır yok → satırı burada açarız. payments.id
+  // UUID kolonu olduğu için "osb_<orderid>" YAZILAMAZ; bunun yerine orderid'i UNIQUE
+  // text `idempotencyKey="osb_<orderid>"` alanına koyar, gerçek uuid'yi geri okuruz.
+  const osbIdemKey = `osb_${orderId}`;
+  const kdv = calcKdv(product.creditTL);
+  await db.insert(payments).values({
+    userId,
+    metod: "shopier_osb",
+    miktarTL: String(product.creditTL),
+    kdvTL: String(kdv.kdvTL),
+    netTL: String(kdv.netTL),
+    payableTL: String(product.priceTL),
+    creditTL: String(product.creditTL),
+    durum: "bekliyor",
+    idempotencyKey: osbIdemKey,
+  }).onConflictDoNothing({ target: payments.idempotencyKey });
+
+  const paymentRows = await db.select({ id: payments.id })
+    .from(payments).where(eq(payments.idempotencyKey, osbIdemKey)).limit(1);
+  if (!paymentRows.length) {
+    // Beklenmez (insert + onConflict sonrası satır olmalı) — güvenli tarafta dead-letter.
+    logger.error({ osbIdemKey }, "OSB payment row not found after upsert");
+    await recordOsbDeadLetter(orderId, "payment_row_missing", payload);
+    res.status(200).send("success");
+    return;
+  }
+  const paymentId = paymentRows[0].id;
+
+  const credit = await creditUserBalance(
+    userId,
+    paymentId,
+    product.creditTL,
+    "shopier_osb",
+    osbIdemKey,
+    safeOsbPayload(payload),
+    { paidTL: product.priceTL },
+  );
+
+  if (credit.success || credit.alreadyCredited) {
+    res.status(200).send("success");
+    return;
+  }
+
+  // Kredi başarısız → payment durumunu YENİDEN OKU (yarış kaybedeni / commit-sonrası
+  // throw bakiyeyi yüklemiş olabilir). basarili ise success ack et, gereksiz retry önle.
+  let recheckDurum: string | null = null;
+  try {
+    const recheck = await db.select({ durum: payments.durum }).from(payments).where(eq(payments.id, paymentId)).limit(1);
+    recheckDurum = recheck.length ? recheck[0].durum : null;
+  } catch (e) {
+    logger.error({ err: e, paymentId }, "OSB credit recheck failed");
+  }
+  if (recheckDurum === "basarili") {
+    res.status(200).send("success");
+    return;
+  }
+
+  // Gerçek kredilendirme hatası → Shopier retry etsin.
+  logger.error({ paymentId }, "Shopier OSB credit failed — returning 500 for retry");
+  res.status(500).send("error");
+}
+
 // ── GET /api/payments/methods ─────────────────────────────────────────────────
 router.get("/methods", userAuth, requireWhatsappVerified, async (_req, res, next) => {
   try {
@@ -453,7 +633,7 @@ router.post(
   }
 );
 
-// ── POST /api/payments/shopier/osb (PUBLIC — Shopier OSB relay) ───────────────
+// ── POST /api/payments/shopier/osb (PUBLIC — Shopier OSB relay, checkout-form format) ─
 router.post(
   "/shopier/osb",
   express.urlencoded({ extended: false }),
@@ -461,6 +641,22 @@ router.post(
     try {
       const body = req.body as Record<string, string>;
       await handleShopierCallbackBody(body, res, { mode: "json", allowFallback: true });
+    } catch (e) { next(e); }
+  }
+);
+
+// ── POST /api/payments/shopier/osb-notify (PUBLIC — Shopier official OSB / Sipariş
+//    Bildirimi, sabit-link otomatik kredilendirme — Paket 3) ────────────────────
+// notificationaccess.php formatı (res+hash, SHOPIER_OSB_USERNAME/PASSWORD HMAC).
+// Shopier panelinde "Sipariş Bildirimi (OSB)" URL'si BUNA ayarlanır. Hem urlencoded
+// (named / positional / bracket) hem json gövdeyi normalize eder.
+router.post(
+  "/shopier/osb-notify",
+  express.urlencoded({ extended: true }),
+  express.json(),
+  async (req, res, next) => {
+    try {
+      await handleShopierOsbBody(req.body, res);
     } catch (e) { next(e); }
   }
 );
@@ -880,6 +1076,134 @@ router.get("/admin/all", adminAuth, async (req, res, next) => {
     if (durum) rows = rows.filter(p => p.durum === durum);
     if (userId) rows = rows.filter(p => p.userId === userId);
     res.json(rows.map(serializePayment));
+  } catch (e) { next(e); }
+});
+
+// ── Admin: GET /api/payments/admin/osb-dead-letters ──────────────────────────
+// Otomatik kredilendirilemeyen GEÇERLİ-imzalı OSB bildirimleri (manuel inceleme).
+router.get("/admin/osb-dead-letters", adminAuth, async (req, res, next) => {
+  try {
+    const { durum } = req.query as Record<string, string>;
+    let rows = await db.select().from(shopierOsbDeadLetters).orderBy(desc(shopierOsbDeadLetters.olusturma));
+    if (durum) rows = rows.filter((r) => r.durum === durum);
+    res.json(rows.map((r) => ({
+      id: r.id,
+      shopierOrderId: r.shopierOrderId,
+      reason: r.reason,
+      buyerEmail: r.buyerEmail,
+      productId: r.productId,
+      priceTL: r.priceTL === null ? null : Number(r.priceTL),
+      durum: r.durum,
+      cozumNotu: r.cozumNotu,
+      cozenAdmin: r.cozenAdmin,
+      transactionId: r.transactionId,
+      olusturma: r.olusturma instanceof Date ? r.olusturma.toISOString() : String(r.olusturma),
+      cozum: r.cozum instanceof Date ? r.cozum.toISOString() : (r.cozum ?? null),
+    })));
+  } catch (e) { next(e); }
+});
+
+// ── Admin: POST /api/payments/admin/osb-dead-letters/:id/resolve ──────────────
+// Admin bir dead-letter'ı bir kullanıcıya manuel olarak kredilendirir. Kredi miktarı
+// dead-letter'ın eşleştiği ürün (priceTL) veya açıkça verilen creditTL'dir. Idempotency:
+// payments.idempotencyKey = "osbdl_<deadLetterId>" (UNIQUE text) → tekrar onayda already_credited.
+router.post("/admin/osb-dead-letters/:id/resolve", adminAuth, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { userId, creditTL: creditTLRaw, not } = req.body as { userId?: string; creditTL?: number; not?: string };
+
+    const rows = await db.select().from(shopierOsbDeadLetters).where(eq(shopierOsbDeadLetters.id, id)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Dead-letter kaydı bulunamadı." }); return; }
+    const dl = rows[0];
+    if (dl.durum !== "bekliyor") {
+      res.status(409).json({ error: `Bu kayıt zaten ${dl.durum} durumunda.` });
+      return;
+    }
+
+    if (!userId) { res.status(400).json({ error: "userId zorunlu." }); return; }
+    const userRows = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!userRows.length) { res.status(404).json({ error: "Kullanıcı bulunamadı." }); return; }
+
+    const creditTL = Number(creditTLRaw ?? dl.priceTL ?? 0);
+    if (!Number.isFinite(creditTL) || creditTL <= 0) {
+      res.status(400).json({ error: "Geçerli bir creditTL gerekli." });
+      return;
+    }
+
+    const osbIdemKey = `osbdl_${dl.id}`;
+    const kdv = calcKdv(creditTL);
+    await db.insert(payments).values({
+      userId,
+      metod: "shopier_osb_manual",
+      miktarTL: String(creditTL),
+      kdvTL: String(kdv.kdvTL),
+      netTL: String(kdv.netTL),
+      payableTL: dl.priceTL === null ? String(creditTL) : String(dl.priceTL),
+      creditTL: String(creditTL),
+      durum: "bekliyor",
+      idempotencyKey: osbIdemKey,
+    }).onConflictDoNothing({ target: payments.idempotencyKey });
+
+    const paymentRows = await db.select({ id: payments.id })
+      .from(payments).where(eq(payments.idempotencyKey, osbIdemKey)).limit(1);
+    if (!paymentRows.length) {
+      res.status(500).json({ error: "Ödeme kaydı oluşturulamadı." });
+      return;
+    }
+    const paymentId = paymentRows[0].id;
+
+    const credit = await creditUserBalance(
+      userId,
+      paymentId,
+      creditTL,
+      "shopier_osb_manual",
+      osbIdemKey,
+      undefined,
+      { paidTL: dl.priceTL === null ? creditTL : Number(dl.priceTL) },
+    );
+    if (!credit.success && !credit.alreadyCredited) {
+      res.status(500).json({ error: "Bakiye yüklenirken hata oluştu." });
+      return;
+    }
+
+    await db.update(shopierOsbDeadLetters).set({
+      durum: "cozuldu",
+      cozum: new Date(),
+      cozenAdmin: req.admin?.sub ?? "admin",
+      cozumNotu: not ?? null,
+      transactionId: credit.txId ?? null,
+    }).where(eq(shopierOsbDeadLetters.id, id));
+
+    await writeAudit(
+      "osb_dead_letter_resolve",
+      userId,
+      `OSB dead-letter kredilendirildi: ${dl.shopierOrderId} ₺${creditTL.toFixed(2)}${not ? " — " + not : ""}`,
+      req.admin?.sub,
+    );
+
+    res.json({ ok: true, transactionId: credit.txId, alreadyCredited: Boolean(credit.alreadyCredited) });
+  } catch (e) { next(e); }
+});
+
+// ── Admin: POST /api/payments/admin/osb-dead-letters/:id/ignore ───────────────
+router.post("/admin/osb-dead-letters/:id/ignore", adminAuth, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { not } = req.body as { not?: string };
+    const rows = await db.select().from(shopierOsbDeadLetters).where(eq(shopierOsbDeadLetters.id, id)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Dead-letter kaydı bulunamadı." }); return; }
+    if (rows[0].durum !== "bekliyor") {
+      res.status(409).json({ error: `Bu kayıt zaten ${rows[0].durum} durumunda.` });
+      return;
+    }
+    await db.update(shopierOsbDeadLetters).set({
+      durum: "yoksayildi",
+      cozum: new Date(),
+      cozenAdmin: req.admin?.sub ?? "admin",
+      cozumNotu: not ?? null,
+    }).where(eq(shopierOsbDeadLetters.id, id));
+    await writeAudit("osb_dead_letter_ignore", rows[0].buyerEmail ?? "", `OSB dead-letter yoksayıldı: ${rows[0].shopierOrderId}`, req.admin?.sub);
+    res.json({ ok: true });
   } catch (e) { next(e); }
 });
 

@@ -69,6 +69,14 @@ const schema = z.object({
   SHOPIER_API_SECRET: z.string().optional(),
   SHOPIER_RETURN_URL: z.string().optional(),
   SHOPIER_OSB_FALLBACK_URL: z.string().optional(),
+  // Shopier OSB (Sipariş Bildirimi / notificationaccess.php) — sabit-link otomatik
+  // kredilendirme (Paket 3). Bunlar checkout API_KEY/SECRET'tan AYRIDIR; Shopier
+  // panelinden alınır ve YALNIZ server-side tutulur. İkisi de boşsa OSB uç pasif.
+  SHOPIER_OSB_USERNAME: z.string().optional(),
+  SHOPIER_OSB_PASSWORD: z.string().optional(),
+  // productId → { priceTL, creditTL } JSON eşlemesi. Örn:
+  // {"47233749":{"priceTL":899,"creditTL":899}}  — boş/hatalı JSON → OSB kredi vermez.
+  SHOPIER_OSB_PRODUCT_MAP: z.string().optional(),
 
   // Cryptomus payment (optional — returns 503 when unset)
   CRYPTOMUS_MERCHANT_ID: z.string().optional(),

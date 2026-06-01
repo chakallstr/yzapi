@@ -493,3 +493,30 @@ export const maliIzlemeTaramalari = pgTable(
   },
   (t) => [index("mali_izleme_scan_at_idx").on(t.scanAt)]
 );
+
+// ── shopier_osb_dead_letters (Paket 3 — eşleşmeyen/işlenemeyen OSB bildirimleri) ──
+// Shopier sabit-link OSB bildirimi GEÇERLİ imzalı ama otomatik kredilendirilemediğinde
+// (bilinmeyen ürün / tutar uyuşmazlığı / bilinmeyen veya çoğul email / yanlış para birimi)
+// buraya KALICI olarak yazılır. Amaç: para Shopier'de tahsil edildi ama bakiye yüklenemedi
+// vakalarının kaybolmaması — admin manuel eşleştirip kredilendirebilir. Secret İÇERMEZ
+// (imza/hash saklanmaz; yalnız sipariş/müşteri özeti + ham güvenli payload). idempotency:
+// shopier_order_id UNIQUE → aynı bildirim iki kez dead-letter'a düşmez.
+export const shopierOsbDeadLetters = pgTable(
+  "shopier_osb_dead_letters",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    shopierOrderId: text("shopier_order_id").notNull().unique(),
+    reason: text("reason").notNull(), // unknown_product | amount_mismatch | unknown_email | ambiguous_email | currency_mismatch
+    buyerEmail: text("buyer_email"),
+    productId: text("product_id"),
+    priceTL: numeric("price_tl", { precision: 14, scale: 4 }),
+    payloadJson: jsonb("payload_json"), // güvenli (imza/hash çıkarılmış) ham OSB payload
+    durum: text("durum").notNull().default("bekliyor"), // bekliyor | cozuldu | yoksayildi
+    cozumNotu: text("cozum_notu"),
+    cozenAdmin: text("cozen_admin"),
+    transactionId: uuid("transaction_id").references(() => transactions.id),
+    olusturma: timestamp("olusturma", { withTimezone: true }).notNull().default(sql`now()`),
+    cozum: timestamp("cozum", { withTimezone: true }),
+  },
+  (t) => [index("shopier_osb_dead_letters_durum_idx").on(t.durum)]
+);

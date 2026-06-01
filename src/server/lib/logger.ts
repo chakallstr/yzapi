@@ -29,6 +29,8 @@ export const redactPaths = [
   "provider_message_id",
   "signature",
   "sign",
+  "res",
+  "hash",
 ];
 
 export const logger = pino({

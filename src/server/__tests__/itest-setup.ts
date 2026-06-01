@@ -17,3 +17,9 @@ process.env.APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:4567";
 process.env.CLOSEROUTER_API_KEY = "closerouter_test_key";
 process.env.CLOSEROUTER_BASE_URL = "https://api.closerouter.dev/v1";
 process.env.WHATSAPP_OTP_ENABLED = "false";
+// Shopier OSB (Paket 3) — fixed-link auto-credit itest fixtures.
+process.env.SHOPIER_OSB_USERNAME = process.env.SHOPIER_OSB_USERNAME || "osb_itest_user";
+process.env.SHOPIER_OSB_PASSWORD = process.env.SHOPIER_OSB_PASSWORD || "osb_itest_pass";
+process.env.SHOPIER_OSB_PRODUCT_MAP =
+  process.env.SHOPIER_OSB_PRODUCT_MAP ||
+  JSON.stringify({ "47233749": { priceTL: 899, creditTL: 899 } });

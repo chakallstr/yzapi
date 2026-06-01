@@ -149,3 +149,156 @@ export function verifyCallback(body: Record<string, string>): ShopierCallbackVer
     return { valid: false };
   }
 }
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// Shopier OSB (Sipariş Bildirimi / notificationaccess.php) — sabit-link otomatik
+// kredilendirme (Paket 3). Bu, checkout-form callback'ten (verifyCallback) AYRI ve
+// FARKLI bir imza şemasıdır:
+//   hash = HMAC-SHA256(key = SHOPIER_OSB_PASSWORD, data = base64payload + SHOPIER_OSB_USERNAME).hex
+// payload = base64(JSON) → { email, orderid, currency, price, productid, istest, ... }
+// Kaynak: Shopier resmi NodeJS örneği (notificationaccess.php).
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface OsbPayload {
+  email?: string;
+  orderid?: string;
+  currency?: string;
+  price?: string;
+  productid?: string;
+  buyername?: string;
+  buyersurname?: string;
+  productcount?: unknown;
+  istest?: unknown;
+  [k: string]: unknown;
+}
+
+export interface OsbVerifyResult {
+  valid: boolean;
+  reason?: string;
+  payload?: OsbPayload;
+}
+
+/**
+ * Shopier OSB gövdesi kaynaklar arası FARKLI biçimlerde gelebilir (gerçek express
+ * body-parser ile doğrulandı):
+ *  - named:           { res, hash }
+ *  - positional-obj:  { 0:{value}, 1:{value} }        (extended:true)
+ *  - bracket-literal: { "0[value]":..., "1[value]":...} (extended:false)
+ *  - array:           [ {value}, {value} ]
+ * Hepsini { encoded, hash } biçimine normalize eder.
+ */
+export function normalizeOsbBody(body: unknown): { encoded: string; hash: string } | null {
+  if (!body || typeof body !== "object") return null;
+  const b = body as Record<string, any>;
+
+  if (Array.isArray(body)) {
+    if (typeof body[0]?.value === "string" && typeof body[1]?.value === "string") {
+      return { encoded: String(body[0].value), hash: String(body[1].value) };
+    }
+    return null;
+  }
+  if (typeof b.res === "string" && typeof b.hash === "string") {
+    return { encoded: b.res, hash: b.hash };
+  }
+  if (b[0] && b[1] && typeof b[0].value === "string" && typeof b[1].value === "string") {
+    return { encoded: b[0].value, hash: b[1].value };
+  }
+  if (typeof b["0[value]"] === "string" && typeof b["1[value]"] === "string") {
+    return { encoded: b["0[value]"], hash: b["1[value]"] };
+  }
+  return null;
+}
+
+/**
+ * OSB test siparişi tespiti — KORUMACIL (Z3). Yalnız "0" / "false" / boş / yok =
+ * gerçek sipariş kabul edilir. Diğer her şey (1, true, "1", "true", "yes", ...) TEST
+ * sayılır → kredi YOK. Böylece Shopier test bildirimleri asla gerçek bakiye yüklemez.
+ */
+export function isOsbTestOrder(value: unknown): boolean {
+  if (value === undefined || value === null) return false;
+  const s = String(value).trim().toLowerCase();
+  return !(s === "0" || s === "false" || s === "");
+}
+
+/**
+ * OSB bildirimini doğrula. Başarılıysa çözülmüş payload'ı döndürür.
+ * timing-safe karşılaştırma + uzunluk guard (throw yok).
+ */
+export function verifyOsbNotification(body: unknown): OsbVerifyResult {
+  const username = env.SHOPIER_OSB_USERNAME;
+  const password = env.SHOPIER_OSB_PASSWORD;
+  if (!username || !password) return { valid: false, reason: "osb_not_configured" };
+
+  const norm = normalizeOsbBody(body);
+  if (!norm) return { valid: false, reason: "missing_fields" };
+
+  const expected = createHmac("sha256", password).update(norm.encoded + username).digest("hex");
+  let ok = false;
+  try {
+    const a = Buffer.from(expected, "utf8");
+    const b = Buffer.from(norm.hash, "utf8");
+    ok = a.length === b.length && timingSafeEqual(a, b);
+  } catch {
+    ok = false;
+  }
+  if (!ok) return { valid: false, reason: "bad_signature" };
+
+  let payload: OsbPayload;
+  try {
+    payload = JSON.parse(Buffer.from(norm.encoded, "base64").toString("utf8"));
+  } catch {
+    return { valid: false, reason: "bad_payload" };
+  }
+  if (!payload || typeof payload !== "object") return { valid: false, reason: "bad_payload" };
+
+  return { valid: true, payload };
+}
+
+export interface OsbProduct {
+  priceTL: number;
+  creditTL: number;
+}
+
+let _osbProductMapCache: Record<string, OsbProduct> | null | undefined;
+
+/**
+ * Sabit-link ürün eşlemesi: Shopier productId → { priceTL (panel sabit-link fiyatı),
+ * creditTL (yüklenecek bakiye, KDV dahil) }. Env `SHOPIER_OSB_PRODUCT_MAP` JSON'undan
+ * okunur, savunmacı parse + cache. Hatalı JSON → boş map (kredi vermez, güvenli taraf).
+ */
+export function getOsbProductMap(): Record<string, OsbProduct> {
+  if (_osbProductMapCache !== undefined) return _osbProductMapCache ?? {};
+  const raw = env.SHOPIER_OSB_PRODUCT_MAP?.trim();
+  if (!raw) {
+    _osbProductMapCache = null;
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const map: Record<string, OsbProduct> = {};
+    for (const [pid, val] of Object.entries(parsed)) {
+      const v = val as Record<string, unknown>;
+      const priceTL = Number(v.priceTL);
+      const creditTL = Number(v.creditTL);
+      if (Number.isFinite(priceTL) && priceTL > 0 && Number.isFinite(creditTL) && creditTL > 0) {
+        map[String(pid)] = { priceTL, creditTL };
+      }
+    }
+    _osbProductMapCache = map;
+    return map;
+  } catch {
+    _osbProductMapCache = null;
+    return {};
+  }
+}
+
+/** Test yardımcısı — env değişince cache sıfırlanır. */
+export function resetOsbProductMapCache(): void {
+  _osbProductMapCache = undefined;
+}
+
+export function resolveOsbProduct(productId: unknown): OsbProduct | null {
+  const map = getOsbProductMap();
+  return map[String(productId ?? "")] ?? null;
+}

@@ -113,6 +113,13 @@
       "when": 1780608000000,
       "tag": "0015_mali_izleme",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1780694400000,
+      "tag": "0016_shopier_osb_dead_letters",
+      "breakpoints": true
     }
   ]
 }
