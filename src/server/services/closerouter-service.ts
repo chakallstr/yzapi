@@ -186,7 +186,7 @@ export function parseSseCompletion(text: string): Record<string, unknown> {
   const usage = [...chunks].reverse().find((chunk) => chunk.usage)?.usage;
 
   return {
-    id: first.id ?? "chatcmpl_omniroute",
+    id: first.id ?? "chatcmpl",
     object: "chat.completion",
     created: first.created,
     model: first.model,

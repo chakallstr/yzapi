@@ -851,7 +851,7 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
   const [saving, setSaving] = useState('');
   const [saved, setSaved] = useState('');
   const [apiSettings, setApiSettings] = useState(null);
-  const [providerSnapshot, setProviderSnapshot] = useState({ activeProviderId: 'closerouter', providers: [] });
+  const [providerSnapshot, setProviderSnapshot] = useState({ activeProviderId: '', providers: [] });
   const [modelPolicies, setModelPolicies] = useState([]);
   const [configForm, setConfigForm] = useState({});
   const [selectedModelId, setSelectedModelId] = useState('');
@@ -867,7 +867,7 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
   const [testResult, setTestResult] = useState(null);
   const [testError, setTestError] = useState('');
 
-  // ── Aktif sağlayıcı (provider_profiles): metro ⇄ closerouter switch ──────────
+  // ── Aktif sağlayıcı (provider_profiles): profiller arası geçiş ──────────
   const [profiles, setProfiles] = useState([]);
   const [profilesError, setProfilesError] = useState('');
   const [profileDrafts, setProfileDrafts] = useState({}); // id -> { baseUrl, apiKey, supportedModelIds }
@@ -1205,7 +1205,7 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
         </div>
 
         <div style={{ ...grid(180), marginTop: 14 }}>
-          <TopCard label="Aktif provider" value={providerSnapshot.activeProviderId || configForm.activeProviderId || 'closerouter'} />
+          <TopCard label="Aktif provider" value={providerSnapshot.activeProviderId || configForm.activeProviderId || '—'} />
           <TopCard label="Context limiti" value={`${fmt.num(Number(configForm.defaultContextLimitTokens || 0))}`} sub="95K varsayılan sınır" />
           <TopCard label="Key / dk" value={fmt.num(Number(configForm.defaultPerKeyPerMinute || 0))} sub="dakika başına anahtar limiti" />
           <TopCard label="Bakım modu" value={configForm.maintenanceModeForApi ? 'Açık' : 'Kapalı'} sub={configForm.maintenanceModeForApi ? (configForm.maintenanceMessage || 'Bakım mesajı var') : 'canlı trafik açık'} />
@@ -1245,7 +1245,7 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
           <div style={grid(220)}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <Caption>Aktif provider</Caption>
-              <select value={configForm.activeProviderId || 'closerouter'} onChange={(e) => setConfigField('activeProviderId', e.target.value)} style={inputStyle}>
+              <select value={configForm.activeProviderId || ''} onChange={(e) => setConfigField('activeProviderId', e.target.value)} style={inputStyle}>
                 {(providerSnapshot.providers || []).map((provider) => <option key={provider.id} value={provider.id}>{provider.label}</option>)}
               </select>
             </label>
@@ -1356,7 +1356,7 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
               <div>
                 <Caption>Aktif sağlayıcı</Caption>
                 <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 4 }}>
-                  Tek tıkla aktif sağlayıcıyı değiştir (metro ⇄ closerouter). Değişiklik anında geçerli olur, restart gerekmez.
+                  Tek tıkla aktif sağlayıcıyı değiştir. Değişiklik anında geçerli olur, restart gerekmez.
                 </div>
               </div>
               {profileNotice && <Chip tone="ok">{profileNotice}</Chip>}

@@ -5,10 +5,10 @@
 MVP production akışı:
 
 ```text
-Müşteri -> YapayZekaLab API Backend -> CloseRouter
+Müşteri -> YapayZekaLab API Backend -> upstream sağlayıcı
 ```
 
-9Router, LiteLLM, Bifrost veya benzeri routerlar ana satış katmanı değildir. Sadece `ProviderAdapter` arkasında POC/fallback olarak denenebilir.
+Alternatif router/gateway çözümleri ana satış katmanı değildir. Sadece `ProviderAdapter` arkasında POC/fallback olarak denenebilir.
 
 ## Production'a Alınma Şartı
 
@@ -33,4 +33,4 @@ npm run build
 git diff --check
 ```
 
-Bu kapılar geçmeden `activeProviderAdapter` CloseRouter dışına alınmaz.
+Bu kapılar geçmeden `activeProviderAdapter` mevcut upstream sağlayıcı dışına alınmaz.

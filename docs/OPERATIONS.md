@@ -21,14 +21,13 @@ TypeScript (ESM), frontend React 19 + Vite SPA, DB PostgreSQL 14 + Drizzle.
   (≥32, JWT_SECRET'tan FARKLI), WhatsApp OTP açıksa `WHATSAPP_OTP_HASH_SECRET`.
 - **Upstream (aktif sağlayıcı profili öncelikli):** çözüm sırası: aktif `provider_profiles` profili
   (`system_api_config.active_provider_id`) → `system_api_config` DB değeri → env `AI_PROVIDER_BASE_URL`
-  (varsayılan `https://api.claude-popusk.shop/v1`) → `CLOSEROUTER_BASE_URL` → kod-içi varsayılan.
-  Anahtar aynı sırayla profil cipher → DB cipher → env. Hepsi boşsa `/v1` 503 döner.
-  **Şu an AKTİF: metro** (`https://api.stepanovikov.uno/v1`); closerouter (Claude Popusk env'i) yedekte.
+  → kod-içi varsayılan. Anahtar aynı sırayla profil cipher → DB cipher → env. Hepsi boşsa `/v1` 503 döner.
+  **Aktif/yedek sağlayıcı profilleri admin panelden yönetilir** (base URL'ler DB'de tutulur).
 - **Opsiyonel:** Telegram, Shopier, Cryptomus, Crypto Pay, email — hepsi boşken ilgili uç 503 verir, app çökmez.
 
 > ⚠️ Canlı `.env.production` upstream satırı yanlış değişirse tüm `/v1` kesilir.
 > Değiştirmeden önce mevcut satırı yedekle, sonra hemen smoke test (bkz §9).
-> Sağlayıcı değiştirmenin GÜVENLİ yolu env değil: admin panel → Sağlayıcı sekmesi metro⇄closerouter
+> Sağlayıcı değiştirmenin GÜVENLİ yolu env değil: admin panel → Sağlayıcı sekmesi → profil
 > tek-tık (restart yok) veya `scripts/seed-provider-profiles.ts` (bkz §18).
 
 ## 3. Yerel başlatma

@@ -44,7 +44,7 @@ sudo chmod 600 /opt/turkapiprojesi/.env.production
 - `API_KEY_ENCRYPTION_SECRET` (zorunlu; `JWT_SECRET`'tan **farklı**, en az 32 karakter — saklı API anahtarlarını şifreler)
 - `APP_BASE_URL=https://yapayzekalab.org`
 - `FRONTEND_AUTH_RETURN=/`
-- `CLOSEROUTER_API_KEY`
+- `AI_PROVIDER_BASE_URL` + `AI_PROVIDER_API_KEY` (upstream sağlayıcı bağlantısı)
 - ödeme ve email secretları
 - `TELEGRAM_BOT_TOKEN` kullanılıyorsa `TELEGRAM_WEBHOOK_SECRET` (zorunlu — aşağıdaki Telegram Webhook bölümüne bakın)
 - WhatsApp OTP açıksa (`WHATSAPP_OTP_ENABLED=true`) `WHATSAPP_OTP_HASH_SECRET` (zorunlu; `JWT_SECRET`'tan farklı)

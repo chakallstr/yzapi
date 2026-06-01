@@ -9,6 +9,12 @@ const hiddenToken = (...parts) => parts.join("");
 const needles = [
   "CLOSEROUTER_API_KEY",
   "closerouter_",
+  hiddenToken("close", "router"),
+  hiddenToken("omni", "route"),
+  hiddenToken("well", "flow"),
+  hiddenToken("claude-", "popusk"),
+  hiddenToken("stepan", "ovikov"),
+  phrase("api.", "wellflow"),
   "textCarpan",
   "imageCarpan",
   "videoCarpan",
