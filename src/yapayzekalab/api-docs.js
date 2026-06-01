@@ -242,6 +242,7 @@ print(response.choices[0].message.content)`,
       { key: "POST /v1/chat/completions", value: "Ana üretim endpointi" },
       { key: "POST /v1/messages", value: "Anthropic uyumlu mesaj endpointi" },
       { key: "POST /v1/responses", value: "Destek varsa çalışır, değilse güvenli JSON hata döner" },
+      { key: "POST /v1/web-search", value: "Güncel web araması (arama başına sabit ücret)" },
       { key: "POST /v1/images/*", value: "Bu geçişte kapalı, 501 JSON hata döner" },
       { key: "POST /v1/videos/*", value: "Bu geçişte kapalı, 501 JSON hata döner" },
     ],
@@ -292,6 +293,63 @@ print(response.choices[0].message.content)`,
 X-YZ-Remaining-TL: 472.58
 X-YZ-Remaining-USD: 9.9961
 X-YZ-Request-Id: req_123456789`,
+      },
+    ],
+  },
+  {
+    key: "web-search",
+    label: "Web arama (güncel bilgi)",
+    title: "Web arama ile güncel bilgi (web_search)",
+    intro:
+      "Modelin eğitim verisi dışındaki güncel bilgileri (kim, son durum, fiyat, sürüm, haber) cevaplaması için iki yol var: (1) `chat/completions` isteğine `web_search: true` ekleyerek otomatik zenginleştirme — güncel bir soru sezilirse arka planda arama yapılır, sonuçlar modele kaynak olarak verilir ve model atıflı ([1], [2]) cevap üretir; (2) ayrı `POST /v1/web-search` ucu — yalnız arama sonuçlarını döndürür. Her ikisinde de arama başına sabit ücret alınır (token ücretinden ayrı).",
+    referenceRows: [
+      { key: "web_search: true", value: "chat/completions içinde otomatik mod (güncel soruda arar)" },
+      { key: 'web_search: { mode: "always" }', value: "Her istekte arama yapar" },
+      { key: 'web_search: { mode: "auto", num: 5 }', value: "Sezgisel mod + sonuç sayısı (1–10)" },
+      { key: "POST /v1/web-search", value: "Standalone arama: { query, num } → sonuç listesi" },
+      { key: "Ücret", value: "Arama başına sabit 0.001 USD (sonuç dönmezse ücret alınmaz)" },
+    ],
+    bullets: [
+      "`web_search: true` varsayılan olarak `auto` moddur: yalnız güncel/aktüel görünen sorularda arama tetiklenir, sıradan sorularda arama yapılmaz (gereksiz ücret oluşmaz).",
+      "Otomatik modda arama maliyeti, normal token maliyetine EK olarak arama başına 0.001 USD’dir; enjekte edilen sonuçlar girişi büyüttüğü için token maliyeti de bir miktar artar.",
+      "Arama sonuç döndürmezse ücret alınmaz; yanıt yine üretilir.",
+      "Standalone `/v1/web-search` yalnız başlık, bağlantı ve özet döndürür; modeli çağırmaz.",
+      "Streaming (`stream: true`) isteklerinde otomatik web arama uygulanmaz; standalone ucu veya akışsız çağrıyı kullanın.",
+    ],
+    codeBlocks: [
+      {
+        language: "bash",
+        title: "chat/completions · otomatik web arama",
+        code: `curl -X POST https://yapayzekalab.org/v1/chat/completions \\
+  -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "claude-sonnet-4-6",
+    "web_search": true,
+    "messages": [
+      { "role": "user", "content": "En guncel OpenAI modeli hangisi?" }
+    ]
+  }'`,
+      },
+      {
+        language: "bash",
+        title: "Standalone /v1/web-search",
+        code: `curl -X POST https://yapayzekalab.org/v1/web-search \\
+  -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "query": "güncel dolar kuru", "num": 5 }'`,
+      },
+      {
+        language: "json",
+        title: "Standalone arama cevabı",
+        code: `{
+  "object": "web_search",
+  "query": "güncel dolar kuru",
+  "results": [
+    { "title": "...", "url": "https://...", "snippet": "...", "position": 1 }
+  ],
+  "cost": { "tl": "0.0484", "usd": "0.00100000" }
+}`,
       },
     ],
   },
