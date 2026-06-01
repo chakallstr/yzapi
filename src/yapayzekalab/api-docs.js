@@ -27,6 +27,29 @@ export const API_DOC_SECTIONS = [
     ],
     "max_tokens": 120
   }'`,
+        osVariants: {
+          windows: `curl.exe -X POST https://yapayzekalab.org/v1/chat/completions -H "Authorization: Bearer yzk_live_YOUR_KEY" -H "Content-Type: application/json" -d "{\\"model\\":\\"claude-opus-4-7\\",\\"messages\\":[{\\"role\\":\\"user\\",\\"content\\":\\"Merhaba, kisa bir test yaniti ver.\\"}],\\"max_tokens\\":120}"`,
+          macos: `curl -X POST https://yapayzekalab.org/v1/chat/completions \\
+  -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "claude-opus-4-7",
+    "messages": [
+      { "role": "user", "content": "Merhaba, kısa bir test yanıtı ver." }
+    ],
+    "max_tokens": 120
+  }'`,
+          linux: `curl -X POST https://yapayzekalab.org/v1/chat/completions \\
+  -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "claude-opus-4-7",
+    "messages": [
+      { "role": "user", "content": "Merhaba, kısa bir test yanıtı ver." }
+    ],
+    "max_tokens": 120
+  }'`,
+        },
       },
     ],
   },
@@ -131,7 +154,7 @@ export const API_DOC_SECTIONS = [
         type: "CLI · OpenAI-compatible",
         steps: [
           "Kurulum: `npm install -g @openai/codex`.",
-          "Ortam: `export OPENAI_BASE_URL=\"https://yapayzekalab.org/v1\"` ve `export OPENAI_API_KEY=\"yzk_live_...\"`.",
+          "Ortam değişkenlerini işletim sistemine göre ayarla (aşağıdaki sekmelerden kendi OS'unu seç).",
           "Veya `~/.codex/config.toml` içinde `model_provider` olarak base_url `https://yapayzekalab.org/v1` tanımla.",
           "Model olarak aktif katalogdan bir Claude ID kullan: `claude-opus-4-7`, `claude-sonnet-4-6` veya `claude-haiku-4-5-20251001`.",
           "Not: Codex bir OpenAI aracıdır; Claude modellerinde metadata uyarısı verebilir. Claude ile en sorunsuz deneyim için aşağıdaki Claude Code kartını tercih et.",
@@ -145,15 +168,32 @@ model_provider = "yapayzekalab"
 name = "YapayZekaLab"
 base_url = "https://yapayzekalab.org/v1"
 env_key = "OPENAI_API_KEY"`,
+        osVariants: {
+          windows: `# PowerShell (bu oturum için)
+$env:OPENAI_BASE_URL="https://yapayzekalab.org/v1"
+$env:OPENAI_API_KEY="yzk_live_YOUR_KEY"
+
+# Kalıcı (kapat-aç sonrası geçerli):
+setx OPENAI_BASE_URL "https://yapayzekalab.org/v1"
+setx OPENAI_API_KEY "yzk_live_YOUR_KEY"
+
+codex`,
+          macos: `export OPENAI_BASE_URL="https://yapayzekalab.org/v1"
+export OPENAI_API_KEY="yzk_live_YOUR_KEY"
+codex`,
+          linux: `export OPENAI_BASE_URL="https://yapayzekalab.org/v1"
+export OPENAI_API_KEY="yzk_live_YOUR_KEY"
+codex`,
+        },
       },
       {
         name: "Claude Code",
         type: "CLI · Anthropic-compatible",
         steps: [
           "Kurulum: `npm install -g @anthropic-ai/claude-code`.",
-          "`export ANTHROPIC_BASE_URL=\"https://yapayzekalab.org\"` (kök — `/v1` EKLEME, Claude Code kendisi ekler).",
-          "`export ANTHROPIC_AUTH_TOKEN=\"yzk_live_...\"` (senin API anahtarın, Bearer olarak gider).",
-          "`export ANTHROPIC_MODEL=\"claude-sonnet-4-6\"` ve `ANTHROPIC_SMALL_FAST_MODEL=\"claude-sonnet-4-6\"`.",
+          "Ortam değişkenlerini işletim sistemine göre ayarla (aşağıdaki Windows / macOS / Linux sekmelerinden kendi OS'unu seç — sözdizimi farklıdır).",
+          "Base URL KÖK olmalı: `https://yapayzekalab.org` — `/v1` EKLEME, Claude Code yolu kendisi ekler.",
+          "Anahtar `ANTHROPIC_AUTH_TOKEN`'a girer (Bearer olarak gider). `ANTHROPIC_API_KEY` KULLANMA — yanlış header gönderir ve auth çakışması olur.",
           "`claude` komutuyla başlat. Not: `/v1/messages` akışsız (non-streaming) yanıt döner.",
         ],
         code: `export ANTHROPIC_BASE_URL="https://yapayzekalab.org"
@@ -161,6 +201,34 @@ export ANTHROPIC_AUTH_TOKEN="yzk_live_YOUR_KEY"
 export ANTHROPIC_MODEL="claude-sonnet-4-6"
 export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
 claude`,
+        osVariants: {
+          windows: `# PowerShell (bu oturum için)
+$env:ANTHROPIC_BASE_URL="https://yapayzekalab.org"
+$env:ANTHROPIC_AUTH_TOKEN="yzk_live_YOUR_KEY"
+$env:ANTHROPIC_MODEL="claude-sonnet-4-6"
+$env:ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
+
+# Kalıcı (kapat-aç sonrası geçerli):
+setx ANTHROPIC_BASE_URL "https://yapayzekalab.org"
+setx ANTHROPIC_AUTH_TOKEN "yzk_live_YOUR_KEY"
+setx ANTHROPIC_MODEL "claude-sonnet-4-6"
+setx ANTHROPIC_SMALL_FAST_MODEL "claude-sonnet-4-6"
+
+# Eski çakışan değişkeni temizle (auth conflict yaşarsan):
+Remove-Item Env:\\ANTHROPIC_API_KEY -ErrorAction SilentlyContinue
+
+claude`,
+          macos: `export ANTHROPIC_BASE_URL="https://yapayzekalab.org"
+export ANTHROPIC_AUTH_TOKEN="yzk_live_YOUR_KEY"
+export ANTHROPIC_MODEL="claude-sonnet-4-6"
+export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
+claude`,
+          linux: `export ANTHROPIC_BASE_URL="https://yapayzekalab.org"
+export ANTHROPIC_AUTH_TOKEN="yzk_live_YOUR_KEY"
+export ANTHROPIC_MODEL="claude-sonnet-4-6"
+export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
+claude`,
+        },
       },
     ],
   },
@@ -185,6 +253,31 @@ claude`,
     ],
     "max_tokens": 120
   }'`,
+        osVariants: {
+          windows: `curl.exe -X POST https://yapayzekalab.org/v1/chat/completions -H "Authorization: Bearer yzk_live_YOUR_KEY" -H "Content-Type: application/json" -d "{\\"model\\":\\"claude-opus-4-7\\",\\"messages\\":[{\\"role\\":\\"system\\",\\"content\\":\\"Kisa ve net yanit ver.\\"},{\\"role\\":\\"user\\",\\"content\\":\\"Bir satirlik selam ver.\\"}],\\"max_tokens\\":120}"`,
+          macos: `curl -X POST https://yapayzekalab.org/v1/chat/completions \\
+  -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "claude-opus-4-7",
+    "messages": [
+      { "role": "system", "content": "Kısa ve net yanıt ver." },
+      { "role": "user", "content": "Bir satırlık selam ver." }
+    ],
+    "max_tokens": 120
+  }'`,
+          linux: `curl -X POST https://yapayzekalab.org/v1/chat/completions \\
+  -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "claude-opus-4-7",
+    "messages": [
+      { "role": "system", "content": "Kısa ve net yanıt ver." },
+      { "role": "user", "content": "Bir satırlık selam ver." }
+    ],
+    "max_tokens": 120
+  }'`,
+        },
       },
       {
         language: "javascript",
@@ -252,6 +345,13 @@ print(response.choices[0].message.content)`,
         title: "Bakiye sorgusu",
         code: `curl https://yapayzekalab.org/v1/balance \\
   -H "Authorization: Bearer yzk_live_YOUR_KEY"`,
+        osVariants: {
+          windows: `curl.exe https://yapayzekalab.org/v1/balance -H "Authorization: Bearer yzk_live_YOUR_KEY"`,
+          macos: `curl https://yapayzekalab.org/v1/balance \\
+  -H "Authorization: Bearer yzk_live_YOUR_KEY"`,
+          linux: `curl https://yapayzekalab.org/v1/balance \\
+  -H "Authorization: Bearer yzk_live_YOUR_KEY"`,
+        },
       },
       {
         language: "json",
@@ -434,6 +534,21 @@ X-YZ-Request-Id: req_123456789`,
   },
 ];
 
+export const OS_LABELS = { windows: "Windows (PowerShell)", macos: "macOS", linux: "Linux" };
+const OS_ORDER = ["windows", "macos", "linux"];
+
+// Bir kod bloğunu düz metne çevirir. osVariants varsa her OS'u kendi başlığıyla
+// yazar (Windows/macOS/Linux); yoksa tek `code`'u basar.
+const codeToPlainText = (entry) => {
+  if (entry?.osVariants) {
+    return OS_ORDER
+      .filter((os) => entry.osVariants[os])
+      .map((os) => `### ${OS_LABELS[os]}\n${entry.osVariants[os]}`)
+      .join("\n\n");
+  }
+  return entry?.code ?? "";
+};
+
 export const buildApiDocsPlainText = () =>
   API_DOC_SECTIONS.map((section) => {
     const parts = [section.title, "", section.intro];
@@ -452,7 +567,7 @@ export const buildApiDocsPlainText = () =>
       section.clientCards.forEach((card) => {
         parts.push("", `${card.name} — ${card.type}`);
         card.steps.forEach((step) => parts.push(`- ${step}`));
-        if (card.code) parts.push("", card.code);
+        if (card.osVariants || card.code) parts.push("", codeToPlainText(card));
       });
     }
 
@@ -465,7 +580,7 @@ export const buildApiDocsPlainText = () =>
 
     if (section.codeBlocks?.length) {
       section.codeBlocks.forEach((block) => {
-        parts.push("", block.title, "", block.code);
+        parts.push("", block.title, "", codeToPlainText(block));
       });
     }
 

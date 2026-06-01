@@ -1,9 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { I, Card, Chip, Caption } from './shared.jsx';
-import { API_DOC_SECTIONS, buildApiDocsPlainText } from './api-docs.js';
+import { API_DOC_SECTIONS, buildApiDocsPlainText, OS_LABELS } from './api-docs.js';
 import { apiJson, hasStoredAuth } from './auth-client.js';
 
 const KEY_PLACEHOLDER = 'yzk_live_YOUR_KEY';
+const OS_ORDER = ['windows', 'macos', 'linux'];
+
+// Detect the visitor's OS so the install code defaults to the right syntax
+// (PowerShell vs bash). Falls back to windows (where most copy-paste errors
+// happen). Read once at module load; safe in SSR-less SPA.
+const detectOs = () => {
+  if (typeof navigator === 'undefined') return 'windows';
+  const ua = `${navigator.platform || ''} ${navigator.userAgent || ''}`.toLowerCase();
+  if (ua.includes('mac')) return 'macos';
+  if (ua.includes('linux') || ua.includes('android')) return 'linux';
+  return 'windows';
+};
 
 // Replace the docs placeholder with the signed-in user's own key everywhere it
 // appears in copyable code. When the user hides the key (or has none), the
@@ -13,6 +25,35 @@ const personalizeText = (text, key, reveal) => {
   return text.split(KEY_PLACEHOLDER).join(key);
 };
 
+// OS selector tabs (Windows / macOS / Linux). Only the OS keys present in
+// `variants` are shown; selecting one swaps the rendered code block.
+const OsTabs = ({ variants, selected, onSelect }) => {
+  const available = OS_ORDER.filter((os) => variants[os]);
+  if (available.length <= 1) return null;
+  return (
+    <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+      {available.map((os) => {
+        const active = os === selected;
+        return (
+          <button
+            key={os}
+            type="button"
+            onClick={() => onSelect(os)}
+            style={{
+              padding: '5px 11px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+              background: active ? 'var(--ink)' : 'var(--surface-2)',
+              color: active ? '#fff' : 'var(--ink-2)',
+              border: '1px solid var(--border)', cursor: 'pointer',
+            }}
+          >
+            {OS_LABELS[os]}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
 const DocumentsTab = () => {
   const [copied, setCopied] = useState(false);
   const [copiedBlock, setCopiedBlock] = useState('');
@@ -20,7 +61,15 @@ const DocumentsTab = () => {
   const [keyMasked, setKeyMasked] = useState('');
   const [keyState, setKeyState] = useState('idle'); // idle | loading | ready | none | error
   const [showKey, setShowKey] = useState(true);
+  const [osChoice, setOsChoice] = useState(detectOs());
   const docs = useMemo(() => API_DOC_SECTIONS, []);
+
+  // Return the code string for an entry (clientCard or codeBlock), honoring the
+  // selected OS variant when present, otherwise the default `code`.
+  const codeForOs = (entry) => {
+    if (entry?.osVariants) return entry.osVariants[osChoice] ?? entry.osVariants.windows ?? entry.code ?? '';
+    return entry?.code ?? '';
+  };
 
   // On mount, if the user is signed in, fetch their active key and reveal its
   // plaintext (owner-scoped backend endpoint) so examples are copy-ready.
@@ -257,25 +306,32 @@ const DocumentsTab = () => {
                             </div>
                           ))}
                         </div>
-                        {card.code ? (
+                        {card.osVariants || card.code ? (
                           <div style={{ position: 'relative' }}>
-                            <button
-                              onClick={() => copyBlock(`${doc.key}-${card.name}`, card.code)}
-                              style={{
-                                position: 'absolute', top: 10, right: 10,
-                                padding: '5px 9px', borderRadius: 8,
-                                background: copiedBlock === `${doc.key}-${card.name}` ? 'var(--ok-bg)' : 'rgba(226,232,240,0.12)',
-                                color: copiedBlock === `${doc.key}-${card.name}` ? '#047857' : '#e2e8f0',
-                                fontSize: 10.5, fontWeight: 600,
-                                display: 'flex', alignItems: 'center', gap: 5,
-                              }}
-                            >
-                              <I.Copy size={11} stroke={copiedBlock === `${doc.key}-${card.name}` ? '#047857' : '#e2e8f0'} />
-                              {copiedBlock === `${doc.key}-${card.name}` ? 'Kopyalandı' : 'Kopyala'}
-                            </button>
-                            <pre style={{ margin: '12px 0 0', padding: 12, borderRadius: 10, background: '#0f172a', color: '#e2e8f0', overflowX: 'auto', fontSize: 11, lineHeight: 1.55 }}>
-                              <code>{personalize(card.code)}</code>
-                            </pre>
+                            {card.osVariants ? (
+                              <div style={{ marginTop: 12 }}>
+                                <OsTabs variants={card.osVariants} selected={osChoice} onSelect={setOsChoice} />
+                              </div>
+                            ) : null}
+                            <div style={{ position: 'relative' }}>
+                              <button
+                                onClick={() => copyBlock(`${doc.key}-${card.name}`, codeForOs(card))}
+                                style={{
+                                  position: 'absolute', top: 10, right: 10,
+                                  padding: '5px 9px', borderRadius: 8,
+                                  background: copiedBlock === `${doc.key}-${card.name}` ? 'var(--ok-bg)' : 'rgba(226,232,240,0.12)',
+                                  color: copiedBlock === `${doc.key}-${card.name}` ? '#047857' : '#e2e8f0',
+                                  fontSize: 10.5, fontWeight: 600,
+                                  display: 'flex', alignItems: 'center', gap: 5,
+                                }}
+                              >
+                                <I.Copy size={11} stroke={copiedBlock === `${doc.key}-${card.name}` ? '#047857' : '#e2e8f0'} />
+                                {copiedBlock === `${doc.key}-${card.name}` ? 'Kopyalandı' : 'Kopyala'}
+                              </button>
+                              <pre style={{ margin: card.osVariants ? 0 : '12px 0 0', padding: 12, borderRadius: 10, background: '#0f172a', color: '#e2e8f0', overflowX: 'auto', fontSize: 11, lineHeight: 1.55 }}>
+                                <code>{personalize(codeForOs(card))}</code>
+                              </pre>
+                            </div>
                           </div>
                         ) : null}
                       </div>
@@ -326,7 +382,7 @@ const DocumentsTab = () => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                           <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{block.title}</div>
                           <button
-                            onClick={() => copyBlock(`${doc.key}-${block.title}`, block.code)}
+                            onClick={() => copyBlock(`${doc.key}-${block.title}`, codeForOs(block))}
                             style={{
                               padding: '6px 10px',
                               borderRadius: 9,
@@ -344,8 +400,11 @@ const DocumentsTab = () => {
                             {copiedBlock === `${doc.key}-${block.title}` ? 'Kopyalandı' : 'Kod kopyala'}
                           </button>
                         </div>
+                        {block.osVariants ? (
+                          <OsTabs variants={block.osVariants} selected={osChoice} onSelect={setOsChoice} />
+                        ) : null}
                         <pre style={{ margin: 0, padding: 14, borderRadius: 12, background: '#0f172a', color: '#e2e8f0', overflowX: 'auto', fontSize: 11.5, lineHeight: 1.6 }}>
-                          <code>{personalize(block.code)}</code>
+                          <code>{personalize(codeForOs(block))}</code>
                         </pre>
                       </div>
                     ))}
