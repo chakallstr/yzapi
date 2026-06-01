@@ -52,6 +52,12 @@ const schema = z.object({
   OPENWA_API_KEY: z.string().optional(),
   OPENWA_SESSION_ID: z.string().optional(),
 
+  // Admin operasyon bildirimleri (yeni üye / ödeme denemesi / ödeme sorunu).
+  // OpenWA üzerinden admin'in WhatsApp numarasına gönderilir. Numara/OpenWA
+  // env'i yoksa sessiz no-op (akışı bloklamaz). Numara TR formatı (5xx... veya 90...).
+  ADMIN_WHATSAPP_NUMBER: z.string().optional(),
+  ADMIN_NOTIFY_WHATSAPP_ENABLED: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+
   // Frontend
   APP_BASE_URL: z.string().default("http://localhost:4567"),
   FRONTEND_AUTH_RETURN: z.string().default("/"),

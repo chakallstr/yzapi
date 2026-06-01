@@ -14,6 +14,7 @@ import { writeAudit } from "../services/audit-service.js";
 import { logger } from "../lib/logger.js";
 import { isIbanConfigured, validatePaymentAmount } from "../services/payment-guards.js";
 import { adminPaymentNotificationEmail } from "../services/email-service.js";
+import { notifyAdmin } from "../services/admin-notify-service.js";
 import { buildUsdTopupQuote } from "../services/payment-pricing.js";
 
 const router = Router();
@@ -241,6 +242,9 @@ async function handleShopierCallbackBody(
       reference: body.platform_order_id,
       status: "invalid_signature",
     }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
+    // NOT: invalid_signature dalına WhatsApp notify EKLENMEZ — /shopier/callback PUBLIC
+    // + rate-limit yok; rastgele/sahte istek WhatsApp spam'i tetikler (spam guard).
+    // E-posta bildirimi (yukarıda) yeterli; WhatsApp yalnız imza-geçerli gerçek sorunlarda.
     finishShopierResponse(res, opts.mode, false);
     return;
   }
@@ -269,6 +273,13 @@ async function handleShopierCallbackBody(
       reference: result.platformOrderId,
       status: result.status ?? "fail",
     }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
+    notifyAdmin({
+      kind: "odeme_sorunu",
+      title: "Shopier ödeme başarısız",
+      method: "shopier",
+      reference: result.platformOrderId,
+      status: result.status ?? "fail",
+    }).catch((e: unknown) => logger.error({ err: e }, "admin notify failed"));
     finishShopierResponse(res, opts.mode, opts.mode === "json", { status: result.status ?? "fail" });
     return;
   }
@@ -298,6 +309,13 @@ async function handleShopierCallbackBody(
       reference: paymentId,
       status: "currency_mismatch",
     }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
+    notifyAdmin({
+      kind: "odeme_sorunu",
+      title: "Shopier ödeme para birimi uyuşmadı",
+      method: "shopier",
+      reference: paymentId,
+      status: "currency_mismatch",
+    }).catch((e: unknown) => logger.error({ err: e }, "admin notify failed"));
     finishShopierResponse(res, opts.mode, false, { error: "currency_mismatch" });
     return;
   }
@@ -316,6 +334,14 @@ async function handleShopierCallbackBody(
       status: "amount_mismatch",
       payableTL: expectedPaidTL,
     }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
+    notifyAdmin({
+      kind: "odeme_sorunu",
+      title: "Shopier ödeme tutarı uyuşmadı",
+      method: "shopier",
+      reference: paymentId,
+      status: "amount_mismatch",
+      amountTL: expectedPaidTL,
+    }).catch((e: unknown) => logger.error({ err: e }, "admin notify failed"));
     finishShopierResponse(res, opts.mode, false, { error: "amount_mismatch" });
     return;
   }
@@ -386,6 +412,14 @@ async function recordOsbDeadLetter(
     status: reason,
     reason: "Geçerli imzalı OSB bildirimi eşleştirilemedi — admin manuel kontrol gerekir.",
   }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
+  notifyAdmin({
+    kind: "odeme_sorunu",
+    title: "Shopier OSB otomatik kredilendirilemedi",
+    method: "shopier_osb",
+    reference: orderId,
+    status: reason,
+    detail: "Geçerli imzalı OSB bildirimi eşleştirilemedi — manuel kontrol gerekir.",
+  }).catch((e: unknown) => logger.error({ err: e }, "admin notify failed"));
 }
 
 type OsbPayloadLike = Record<string, unknown> & {
@@ -617,6 +651,15 @@ router.post("/shopier/init", userAuth, requireWhatsappVerified, async (req, res,
       adSoyad,
     });
 
+    notifyAdmin({
+      kind: "odeme_denemesi",
+      title: "Ödeme başlatıldı (Shopier)",
+      userEmail: email,
+      method: "shopier",
+      amountTL: quote.payableTL,
+      reference: paymentId,
+    }).catch((e: unknown) => logger.error({ err: e }, "admin notify (shopier init) failed"));
+
     res.json({ paymentId, kdv, quote, ...checkout });
   } catch (e) { next(e); }
 });
@@ -723,6 +766,15 @@ router.post("/iban/init", userAuth, requireWhatsappVerified, async (req, res, ne
       reference: referansKodu,
       status: "bekliyor",
     }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
+    notifyAdmin({
+      kind: "odeme_denemesi",
+      title: "Ödeme başlatıldı (IBAN)",
+      userEmail: userRows[0]?.email,
+      method: "iban",
+      amountTL: quote.payableTL,
+      reference: referansKodu,
+      status: "bekliyor",
+    }).catch((e: unknown) => logger.error({ err: e }, "admin notify (iban init) failed"));
 
     res.json({
       paymentId,
@@ -786,6 +838,15 @@ router.post("/crypto/init", userAuth, requireWhatsappVerified, async (req, res, 
     }).returning({ id: payments.id });
 
     const paymentId = inserted[0].id;
+
+    notifyAdmin({
+      kind: "odeme_denemesi",
+      title: "Ödeme başlatıldı (Kripto)",
+      userEmail: userRows[0]?.email,
+      method: cryptomusProviderEnabled ? "cryptomus" : "crypto_manual",
+      amountTL: quote.payableTL,
+      reference: cryptomusProviderEnabled ? paymentId : manualReference,
+    }).catch((e: unknown) => logger.error({ err: e }, "admin notify (crypto init) failed"));
 
     if (!cryptomusProviderEnabled) {
       res.json({
@@ -859,6 +920,13 @@ router.post(
           .where(eq(payments.id, order_id as string)).limit(1);
         if (!byId.length) {
           logger.warn({ uuid, order_id }, "Cryptomus webhook: payment not found");
+          notifyAdmin({
+            kind: "odeme_sorunu",
+            title: "Cryptomus ödeme eşleşmedi",
+            method: "cryptomus",
+            reference: String(order_id ?? uuid),
+            status: "payment_not_found",
+          }).catch((e2: unknown) => logger.error({ err: e2 }, "admin notify (cryptomus not found) failed"));
           res.json({ ok: true });
           return;
         }
@@ -876,6 +944,13 @@ router.post(
           order_id,
           paidCurrency,
         }, "Cryptomus webhook currency mismatch");
+        notifyAdmin({
+          kind: "odeme_sorunu",
+          title: "Cryptomus para birimi uyuşmadı",
+          method: "cryptomus",
+          reference: String(order_id ?? uuid),
+          status: "currency_mismatch",
+        }).catch((e2: unknown) => logger.error({ err: e2 }, "admin notify (cryptomus currency) failed"));
         res.json({ ok: true });
         return;
       }
@@ -885,6 +960,13 @@ router.post(
           order_id,
           paidToCurrency,
         }, "Cryptomus webhook target currency mismatch");
+        notifyAdmin({
+          kind: "odeme_sorunu",
+          title: "Cryptomus hedef para birimi uyuşmadı",
+          method: "cryptomus",
+          reference: String(order_id ?? uuid),
+          status: "target_currency_mismatch",
+        }).catch((e2: unknown) => logger.error({ err: e2 }, "admin notify (cryptomus to_currency) failed"));
         res.json({ ok: true });
         return;
       }
@@ -895,6 +977,13 @@ router.post(
           paidAmountUsd,
           expectedAmountUsd,
         }, "Cryptomus webhook amount mismatch");
+        notifyAdmin({
+          kind: "odeme_sorunu",
+          title: "Cryptomus tutar uyuşmadı",
+          method: "cryptomus",
+          reference: String(order_id ?? uuid),
+          status: "amount_mismatch",
+        }).catch((e2: unknown) => logger.error({ err: e2 }, "admin notify (cryptomus amount) failed"));
         res.json({ ok: true });
         return;
       }
@@ -916,6 +1005,14 @@ router.post(
       );
 
       if (!credit.success && !credit.alreadyCredited) {
+        notifyAdmin({
+          kind: "odeme_sorunu",
+          title: "Cryptomus kredilendirme başarısız",
+          method: "cryptomus",
+          reference: String(order_id ?? uuid),
+          status: "credit_failed",
+          detail: "Bakiye yüklenemedi — manuel kontrol gerekir.",
+        }).catch((e2: unknown) => logger.error({ err: e2 }, "admin notify (cryptomus credit) failed"));
         res.status(500).json({ error: "Bakiye yüklenirken hata oluştu." });
         return;
       }

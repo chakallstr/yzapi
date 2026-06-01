@@ -82,7 +82,8 @@
 >    (SDK curl/python, client kartları, Codex Claude'a yönlendirildi). tab-home pazarlama metni güncellendi.
 > 7. **Doğrulama:** 312 test + build yeşil; canlı `/api/models` 5 model + tüm hedef fiyatlar DOĞRU;
 >    sağlayıcı adı sızıntısı YOK; ledger drift=0; gerçek trafik 7×200 + 3×429.
-> 8. **GÜVENLİK (ROTE EDİLMELİ):** Wellflow key (`wf_...fpI2`) + metro key (`sk-ant-...GBH5`) sohbette açık geçti.
+> 8. **GÜVENLİK (✅ ROTE EDİLDİ — 2026-06-01, kullanıcı beyanı):** Wellflow key (`wf_...fpI2`) + metro key
+>    (`sk-ant-...GBH5`) sohbette açık geçmişti; kullanıcı tarafından iptal/yenileme yapıldı.
 > **NOT:** `user.ts` + `report-service.ts` (aylık rapor) paralel oturum işi olarak bulundu, deploy temiz-tree
 > için `ef88630`'da commit'lendi; bu oturumda yazılmadı, sadece test+build yeşil doğrulandı.
 
@@ -190,7 +191,7 @@ Ops (`/Users/ufuk/yeniapi/_ops`, git dışı): `backup-full.sh` sertleştirildi.
   claude-sonnet-4.6=0.78, claude-haiku-4.5=0.70 (USD/1M, input=output; her yerde aynı: master-models
   familyPrice + added_models seed + shared.jsx + contract testleri). DOKUNULMAZ billing FORMÜLÜ
   değişmedi; sadece müşteri fiyat sabitleri (USD bazlı, billing otomatik bu sabitleri okur).
-- **GÜVENLİK:** metro key (`sk-ant-api01-...BH5`) ve Claude Popusk key (`sk-****UHNk`) sohbette açık geçti → ROTE EDİLMELİ.
+- **GÜVENLİK (✅ ROTE EDİLDİ — 2026-06-01, kullanıcı beyanı):** metro key (`sk-ant-api01-...BH5`) ve Claude Popusk key (`sk-****UHNk`) sohbette açık geçmişti; iptal/yenileme yapıldı.
 
 ### ✅ BLOCKER-1: ÇÖZÜLDÜ (2026-05-30) — yeni sağlayıcı Claude Popusk
 - **Kök neden:** CloseRouter kapandı; canlı `.env.production` geçici olarak yerel OmniRoute'a (`127.0.0.1:20128`) yönlendirilmişti, o da provider credential'sızdı → tüm modeller 400/502.
@@ -201,7 +202,7 @@ Ops (`/Users/ufuk/yeniapi/_ops`, git dışı): `backup-full.sh` sertleştirildi.
   - `OMNIROUTE_MODEL_MAP` zaten yalnız `127.0.0.1:20128`/`api.seslab.tr` için aktif → yeni base URL'de kendiliğinden devre dışı (koda dokunulmadı).
 - **CANLI KANIT (funded key `yzk_live_****6cda`):** `/v1/chat/completions` → **200**, bakiye 925.2764 → 925.2759 (−0.0005 TL), `usage_records.status=success`. 6 model ailesi (Claude/GPT-5.4-mini/GPT-5.5/o4-mini/Gemini-3.1) hepsi 200+düşüm. `gemini-3-pro-preview` → 403 "Model disabled". **Ledger drift=0.**
 - **Fiyatlar DEĞİŞMEDİ** (talimat + DOKUNULMAZ kuralı): `pricing-service`, `pricing/`, `customerInputUsd` aynı.
-- **GÜVENLİK:** sohbette geçen yeni sağlayıcı key'i (`sk-****UHNk`) rote edilmeli.
+- **GÜVENLİK (✅ ROTE EDİLDİ — 2026-06-01, kullanıcı beyanı):** sohbette geçen sağlayıcı key'i (`sk-****UHNk`) iptal/yenileme yapıldı.
 
 ### Katalog ↔ upstream isim uyuşmazlığı — ✅ profil model_map ile çözüldü
 - Aktif profil `model_map` (katalog-id → upstream-wire-id) artık upstream'e uygulanıyor
@@ -229,7 +230,7 @@ Ops (`/Users/ufuk/yeniapi/_ops`, git dışı): `backup-full.sh` sertleştirildi.
 - **API_KEY_ENCRYPTION_SECRET** — değişirse mevcut cipher'lar çözülemez (rotasyon scripti şart).
 - **DB migration** — `/opt/turkapiprojesi` git değil; migrate ENV_FILE_PATH ile çalışır.
 - **canli/src vs çalışan dist** — geçmişte sapma vardı; deploy daima `kaynak`'tan.
-- Bu sohbette VPS root + cPanel + CLOSEROUTER_API_KEY şifreleri açık geçti → KULLANICI ROTE ETMELİ.
+- Geçmiş sohbetlerde VPS root + cPanel + CLOSEROUTER_API_KEY şifreleri açık geçmişti → ✅ ROTE EDİLDİ (2026-06-01, kullanıcı beyanı).
 
 ## 10. DOKUNULMAMASI gereken dosyalar / mantıklar
 
@@ -252,7 +253,7 @@ Yeni session başlarken:
 2. Sağlayıcı değiştirmek gerekirse: admin panel → Sağlayıcı sekmesi → metro⇄closerouter tek-tık
    (veya `scripts/seed-provider-profiles.ts` ACTIVE_PROVIDER env'i ile). Restart gerekmez.
 3. Yeni sağlayıcı eklenirken model adı formatını **gerçek endpoint'te** doğrula; gerekirse `model_map` doldur.
-4. **GÜVENLİK:** metro key (`sk-ant-api01-...BH5`) + Claude Popusk key (`sk-****UHNk`) sohbette açık geçti → ROTE EDİLMELİ.
+4. **GÜVENLİK (✅ ROTE EDİLDİ — 2026-06-01, kullanıcı beyanı):** metro key (`sk-ant-api01-...BH5`) + Claude Popusk key (`sk-****UHNk`) sohbette açık geçmişti; iptal/yenileme yapıldı.
 
 Çalışma kuralları: kod düzeltmeleri `kaynak`'ta + `npm test`/`tsc`/`itest` yeşil + `sync-deploy.sh` ile deploy.
 Agent ekibi modeli (`.kiro/steering/agent-team-workflow.md`): her görev → uygulama ajanı → 3 QA (2/3 PASS).

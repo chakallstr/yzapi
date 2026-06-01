@@ -16,6 +16,7 @@ import {
   verifyWhatsappPendingToken,
 } from "../services/auth-service.js";
 import { welcomeEmail } from "../services/email-service.js";
+import { notifyAdmin } from "../services/admin-notify-service.js";
 import { grantSignupBonusIfEligible } from "../services/signup-bonus-service.js";
 import {
   hasActiveVerifiedWhatsappForUser,
@@ -108,6 +109,13 @@ router.get("/google/callback", async (req, res, next) => {
       welcomeEmail({ email: profile.email, adSoyad: profile.name || profile.email }).catch((e) =>
         logger.error({ err: e }, "[auth] welcome email failed"),
       );
+
+      // Admin'e yeni üye bildirimi (WhatsApp) — fire-and-forget, akışı bloklamaz.
+      notifyAdmin({
+        kind: "yeni_uye",
+        title: "Yeni üye kaydı",
+        userEmail: profile.email,
+      }).catch((e) => logger.error({ err: e }, "[auth] admin notify (signup) failed"));
     }
 
     await db.insert(auditLogs).values({

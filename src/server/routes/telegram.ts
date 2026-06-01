@@ -8,6 +8,7 @@ import { adminAuth } from "../middleware/admin-auth.js";
 import { userAuth } from "../middleware/user-auth.js";
 import { isTelegramWebhookAuthorized } from "./telegram-webhook-auth.js";
 import { calcKdv, creditUserBalance } from "../services/payment-common.js";
+import { notifyAdmin } from "../services/admin-notify-service.js";
 import { buildUsdTopupQuote } from "../services/payment-pricing.js";
 import {
   CryptoPayError,
@@ -457,12 +458,26 @@ async function handleCryptoPayWebhook(req: RawRequest, res: Response, next: Next
     const payment = await findCryptoBotPayment(invoice);
     if (!payment) {
       logger.warn({ invoiceId: invoice.invoice_id, payload: invoice.payload }, "Crypto Pay webhook payment not found");
+      notifyAdmin({
+        kind: "odeme_sorunu",
+        title: "Crypto Pay ödeme eşleşmedi",
+        method: "crypto_bot",
+        reference: String(invoice.invoice_id),
+        status: "payment_not_found",
+      }).catch((err) => logger.error({ err }, "admin notify (crypto-pay not found) failed"));
       res.json({ ok: true });
       return;
     }
 
     if (!amountMatches(payment, invoice)) {
       logger.warn({ paymentId: payment.id, invoice }, "Crypto Pay webhook amount mismatch");
+      notifyAdmin({
+        kind: "odeme_sorunu",
+        title: "Crypto Pay tutar uyuşmadı",
+        method: "crypto_bot",
+        reference: payment.id,
+        status: "amount_mismatch",
+      }).catch((err) => logger.error({ err }, "admin notify (crypto-pay amount) failed"));
       res.json({ ok: true });
       return;
     }
@@ -484,6 +499,14 @@ async function handleCryptoPayWebhook(req: RawRequest, res: Response, next: Next
     );
 
     if (!credit.success && !credit.alreadyCredited) {
+      notifyAdmin({
+        kind: "odeme_sorunu",
+        title: "Crypto Pay kredilendirme başarısız",
+        method: "crypto_bot",
+        reference: payment.id,
+        status: "credit_failed",
+        detail: "Bakiye yüklenemedi — manuel kontrol gerekir.",
+      }).catch((err) => logger.error({ err }, "admin notify (crypto-pay credit) failed"));
       res.status(500).json({ error: "Bakiye yüklenirken hata oluştu." });
       return;
     }
