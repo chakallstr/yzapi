@@ -30,6 +30,30 @@ describe("MASTER_MODELS — Claude Popusk text catalog", () => {
     expect(canonicalizeModelId("gemini-3.1-pro-preview")).toBe("gemini-3.1-pro-preview");
   });
 
+  it("strips Claude Code 1M-context [..] suffix before resolving (claude-sonnet-4-6[1m] → claude-sonnet-4-6)", () => {
+    // Claude Code, bir modeli 1M context'li gördüğünde wire-name'e "[1m]" ekler
+    // (claude-code Issue #25022). Kanonik katalog ID'leri bu eki taşımaz → eki
+    // ayıkla, sonra alias çöz. Aksi halde /v1/chat/completions + /v1/messages 404.
+    expect(canonicalizeModelId("claude-sonnet-4-6[1m]")).toBe("claude-sonnet-4-6");
+    expect(canonicalizeModelId("claude-opus-4-7[1m]")).toBe("claude-opus-4-7");
+    // Nokta-form + suffix birlikte: önce ayıkla, sonra dotted-alias çöz.
+    expect(canonicalizeModelId("claude-sonnet-4.6[1m]")).toBe("claude-sonnet-4-6");
+    // Eklentisiz ID hiç değişmez (tam geriye-uyumlu).
+    expect(canonicalizeModelId("claude-sonnet-4-6")).toBe("claude-sonnet-4-6");
+    expect(canonicalizeModelId("gpt-5.4")).toBe("gpt-5.4");
+  });
+
+  it("bridges added-model dash form to dotted catalog id (claude-opus-4-8[1m] → claude-opus-4.8)", () => {
+    // opus 4.8 added_models katmanında NOKTA formuyla kayıtlı (alias yok). Claude
+    // Code TİRE + [1m] gönderir. Strip + dash→dot köprüsü kanonik nokta-id'ye
+    // çözmeli; aksi halde upstream'e tire gider ve 404 olur (canlı doğrulandı:
+    // claude-opus-4.8=200, claude-opus-4-8=404).
+    expect(canonicalizeModelId("claude-opus-4-8[1m]")).toBe("claude-opus-4.8");
+    expect(canonicalizeModelId("claude-opus-4-8")).toBe("claude-opus-4.8");
+    // Zaten nokta-form gelirse aynen kalır.
+    expect(canonicalizeModelId("claude-opus-4.8")).toBe("claude-opus-4.8");
+  });
+
   it("uses the approved customer-facing price tiers", () => {
     const byId = new Map(MASTER_MODELS.map((model) => [model.id, model]));
 

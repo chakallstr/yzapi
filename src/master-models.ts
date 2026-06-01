@@ -223,7 +223,34 @@ for (const model of MASTER_MODELS) {
   for (const alias of model.aliases ?? []) MODEL_ALIAS_TO_ID.set(alias, model.id);
 }
 
+// added_models katmanındaki modeller alias taşımaz (yalnız tek bir kanonik id).
+// Bazı modeller katalogda NOKTA formuyla kayıtlı (örn. "claude-opus-4.8") ama
+// istemci (Claude Code) TİRE formu gönderiyor ("claude-opus-4-8"). MASTER_MODELS
+// alias tablosu bunları kapsamadığından, added-model tire→nokta köprüsünü burada
+// statik tutuyoruz. 42-kilit korunur (MASTER_MODELS'e EKLENMEZ). Yalnız wire-name
+// normalizasyonu — upstream nokta formunu kabul eder; fatura/fiyat değişmez.
+const ADDED_MODEL_DASH_TO_DOT: Record<string, string> = {
+  "claude-opus-4-8": "claude-opus-4.8",
+};
+
+// Bazı istemciler (örn. Claude Code) model adının sonuna context/beta etiketi
+// ekler: "claude-sonnet-4-6[1m]". Bizim katalog kanonik ID'leri böyle bir ek
+// taşımaz. Strateji: önce TAM eşleşme dene (geçerli/bilinen id'yi ASLA değiştirme),
+// olmazsa "[..]" ekini ayıkla ve tekrar dene. Strip edilen biçim de bilinmiyorsa
+// orijinali AYNEN döndür — böylece sonu "[..]" ile biten meşru added-model id'leri
+// bozulmaz (P7 round-trip). Yalnız wire-name normalizasyonu; fatura/fiyat değişmez.
 export function canonicalizeModelId(modelId: string | undefined): string | undefined {
   if (!modelId) return modelId;
-  return MODEL_ALIAS_TO_ID.get(modelId) ?? modelId;
+  // 1) Tam eşleşme: alias tablosu veya added-model tire→nokta köprüsü.
+  const exact = MODEL_ALIAS_TO_ID.get(modelId) ?? ADDED_MODEL_DASH_TO_DOT[modelId];
+  if (exact) return exact;
+  // 2) Sondaki "[..]" context/beta etiketini ayıkla, sadece BİLİNEN bir id'ye
+  //    çözülüyorsa kullan.
+  const stripped = modelId.replace(/\[[^\]]*\]\s*$/, "").trim();
+  if (stripped !== modelId) {
+    const viaStrip = MODEL_ALIAS_TO_ID.get(stripped) ?? ADDED_MODEL_DASH_TO_DOT[stripped];
+    if (viaStrip) return viaStrip;
+  }
+  // 3) Bilinmeyen id → orijinali aynen koru (geriye-uyumlu; bracket'li id'ler sağ kalır).
+  return modelId;
 }
