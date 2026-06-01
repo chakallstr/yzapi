@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "../db/client.js";
 import { users, apiKeys, usageRecords, systemConfig } from "../db/schema.js";
 import { eq, and, desc } from "drizzle-orm";
-import { encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
+import { encryptApiKey, generateApiKey, hashApiKey, decryptApiKey } from "../services/api-key-service.js";
 import { writeAudit } from "../services/audit-service.js";
 import { getTelegramAccountSummary } from "../services/telegram-bot-service.js";
 import { getWhatsappVerificationSummary } from "../services/whatsapp-otp-service.js";
@@ -234,6 +234,39 @@ router.post("/api-keys/:id/revoke", async (req, res, next) => {
     await writeAudit("user_apikey_revoke", id, `Kullanıcı key iptal etti: ${updated[0].maskedKey}`, req.user!.id);
 
     res.json({ success: true });
+  } catch (e) { next(e); }
+});
+
+// GET /api/user/api-keys/:id/reveal
+// Owner-only: decrypts the caller's OWN stored key cipher (same re-delivery
+// pattern as Telegram) so the panel can pre-fill docs/code examples with the
+// user's real key. Scoped strictly by userId; never returns other users' keys.
+router.get("/api-keys/:id/reveal", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const rows = await db
+      .select({
+        id: apiKeys.id,
+        ad: apiKeys.ad,
+        maskedKey: apiKeys.maskedKey,
+        cipher: apiKeys.fullKeyCipher,
+      })
+      .from(apiKeys)
+      .where(and(eq(apiKeys.id, id), eq(apiKeys.userId, req.user!.id), eq(apiKeys.aktif, true)))
+      .limit(1);
+
+    const row = rows[0];
+    if (!row) { res.status(404).json({ error: "API key not found" }); return; }
+
+    const plaintext = decryptApiKey(row.cipher);
+    if (!plaintext) {
+      // Older keys created before cipher storage cannot be revealed.
+      res.status(409).json({ error: "key_not_recoverable", maskedKey: row.maskedKey });
+      return;
+    }
+
+    await writeAudit("user_apikey_reveal", row.id, `Kullanıcı key görüntüledi: ${row.maskedKey}`, req.user!.id);
+    res.json({ id: row.id, ad: row.ad, key: plaintext, maskedKey: row.maskedKey });
   } catch (e) { next(e); }
 });
 

@@ -352,8 +352,8 @@ const Caption = ({ children, style }) => (
   }}>{children}</div>
 );
 
-const Card = ({ children, style, pad = 20, hoverable = false, onClick }) => (
-  <div onClick={onClick} className={`card ${hoverable ? 'card-hover' : ''}`} style={{
+const Card = ({ children, style, pad = 20, hoverable = false, onClick, id }) => (
+  <div id={id} onClick={onClick} className={`card ${hoverable ? 'card-hover' : ''}`} style={{
     background: 'var(--surface)',
     border: '1px solid var(--border)',
     borderRadius: 'var(--r-lg)',
