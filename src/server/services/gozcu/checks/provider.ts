@@ -1,7 +1,7 @@
 // Gözcü — sağlayıcı (upstream) sağlığı domeni.
 
 import { dbSql } from "../../../db/client.js";
-import { aiProviderApiKey, aiProviderBaseUrl } from "../../../lib/env.js";
+import { resolveProviderBaseUrl, resolveProviderApiKey } from "../../provider-config-service.js";
 import type { GozcuCheckResult, Severity } from "../types.js";
 
 function num(v: unknown): number {
@@ -58,41 +58,53 @@ async function checkUpstreamTimeoutRate(): Promise<GozcuCheckResult> {
   };
 }
 
-// models_reachability — upstream GET /models 2.5s probe (yalnız gerçek taramada çağrılır).
+// models_reachability — AKTİF sağlayıcının (proxy'nin gerçekte kullandığı) /models ucunu
+// yoklar. Tek geçici timeout false-page atmasın diye 2 deneme (4sn/deneme); yalnız İKİSİ de
+// başarısızsa red. resolveProviderBaseUrl/ApiKey proxy ile AYNI çözümlemeyi yapar.
 async function checkModelsReachability(): Promise<GozcuCheckResult> {
-  const base = aiProviderBaseUrl();
-  const key = aiProviderApiKey();
-  let severity: Severity = "green";
-  let measured = "erişilebilir";
+  let base: string | undefined;
+  let key: string | undefined;
+  try {
+    base = await resolveProviderBaseUrl();
+    key = await resolveProviderApiKey();
+  } catch {
+    /* çözümleme hatası → yapılandırılmamış say */
+  }
   if (!base || !key) {
-    severity = "yellow";
-    measured = "sağlayıcı yapılandırılmamış";
-  } else {
+    return {
+      name: "models_reachability",
+      domain: "provider",
+      signalSource: "aktif sağlayıcı GET /models",
+      measured: "sağlayıcı yapılandırılmamış",
+      threshold: "200 🟢 · yapılandırılmamış 🟡 · 2/2 fail 🔴",
+      severity: "yellow",
+    };
+  }
+
+  let ok = false;
+  let lastErr = "";
+  for (let attempt = 1; attempt <= 2 && !ok; attempt++) {
     try {
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 2500);
-      const res = await fetch(`${base}/models`, {
-        headers: { Authorization: `Bearer ${key}` },
-        signal: ctrl.signal,
-      });
+      const timer = setTimeout(() => ctrl.abort(), 4000);
+      const res = await fetch(`${base}/models`, { headers: { Authorization: `Bearer ${key}` }, signal: ctrl.signal });
       clearTimeout(timer);
-      if (!res.ok) {
-        severity = "red";
-        measured = `HTTP ${res.status}`;
-      }
+      if (res.ok) ok = true;
+      else lastErr = `HTTP ${res.status}`;
     } catch {
-      severity = "red";
-      measured = "erişilemiyor / timeout";
+      lastErr = "erişilemiyor / timeout";
     }
   }
+
+  const severity: Severity = ok ? "green" : "red";
   return {
     name: "models_reachability",
     domain: "provider",
-    signalSource: "upstream GET /models",
-    measured,
-    threshold: "200 🟢 · yapılandırılmamış 🟡 · fail 🔴",
+    signalSource: "aktif sağlayıcı GET /models",
+    measured: ok ? "erişilebilir" : `${lastErr} (2/2 deneme)`,
+    threshold: "200 🟢 · yapılandırılmamış 🟡 · 2/2 fail 🔴",
     severity,
-    immediate: severity === "red",
+    immediate: severity === "red", // gerçek sürekli kesinti hızlı pagelensin; geçici blip retry'le elenir
   };
 }
 
