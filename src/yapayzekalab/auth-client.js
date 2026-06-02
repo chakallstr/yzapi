@@ -143,7 +143,10 @@ export const apiJson = async (url, options = {}) => {
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(data?.message || data?.error || `İstek başarısız (${response.status})`);
+    const error = new Error(data?.message || data?.error || `İstek başarısız (${response.status})`);
+    // Expose the HTTP status so callers can distinguish auth (401) from other failures.
+    error.status = response.status;
+    throw error;
   }
   return data;
 };

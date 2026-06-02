@@ -6,7 +6,7 @@ import {
   computeOurUsd, usdToTL, computeTLPrice, fmt,
   mockLogs, promptPool, useCountUp, useLogStream, nowTime,
 } from './shared.jsx';
-import { apiJson, authFetch, getAccessToken } from './auth-client.js';
+import { apiJson, authFetch, getAccessToken, hasStoredAuth } from './auth-client.js';
 
 /* ============================================
    AccountTab — Bakiye (USD birincil) · API anahtarları · ödeme yöntemleri.
@@ -57,6 +57,11 @@ const shortDate = (value) => {
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 };
+// An error counts as "not authenticated" when the API replied 401 or the auth
+// client signalled an expired/invalid session (it clears tokens then throws).
+const isAuthError = (error) =>
+  error?.status === 401 || /oturum|unauthorized|invalid|expired|user role|giriş/i.test(error?.message || '');
+
 const rawKeyText = (key) => key?.fullKey || key?.key || '';
 const rawKeyOrMessage = (key) => rawKeyText(key) || 'Eski key raw saklanmadi. Yeni key uret.';
 const buildWhatsAppPaymentLink = (paymentInstruction) => {
@@ -564,6 +569,11 @@ const AccountTab = ({ ctx }) => {
   const [panelError, setPanelError] = useState('');
   const [panelBusy, setPanelBusy] = useState(false);
   const [me, setMe] = useState(null);
+  // Balance load lifecycle — distinguishes a genuine zero balance from auth/load
+  // failures so we never show a misleading $0.00. Starts as 'loading'; becomes
+  // 'unauthed' when no token / 401, 'error' on transient/network failure, or
+  // 'ok' once /api/user/me succeeds.
+  const [balanceState, setBalanceState] = useState(hasStoredAuth() ? 'loading' : 'unauthed');
   const [apiKeys, setApiKeys] = useState([]);
   const [usageRows, setUsageRows] = useState([]);
   const [paymentRows, setPaymentRows] = useState([]);
@@ -585,7 +595,11 @@ const AccountTab = ({ ctx }) => {
   const [telegramDeepLink, setTelegramDeepLink] = useState('');
   const telegramPollRef = useRef(null);
 
+  const hasLoadedBalance = me?.bakiyeUsd !== undefined && me?.bakiyeUsd !== null;
   const balanceUSD = asNumber(me?.bakiyeUsd, fallbackBalanceUSD);
+  // Only show a balance number when we truly have one: a fresh success, or an
+  // error/refresh state that still holds a previously-loaded (last-known) value.
+  const showBalanceNumber = balanceState === 'ok' || (balanceState === 'error' && hasLoadedBalance);
   const userCode = me?.userCode || (me?.id ? `u-${String(me.id).replace(/-/g, '').slice(0, 8)}` : 'profil');
   const monthCostUsd = asNumber(monthlyReport?.summary?.costUsd, usageRows.reduce((sum, row) => sum + asNumber(row.costUsd, asNumber(row.costTL, 0) / tlRate), 0));
   const monthRequests = asNumber(monthlyReport?.summary?.requestCount, usageRows.length);
@@ -624,6 +638,7 @@ const AccountTab = ({ ctx }) => {
   const refreshMe = async () => {
     const meData = await apiJson('/api/user/me');
     applyMeData(meData);
+    setBalanceState('ok');
     return meData;
   };
 
@@ -660,13 +675,25 @@ const AccountTab = ({ ctx }) => {
   };
 
   const loadAccount = async () => {
-    if (!getAccessToken()) return;
+    if (!getAccessToken()) {
+      // No token at all: this is the not-authenticated state, not a zero balance.
+      setBalanceState('unauthed');
+      return;
+    }
     setPanelBusy(true);
     setPanelError('');
+    if (balanceState !== 'ok') setBalanceState('loading');
     const safe = (promise, fallback) => promise.catch(() => fallback);
     try {
-      const [meData, keysData, usageData, paymentsData, methodsData, teamData, webhookData, sandboxData, reportData] = await Promise.all([
-        safe(apiJson('/api/user/me'), null),
+      // The balance (me) request is tracked separately so we can tell apart a
+      // genuine zero balance from an auth failure or a transient load error.
+      // The remaining requests keep their empty-state fallbacks — they drive
+      // non-balance UI (keys, usage, payments…) where "empty" is acceptable.
+      const meResult = await apiJson('/api/user/me').then(
+        (data) => ({ ok: true, data }),
+        (error) => ({ ok: false, error }),
+      );
+      const [keysData, usageData, paymentsData, methodsData, teamData, webhookData, sandboxData, reportData] = await Promise.all([
         safe(apiJson('/api/user/api-keys'), []),
         safe(apiJson('/api/user/usage-records'), []),
         safe(apiJson('/api/payments/me'), []),
@@ -676,7 +703,21 @@ const AccountTab = ({ ctx }) => {
         safe(apiJson('/api/user/sandbox-key'), null),
         safe(apiJson(`/api/user/reports/monthly?month=${currentMonth()}`), null),
       ]);
-      applyMeData(meData);
+
+      if (meResult.ok) {
+        applyMeData(meResult.data);
+        setBalanceState('ok');
+      } else if (isAuthError(meResult.error)) {
+        // 401 / expired session: clear stale balance, show the login prompt.
+        applyMeData(null);
+        setBalanceState('unauthed');
+      } else {
+        // Transient/network/5xx: do NOT reset to 0 — keep any last-known balance
+        // (label it as such in the UI) and surface a retry affordance.
+        setBalanceState('error');
+        setPanelError(meResult.error instanceof Error ? meResult.error.message : 'Bakiye yüklenemedi');
+      }
+
       setApiKeys(Array.isArray(keysData) ? keysData : []);
       setUsageRows(Array.isArray(usageData) ? usageData : []);
       setPaymentRows(Array.isArray(paymentsData) ? paymentsData : []);
@@ -685,8 +726,9 @@ const AccountTab = ({ ctx }) => {
       setWebhooks(webhookData);
       setSandboxKey(sandboxData);
       setMonthlyReport(reportData);
-      setSettingsMessage('');
+      if (meResult.ok) setSettingsMessage('');
     } catch (error) {
+      setBalanceState((prev) => (prev === 'ok' ? 'ok' : 'error'));
       setPanelError(error instanceof Error ? error.message : 'Panel verileri alınamadı');
     } finally {
       setPanelBusy(false);
@@ -754,6 +796,10 @@ const AccountTab = ({ ctx }) => {
     try {
       const updated = await apiJson('/api/user/me', { method: 'PATCH', body: { adSoyad: settingsName } });
       setMe(updated);
+      if (updated?.bakiyeUsd !== undefined) {
+        setTweak('balanceUSD', asNumber(updated.bakiyeUsd, fallbackBalanceUSD));
+        setBalanceState('ok');
+      }
       setSettingsName(updated?.adSoyad || settingsName);
       setSettingsMessage('Profil kaydedildi');
     } catch (error) {
@@ -993,28 +1039,106 @@ const AccountTab = ({ ctx }) => {
           <div style={{ position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <Caption style={{ color: 'rgba(255,255,255,0.55)' }}>Mevcut bakiye · USD</Caption>
-              <Chip tone="ok" style={{ background: 'rgba(16,185,129,0.15)', color: '#6ee7b7', border: '1px solid rgba(110,231,183,0.3)' }}>
-                <PulseDot color="#10b981" size={5} withRing={false} /> aktif
-              </Chip>
-            </div>
-            <div style={{ fontSize: 52, fontWeight: 600, letterSpacing: -2.2, lineHeight: 1, marginTop: 14, fontFamily: 'var(--font-sans)' }} className="tnum">
-              ${balanceUSD.toFixed(2)}
-            </div>
-            <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: 'var(--font-mono)' }} className="tnum">
-              ≈ ₺{(balanceUSD * tlRate).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · bilgi · kur ₺{tlRate.toFixed(2)}
+              {balanceState === 'ok' && (
+                <Chip tone="ok" style={{ background: 'rgba(16,185,129,0.15)', color: '#6ee7b7', border: '1px solid rgba(110,231,183,0.3)' }}>
+                  <PulseDot color="#10b981" size={5} withRing={false} /> aktif
+                </Chip>
+              )}
+              {balanceState === 'unauthed' && (
+                <Chip tone="neutral" style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.2)' }}>
+                  giriş gerekli
+                </Chip>
+              )}
+              {balanceState === 'error' && (
+                <Chip tone="neutral" style={{ background: 'rgba(245,158,11,0.15)', color: '#fcd34d', border: '1px solid rgba(252,211,77,0.3)' }}>
+                  bağlantı sorunu
+                </Chip>
+              )}
             </div>
 
-            <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,0.1)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-              <div>
-                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', fontFamily: 'var(--font-mono)', letterSpacing: 0.6 }}>BU AY KULLANIM</div>
-                <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.5, marginTop: 4 }} className="tnum">${monthCostUsd.toFixed(2)}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1, fontFamily: 'var(--font-mono)' }}>≈ ₺{(monthCostUsd * tlRate).toFixed(2)}</div>
+            {/* --- NOT AUTHENTICATED: never show a balance number --- */}
+            {balanceState === 'unauthed' && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.6, lineHeight: 1.25 }}>
+                  Giriş gerekli
+                </div>
+                <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', marginTop: 8, lineHeight: 1.55 }}>
+                  Bakiyeni görmek için giriş yap.
+                </div>
+                <button onClick={() => window.location.assign('/api/auth/google')} style={{
+                  marginTop: 16, padding: '10px 16px', borderRadius: 10,
+                  background: 'var(--accent)', color: '#fff', fontSize: 12.5, fontWeight: 600,
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                }}>
+                  <I.Key size={13} stroke="#fff" /> Giriş yap
+                </button>
               </div>
-              <div>
-                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', fontFamily: 'var(--font-mono)', letterSpacing: 0.6 }}>İSTEK</div>
-                <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.5, marginTop: 4 }} className="tnum">{fmt.num(monthRequests)}</div>
+            )}
+
+            {/* --- LOADING (token present, first fetch in flight) --- */}
+            {balanceState === 'loading' && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 28, fontWeight: 600, letterSpacing: -1, lineHeight: 1, color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <I.Refresh size={18} stroke="rgba(255,255,255,0.6)" className="spin-slow" /> Bakiye yükleniyor…
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* --- LOAD ERROR with no prior value: keep zero hidden, offer retry --- */}
+            {balanceState === 'error' && !hasLoadedBalance && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.6, lineHeight: 1.25 }}>
+                  Bakiye yüklenemedi
+                </div>
+                <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', marginTop: 8, lineHeight: 1.55 }}>
+                  Bağlantı veya sunucu kaynaklı geçici bir sorun olabilir. Bu bir sıfır bakiye değildir.
+                </div>
+                <button onClick={() => loadAccount()} disabled={panelBusy} style={{
+                  marginTop: 16, padding: '10px 16px', borderRadius: 10,
+                  background: 'rgba(255,255,255,0.12)', color: '#fff', fontSize: 12.5, fontWeight: 600,
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  display: 'inline-flex', alignItems: 'center', gap: 8, opacity: panelBusy ? 0.6 : 1,
+                }}>
+                  <I.Refresh size={13} stroke="#fff" className={panelBusy ? 'spin-slow' : undefined} /> Tekrar dene
+                </button>
+              </div>
+            )}
+
+            {/* --- SUCCESS, or ERROR-with-last-known: show the real number --- */}
+            {showBalanceNumber && (
+              <>
+                <div style={{ fontSize: 52, fontWeight: 600, letterSpacing: -2.2, lineHeight: 1, marginTop: 14, fontFamily: 'var(--font-sans)' }} className="tnum">
+                  ${balanceUSD.toFixed(2)}
+                </div>
+                <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: 'var(--font-mono)' }} className="tnum">
+                  ≈ ₺{(balanceUSD * tlRate).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · bilgi · kur ₺{tlRate.toFixed(2)}
+                </div>
+                {balanceState === 'error' && (
+                  <div style={{ fontSize: 11, color: '#fcd34d', marginTop: 8, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>Son bilinen bakiye — güncellenemedi.</span>
+                    <button onClick={() => loadAccount()} disabled={panelBusy} style={{
+                      padding: '3px 8px', borderRadius: 7, background: 'rgba(255,255,255,0.12)', color: '#fff',
+                      fontSize: 10.5, fontWeight: 600, border: '1px solid rgba(255,255,255,0.2)', opacity: panelBusy ? 0.6 : 1,
+                    }}>Tekrar dene</button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Monthly usage summary — kept for any state that shows the panel */}
+            {balanceState !== 'unauthed' && (
+              <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,0.1)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+                <div>
+                  <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', fontFamily: 'var(--font-mono)', letterSpacing: 0.6 }}>BU AY KULLANIM</div>
+                  <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.5, marginTop: 4 }} className="tnum">${monthCostUsd.toFixed(2)}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1, fontFamily: 'var(--font-mono)' }}>≈ ₺{(monthCostUsd * tlRate).toFixed(2)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', fontFamily: 'var(--font-mono)', letterSpacing: 0.6 }}>İSTEK</div>
+                  <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.5, marginTop: 4 }} className="tnum">{fmt.num(monthRequests)}</div>
+                </div>
+              </div>
+            )}
           </div>
         </Card>
 
