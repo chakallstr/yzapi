@@ -170,6 +170,8 @@ base_url = "https://yapayzekalab.org/v1"
 env_key = "OPENAI_API_KEY"`,
         osVariants: {
           windows: `# PowerShell (bu oturum için)
+# Önceki AI sağlayıcıdan kalan OPENAI_* değişkenlerini temizle:
+Remove-Item Env:\\OPENAI_BASE_URL -ErrorAction SilentlyContinue; Remove-Item Env:\\OPENAI_API_KEY -ErrorAction SilentlyContinue
 $env:OPENAI_BASE_URL="https://yapayzekalab.org/v1"
 $env:OPENAI_API_KEY="yzk_live_YOUR_KEY"
 
@@ -178,10 +180,14 @@ setx OPENAI_BASE_URL "https://yapayzekalab.org/v1"
 setx OPENAI_API_KEY "yzk_live_YOUR_KEY"
 
 codex`,
-          macos: `export OPENAI_BASE_URL="https://yapayzekalab.org/v1"
+          macos: `# Önceki AI sağlayıcıdan kalan OPENAI_* değişkenlerini temizle (bu kabuk):
+unset OPENAI_BASE_URL OPENAI_API_KEY
+export OPENAI_BASE_URL="https://yapayzekalab.org/v1"
 export OPENAI_API_KEY="yzk_live_YOUR_KEY"
 codex`,
-          linux: `export OPENAI_BASE_URL="https://yapayzekalab.org/v1"
+          linux: `# Önceki AI sağlayıcıdan kalan OPENAI_* değişkenlerini temizle (bu kabuk):
+unset OPENAI_BASE_URL OPENAI_API_KEY
+export OPENAI_BASE_URL="https://yapayzekalab.org/v1"
 export OPENAI_API_KEY="yzk_live_YOUR_KEY"
 codex`,
         },
@@ -194,6 +200,7 @@ codex`,
           "Ortam değişkenlerini işletim sistemine göre ayarla (aşağıdaki Windows / macOS / Linux sekmelerinden kendi OS'unu seç — sözdizimi farklıdır).",
           "Base URL KÖK olmalı: `https://yapayzekalab.org` — `/v1` EKLEME, Claude Code yolu kendisi ekler.",
           "Anahtar `ANTHROPIC_AUTH_TOKEN`'a girer (Bearer olarak gider). `ANTHROPIC_API_KEY` KULLANMA — yanlış header gönderir ve auth çakışması olur.",
+          "Daha önce başka bir AI sağlayıcı kullandıysan, eski `ANTHROPIC_*` ortam değişkenlerini ve `~/.claude/settings.json` içindeki eski `env` ayarlarını TEMİZLE — bunlar aşağıdaki ayarları ezip bağlantı hatasına yol açar (aşağıdaki sekmedeki temizleme satırları bunu yapar).",
           "`claude` komutuyla başlat. Not: `/v1/messages` akışsız (non-streaming) yanıt döner.",
         ],
         code: `export ANTHROPIC_BASE_URL="https://yapayzekalab.org"
@@ -202,30 +209,46 @@ export ANTHROPIC_MODEL="claude-sonnet-4-6"
 export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
 claude`,
         osVariants: {
-          windows: `# PowerShell (bu oturum için)
+          windows: `# PowerShell — tüm bloğu yapıştır, Enter'a bas
+
+# 1) Önceki AI sağlayıcıdan kalan değişkenleri temizle (oturum + kalıcı):
+Remove-Item Env:\\ANTHROPIC_API_KEY -ErrorAction SilentlyContinue
+Remove-Item Env:\\ANTHROPIC_BASE_URL -ErrorAction SilentlyContinue
+Remove-Item Env:\\ANTHROPIC_AUTH_TOKEN -ErrorAction SilentlyContinue
+setx ANTHROPIC_API_KEY "" >$null 2>&1
+
+# 2) YapayZekaLab ayarları (bu oturum):
 $env:ANTHROPIC_BASE_URL="https://yapayzekalab.org"
 $env:ANTHROPIC_AUTH_TOKEN="yzk_live_YOUR_KEY"
-$env:ANTHROPIC_MODEL="claude-sonnet-4-6"
+$env:ANTHROPIC_MODEL="claude-opus-4-8"
 $env:ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
 
-# Kalıcı (kapat-aç sonrası geçerli):
+# 3) Kalıcı yap (yeni pencerelerde de geçerli):
 setx ANTHROPIC_BASE_URL "https://yapayzekalab.org"
 setx ANTHROPIC_AUTH_TOKEN "yzk_live_YOUR_KEY"
-setx ANTHROPIC_MODEL "claude-sonnet-4-6"
+setx ANTHROPIC_MODEL "claude-opus-4-8"
 setx ANTHROPIC_SMALL_FAST_MODEL "claude-sonnet-4-6"
 
-# Eski çakışan değişkeni temizle (auth conflict yaşarsan):
-Remove-Item Env:\\ANTHROPIC_API_KEY -ErrorAction SilentlyContinue
+# 4) Önceki sağlayıcı %USERPROFILE%\\.claude\\settings.json yazdıysa, "env" bloğundaki
+#    eski ANTHROPIC_* anahtarlarını sil:  notepad "$env:USERPROFILE\\.claude\\settings.json"
 
 claude`,
-          macos: `export ANTHROPIC_BASE_URL="https://yapayzekalab.org"
+          macos: `# 1) Önceki sağlayıcıdan kalanları temizle (bu kabuk):
+unset ANTHROPIC_API_KEY ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN
+# 2) Daha önce ~/.zshrc'ye ANTHROPIC_* eklediysen O SATIRLARI SİL (yeni terminallerde
+#    aşağıyı ezer). Ayrıca ~/.claude/settings.json "env" bloğundaki eski anahtarları sil.
+export ANTHROPIC_BASE_URL="https://yapayzekalab.org"
 export ANTHROPIC_AUTH_TOKEN="yzk_live_YOUR_KEY"
-export ANTHROPIC_MODEL="claude-sonnet-4-6"
+export ANTHROPIC_MODEL="claude-opus-4-8"
 export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
 claude`,
-          linux: `export ANTHROPIC_BASE_URL="https://yapayzekalab.org"
+          linux: `# 1) Önceki sağlayıcıdan kalanları temizle (bu kabuk):
+unset ANTHROPIC_API_KEY ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN
+# 2) Daha önce ~/.bashrc'ye ANTHROPIC_* eklediysen O SATIRLARI SİL (yeni terminallerde
+#    aşağıyı ezer). Ayrıca ~/.claude/settings.json "env" bloğundaki eski anahtarları sil.
+export ANTHROPIC_BASE_URL="https://yapayzekalab.org"
 export ANTHROPIC_AUTH_TOKEN="yzk_live_YOUR_KEY"
-export ANTHROPIC_MODEL="claude-sonnet-4-6"
+export ANTHROPIC_MODEL="claude-opus-4-8"
 export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
 claude`,
         },
