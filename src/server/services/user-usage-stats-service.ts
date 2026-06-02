@@ -72,18 +72,23 @@ function round6(n: number): number {
 }
 
 // Takvim ayının başlangıcını (TZ-yerel 00:00) UTC instant olarak döner.
-// Istanbul sabit UTC+3 olsa da ofseti Intl ile dinamik bulur (DST-güvenli).
-function startOfMonthInTz(now: Date, tz: string): Date {
-  const parts = new Intl.DateTimeFormat("en-US", {
+// Ofset, AY-BAŞI anında ölçülür (now'da değil) → DST'li zone'larda da ay-sınırında
+// doğru kalır (now ile ay-başı arasında DST geçişi olsa bile kaymaz). Istanbul
+// sabit +3 olduğundan pratikte fark etmez, ama footgun'u kökten kaldırır.
+export function startOfMonthInTz(now: Date, tz: string): Date {
+  const head = new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit" }).formatToParts(now);
+  const y = Number(head.find((p) => p.type === "year")?.value || 0);
+  const mo = Number(head.find((p) => p.type === "month")?.value || 0);
+  // Ayın 1'i 00:00'ı önce UTC gibi varsay, sonra o anın TZ'deki gerçek ofsetiyle düzelt.
+  const guess = Date.UTC(y, mo - 1, 1, 0, 0, 0);
+  const wall = new Intl.DateTimeFormat("en-US", {
     timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-  }).formatToParts(now);
-  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value || 0);
-  const y = get("year");
-  const mo = get("month");
-  const asUtc = Date.UTC(y, mo - 1, get("day"), get("hour"), get("minute"), get("second"));
-  const offsetMs = Math.round((asUtc - now.getTime()) / 60000) * 60000;
-  return new Date(Date.UTC(y, mo - 1, 1, 0, 0, 0) - offsetMs);
+  }).formatToParts(new Date(guess));
+  const g = (t: string) => Number(wall.find((p) => p.type === t)?.value || 0);
+  const localAsUtc = Date.UTC(g("year"), g("month") - 1, g("day"), g("hour") % 24, g("minute"), g("second"));
+  const offsetMs = localAsUtc - guess;
+  return new Date(guess - offsetMs);
 }
 
 export type UsageStatsRow = Pick<
@@ -110,7 +115,10 @@ export function computeUserUsageStats(input: {
     costTL: number; costUsd: number;
   };
   const buckets: Bucket[] = [];
-  for (let ts = start.getTime(); ts <= now.getTime(); ts += bucketMs) {
+  // Yarı-açık kovalar [start, now): son kova [now-bucketMs, now) süregelen dönemdir.
+  // < now (≤ değil) → tam WINDOW/BUCKET sayısı (hour=12/day=24/week=7/month=30),
+  // sonda 'şimdi'de başlayan boş bir kova üretilmez. now'daki satır son kovaya clamp'lenir.
+  for (let ts = start.getTime(); ts < now.getTime(); ts += bucketMs) {
     const bs = new Date(ts);
     buckets.push({
       bucketStart: bs.toISOString(), label: bucketLabel(bs, window),
@@ -203,6 +211,7 @@ export function computeUserUsageStats(input: {
 
   const totalReq = overview.requestCount || 1;
   const totalTok = overview.totalTokens || 1;
+  const totalCost = overview.costTL || 1; // ham toplam (yuvarlamadan önce) — pay paydası
   const models = [...modelAgg.values()]
     .sort((a, b) => b.requestCount - a.requestCount || b.costTL - a.costTL)
     .map((m) => ({
@@ -220,6 +229,7 @@ export function computeUserUsageStats(input: {
       costUsd: round6(m.costUsd),
       trafficSharePct: round2((m.requestCount / totalReq) * 100),
       tokenSharePct: round2(((m.inputTokens + m.outputTokens) / totalTok) * 100),
+      costSharePct: round2((m.costTL / totalCost) * 100),
     }));
 
   return {

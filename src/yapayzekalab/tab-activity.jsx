@@ -716,7 +716,7 @@ const ActivityTab = ({ ctx }) => {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-        <ActKPI label="Toplam istek" value={kpiRequests} delta={(loading || statsLoading) ? 'yükleniyor…' : `${rangeLabel} · tüm geçmiş`} />
+        <ActKPI label="Toplam istek" value={kpiRequests} delta={(loading || statsLoading) ? 'yükleniyor…' : `${rangeLabel} · cap yok`} />
         <ActKPI label="Toplam token" value={kpiTokens} delta={kpiCache > 0 ? `cache ${fmt.num(kpiCache)} · ${rangeLabel}` : `g ${fmt.num(kpiInput)} · ç ${fmt.num(kpiOutput)}`} />
         <ActKPI label="Avg gecikme" value={avgLatency} unit="ms" delta={total ? `${total} kayıt ölçüldü` : 'ölçüm yok'} />
         <ActKPI label="Bu ay harcama" value={monthUsd} unit="$" delta={`≈ ₺${Number(monthTl).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} decimals={2} />
@@ -856,11 +856,11 @@ const ActivityTab = ({ ctx }) => {
             </div>
             {stats.models && stats.models.length ? (
               <div style={{ overflowX: 'auto' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) 78px 72px 96px 104px 104px', gap: 10, padding: '10px 16px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
-                  <Caption>Model</Caption><Caption>İstek</Caption><Caption>Pay %</Caption><Caption>Token</Caption><Caption>Maliyet ₺</Caption><Caption>Maliyet $</Caption>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) 66px 62px 84px 92px 92px 70px', gap: 10, padding: '10px 16px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
+                  <Caption>Model</Caption><Caption>İstek</Caption><Caption>Pay %</Caption><Caption>Token</Caption><Caption>Maliyet ₺</Caption><Caption>Maliyet $</Caption><Caption>Mlyt %</Caption>
                 </div>
                 {stats.models.slice(0, 20).map((m) => (
-                  <div key={m.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) 78px 72px 96px 104px 104px', gap: 10, padding: '0 16px' }}>
+                  <div key={m.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) 66px 62px 84px 92px 92px 70px', gap: 10, padding: '0 16px' }}>
                     <div style={statCell}>
                       <div style={{ fontWeight: 600 }}>{modelMeta(m.id).label || m.name}</div>
                       <div style={{ fontSize: 10, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{m.id}</div>
@@ -870,6 +870,7 @@ const ActivityTab = ({ ctx }) => {
                     <div className="tnum" style={statCell}>{fmt.num(m.totalTokens)}</div>
                     <div className="tnum" style={statCell}>₺{Number(m.costTL).toFixed(2)}</div>
                     <div className="tnum" style={statCell}>${Number(m.costUsd).toFixed(4)}</div>
+                    <div className="tnum" style={statCell}>{m.costSharePct}%</div>
                   </div>
                 ))}
               </div>

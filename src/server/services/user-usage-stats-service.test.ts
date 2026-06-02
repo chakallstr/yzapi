@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeUserUsageStats, type UsageStatsRow } from "./user-usage-stats-service.js";
+import { computeUserUsageStats, startOfMonthInTz, type UsageStatsRow } from "./user-usage-stats-service.js";
 
 // Sabit "now" — bucket/pencere hesapları deterministik olsun.
 const NOW = new Date("2026-06-02T12:00:00.000Z");
@@ -108,5 +108,47 @@ describe("computeUserUsageStats — müşteri kullanım istatistikleri", () => {
     expect(s.models).toEqual([]);
     expect(Number.isFinite(s.overview.costUsd)).toBe(true);
     expect(s.timeseries.length).toBeGreaterThan(0); // kovalar yine üretilir
+  });
+
+  it("bucket sayısı yorumla tutar (yarı-açık [start,now)): day=24, week=7", () => {
+    const day = computeUserUsageStats({ now: NOW, window: "day", usageRows: [] });
+    const week = computeUserUsageStats({ now: NOW, window: "week", usageRows: [] });
+    expect(day.timeseries.length).toBe(24);
+    expect(week.timeseries.length).toBe(7);
+  });
+
+  it("model maliyet payı (costSharePct) toplam maliyete oranlı", () => {
+    const s = computeUserUsageStats({
+      now: NOW, window: "day",
+      usageRows: [
+        row({ modelId: "model-a", costTL: 3 }),
+        row({ modelId: "model-b", costTL: 1 }),
+      ],
+    });
+    const a = s.models.find((m) => m.id === "model-a");
+    const b = s.models.find((m) => m.id === "model-b");
+    expect(a?.costSharePct).toBe(75);
+    expect(b?.costSharePct).toBe(25);
+  });
+});
+
+describe("startOfMonthInTz — takvim ayı başlangıcı (UTC instant)", () => {
+  it("Europe/Istanbul (sabit +3): ay-başı TR 00:00 = UTC önceki gün 21:00", () => {
+    // now = 2026-06-02T12:00Z (TR 15:00) → 1 Haz 00:00 TR = 31 May 21:00 UTC
+    expect(startOfMonthInTz(new Date("2026-06-02T12:00:00Z"), "Europe/Istanbul").toISOString())
+      .toBe("2026-05-31T21:00:00.000Z");
+  });
+
+  it("Europe/Istanbul ay-sınırı: now TR 01:00 olsa bile aynı ay-başı", () => {
+    // now = 2026-05-31T22:00Z (TR 2026-06-01 01:00) → yine 2026-05-31T21:00Z
+    expect(startOfMonthInTz(new Date("2026-05-31T22:00:00Z"), "Europe/Istanbul").toISOString())
+      .toBe("2026-05-31T21:00:00.000Z");
+  });
+
+  it("DST'li zone (Europe/Berlin): ofset AY-BAŞINDA ölçülür, kaymaz", () => {
+    // now = DST geçişinden sonra (29 Mart), ama 1 Mart hâlâ CET (+1) →
+    // ay-başı = 1 Mart 00:00 Berlin = 28 Şub 23:00 UTC (now ofsetiyle ölçülseydi 22:00 olurdu — hata)
+    expect(startOfMonthInTz(new Date("2026-03-30T10:00:00Z"), "Europe/Berlin").toISOString())
+      .toBe("2026-02-28T23:00:00.000Z");
   });
 });
