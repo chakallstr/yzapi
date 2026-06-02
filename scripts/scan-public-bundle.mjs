@@ -14,6 +14,8 @@ const needles = [
   hiddenToken("well", "flow"),
   hiddenToken("claude-", "popusk"),
   hiddenToken("stepan", "ovikov"),
+  hiddenToken("pop", "usk"),
+  hiddenToken("met", "ro"),
   phrase("api.", "wellflow"),
   "textCarpan",
   "imageCarpan",

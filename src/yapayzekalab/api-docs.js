@@ -11,6 +11,7 @@ export const API_DOC_SECTIONS = [
       "Ana metin endpointi: `/v1/chat/completions`",
       "Bakiye sorgu endpointi: `/v1/balance`",
       "Modelleri canlı çekmek için: `/v1/models`",
+      "`model` değerini katalogdaki herhangi bir ID ile değiştirebilirsin (örn. `gpt-5.5`, `gemini-3.1-pro-preview`).",
       "Başlamadan önce panelden kendi API anahtarını oluştur ve hesabında kullanılabilir bakiye bulundur.",
     ],
     codeBlocks: [
@@ -79,7 +80,7 @@ export const API_DOC_SECTIONS = [
     label: "Desteklenen istemciler",
     title: "Desteklenen istemciler ve bağlantı parametreleri",
     intro:
-      "Tüm OpenAI-uyumlu istemciler base URL + `yzk_live_` anahtarıyla çalışır (Codex CLI, Cline, Roo Code, Kilo Code, OpenCode, Cherry Studio, OpenAI SDK). Claude Code için Anthropic-uyumlu `/v1/messages` endpointi açıktır; `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ile bağlanılır. Aktif katalog Claude modelleridir (`claude-opus-4-7`, `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`); en sorunsuz deneyim Claude Code iledir.",
+      "Tüm OpenAI-uyumlu istemciler base URL + `yzk_live_` anahtarıyla çalışır (Codex CLI, Cline, Roo Code, Kilo Code, OpenCode, Cherry Studio, OpenAI SDK). Claude Code için Anthropic-uyumlu `/v1/messages` endpointi açıktır; `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ile bağlanılır. Aktif katalog Claude, GPT ve Gemini ailelerinden çok sayıda metin modeli içerir (örn. `claude-opus-4-7`, `gpt-5.5`, `gemini-3.1-pro-preview`); tam liste için `/v1/models`. Claude Code ile en sorunsuz deneyimi Claude modellerinde yaşarsın.",
     clientCards: [
       {
         name: "Cline",
@@ -88,7 +89,7 @@ export const API_DOC_SECTIONS = [
           "API Provider olarak `OpenAI Compatible` seç.",
           "Base URL alanına `https://yapayzekalab.org/v1` yaz.",
           "API Key alanına `yzk_live_...` anahtarını gir.",
-          "Model ID olarak `claude-opus-4-7`, `claude-opus-4-6`, `claude-sonnet-4-6` veya `claude-haiku-4-5-20251001` seç.",
+          "Model ID olarak katalogdaki herhangi bir ID seç (örn. `claude-opus-4-7`, `gpt-5.5`, `gemini-3.1-pro-preview`).",
         ],
       },
       {
@@ -98,7 +99,7 @@ export const API_DOC_SECTIONS = [
           "API Provider olarak `OpenAI Compatible` seç (yeni arayüzde `Custom provider`).",
           "Base URL `https://yapayzekalab.org/v1`.",
           "API Key senin `yzk_live_...` anahtarın.",
-          "Model olarak aktif katalogdan bir ID seç (örn. `claude-opus-4-7`, `claude-sonnet-4-6`).",
+          "Model olarak aktif katalogdan bir ID seç (örn. `claude-opus-4-7`, `gpt-5.5`, `gemini-3.1-pro-preview`).",
         ],
       },
       {
@@ -107,7 +108,7 @@ export const API_DOC_SECTIONS = [
         steps: [
           "Provider `@ai-sdk/openai-compatible` ile tanımlanır.",
           "Base URL `https://yapayzekalab.org/v1`.",
-          "Model listene `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-opus-4-6` gibi aktif modelleri ekle.",
+          "Model listene `claude-opus-4-7`, `gpt-5.5`, `gemini-3.1-pro-preview` gibi aktif modelleri ekle.",
         ],
         code: `{
   "$schema": "https://opencode.ai/config.json",
@@ -121,7 +122,9 @@ export const API_DOC_SECTIONS = [
       "models": {
         "claude-opus-4-7": { "name": "claude-opus-4-7" },
         "claude-sonnet-4-6": { "name": "claude-sonnet-4-6" },
-        "claude-opus-4-6": { "name": "claude-opus-4-6" }
+        "claude-opus-4-6": { "name": "claude-opus-4-6" },
+        "gpt-5.5": { "name": "gpt-5.5" },
+        "gemini-3.1-pro-preview": { "name": "gemini-3.1-pro-preview" }
       }
     }
   }
@@ -135,7 +138,7 @@ export const API_DOC_SECTIONS = [
           "API Provider tipi `OpenAI Compatible` olsun.",
           "Base URL `https://yapayzekalab.org/v1`.",
           "API Key olarak `yzk_live_...` kullan.",
-          "Model olarak `/v1/models` listesinden bir ID seç (örn. `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`).",
+          "Model olarak `/v1/models` listesinden bir ID seç (örn. `claude-opus-4-7`, `gpt-5.5`, `gemini-3.1-pro-preview`).",
         ],
       },
       {
@@ -146,7 +149,7 @@ export const API_DOC_SECTIONS = [
           "API adresine KÖK adresi yaz: `https://yapayzekalab.org` — Cherry `/v1/chat/completions` yolunu kendisi ekler.",
           "Alternatif: tam yolu `#` ile bitir → `https://yapayzekalab.org/v1/chat/completions#` (Cherry adresi aynen kullanır).",
           "API Key olarak `yzk_live_...` kullan.",
-          "Model olarak `/v1/models`'tan gördüğün bir ID seç (örn. `claude-sonnet-4-6`).",
+          "Model olarak `/v1/models`'tan gördüğün bir ID seç (örn. `gpt-5.5` veya `claude-sonnet-4-6`).",
         ],
       },
       {
@@ -156,12 +159,12 @@ export const API_DOC_SECTIONS = [
           "Kurulum: `npm install -g @openai/codex`.",
           "Ortam değişkenlerini işletim sistemine göre ayarla (aşağıdaki sekmelerden kendi OS'unu seç).",
           "Veya `~/.codex/config.toml` içinde `model_provider` olarak base_url `https://yapayzekalab.org/v1` tanımla.",
-          "Model olarak aktif katalogdan bir Claude ID kullan: `claude-opus-4-7`, `claude-sonnet-4-6` veya `claude-haiku-4-5-20251001`.",
-          "Not: Codex bir OpenAI aracıdır; Claude modellerinde metadata uyarısı verebilir. Claude ile en sorunsuz deneyim için aşağıdaki Claude Code kartını tercih et.",
+          "Model olarak aktif katalogdan bir ID kullan; Codex OpenAI-native olduğu için GPT modelleri en sorunsuz oturur (örn. `gpt-5.5`, `gpt-5.4`).",
+          "Not: Codex bir OpenAI aracıdır; GPT modelleri Codex'e en sorunsuz oturur. Claude modellerinde metadata uyarısı verebilir — Claude ile en iyi deneyim için aşağıdaki Claude Code kartını tercih et.",
           "`codex` komutuyla başlat.",
         ],
         code: `# ~/.codex/config.toml
-model = "claude-opus-4-7"
+model = "gpt-5.5"
 model_provider = "yapayzekalab"
 
 [model_providers.yapayzekalab]
@@ -290,7 +293,7 @@ const client = new OpenAI({
 });
 
 const response = await client.chat.completions.create({
-  model: "claude-sonnet-4-6",
+  model: "gpt-5.5",
   messages: [
     { role: "user", content: "Kısa bir ürün açıklaması yaz." }
   ],
@@ -310,7 +313,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="claude-haiku-4-5-20251001",
+    model="gemini-3.1-pro-preview",
     messages=[
         {"role": "user", "content": "3 maddelik özet çıkar."}
     ],
@@ -472,7 +475,7 @@ X-YZ-Request-Id: req_123456789`,
     label: "Model kataloğu",
     title: "Aktif modeller",
     intro:
-      "Aşağıdaki liste şu an aktif sağlayıcıda kullanılabilen modelleri gösterir. Tam ve güncel liste için her zaman `/v1/models` ucunu kullan — aktif sağlayıcı değişirse liste de değişir.",
+      "Aşağıdaki liste aktif katalogdaki başlıca metin modellerini aileye göre gösterir. Tam ve güncel liste için her zaman `/v1/models` ucunu kullan (tarihli sürüm anlık-fotoğrafları da burada görünür) — aktif katalog değişirse liste de değişir.",
     modelGroups: [
       {
         family: "Claude (Anthropic)",
@@ -480,8 +483,47 @@ X-YZ-Request-Id: req_123456789`,
           "claude-opus-4.8",
           "claude-opus-4-7",
           "claude-opus-4-6",
+          "claude-opus-4-5-20251101",
+          "claude-opus-4-1-20250805",
           "claude-sonnet-4-6",
+          "claude-sonnet-4-5-20250929",
+          "claude-sonnet-4-20250514",
           "claude-haiku-4-5-20251001",
+        ],
+      },
+      {
+        family: "GPT (OpenAI)",
+        models: [
+          "gpt-5.5",
+          "gpt-5.4",
+          "gpt-5.4-mini",
+          "gpt-5.4-nano",
+          "gpt-5.3-chat-latest",
+          "gpt-5.2",
+          "gpt-5.2-chat-latest",
+          "gpt-5.1",
+          "gpt-5.1-chat-latest",
+          "gpt-5",
+          "gpt-5-mini",
+          "gpt-5-nano",
+          "gpt-5-search-api",
+          "gpt-5-chat-latest",
+        ],
+      },
+      {
+        family: "o-serisi (OpenAI)",
+        models: [
+          "o3",
+          "o3-mini",
+          "o4-mini",
+        ],
+      },
+      {
+        family: "Gemini (Google)",
+        models: [
+          "gemini-3.1-pro-preview",
+          "gemini-3.1-pro-preview-customtools",
+          "gemini-3-flash-preview",
         ],
       },
     ],

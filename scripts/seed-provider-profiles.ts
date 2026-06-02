@@ -6,13 +6,17 @@
 //   metro       — ACTIVE upstream (api.stepanovikov.uno/v1). Serves a subset of
 //                 the catalog; some catalog ids need a wire-name rewrite
 //                 (model_map) because metro expects the nokta-form id.
-//   closerouter — STANDBY upstream. base_url = current env AI_PROVIDER_BASE_URL
-//                 (the working Claude Popusk endpoint); api key left empty so the
-//                 resolver falls back to the env key. Supports the full master
-//                 catalog minus gemini-3-pro-preview (disabled upstream).
+//   closerouter — STANDBY upstream (Claude Popusk, base https://api.claude-popusk.shop/v1
+//                 via env AI_PROVIDER_BASE_URL). Has its OWN dedicated reseller key
+//                 read from env POPUSK_API_KEY (set conditionally so an empty env
+//                 keeps the stored cipher). Serves the full master catalog minus
+//                 gemini-3-pro-preview, PLUS added model claude-opus-4.8 (dot→dash
+//                 wire rewrite via model_map).
 //
-// The metro API key is read from env METRO_API_KEY (never hard-coded / committed).
-// The active profile is set from env ACTIVE_PROVIDER (default "metro").
+// Provider keys are read from env (METRO_API_KEY, POPUSK_API_KEY) — never
+// hard-coded / committed. The active profile is set from env ACTIVE_PROVIDER
+// (default "metro"); this script only refreshes the closerouter row and re-applies
+// the active provider, so pass the CURRENT active provider to avoid switching.
 //
 // Run on the server (reads .env.production for DATABASE_URL + secrets):
 //   ENV_FILE_PATH=.env.production NODE_ENV=production METRO_API_KEY='***' \
@@ -87,11 +91,14 @@ const METRO_MODEL_MAP: Record<string, string> = {
   "claude-haiku-4-5-20251001": "claude-haiku-4.5",
 };
 
-// Standby (closerouter) supported ids = full master catalog minus the upstream-
-// disabled gemini-3-pro-preview. The standby uses the env base/key (Claude Popusk).
-const STANDBY_SUPPORTED_MODEL_IDS = MASTER_MODELS.map((m) => m.id).filter(
-  (id) => id !== "gemini-3-pro-preview",
-);
+// Standby (closerouter = Claude Popusk) supported ids = full master catalog minus
+// the upstream-disabled gemini-3-pro-preview, PLUS the added model claude-opus-4.8
+// (popusk's /v1/models serves opus-4.8; the wire id is the dash form, see modelMap
+// below). gemini-3.5-flash stays excluded (added model, not served by popusk).
+const STANDBY_SUPPORTED_MODEL_IDS = [
+  ...MASTER_MODELS.map((m) => m.id).filter((id) => id !== "gemini-3-pro-preview"),
+  "claude-opus-4.8", // added model — exposed via the modelMap dot→dash rewrite
+];
 
 async function main() {
   const metroKey = process.env.METRO_API_KEY;
@@ -121,18 +128,25 @@ async function main() {
   });
   console.log(`  metro upserted (base=${METRO_BASE_URL}, ${METRO_SUPPORTED_MODEL_IDS.length} models, ${Object.keys(METRO_MODEL_MAP).length} mapped)`);
 
-  // ── closerouter (standby upstream; env base/key fallback) ───────────────────
+  // ── closerouter (standby upstream = Claude Popusk) ──────────────────────────
+  // KEY: popusk has its OWN reseller key, read from env POPUSK_API_KEY (never
+  // hard-coded / committed; mirrors the METRO_API_KEY handling above). Set it
+  // conditionally so an empty env preserves any existing stored cipher instead
+  // of nulling it. NOTE: the old behaviour (omit apiKey → fall back to the env
+  // AI_PROVIDER_API_KEY) is WRONG now that the active provider's key lives there.
   const standbyBase = aiProviderBaseUrl();
   await upsertProviderProfile({
     id: "closerouter",
-    label: "CloseRouter (standby / Claude Popusk)",
+    label: "Claude Popusk (standby)",
     baseUrl: standbyBase,
-    // apiKey omitted → cipher stays null → resolver falls back to the env key.
+    ...(process.env.POPUSK_API_KEY ? { apiKey: process.env.POPUSK_API_KEY } : {}),
     enabled: true,
     supportedModelIds: STANDBY_SUPPORTED_MODEL_IDS,
-    modelMap: {},
+    // canonical id → popusk wire id. opus-4.8's canonical id is dot-form but
+    // popusk serves it as the dash form; the rest forward verbatim.
+    modelMap: { "claude-opus-4.8": "claude-opus-4-8" },
   });
-  console.log(`  closerouter upserted (base=${standbyBase}, ${STANDBY_SUPPORTED_MODEL_IDS.length} models, env key fallback)`);
+  console.log(`  closerouter upserted (base=${standbyBase}, ${STANDBY_SUPPORTED_MODEL_IDS.length} models, key=${process.env.POPUSK_API_KEY ? "POPUSK_API_KEY" : "(unchanged)"})`);
 
   // ── activate ─────────────────────────────────────────────────────────────────
   await setActiveProvider(activeProvider);

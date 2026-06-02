@@ -398,7 +398,7 @@ const mockPayments = [
 ];
 
 const mockAnnouncements = [
-  { id: 1, mesaj: 'Claude Popusk uyumlu metin kataloğu aktif · görsel/video geçici kapalı', tip: 'basari', aktif: true,  baslangic: '24 May 09:00', bitis: '—' },
+  { id: 1, mesaj: 'Metin kataloğu aktif · görsel/video geçici kapalı', tip: 'basari', aktif: true,  baslangic: '24 May 09:00', bitis: '—' },
   { id: 2, mesaj: 'Anthropic planlı bakım: 25 Mayıs 02:00–04:00 arası kısa kesinti',     tip: 'uyari',  aktif: true,  baslangic: '24 May 14:00', bitis: '25 May 04:00' },
   { id: 3, mesaj: 'Cryptomus USDT onay süreleri normal seviyede',                          tip: 'bilgi',  aktif: true,  baslangic: '23 May 18:00', bitis: '—' },
   { id: 4, mesaj: 'GPT katalog fiyatları güncellendi — yeni kur ile TL karşılığı yenilendi', tip: 'basari', aktif: false, baslangic: '20 May 10:00', bitis: '22 May 10:00' },
