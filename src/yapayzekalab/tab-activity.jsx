@@ -459,7 +459,7 @@ const UsageHistoryTable = ({ records, tlRate, loading }) => {
                       </span>
                       <StatusBadge status={record.status} />
                       <span style={{ display: 'grid', placeItems: 'center', color: 'var(--ink-3)', transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
-                        <I.ChevronDown size={14} />
+                        <I.Chevron size={14} />
                       </span>
                     </div>
                     {expanded && <ExpandedDetail record={record} tlRate={tlRate} />}
