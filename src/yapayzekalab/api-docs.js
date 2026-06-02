@@ -209,47 +209,131 @@ export ANTHROPIC_MODEL="claude-sonnet-4-6"
 export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
 claude`,
         osVariants: {
-          windows: `# PowerShell — tüm bloğu yapıştır, Enter'a bas
+          windows: `# PowerShell — tum blogu yapistir, Enter'a bas. Hicbir sey kurulu degilse bile calisir.
 
-# 1) Önceki AI sağlayıcıdan kalan değişkenleri temizle (oturum + kalıcı):
+# Claude Code kur / onar
+irm https://claude.ai/install.ps1 | iex
+
+# PATH'i bu oturumda yenile
+$env:Path = [Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [Environment]::GetEnvironmentVariable("Path","User")
+
+# claude hala yoksa npm fallback
+if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+  if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+    winget install -e --id OpenJS.NodeJS.LTS
+    Write-Host "Node kuruldu. PowerShell'i kapat-ac, bu blogu tekrar calistir."
+    exit
+  }
+  npm install -g @anthropic-ai/claude-code@latest
+  $npmPrefix = npm config get prefix
+  $env:Path = "$env:Path;$npmPrefix"
+}
+
+# YapayZekaLab ayarlari
+$Token = "yzk_live_YOUR_KEY"
+
+# Onceki saglayicidan kalan anahtari temizle (oturum + kalici)
 Remove-Item Env:\\ANTHROPIC_API_KEY -ErrorAction SilentlyContinue
-Remove-Item Env:\\ANTHROPIC_BASE_URL -ErrorAction SilentlyContinue
-Remove-Item Env:\\ANTHROPIC_AUTH_TOKEN -ErrorAction SilentlyContinue
-setx ANTHROPIC_API_KEY "" >$null 2>&1
+[Environment]::SetEnvironmentVariable("ANTHROPIC_API_KEY", $null, "User")
 
-# 2) YapayZekaLab ayarları (bu oturum):
-$env:ANTHROPIC_BASE_URL="https://yapayzekalab.org"
-$env:ANTHROPIC_AUTH_TOKEN="yzk_live_YOUR_KEY"
-$env:ANTHROPIC_MODEL="claude-opus-4-8"
-$env:ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
+$env:ANTHROPIC_BASE_URL = "https://yapayzekalab.org"
+$env:ANTHROPIC_AUTH_TOKEN = $Token
+$env:ANTHROPIC_MODEL = "claude-opus-4-8"
+$env:ANTHROPIC_SMALL_FAST_MODEL = "claude-sonnet-4-6"
 
-# 3) Kalıcı yap (yeni pencerelerde de geçerli):
-setx ANTHROPIC_BASE_URL "https://yapayzekalab.org"
-setx ANTHROPIC_AUTH_TOKEN "yzk_live_YOUR_KEY"
-setx ANTHROPIC_MODEL "claude-opus-4-8"
-setx ANTHROPIC_SMALL_FAST_MODEL "claude-sonnet-4-6"
+[Environment]::SetEnvironmentVariable("ANTHROPIC_BASE_URL", "https://yapayzekalab.org", "User")
+[Environment]::SetEnvironmentVariable("ANTHROPIC_AUTH_TOKEN", $Token, "User")
+[Environment]::SetEnvironmentVariable("ANTHROPIC_MODEL", "claude-opus-4-8", "User")
+[Environment]::SetEnvironmentVariable("ANTHROPIC_SMALL_FAST_MODEL", "claude-sonnet-4-6", "User")
 
-# 4) Önceki sağlayıcı %USERPROFILE%\\.claude\\settings.json yazdıysa, "env" bloğundaki
-#    eski ANTHROPIC_* anahtarlarını sil:  notepad "$env:USERPROFILE\\.claude\\settings.json"
+# setx ile de kalici yaz (yeni pencerelerde de gecerli)
+setx ANTHROPIC_BASE_URL "https://yapayzekalab.org" >$null
+setx ANTHROPIC_AUTH_TOKEN "$Token" >$null
+setx ANTHROPIC_MODEL "claude-opus-4-8" >$null
+setx ANTHROPIC_SMALL_FAST_MODEL "claude-sonnet-4-6" >$null
 
+# Onceki saglayici %USERPROFILE%\\.claude\\settings.json yazdiysa "env" blogundaki eski ANTHROPIC_* anahtarlarini sil.
+
+where.exe claude
+claude --version
 claude`,
-          macos: `# 1) Önceki sağlayıcıdan kalanları temizle (bu kabuk):
+          macos: `# bash/zsh — tum blogu yapistir, Enter'a bas. Hicbir sey kurulu degilse bile calisir.
+
+# Claude Code kur / onar
+curl -fsSL https://claude.ai/install.sh | bash
+export PATH="$HOME/.local/bin:$PATH"
+
+# claude yoksa npm fallback
+if ! command -v claude >/dev/null 2>&1; then
+  if command -v npm >/dev/null 2>&1; then
+    npm install -g @anthropic-ai/claude-code@latest
+    export PATH="$(npm config get prefix)/bin:$PATH"
+  else
+    echo "Once Node.js kur (https://nodejs.org), sonra bu blogu tekrar calistir."
+  fi
+fi
+
+# YapayZekaLab ayarlari
+TOKEN="yzk_live_YOUR_KEY"
+
+# Onceki saglayicidan kalanlari temizle (oturum + ~/.zshrc + settings.json notu)
 unset ANTHROPIC_API_KEY ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN
-# 2) Daha önce ~/.zshrc'ye ANTHROPIC_* eklediysen O SATIRLARI SİL (yeni terminallerde
-#    aşağıyı ezer). Ayrıca ~/.claude/settings.json "env" bloğundaki eski anahtarları sil.
+sed -i '' -e '/^export ANTHROPIC_/d' ~/.zshrc 2>/dev/null
+
 export ANTHROPIC_BASE_URL="https://yapayzekalab.org"
-export ANTHROPIC_AUTH_TOKEN="yzk_live_YOUR_KEY"
+export ANTHROPIC_AUTH_TOKEN="$TOKEN"
 export ANTHROPIC_MODEL="claude-opus-4-8"
 export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
+
+# Kalici yap (yeni terminallerde de gecerli)
+{
+  echo "export ANTHROPIC_BASE_URL=\\"https://yapayzekalab.org\\""
+  echo "export ANTHROPIC_AUTH_TOKEN=\\"$TOKEN\\""
+  echo "export ANTHROPIC_MODEL=\\"claude-opus-4-8\\""
+  echo "export ANTHROPIC_SMALL_FAST_MODEL=\\"claude-sonnet-4-6\\""
+} >> ~/.zshrc
+# Eski saglayici ~/.claude/settings.json yazdiysa "env" blogundaki eski ANTHROPIC_* anahtarlarini sil.
+
+which claude && claude --version
 claude`,
-          linux: `# 1) Önceki sağlayıcıdan kalanları temizle (bu kabuk):
+          linux: `# bash — tum blogu yapistir, Enter'a bas. Hicbir sey kurulu degilse bile calisir.
+
+# Claude Code kur / onar
+curl -fsSL https://claude.ai/install.sh | bash
+export PATH="$HOME/.local/bin:$PATH"
+
+# claude yoksa npm fallback
+if ! command -v claude >/dev/null 2>&1; then
+  if command -v npm >/dev/null 2>&1; then
+    npm install -g @anthropic-ai/claude-code@latest
+    export PATH="$(npm config get prefix)/bin:$PATH"
+  else
+    echo "Once Node.js kur (https://nodejs.org), sonra bu blogu tekrar calistir."
+  fi
+fi
+
+# YapayZekaLab ayarlari
+TOKEN="yzk_live_YOUR_KEY"
+
+# Onceki saglayicidan kalanlari temizle (oturum + ~/.bashrc + settings.json notu)
 unset ANTHROPIC_API_KEY ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN
-# 2) Daha önce ~/.bashrc'ye ANTHROPIC_* eklediysen O SATIRLARI SİL (yeni terminallerde
-#    aşağıyı ezer). Ayrıca ~/.claude/settings.json "env" bloğundaki eski anahtarları sil.
+sed -i -e '/^export ANTHROPIC_/d' ~/.bashrc 2>/dev/null
+
 export ANTHROPIC_BASE_URL="https://yapayzekalab.org"
-export ANTHROPIC_AUTH_TOKEN="yzk_live_YOUR_KEY"
+export ANTHROPIC_AUTH_TOKEN="$TOKEN"
 export ANTHROPIC_MODEL="claude-opus-4-8"
 export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
+
+# Kalici yap (yeni terminallerde de gecerli)
+{
+  echo "export ANTHROPIC_BASE_URL=\\"https://yapayzekalab.org\\""
+  echo "export ANTHROPIC_AUTH_TOKEN=\\"$TOKEN\\""
+  echo "export ANTHROPIC_MODEL=\\"claude-opus-4-8\\""
+  echo "export ANTHROPIC_SMALL_FAST_MODEL=\\"claude-sonnet-4-6\\""
+} >> ~/.bashrc
+# Eski saglayici ~/.claude/settings.json yazdiysa "env" blogundaki eski ANTHROPIC_* anahtarlarini sil.
+
+which claude && claude --version
 claude`,
         },
       },
