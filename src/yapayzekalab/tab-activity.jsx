@@ -44,11 +44,17 @@ const isOkStatus = (status) => {
 const recordTokens = (record) => {
   const inputUsage = Number(record.inputUsage || 0);
   const outputUsage = Number(record.outputUsage || 0);
-  const cacheRead = Number(record.cacheReadTokens || 0);
-  const cacheCreate = Number(record.cacheCreateTokens || 0);
-  const base = Number.isFinite(Number(record.baseInputTokens))
-    ? Number(record.baseInputTokens)
-    : Math.max(0, inputUsage - cacheRead - cacheCreate);
+  const rawCacheRead = Number(record.cacheReadTokens || 0);
+  const rawCacheCreate = Number(record.cacheCreateTokens || 0);
+  // Gösterim DEĞİŞMEZİ: cache kalemleri faturalanan girişin ALT KÜMESİDİR; üç
+  // kırılım satırı (base + cacheRead + cacheCreate) her zaman 'Toplam giriş'e
+  // toplanmalı. Bozuk upstream verisinde (cache > inputUsage) bu kırılmasın diye
+  // cache'i girişe clamp'leyip base'i clamp'li değerlerden türetiriz. Sağlıklı
+  // veride (cache <= giriş) clamp no-op'tur; ortak yol değişmez. Faturalama bu
+  // helper'ı KULLANMAZ (yalnız gösterim) — money-flow etkilenmez.
+  const cacheRead = Math.max(0, Math.min(rawCacheRead, inputUsage));
+  const cacheCreate = Math.max(0, Math.min(rawCacheCreate, inputUsage - cacheRead));
+  const base = Math.max(0, inputUsage - cacheRead - cacheCreate);
   const units = Number(record.unitsUsage || 0);
   return {
     base,
