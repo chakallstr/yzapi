@@ -24,29 +24,47 @@ function makeTextForEstimatedTokens(tokens: number): string {
 }
 
 describe("request guard service", () => {
-  it("allows exactly 95K estimated context", () => {
+  it("defaults the context cap to MAX_OPERATION_CONTEXT_TOKENS (1M) when no contextLimitTokens is passed", () => {
+    expect(MAX_OPERATION_CONTEXT_TOKENS).toBe(1_000_000);
+
+    // A payload comfortably above the old 95K cap but below 1M must now pass.
     const guard = buildRequestGuard({
       endpoint: "chat",
       model,
       body: {
         model: "gpt-5.4-mini",
-        messages: [{ role: "user", content: makeTextForEstimatedTokens(MAX_OPERATION_CONTEXT_TOKENS) }],
+        messages: [{ role: "user", content: makeTextForEstimatedTokens(200_000) }],
       },
     });
 
-    expect(guard.contextTokens).toBe(MAX_OPERATION_CONTEXT_TOKENS);
+    expect(guard.contextTokens).toBe(200_000);
     expect(guard.reservedCompletionTokens).toBe(DEFAULT_OUTPUT_RESERVE_TOKENS);
     expect(guard.guardedBody.max_tokens).toBe(DEFAULT_OUTPUT_RESERVE_TOKENS);
   });
 
-  it("blocks requests above 95K estimated context before upstream", () => {
+  it("caps at the passed contextLimitTokens and blocks anything above it", () => {
+    // Exactly at the passed limit is allowed.
+    const limit = 200_000;
+    const guard = buildRequestGuard({
+      endpoint: "chat",
+      model,
+      body: {
+        model: "gpt-5.4-mini",
+        messages: [{ role: "user", content: makeTextForEstimatedTokens(limit) }],
+      },
+      contextLimitTokens: limit,
+    });
+    expect(guard.contextTokens).toBe(limit);
+
+    // One token above the passed limit is blocked with the dynamic message.
     expect(() => buildRequestGuard({
       endpoint: "chat",
       model,
       body: {
         model: "gpt-5.4-mini",
-        messages: [{ role: "user", content: makeTextForEstimatedTokens(MAX_OPERATION_CONTEXT_TOKENS + 1) }],
+        messages: [{ role: "user", content: makeTextForEstimatedTokens(limit + 1) }],
       },
+      contextLimitTokens: limit,
     })).toThrowError(BadRequestError);
 
     expect(() => buildRequestGuard({
@@ -54,9 +72,10 @@ describe("request guard service", () => {
       model,
       body: {
         model: "gpt-5.4-mini",
-        messages: [{ role: "user", content: makeTextForEstimatedTokens(MAX_OPERATION_CONTEXT_TOKENS + 1) }],
+        messages: [{ role: "user", content: makeTextForEstimatedTokens(limit + 1) }],
       },
-    })).toThrow("Bu işlem 95K maksimum context limitini aşıyor. Lütfen girdiyi kısaltın veya parçalar halinde gönderin.");
+      contextLimitTokens: limit,
+    })).toThrow(`Bu işlem ${limit} maksimum context limitini aşıyor. Lütfen girdiyi kısaltın veya parçalar halinde gönderin.`);
   });
 
   it("preserves explicit response max_output_tokens when provided", () => {

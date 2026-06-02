@@ -1,13 +1,14 @@
 import YapayZekaLabApp from "./yapayzekalab/App.jsx";
 import TelegramTopupApp from "./yapayzekalab/TelegramTopupApp.jsx";
 
-type LegacyTab = "home" | "models" | "activity" | "account" | "admin";
+type LegacyTab = "home" | "models" | "activity" | "account" | "admin" | "documents";
 
 const routeToInitialTab = (path: string): LegacyTab => {
   if (path.startsWith("/models")) return "models";
   if (path.startsWith("/activity") || path.startsWith("/usage")) return "activity";
   if (path.startsWith("/admin")) return "admin";
-  if (path.startsWith("/docs")) return "home";
+  if (path.startsWith("/docs")) return "documents";
+  if (path.startsWith("/documents")) return "documents";
   if (
     path.startsWith("/api") ||
     path.startsWith("/keys") ||

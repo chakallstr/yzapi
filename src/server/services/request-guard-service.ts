@@ -1,6 +1,6 @@
 import { BadRequestError } from "../lib/errors.js";
 
-export const MAX_OPERATION_CONTEXT_TOKENS = 95_000;
+export const MAX_OPERATION_CONTEXT_TOKENS = 1_000_000;
 export const DEFAULT_OUTPUT_RESERVE_TOKENS = 4_096;
 
 type GuardEndpoint = "chat" | "messages" | "responses";
@@ -165,9 +165,6 @@ export function buildRequestGuard(opts: BuildRequestGuardOptions): RequestGuardR
     ? Math.floor(opts.contextLimitTokens)
     : MAX_OPERATION_CONTEXT_TOKENS;
   if (contextTokens > contextLimitTokens) {
-    if (contextLimitTokens === MAX_OPERATION_CONTEXT_TOKENS) {
-      throw new BadRequestError("Bu işlem 95K maksimum context limitini aşıyor. Lütfen girdiyi kısaltın veya parçalar halinde gönderin.");
-    }
     throw new BadRequestError(`Bu işlem ${contextLimitTokens} maksimum context limitini aşıyor. Lütfen girdiyi kısaltın veya parçalar halinde gönderin.`);
   }
 

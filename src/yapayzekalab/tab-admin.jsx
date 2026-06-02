@@ -1208,7 +1208,7 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
 
         <div style={{ ...grid(180), marginTop: 14 }}>
           <TopCard label="Aktif provider" value={providerSnapshot.activeProviderId || configForm.activeProviderId || '—'} />
-          <TopCard label="Context limiti" value={`${fmt.num(Number(configForm.defaultContextLimitTokens || 0))}`} sub="95K varsayılan sınır" />
+          <TopCard label="Context limiti" value={`${fmt.num(Number(configForm.defaultContextLimitTokens || 0))}`} sub="1M varsayılan sınır" />
           <TopCard label="Key / dk" value={fmt.num(Number(configForm.defaultPerKeyPerMinute || 0))} sub="dakika başına anahtar limiti" />
           <TopCard label="Bakım modu" value={configForm.maintenanceModeForApi ? 'Açık' : 'Kapalı'} sub={configForm.maintenanceModeForApi ? (configForm.maintenanceMessage || 'Bakım mesajı var') : 'canlı trafik açık'} />
         </div>

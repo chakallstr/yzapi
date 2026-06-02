@@ -47,7 +47,7 @@ export type RuntimeApiConfig = {
 
 export const DEFAULT_API_SETTINGS: Omit<RuntimeApiConfig, "updatedAt"> = {
   activeProviderId: "closerouter",
-  defaultContextLimitTokens: 95_000,
+  defaultContextLimitTokens: 1_000_000,
   defaultOutputReserveTokens: 4_096,
   defaultPerKeyPerMinute: env.RATE_LIMIT_PER_KEY_PER_MIN,
   defaultPerUserPerMinute: 120,

@@ -145,7 +145,7 @@ export const apiKeys = pgTable(
 export const systemApiConfig = pgTable("system_api_config", {
   id: integer("id").primaryKey().default(1),
   activeProviderId: text("active_provider_id").notNull().default("closerouter"),
-  defaultContextLimitTokens: integer("default_context_limit_tokens").notNull().default(95_000),
+  defaultContextLimitTokens: integer("default_context_limit_tokens").notNull().default(1_000_000),
   defaultOutputReserveTokens: integer("default_output_reserve_tokens").notNull().default(4_096),
   defaultPerKeyPerMinute: integer("default_per_key_per_minute").notNull().default(60),
   defaultPerUserPerMinute: integer("default_per_user_per_minute").notNull().default(120),
