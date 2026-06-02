@@ -6,10 +6,11 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=yapayzekalab
-WorkingDirectory=/opt/yapayzekalab
-EnvironmentFile=/opt/yapayzekalab/.env.production
+User=turkapi
+Group=turkapi
+WorkingDirectory=/opt/turkapiprojesi
+EnvironmentFile=/opt/turkapiprojesi/.env.production
 # Uygulamadan bagimsiz: yalniz /health'i yoklar, OpenWA'ya dogrudan yazar.
-ExecStart=/usr/bin/node /opt/yapayzekalab/scripts/gozcu-heartbeat.mjs
+ExecStart=/usr/bin/node /opt/turkapiprojesi/scripts/gozcu-heartbeat.mjs
 # Bir tur takilirsa systemd zorla kessin (oneshot timer'i kilitlemesin).
 TimeoutStartSec=30
