@@ -7,6 +7,7 @@
 
 import { dbSql } from "../../../db/client.js";
 import { reapOrphanReservations } from "../../../jobs/orphan-reservation-reaper-job.js";
+import { invalidateProviderConfigCache } from "../../provider-config-service.js";
 import { env } from "../../../lib/env.js";
 
 export interface HealResult {
@@ -45,6 +46,33 @@ async function staleIbanCount(days: number): Promise<number> {
     WHERE durum='bekliyor' AND olusturma < now() - (${days} || ' days')::interval
   `;
   return Number(rows[0]?.c ?? 0);
+}
+
+// Bir sağlayıcının /models ucu ayakta mı (auth'suz hızlı bağlanırlık: 200/401/403=ayakta, 5xx/timeout=down).
+async function providerReachable(base: string): Promise<boolean> {
+  try {
+    const c = new AbortController();
+    const t = setTimeout(() => c.abort(), 4000);
+    const r = await fetch(`${base.replace(/\/+$/, "")}/models`, { signal: c.signal });
+    clearTimeout(t);
+    return r.status < 500;
+  } catch {
+    return false;
+  }
+}
+
+// Aktif OLMAYAN, enabled + erişilebilir ilk alternatif sağlayıcıyı bul.
+async function findHealthyAlternate(): Promise<{ from: string; to: string } | null> {
+  const cfg = await dbSql<{ active: string | null }[]>`SELECT active_provider_id AS active FROM system_api_config LIMIT 1`;
+  const active = cfg[0]?.active ?? "";
+  const profs = await dbSql<{ id: string; base_url: string }[]>`
+    SELECT id, base_url FROM provider_profiles
+    WHERE enabled = true AND id <> ${active} AND base_url IS NOT NULL ORDER BY id
+  `;
+  for (const p of profs) {
+    if (await providerReachable(p.base_url)) return { from: active || "(yok)", to: p.id };
+  }
+  return null;
 }
 
 export const HEAL_REGISTRY: HealAction[] = [
@@ -94,6 +122,30 @@ export const HEAL_REGISTRY: HealAction[] = [
       `;
       const n = Number(rows[0]?.c ?? 0);
       return { applied: n, detail: `${n} bayat IBAN ödemesi reddedildi`, fixedChecks: ["pending_iban_buildup"] };
+    },
+  },
+  {
+    id: "failover_provider",
+    description: "Aktif sağlayıcı sürekli erişilemezse enabled + erişilebilir bir alternatife otomatik geç (sistem ayakta kalsın). Para hareketi YOK.",
+    triggerChecks: ["models_reachability"],
+    moneyMoving: false, // operasyonel; bakiye dokunulmaz — ama tüm trafiği yönlendirir (tiered'da oto)
+    maxPerHour: 2, // oscillation koruması: iki sağlayıcı da bozuksa sürekli geçiş yapmaz
+    guard: async () => {
+      const alt = await findHealthyAlternate();
+      return alt ? { canRun: true, reason: `${alt.from} → ${alt.to}` } : { canRun: false, reason: "erişilebilir alternatif yok" };
+    },
+    dryRun: async () => {
+      const alt = await findHealthyAlternate();
+      return alt
+        ? { affected: 1, preview: `Aktif sağlayıcıyı ${alt.from} → ${alt.to} olarak değiştir (alternatif erişilebilir)` }
+        : { affected: 0, preview: "erişilebilir alternatif yok — değişiklik yapılmaz" };
+    },
+    apply: async () => {
+      const alt = await findHealthyAlternate();
+      if (!alt) return { applied: 0, detail: "alternatif yok — failover yapılmadı", fixedChecks: [] };
+      await dbSql`UPDATE system_api_config SET active_provider_id = ${alt.to}`;
+      invalidateProviderConfigCache();
+      return { applied: 1, detail: `Aktif sağlayıcı ${alt.from} → ${alt.to} (otomatik failover)`, fixedChecks: ["models_reachability"] };
     },
   },
 ];

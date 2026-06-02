@@ -9,6 +9,9 @@ function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+// models_reachability ardışık-başarısızlık sayacı (flaky sağlayıcı gürültüsünü önler).
+let modelsFailStreak = 0;
+
 // upstream_error_rate — usage_records.error_code LIKE 'upstream_%' (15dk).
 async function checkUpstreamErrorRate(): Promise<GozcuCheckResult> {
   const rows = await dbSql<{ err: string; total: string }[]>`
@@ -96,15 +99,22 @@ async function checkModelsReachability(): Promise<GozcuCheckResult> {
     }
   }
 
-  const severity: Severity = ok ? "green" : "red";
+  modelsFailStreak = ok ? 0 : modelsFailStreak + 1;
+  // 1–2 ardışık fail (geçici/flaky sağlayıcı) → yellow (page YOK). ≥3 ardışık (~3dk sürekli)
+  // → red+immediate (gerçek kesinti) + failover önerisi. Aralıklı yavaşlık WhatsApp spam'i yapmaz.
+  const severity: Severity = ok ? "green" : modelsFailStreak >= 3 ? "red" : "yellow";
   return {
     name: "models_reachability",
     domain: "provider",
     signalSource: "aktif sağlayıcı GET /models",
-    measured: ok ? "erişilebilir" : `${lastErr} (2/2 deneme)`,
-    threshold: "200 🟢 · yapılandırılmamış 🟡 · 2/2 fail 🔴",
+    measured: ok ? "erişilebilir" : `${lastErr} (2/2 deneme · ardışık ${modelsFailStreak})`,
+    threshold: "200 🟢 · 1–2 ardışık fail 🟡 · ≥3 ardışık fail 🔴",
     severity,
-    immediate: severity === "red", // gerçek sürekli kesinti hızlı pagelensin; geçici blip retry'le elenir
+    immediate: severity === "red",
+    suggestedHeal:
+      severity === "red"
+        ? { id: "failover_provider", reason: "aktif sağlayıcı sürekli erişilemez", reversible: true }
+        : undefined,
   };
 }
 
