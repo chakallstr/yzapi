@@ -19,6 +19,7 @@ import { refreshKur } from "../services/kur-service.js";
 import { getReconciliationReport } from "../services/reconciliation-service.js";
 import { runScan, persistScan, getLatestScan } from "../services/mali-izleme-service.js";
 import { runGozcuScan, getOpenFindings, getSignalHistory } from "../services/gozcu/engine.js";
+import { executeHealForCheck } from "../services/gozcu/heal/run.js";
 import { encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
 import { getAdminTrafficAnalytics, type TrafficWindow } from "../services/admin-traffic-service.js";
 import {
@@ -1164,6 +1165,20 @@ router.post("/gozcu/findings/:id/snooze", async (req, res, next) => {
     if (!rows.length) return res.status(404).json({ error: "Bulgu bulunamadı" });
     await writeAudit("gozcu_snooze", rows[0].check_name, `${hours}sa erteleme by ${who}`);
     res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// İnsan-onaylı tek-tık müdahale (para-hareketi heal'ler için onay yolu). Tüm güvenlik
+// rayları (rate-limit/guard/dryRun/cap/audit) executeHealForCheck içinde uygulanır.
+router.post("/gozcu/findings/:id/heal", async (req, res, next) => {
+  try {
+    const who = req.user?.email ?? req.admin?.sub ?? "admin";
+    const rows = await dbSql<{ check_name: string }[]>`
+      SELECT check_name FROM gozcu_findings WHERE id=${req.params.id}::uuid
+    `;
+    if (!rows.length) return res.status(404).json({ error: "Bulgu bulunamadı" });
+    const result = await executeHealForCheck(rows[0].check_name, who);
+    res.status(result.ok ? 200 : 409).json(result);
   } catch (e) { next(e); }
 });
 

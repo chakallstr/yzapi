@@ -140,8 +140,12 @@ const schema = z.object({
   GOZCU_LLM_MONTHLY_TOKENS: z.coerce.number().default(2_000_000),
   GOZCU_ESCALATE_CONFIDENCE: z.coerce.number().default(0.6),
   GOZCU_DIAGNOSE_COOLDOWN_HOURS: z.coerce.number().default(6),
-  // Katman-6 oto-müdahale: varsayılan KAPALI (kill-switch).
-  GOZCU_AUTOHEAL_ENABLED: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  // Katman-6 oto-müdahale modu (varsayılan KAPALI):
+  //  off    → hiç müdahale yok (yalnız tespit+öneri)
+  //  shadow → dry-run hesaplar + loglar ama UYGULAMAZ ("ne yapacaktı" görünür) — güven inşası
+  //  tiered → para-DIŞI heal'ler oto; para-hareketi heal'ler ONAY-KAPILI (panelden tek-tık)
+  //  auto   → tüm whitelist heal'ler otomatik (en agresif)
+  GOZCU_AUTOHEAL_MODE: z.enum(["off", "shadow", "tiered", "auto"]).default("off"),
   GOZCU_HEAL_MAX_AFFECTED: z.coerce.number().default(50),
   GOZCU_IBAN_STALE_DAYS: z.coerce.number().default(14),
   // Kod dilimi okuma kökü (deploy: /opt/yapayzekalab; dev: cwd).

@@ -90,6 +90,15 @@ export function AdminGozcu({ token }) {
     try { await apiPost(`/api/admin/gozcu/findings/${id}/snooze`, token, { hours: 24 }); await load(); }
     catch (e) { setError(e.message); }
   };
+  const heal = async (id) => {
+    if (!window.confirm('Bu müdahaleyi onaylıyor musun? Güvenlik rayları (dry-run/cap/rate-limit) + audit uygulanır.')) return;
+    try {
+      const r = await apiPost(`/api/admin/gozcu/findings/${id}/heal`, token);
+      setError('');
+      window.alert(r?.detail || 'Uygulandı');
+      await load();
+    } catch (e) { setError(e.message); }
+  };
 
   if (error && !findings.length && !latest) {
     return (
@@ -187,6 +196,24 @@ export function AdminGozcu({ token }) {
             </div>
           )}
 
+          {/* Önerilen müdahale (gölge / onay-bekliyor) + tek-tık uygula */}
+          {f.autoheal_result_json && f.autoheal_result_json.preview && (
+            <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: '#fff7ed', border: '1px solid #fed7aa' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 12, color: '#9a3412' }}>
+                  🔧 Önerilen müdahale
+                  {f.autoheal_result_json.mode === 'shadow' ? ' (gölge — uygulanmadı)'
+                    : f.autoheal_result_json.mode === 'pending_approval' ? ' (onay bekliyor)'
+                    : f.autoheal_result_json.mode === 'applied' ? ' (uygulandı ✓)' : ''}
+                  : {f.autoheal_result_json.preview}
+                </div>
+                {f.autoheal_result_json.mode !== 'applied' && (
+                  <button onClick={() => heal(f.id)} style={btnHeal}>Onayla & Uygula</button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Kanıt */}
           {f.evidence_json != null && (
             <pre style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8, maxHeight: 160, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
@@ -206,4 +233,8 @@ const btnPrimary = {
 const btnGhost = {
   padding: '6px 11px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--ink-2)',
   fontSize: 11.5, fontWeight: 600, border: '1px solid var(--border)', cursor: 'pointer',
+};
+const btnHeal = {
+  padding: '6px 12px', borderRadius: 8, background: '#ea580c', color: '#fff',
+  fontSize: 11.5, fontWeight: 700, border: 'none', cursor: 'pointer', flexShrink: 0,
 };
