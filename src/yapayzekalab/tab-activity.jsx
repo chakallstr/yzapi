@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   I, Card, Chip, Caption, PulseDot,
-  PROVIDERS, MODELS_BY_ID, fmt, useCountUp,
+  PROVIDERS, MODELS_BY_ID, modelMeta, fmt, useCountUp,
 } from './shared.jsx';
 import { apiJson } from './auth-client.js';
 
@@ -14,17 +14,58 @@ const toDate = (value) => {
 
 const startOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
 
-const currencyUsd = (value) => `$${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
 const formatLogTime = (value) => {
   const date = toDate(value);
   if (!date) return '—';
   return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 };
 
+// Tam tarih + saat:dakika:saniye (admin paneliyle aynı çözünürlük).
+const formatLogDateTime = (value) => {
+  const date = toDate(value);
+  if (!date) return '—';
+  return date.toLocaleString('tr-TR', {
+    day: '2-digit', month: '2-digit', year: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+};
+
 const formatStatus = (status) => {
   if (!status) return 'ok';
   return String(status).toLowerCase();
+};
+
+const isOkStatus = (status) => {
+  const s = formatStatus(status);
+  return s === 'ok' || s === 'success';
+};
+
+// Bir kaydın gerçek token kalemlerini güvenle çıkarır (backend cache kırılımını veriyor).
+const recordTokens = (record) => {
+  const inputUsage = Number(record.inputUsage || 0);
+  const outputUsage = Number(record.outputUsage || 0);
+  const cacheRead = Number(record.cacheReadTokens || 0);
+  const cacheCreate = Number(record.cacheCreateTokens || 0);
+  const base = Number.isFinite(Number(record.baseInputTokens))
+    ? Number(record.baseInputTokens)
+    : Math.max(0, inputUsage - cacheRead - cacheCreate);
+  const units = Number(record.unitsUsage || 0);
+  return {
+    base,
+    cacheRead,
+    cacheCreate,
+    inputUsage,
+    outputUsage,
+    units,
+    total: inputUsage + outputUsage,
+  };
+};
+
+const usdFor = (record, tlRate) => {
+  const usd = Number(record.costUsd || 0);
+  if (usd > 0) return usd;
+  const tl = Number(record.costTL || 0);
+  return tlRate > 0 ? tl / tlRate : 0;
 };
 
 const LatencyChart = ({ points, p50, accentColor = 'var(--accent)' }) => {
@@ -165,88 +206,234 @@ const EmptyState = ({ children }) => (
   </div>
 );
 
-const LiveLogTable = ({ records }) => (
-  <Card pad={20}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 14 }}>
-      <div>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>Son API çağrıları</div>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
-          Gerçek kullanım kayıtları gösterilir
-        </div>
-      </div>
-      <Chip tone="ok">
-        <PulseDot color="#10b981" size={6} withRing={false} />
-        kayıtlı
-      </Chip>
-    </div>
+const StatusBadge = ({ status }) => {
+  const ok = isOkStatus(status);
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 600,
+      padding: '3px 8px', borderRadius: 999,
+      background: ok ? 'var(--ok-bg)' : '#fff7ed',
+      color: ok ? '#047857' : '#c2410c',
+    }}>
+      {ok ? <I.Check size={11} stroke="#047857" /> : <I.Clock size={10} stroke="#c2410c" />}
+      {ok ? 'başarılı' : 'hata'}
+    </span>
+  );
+};
 
-    {records.length === 0 ? (
-      <EmptyState>Henüz kullanım kaydı yok. İlk API çağrısından sonra burada görünür.</EmptyState>
-    ) : (
-      <div style={{ overflow: 'hidden', maxHeight: 420 }}>
-        <div style={{
-          display: 'grid', gridTemplateColumns: '70px 1.4fr 1fr 70px 70px 80px 60px',
-          gap: 12, padding: '0 0 8px', borderBottom: '1px solid var(--border)',
-        }}>
-          {['Zaman', 'Model', 'Sağlayıcı', 'Tip', 'Gecikme', 'Token (g+ç)', 'Durum'].map((h) => (
-            <Caption key={h} style={{ fontSize: 9 }}>{h}</Caption>
-          ))}
-        </div>
-        {records.slice(0, 10).map((record, i) => {
-          const m = MODELS_BY_ID[record.modelId] || null;
-          const provider = m ? PROVIDERS[m.provider] : null;
-          const status = formatStatus(record.status);
-          return (
-            <div
-              key={record.id}
-              style={{
-                display: 'grid', gridTemplateColumns: '70px 1.4fr 1fr 70px 70px 80px 60px',
-                gap: 12, padding: '12px 0', borderBottom: i < 9 ? '1px solid var(--border)' : 'none',
-                alignItems: 'center', fontSize: 12,
-              }}
-            >
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 11 }}>{formatLogTime(record.timestamp)}</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                <span style={{ width: 6, height: 6, borderRadius: 2, background: provider?.color || 'var(--ink-3)', flexShrink: 0 }} />
-                <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m?.label || record.modelId}</span>
-              </span>
-              <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 600, letterSpacing: 0.3,
-                padding: '2px 8px', borderRadius: 999, background: provider ? `${provider.color}20` : 'var(--surface-2)',
-                color: provider?.color || 'var(--ink-2)', alignSelf: 'center', justifySelf: 'start',
-              }}>
-                {provider?.label || 'Bilinmiyor'}
-              </span>
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 11 }}>{record.type || 'text'}</span>
-              <span style={{ fontFamily: 'var(--font-mono)' }} className="tnum">{record.responseMs ? `${record.responseMs}ms` : '—'}</span>
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }} className="tnum">{
-                (() => {
-                  const inTok = Number(record.inputUsage || 0);
-                  const outTok = Number(record.outputUsage || 0);
-                  const units = Number(record.unitsUsage || 0);
-                  // Metin modellerinde gerçek token = giriş+çıkış; görsel/video'da units (adet/saniye).
-                  if (inTok > 0 || outTok > 0) return `${fmt.num(inTok)}+${fmt.num(outTok)}`;
-                  return fmt.num(units);
-                })()
-              }</span>
-              <span>
-                <span style={{
-                  width: 20, height: 20, borderRadius: '50%',
-                  background: status === 'ok' || status === 'success' ? 'var(--ok-bg)' : '#fff7ed',
-                  display: 'grid', placeItems: 'center',
-                }}>
-                  {status === 'ok' || status === 'success'
-                    ? <I.Check size={12} stroke="#047857" />
-                    : <I.Clock size={11} stroke="#c2410c" />}
-                </span>
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    )}
-  </Card>
+// Genişletilebilir detay satırı — bir isteğin tüm token/maliyet kırılımı.
+const DetailRow = ({ label, value, mono = true, accent = false }) => (
+  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+    <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{label}</span>
+    <span
+      className={mono ? 'tnum' : undefined}
+      style={{ fontSize: 11.5, fontWeight: accent ? 600 : 500, fontFamily: mono ? 'var(--font-mono)' : 'inherit', color: accent ? 'var(--ink)' : 'var(--ink-2)', textAlign: 'right', wordBreak: 'break-all' }}
+    >
+      {value}
+    </span>
+  </div>
 );
+
+const ExpandedDetail = ({ record, tlRate }) => {
+  const t = recordTokens(record);
+  const usd = usdFor(record, tlRate);
+  const tl = Number(record.costTL || 0);
+  const keyLabel = record.apiKeyName || record.apiKeyMasked || '—';
+  return (
+    <div style={{
+      gridColumn: '1 / -1', padding: '14px 16px', background: 'var(--surface-2)',
+      borderBottom: '1px solid var(--border)',
+      display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '4px 28px',
+    }}>
+      <div>
+        <Caption style={{ fontSize: 9 }}>Token kırılımı</Caption>
+        <DetailRow label="Bağlam girişi (taze)" value={fmt.num(t.base)} />
+        <DetailRow label="Cache okuma (önbellek)" value={fmt.num(t.cacheRead)} />
+        <DetailRow label="Cache yazma" value={fmt.num(t.cacheCreate)} />
+        <DetailRow label="Toplam giriş" value={fmt.num(t.inputUsage)} accent />
+        <DetailRow label="Çıkış" value={fmt.num(t.outputUsage)} accent />
+        <DetailRow label="Toplam token" value={fmt.num(t.total)} accent />
+      </div>
+      <div>
+        <Caption style={{ fontSize: 9 }}>Maliyet ve istek</Caption>
+        <DetailRow label="Maliyet (₺)" value={`₺${tl.toFixed(4)}`} accent />
+        <DetailRow label="Maliyet ($)" value={`$${usd.toFixed(6)}`} accent />
+        <DetailRow label="Kalan bakiye (₺)" value={record.remainingTL === null || record.remainingTL === undefined ? '—' : `₺${Number(record.remainingTL).toFixed(2)}`} />
+        <DetailRow label="Gecikme" value={record.responseMs ? `${fmt.num(record.responseMs)} ms` : '—'} />
+        <DetailRow label="API anahtarı" value={keyLabel} mono={false} />
+        <DetailRow label="İşlem tipi" value={record.type || 'text'} />
+        {record.errorCode ? <DetailRow label="Hata kodu" value={record.errorCode} /> : null}
+        <DetailRow label="İstek ID" value={record.requestId || record.id} />
+      </div>
+    </div>
+  );
+};
+
+const HISTORY_GRID = '128px 1.3fr 1fr 110px 96px 130px 96px 30px';
+
+const UsageHistoryTable = ({ records, tlRate, loading }) => {
+  const [modelFilter, setModelFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [query, setQuery] = useState('');
+  const [visible, setVisible] = useState(25);
+  const [expandedId, setExpandedId] = useState(null);
+
+  const modelOptions = useMemo(() => {
+    const set = new Map();
+    records.forEach((r) => {
+      if (!set.has(r.modelId)) set.set(r.modelId, modelMeta(r.modelId).label || r.modelId);
+    });
+    return [...set.entries()].sort((a, b) => a[1].localeCompare(b[1], 'tr'));
+  }, [records]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return records.filter((r) => {
+      if (modelFilter !== 'all' && r.modelId !== modelFilter) return false;
+      if (statusFilter === 'ok' && !isOkStatus(r.status)) return false;
+      if (statusFilter === 'error' && isOkStatus(r.status)) return false;
+      if (q) {
+        const hay = `${r.modelId} ${modelMeta(r.modelId).label || ''} ${r.requestId || ''} ${r.apiKeyName || ''} ${r.errorCode || ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [records, modelFilter, statusFilter, query]);
+
+  useEffect(() => { setVisible(25); }, [modelFilter, statusFilter, query]);
+
+  const shown = filtered.slice(0, visible);
+
+  const selectStyle = {
+    padding: '7px 10px', fontSize: 11.5, borderRadius: 8,
+    border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink-2)',
+  };
+
+  return (
+    <Card pad={0} style={{ overflow: 'hidden' }}>
+      <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>Detaylı kullanım geçmişi</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+            Her istek: tarih, model, bağlam/cache token kırılımı ve ₺ + $ maliyet. Satıra tıkla, tüm detayı gör.
+          </div>
+        </div>
+        <Chip tone="ok">
+          <PulseDot color="#10b981" size={6} withRing={false} />
+          {fmt.num(filtered.length)} kayıt
+        </Chip>
+      </div>
+
+      <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', background: 'var(--surface-2)' }}>
+        <select value={modelFilter} onChange={(e) => setModelFilter(e.target.value)} style={selectStyle}>
+          <option value="all">Tüm modeller</option>
+          {modelOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+        </select>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
+          <option value="all">Tüm durumlar</option>
+          <option value="ok">Yalnız başarılı</option>
+          <option value="error">Yalnız hata</option>
+        </select>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Model, istek ID, anahtar ara…"
+          style={{ ...selectStyle, flex: 1, minWidth: 180 }}
+        />
+        {(modelFilter !== 'all' || statusFilter !== 'all' || query) && (
+          <button
+            onClick={() => { setModelFilter('all'); setStatusFilter('all'); setQuery(''); }}
+            style={{ ...selectStyle, cursor: 'pointer' }}
+          >
+            Temizle
+          </button>
+        )}
+      </div>
+
+      {records.length === 0 ? (
+        <div style={{ padding: 18 }}>
+          <EmptyState>Henüz kullanım kaydı yok. İlk API çağrısından sonra burada görünür.</EmptyState>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ padding: 18 }}>
+          <EmptyState>{loading ? 'Yükleniyor…' : 'Bu filtreyle eşleşen kayıt yok.'}</EmptyState>
+        </div>
+      ) : (
+        <>
+          <div style={{ overflowX: 'auto' }}>
+            <div style={{ minWidth: 860 }}>
+              <div style={{
+                display: 'grid', gridTemplateColumns: HISTORY_GRID, gap: 10,
+                padding: '10px 18px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)',
+              }}>
+                {['Tarih · saat', 'Model', 'API anahtarı', 'Token (g+ç)', 'Gecikme', 'Maliyet ₺ / $', 'Durum', ''].map((h, i) => (
+                  <Caption key={i} style={{ fontSize: 9 }}>{h}</Caption>
+                ))}
+              </div>
+
+              {shown.map((record) => {
+                const meta = modelMeta(record.modelId);
+                const provider = PROVIDERS[meta.provider] || null;
+                const t = recordTokens(record);
+                const usd = usdFor(record, tlRate);
+                const tl = Number(record.costTL || 0);
+                const expanded = expandedId === record.id;
+                const keyLabel = record.apiKeyName || record.apiKeyMasked || '—';
+                return (
+                  <div key={record.id} style={{ display: 'contents' }}>
+                    <div
+                      onClick={() => setExpandedId(expanded ? null : record.id)}
+                      style={{
+                        display: 'grid', gridTemplateColumns: HISTORY_GRID, gap: 10,
+                        padding: '12px 18px', borderBottom: '1px solid var(--border)',
+                        alignItems: 'center', fontSize: 12, cursor: 'pointer',
+                        background: expanded ? 'var(--surface-2)' : 'transparent',
+                      }}
+                    >
+                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 10.5 }}>{formatLogDateTime(record.timestamp)}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: 2, background: provider?.color || 'var(--ink-3)', flexShrink: 0 }} />
+                        <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta.label || record.modelId}</span>
+                      </span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{keyLabel}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }} className="tnum">
+                        {fmt.num(t.inputUsage)}+{fmt.num(t.outputUsage)}
+                        {t.cacheRead > 0 && (
+                          <span style={{ fontSize: 9.5, color: 'var(--ink-4)', display: 'block' }}>cache {fmt.num(t.cacheRead)}</span>
+                        )}
+                      </span>
+                      <span style={{ fontFamily: 'var(--font-mono)' }} className="tnum">{record.responseMs ? `${record.responseMs}ms` : '—'}</span>
+                      <span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }} className="tnum">₺{tl.toFixed(4)}</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-4)', display: 'block' }} className="tnum">${usd.toFixed(6)}</span>
+                      </span>
+                      <StatusBadge status={record.status} />
+                      <span style={{ display: 'grid', placeItems: 'center', color: 'var(--ink-3)', transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+                        <I.ChevronDown size={14} />
+                      </span>
+                    </div>
+                    {expanded && <ExpandedDetail record={record} tlRate={tlRate} />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {filtered.length > visible && (
+            <div style={{ padding: 14, display: 'grid', placeItems: 'center' }}>
+              <button
+                onClick={() => setVisible((v) => v + 25)}
+                style={{ padding: '9px 18px', borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
+              >
+                Daha fazla göster ({fmt.num(filtered.length - visible)} kalan)
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </Card>
+  );
+};
 
 const ActKPI = ({ label, value, delta, unit = '', decimals = 0 }) => {
   const n = useCountUp(Number(value || 0), { duration: 900, decimals });
@@ -317,6 +504,7 @@ const buildLatencyPoints = (records, range) => {
 
 const ActivityTab = ({ ctx }) => {
   const { tweaks } = ctx;
+  const tlRate = tweaks.tlRate || 0;
   const [range, setRange] = useState('day');
   const [records, setRecords] = useState(EMPTY_ACTIVITY);
   const [loading, setLoading] = useState(true);
@@ -355,15 +543,28 @@ const ActivityTab = ({ ctx }) => {
     });
   }, [now, range, records]);
 
-  const monthSpendUsd = useMemo(() => {
+  const monthSpend = useMemo(() => {
     const monthStart = startOfMonth(now).getTime();
-    const totalTl = records.reduce((sum, record) => {
+    let tl = 0;
+    let usd = 0;
+    records.forEach((record) => {
       const date = toDate(record.timestamp);
-      if (!date || date.getTime() < monthStart) return sum;
-      return sum + Number(record.costTL || 0);
-    }, 0);
-    return tweaks.tlRate > 0 ? totalTl / tweaks.tlRate : 0;
-  }, [now, records, tweaks.tlRate]);
+      if (!date || date.getTime() < monthStart) return;
+      tl += Number(record.costTL || 0);
+      usd += usdFor(record, tlRate);
+    });
+    return { tl, usd };
+  }, [now, records, tlRate]);
+
+  const tokenTotals = useMemo(() => {
+    return filtered.reduce((acc, record) => {
+      const t = recordTokens(record);
+      acc.input += t.inputUsage;
+      acc.output += t.outputUsage;
+      acc.cache += t.cacheRead + t.cacheCreate;
+      return acc;
+    }, { input: 0, output: 0, cache: 0 });
+  }, [filtered]);
 
   const avgLatency = useMemo(() => {
     const rows = filtered.filter((record) => Number.isFinite(record.responseMs));
@@ -390,6 +591,7 @@ const ActivityTab = ({ ctx }) => {
   const latValues = filtered.map((record) => Number(record.responseMs || 0)).filter((value) => value > 0).sort((a, b) => a - b);
   const p50 = latValues.length ? latValues[Math.floor((latValues.length - 1) * 0.5)] : 0;
   const rangeLabel = range === 'hour' ? 'son 1 saat' : range === 'week' ? 'son 7 gün' : 'son 24 saat';
+  const totalTokensInRange = tokenTotals.input + tokenTotals.output;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
@@ -429,9 +631,9 @@ const ActivityTab = ({ ctx }) => {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
         <ActKPI label="Toplam istek" value={total} delta={loading ? 'yükleniyor…' : rangeLabel} />
+        <ActKPI label="Toplam token" value={totalTokensInRange} delta={tokenTotals.cache > 0 ? `cache ${fmt.num(tokenTotals.cache)} · ${rangeLabel}` : `g ${fmt.num(tokenTotals.input)} · ç ${fmt.num(tokenTotals.output)}`} />
         <ActKPI label="Avg gecikme" value={avgLatency} unit="ms" delta={total ? `${total} kayıt ölçüldü` : 'ölçüm yok'} />
-        <ActKPI label="Bu ay harcama" value={monthSpendUsd} unit="$" delta={`≈ ₺${(monthSpendUsd * (tweaks.tlRate || 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} decimals={2} />
-        <ActKPI label="Sağlayıcı" value={providerCount} delta={providerCount ? 'kullanılan sağlayıcı' : 'henüz kullanım yok'} />
+        <ActKPI label="Bu ay harcama" value={monthSpend.usd} unit="$" delta={`≈ ₺${monthSpend.tl.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} decimals={2} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 18 }}>
@@ -479,7 +681,7 @@ const ActivityTab = ({ ctx }) => {
         </Card>
       </div>
 
-      <LiveLogTable records={records} />
+      <UsageHistoryTable records={records} tlRate={tlRate} loading={loading} />
     </div>
   );
 };

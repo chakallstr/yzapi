@@ -14,6 +14,32 @@ import {
 
 const router = Router();
 
+// Müşteri kullanım geçmişi için GÜVENLİ token kırılımı çıkarıcı.
+// raw_usage_json'dan YALNIZ sayısal token alanlarını okur; ham JSON'u (sağlayıcı
+// adı / base_url / maliyet / çarpan içerebilir) ASLA dışarı vermez. Böylece
+// upstream sızıntı riski sıfır kalır (DOKUNULMAZ: upstream no-leak).
+export function extractUsageBreakdown(raw: unknown): {
+  cacheReadTokens: number;
+  cacheCreateTokens: number;
+} {
+  const toNum = (v: unknown): number => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+  };
+  if (!raw || typeof raw !== "object") {
+    return { cacheReadTokens: 0, cacheCreateTokens: 0 };
+  }
+  const u = raw as Record<string, unknown>;
+  // Anthropic şeması: cache_read_input_tokens / cache_creation_input_tokens.
+  // OpenAI şeması: prompt_tokens_details.cached_tokens (cache-read alt kümesi).
+  const details = (u.prompt_tokens_details ?? null) as Record<string, unknown> | null;
+  const cacheReadTokens =
+    toNum(u.cache_read_input_tokens) ||
+    toNum(details && typeof details === "object" ? details.cached_tokens : 0);
+  const cacheCreateTokens = toNum(u.cache_creation_input_tokens);
+  return { cacheReadTokens, cacheCreateTokens };
+}
+
 async function buildUserMePayload(userId: string, safe: Record<string, unknown>) {
   const configRows = await db
     .select({ kur: systemConfig.kur })
@@ -119,38 +145,58 @@ router.get("/usage-records", async (req, res, next) => {
       .select({
         id: usageRecords.id,
         requestId: usageRecords.requestId,
+        apiKeyId: usageRecords.apiKeyId,
+        apiKeyName: apiKeys.ad,
+        apiKeyMasked: apiKeys.maskedKey,
         modelId: usageRecords.modelId,
         type: usageRecords.type,
         inputUsage: usageRecords.inputUsage,
         outputUsage: usageRecords.outputUsage,
         unitsUsage: usageRecords.unitsUsage,
+        costUsd: usageRecords.costUsd,
         costTL: usageRecords.costTL,
         remainingTL: usageRecords.remainingTL,
+        rawUsageJson: usageRecords.rawUsageJson,
         responseMs: usageRecords.responseMs,
         status: usageRecords.status,
         errorCode: usageRecords.errorCode,
         timestamp: usageRecords.timestamp,
       })
       .from(usageRecords)
+      .leftJoin(apiKeys, eq(usageRecords.apiKeyId, apiKeys.id))
       .where(eq(usageRecords.userId, req.user!.id))
       .orderBy(desc(usageRecords.timestamp))
-      .limit(100);
+      .limit(200);
 
-    res.json(rows.map((r) => ({
-      id: r.id,
-      requestId: r.requestId,
-      modelId: r.modelId,
-      type: r.type,
-      inputUsage: r.inputUsage,
-      outputUsage: r.outputUsage,
-      unitsUsage: Number(r.unitsUsage),
-      costTL: Number(r.costTL),
-      remainingTL: r.remainingTL === null ? null : Number(r.remainingTL),
-      responseMs: r.responseMs,
-      status: r.status,
-      errorCode: r.errorCode,
-      timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),
-    })));
+    res.json(rows.map((r) => {
+      const { cacheReadTokens, cacheCreateTokens } = extractUsageBreakdown(r.rawUsageJson);
+      const inputUsage = r.inputUsage;
+      // Bağlam (cache) kırılımı: faturalanan giriş = taze giriş + cache_read + cache_create.
+      // baseInputTokens = faturalanan giriş − cache (negatife düşmez).
+      const baseInputTokens = Math.max(0, inputUsage - cacheReadTokens - cacheCreateTokens);
+      return {
+        id: r.id,
+        requestId: r.requestId,
+        apiKeyId: r.apiKeyId,
+        apiKeyName: r.apiKeyName ?? null,
+        apiKeyMasked: r.apiKeyMasked ?? null,
+        modelId: r.modelId,
+        type: r.type,
+        inputUsage,
+        outputUsage: r.outputUsage,
+        baseInputTokens,
+        cacheReadTokens,
+        cacheCreateTokens,
+        unitsUsage: Number(r.unitsUsage),
+        costUsd: Number(r.costUsd),
+        costTL: Number(r.costTL),
+        remainingTL: r.remainingTL === null ? null : Number(r.remainingTL),
+        responseMs: r.responseMs,
+        status: r.status,
+        errorCode: r.errorCode,
+        timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),
+      };
+    }));
   } catch (e) { next(e); }
 });
 
