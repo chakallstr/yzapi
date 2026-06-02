@@ -106,9 +106,6 @@ const STANDBY_SUPPORTED_MODEL_IDS = [
 
 async function main() {
   const metroKey = process.env.METRO_API_KEY;
-  if (!metroKey || !metroKey.trim()) {
-    throw new Error("METRO_API_KEY env zorunlu (metro profili anahtarı). Script key'i dosyaya yazmaz.");
-  }
   const activeProvider = (process.env.ACTIVE_PROVIDER || "metro").trim();
 
   console.log("Seeding provider profiles...");
@@ -120,17 +117,21 @@ async function main() {
   await seedAddedModelsInline();
   console.log("  added_models (metro) seeded (claude-opus-4.8, gemini-3.5-flash)");
 
-  // ── metro (active upstream) ─────────────────────────────────────────────────
-  await upsertProviderProfile({
-    id: "metro",
-    label: "Metro",
-    baseUrl: METRO_BASE_URL,
-    apiKey: metroKey,
-    enabled: true,
-    supportedModelIds: METRO_SUPPORTED_MODEL_IDS,
-    modelMap: METRO_MODEL_MAP,
-  });
-  console.log(`  metro upserted (base=${METRO_BASE_URL}, ${METRO_SUPPORTED_MODEL_IDS.length} models, ${Object.keys(METRO_MODEL_MAP).length} mapped)`);
+  // ── metro (active upstream) — METRO_API_KEY yoksa ATLA (popusk-only refresh) ──
+  if (metroKey && metroKey.trim()) {
+    await upsertProviderProfile({
+      id: "metro",
+      label: "Metro",
+      baseUrl: METRO_BASE_URL,
+      apiKey: metroKey,
+      enabled: true,
+      supportedModelIds: METRO_SUPPORTED_MODEL_IDS,
+      modelMap: METRO_MODEL_MAP,
+    });
+    console.log(`  metro upserted (base=${METRO_BASE_URL}, ${METRO_SUPPORTED_MODEL_IDS.length} models, ${Object.keys(METRO_MODEL_MAP).length} mapped)`);
+  } else {
+    console.log("  metro ATLANDI (METRO_API_KEY yok) — mevcut DB satırı korunur (popusk-only refresh)");
+  }
 
   // ── closerouter (standby upstream = Claude Popusk) ──────────────────────────
   // KEY: popusk has its OWN reseller key, read from env POPUSK_API_KEY (never
@@ -138,7 +139,9 @@ async function main() {
   // conditionally so an empty env preserves any existing stored cipher instead
   // of nulling it. NOTE: the old behaviour (omit apiKey → fall back to the env
   // AI_PROVIDER_API_KEY) is WRONG now that the active provider's key lives there.
-  const standbyBase = aiProviderBaseUrl();
+  // closerouter(popusk) base'i EXPLICIT — AI_PROVIDER_BASE_URL aktif (wellflow) sağlayıcıya
+  // ait olabilir; aiProviderBaseUrl() kullanmak popusk profilini yanlış URL'e set ederdi.
+  const standbyBase = process.env.POPUSK_BASE_URL || "https://api.claude-popusk.shop/v1";
   await upsertProviderProfile({
     id: "closerouter",
     label: "Claude Popusk (standby)",
