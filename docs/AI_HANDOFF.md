@@ -3,8 +3,29 @@
 > Bu belge bir AI/geliştirici session'ından diğerine devir içindir. Mevcut durumun
 > tek doğruluk kaynağı. Yeni session BURADAN başlar.
 >
-> Son güncelleme commit: `c732666` · dal: `phase/release-vps-beta`
-> Canlı deploy: `sync-20260531T115533Z-c732666` · aktif sağlayıcı: **wellflow**
+> Son güncelleme commit: `03ab7ec` · dal: `phase/release-vps-beta`
+> Canlı deploy: `sync-20260602T132304Z-03ab7ec` · aktif sağlayıcı: **wellflow**
+>
+> ## SON OTURUM ÖZETİ (2026-06-02) — Sentinel "gözcü" + müşteri Aktivite sekmesi + tam-geçmiş analitiği (HEPSİ CANLI)
+> **Canlı = HEAD `03ab7ec`** · deploy `sync-20260602T132304Z-03ab7ec` · `/status` api+db+aiProvider=ok, modelCount 42 ·
+> aktif sağlayıcı **wellflow** (`api.wellflow.dev/v1`, 5 Claude modeli). **Deploy borcu YOK** (canlı = yerel HEAD).
+> 1. **Sentinel "gözcü" (CANLI):** 5-domain deterministik nöbetçi motor + LLM teşhis + oto-müdahale (shadow/tiered/auto)
+>    + insan-onaylı heal (panel/WhatsApp) + dış heartbeat unit (canlı yollar: `/opt/turkapiprojesi` + turkapi user + port 4568).
+>    `models_reachability` AKTİF sağlayıcıyı 2-deneme retry ile test eder. Commit'ler: `9fde169` (Sentinel motor),
+>    `c344587` (oto-müdahale), `80ea96d` (heartbeat yolları), `03ab7ec` (reachability aktif-sağlayıcı + retry).
+> 2. **Müşteri "Aktivite" sekmesi (CANLI):** admin-stil tam kullanım geçmişi — istek başına tarih+ss:dd:ss, model,
+>    API anahtarı, token (giriş+çıkış+cache kırılımı), gecikme, ₺+$ maliyet, durum; filtre+arama+sayfalama+satır-genişletme.
+>    Backend `routes/user.ts` `/api/user/usage-records` + saf `extractUsageBreakdown` (ham JSON sızmaz). Commit `fc6ad34`.
+>    482/482 test; **billing/pricing/secret DOKUNULMADI**.
+> 3. **Tam-geçmiş analitiği (CANLI):** zaman serileri + ısı haritası + top modeller + doğru aylık harcama (`a26800f`);
+>    QA adversarial düzeltmeleri — yanıltıcı KPI etiketi, latent DST, bucket off-by-one, maliyet payı, cache clamp (`bda3e8e`, `162633a`).
+> 4. **AÇIK — opus-4.8 ~%90 upstream 502/503 (ops sorunu, faturalama DEĞİL):** wellflow'da opus-4.8 çoğunlukla 502/503.
+>    Teşhis sondası `scripts/messages-502-probe.mjs` **v3 (uncommitted, SALT-OKUNUR)**: `context-1m-2025-08-07` beta flag'i
+>    opus-4.8'i bozuyor mu izole eder. Sonda canlı DB/env ister (`ENV_FILE_PATH=/opt/turkapiprojesi/.env.production`) → operatör çalıştırır.
+> 5. **Diğer açık:** current-feature G6 (Faz 11 satış-öncesi gate); canli-mali-izleme G16-17 (opsiyonel: upstream ping C12 +
+>    kritik-bulgu Telegram push); güvenlik 7-madde "beklemede" (kullanıcı onayı bekliyor).
+> **Git:** working tree temiz (tek istisna `messages-502-probe.mjs`). HEAD `03ab7ec` origin'den **19**, private'tan **12** commit ileri
+> (push borcu var; ama canlı rsync ile güncel). NOT: bu güncellemeyle `docs/AI_HANDOFF.md` modified-uncommitted oldu.
 >
 > ## SON OTURUM ÖZETİ (2026-05-31 #3) — Floor fazla-faturalama düzeltmesi + Claude Code haiku-akını çözümü
 > **İŞ HAFIZASI:** Detaylı adım-adım kayıt `.kiro/CALISMA-GUNLUGU.md`'de (her yeni sekme ÖNCE onu okur — bkz
