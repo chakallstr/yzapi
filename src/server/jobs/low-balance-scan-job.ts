@@ -34,7 +34,7 @@ export function startLowBalanceScanJob(): void {
         })
         .from(users)
         .where(
-          sql`${users.bakiyeTL}::numeric < ${threshold}::numeric AND (${users.lastLowBalanceAlert} IS NULL OR ${users.lastLowBalanceAlert} < ${cooldownCutoff})`,
+          sql`${users.bakiyeTL}::numeric < ${threshold}::numeric AND (${users.lastLowBalanceAlert} IS NULL OR ${users.lastLowBalanceAlert} < ${cooldownCutoff.toISOString()})`,
         );
 
       for (const user of alertUsers) {

@@ -284,7 +284,7 @@ export async function getUserUsageStats(
            COUNT(*)                                AS cnt,
            COALESCE(SUM(input_usage + output_usage), 0) AS tokens
     FROM usage_records
-    WHERE user_id = ${userId}::uuid AND timestamp >= ${monthStart}
+    WHERE user_id = ${userId}::uuid AND timestamp >= ${monthStart.toISOString()}::timestamptz
   `;
   const m = monthRows[0] ?? { tl: "0", usd: "0", cnt: "0", tokens: "0" };
   const monthToDate = {
