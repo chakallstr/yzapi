@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "../db/client.js";
 import { users, apiKeys, usageRecords, systemConfig } from "../db/schema.js";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, gte, lte, type SQL } from "drizzle-orm";
 import { encryptApiKey, generateApiKey, hashApiKey, decryptApiKey } from "../services/api-key-service.js";
 import { writeAudit } from "../services/audit-service.js";
 import { getTelegramAccountSummary } from "../services/telegram-bot-service.js";
@@ -11,34 +11,14 @@ import {
   buildMonthlyReportCsv,
   buildMonthlyReportPdf,
 } from "../services/report-service.js";
+import { extractUsageBreakdown } from "../services/usage-breakdown.js";
+import { getUserUsageStats, type UsageStatsWindow } from "../services/user-usage-stats-service.js";
 
 const router = Router();
 
-// Müşteri kullanım geçmişi için GÜVENLİ token kırılımı çıkarıcı.
-// raw_usage_json'dan YALNIZ sayısal token alanlarını okur; ham JSON'u (sağlayıcı
-// adı / base_url / maliyet / çarpan içerebilir) ASLA dışarı vermez. Böylece
-// upstream sızıntı riski sıfır kalır (DOKUNULMAZ: upstream no-leak).
-export function extractUsageBreakdown(raw: unknown): {
-  cacheReadTokens: number;
-  cacheCreateTokens: number;
-} {
-  const toNum = (v: unknown): number => {
-    const n = Number(v);
-    return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
-  };
-  if (!raw || typeof raw !== "object") {
-    return { cacheReadTokens: 0, cacheCreateTokens: 0 };
-  }
-  const u = raw as Record<string, unknown>;
-  // Anthropic şeması: cache_read_input_tokens / cache_creation_input_tokens.
-  // OpenAI şeması: prompt_tokens_details.cached_tokens (cache-read alt kümesi).
-  const details = (u.prompt_tokens_details ?? null) as Record<string, unknown> | null;
-  const cacheReadTokens =
-    toNum(u.cache_read_input_tokens) ||
-    toNum(details && typeof details === "object" ? details.cached_tokens : 0);
-  const cacheCreateTokens = toNum(u.cache_creation_input_tokens);
-  return { cacheReadTokens, cacheCreateTokens };
-}
+// extractUsageBreakdown taşındı → services/usage-breakdown.ts. Test ve dış
+// kullanım uyumluluğu için buradan re-export ediliyor (DOKUNULMAZ: upstream no-leak).
+export { extractUsageBreakdown } from "../services/usage-breakdown.js";
 
 async function buildUserMePayload(userId: string, safe: Record<string, unknown>) {
   const configRows = await db
@@ -141,6 +121,22 @@ router.get("/api-keys", async (req, res, next) => {
 // GET /api/user/usage-records
 router.get("/usage-records", async (req, res, next) => {
   try {
+    // Sayfalama + filtre (hepsi salt-okuma, kullanıcının KENDİ kayıtları).
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 200));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const model = String(req.query.model ?? "").trim();
+    const status = String(req.query.status ?? "").trim();
+    const fromRaw = String(req.query.from ?? "").trim();
+    const toRaw = String(req.query.to ?? "").trim();
+    const fromDate = fromRaw ? new Date(fromRaw) : null;
+    const toDate = toRaw ? new Date(toRaw) : null;
+
+    const conditions: SQL[] = [eq(usageRecords.userId, req.user!.id)];
+    if (model) conditions.push(eq(usageRecords.modelId, model));
+    if (status) conditions.push(eq(usageRecords.status, status));
+    if (fromDate && !Number.isNaN(fromDate.getTime())) conditions.push(gte(usageRecords.timestamp, fromDate));
+    if (toDate && !Number.isNaN(toDate.getTime())) conditions.push(lte(usageRecords.timestamp, toDate));
+
     const rows = await db
       .select({
         id: usageRecords.id,
@@ -164,9 +160,10 @@ router.get("/usage-records", async (req, res, next) => {
       })
       .from(usageRecords)
       .leftJoin(apiKeys, eq(usageRecords.apiKeyId, apiKeys.id))
-      .where(eq(usageRecords.userId, req.user!.id))
+      .where(and(...conditions))
       .orderBy(desc(usageRecords.timestamp))
-      .limit(200);
+      .limit(limit)
+      .offset(offset);
 
     res.json(rows.map((r) => {
       const { cacheReadTokens, cacheCreateTokens } = extractUsageBreakdown(r.rawUsageJson);
@@ -197,6 +194,20 @@ router.get("/usage-records", async (req, res, next) => {
         timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),
       };
     }));
+  } catch (e) { next(e); }
+});
+
+// GET /api/user/usage-stats?window=hour|day|week|month
+// Tüm geçmiş üzerinden (200-cap YOK) sunucu-tarafı agregat: overview, zaman
+// serisi (maliyet/token/başarı-hata), top modeller ve ay-başından-bugüne toplam.
+// Yalnız kullanıcının KENDİ kayıtları; ham JSON / provider adı sızdırmaz.
+router.get("/usage-stats", async (req, res, next) => {
+  try {
+    const allowed: UsageStatsWindow[] = ["hour", "day", "week", "month"];
+    const windowParam = String(req.query.window ?? "day").trim();
+    const window = (allowed.includes(windowParam as UsageStatsWindow) ? windowParam : "day") as UsageStatsWindow;
+    const stats = await getUserUsageStats(req.user!.id, window);
+    res.json(stats);
   } catch (e) { next(e); }
 });
 
