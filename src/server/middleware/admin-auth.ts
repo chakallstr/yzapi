@@ -3,6 +3,7 @@ import { verifyAccessToken, TokenPayload } from "../services/auth-service.js";
 import { db } from "../db/client.js";
 import { users } from "../db/schema.js";
 import { eq } from "drizzle-orm";
+import { recordAuthFailure, hashIp } from "../services/gozcu/metrics-collector.js";
 
 export const ADMIN_EMAIL = "cix.crazy666@gmail.com";
 
@@ -23,6 +24,7 @@ declare global {
 export async function adminAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) {
+    recordAuthFailure(hashIp(req.ip)); // Gözcü: auth_failure_spike sinyali
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
@@ -59,6 +61,7 @@ export async function adminAuth(req: Request, res: Response, next: NextFunction)
     req.admin = { sub: user.id, role: "admin" };
     next();
   } catch {
+    recordAuthFailure(hashIp(req.ip));
     res.status(401).json({ error: "Invalid or expired token" });
   }
 }

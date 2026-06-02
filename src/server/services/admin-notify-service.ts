@@ -20,7 +20,7 @@
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 
-export type AdminEventKind = "yeni_uye" | "odeme_denemesi" | "odeme_sorunu";
+export type AdminEventKind = "yeni_uye" | "odeme_denemesi" | "odeme_sorunu" | "sistem_uyarisi";
 
 export interface AdminNotifyEvent {
   kind: AdminEventKind;
@@ -31,6 +31,7 @@ export interface AdminNotifyEvent {
   reference?: string;
   status?: string;
   detail?: string;
+  severity?: "red" | "yellow"; // sistem_uyarisi (Gözcü) için ikon seçimi
 }
 
 const WA_TEXT_MAX = 4096;
@@ -68,7 +69,15 @@ export function isNotifyConfigured(): boolean {
 // Olayı kısa, okunur bir WhatsApp metnine çevirir (saf — test edilebilir).
 export function formatAdminEvent(event: AdminNotifyEvent): string {
   const ikon =
-    event.kind === "odeme_sorunu" ? "🔴" : event.kind === "odeme_denemesi" ? "💳" : "🆕";
+    event.kind === "sistem_uyarisi"
+      ? event.severity === "yellow"
+        ? "🟡"
+        : "🔴"
+      : event.kind === "odeme_sorunu"
+        ? "🔴"
+        : event.kind === "odeme_denemesi"
+          ? "💳"
+          : "🆕";
   const lines = [`${ikon} YapayZekaLab — ${event.title}`];
   if (event.userEmail) lines.push(`Kullanıcı: ${event.userEmail}`);
   if (event.method) lines.push(`Yöntem: ${event.method}`);

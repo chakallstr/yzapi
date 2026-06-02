@@ -1,0 +1,13 @@
+[Unit]
+Description=Gozcu heartbeat'i her 60 saniyede calistir
+# Uygulama (yapayzekalab.service) cokse bile bu timer systemd tarafindan surdurulur.
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=60
+AccuracySec=5s
+Persistent=true
+Unit=gozcu-heartbeat.service
+
+[Install]
+WantedBy=timers.target

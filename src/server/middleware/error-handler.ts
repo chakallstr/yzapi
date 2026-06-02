@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { logger } from "../lib/logger.js";
 import { AppError, RateLimitError } from "../lib/errors.js";
+import { recordRateLimited, recordUnhandled } from "../services/gozcu/metrics-collector.js";
 
 export function errorHandler(
   err: Error,
@@ -22,6 +23,7 @@ export function errorHandler(
   }
 
   if (err instanceof RateLimitError) {
+    recordRateLimited(); // Gözcü: rate_limit_hit_spike sinyali
     if (err.retryAfter !== undefined) {
       res.setHeader("Retry-After", String(err.retryAfter));
     }
@@ -47,5 +49,6 @@ export function errorHandler(
   }
 
   logger.error({ err, requestId }, "Unhandled error");
+  recordUnhandled(); // Gözcü: unhandled_error_spike sinyali
   res.status(500).json({ error: "Internal Server Error", code: 500, requestId });
 }

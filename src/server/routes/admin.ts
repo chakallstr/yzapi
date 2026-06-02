@@ -18,6 +18,7 @@ import { writeAudit } from "../services/audit-service.js";
 import { refreshKur } from "../services/kur-service.js";
 import { getReconciliationReport } from "../services/reconciliation-service.js";
 import { runScan, persistScan, getLatestScan } from "../services/mali-izleme-service.js";
+import { runGozcuScan, getOpenFindings, getSignalHistory } from "../services/gozcu/engine.js";
 import { encryptApiKey, generateApiKey, hashApiKey } from "../services/api-key-service.js";
 import { getAdminTrafficAnalytics, type TrafficWindow } from "../services/admin-traffic-service.js";
 import {
@@ -1106,6 +1107,63 @@ router.get("/mali-izleme/gecmis", async (_req, res, next) => {
       durationMs: Number(r.duration_ms),
       trigger: r.trigger,
     })));
+  } catch (e) { next(e); }
+});
+
+// ── Gözcü (Sentinel) — sistem nöbetçisi panel API'leri ────────────────────────
+// adminAuth + requireWhatsappVerified arkasında (app.ts mount). Salt-okunur izleme;
+// mutasyonlar (tara/ack/snooze) writeAudit'lenir. Para hareketi YOK.
+router.get("/gozcu/son", async (_req, res, next) => {
+  try {
+    const [hist, findings] = await Promise.all([getSignalHistory(1), getOpenFindings()]);
+    res.json({ latest: hist[0] ?? null, findings });
+  } catch (e) { next(e); }
+});
+
+router.get("/gozcu/findings", async (_req, res, next) => {
+  try {
+    res.json(await getOpenFindings());
+  } catch (e) { next(e); }
+});
+
+router.get("/gozcu/gecmis", async (_req, res, next) => {
+  try {
+    res.json(await getSignalHistory(100));
+  } catch (e) { next(e); }
+});
+
+router.post("/gozcu/tara", async (_req, res, next) => {
+  try {
+    const result = await runGozcuScan("on_demand");
+    await writeAudit("gozcu_tara", "on_demand", `verdict: ${result.verdict}, kırmızı: ${result.redCount}, sarı: ${result.yellowCount}`);
+    res.json(result);
+  } catch (e) { next(e); }
+});
+
+router.post("/gozcu/findings/:id/ack", async (req, res, next) => {
+  try {
+    const who = req.user?.email ?? req.admin?.sub ?? "admin";
+    const rows = await dbSql<{ check_name: string }[]>`
+      UPDATE gozcu_findings SET status='ack', acked_by=${who} WHERE id=${req.params.id}::uuid RETURNING check_name
+    `;
+    if (!rows.length) return res.status(404).json({ error: "Bulgu bulunamadı" });
+    await writeAudit("gozcu_ack", rows[0].check_name, `acked by ${who}`);
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+router.post("/gozcu/findings/:id/snooze", async (req, res, next) => {
+  try {
+    const hours = Math.max(1, Math.min(720, Number((req.body as { hours?: unknown })?.hours ?? 24)));
+    const who = req.user?.email ?? "admin";
+    const rows = await dbSql<{ check_name: string }[]>`
+      UPDATE gozcu_findings
+      SET status='snoozed', snoozed_until = now() + (${hours} || ' hours')::interval, acked_by=${who}
+      WHERE id=${req.params.id}::uuid RETURNING check_name
+    `;
+    if (!rows.length) return res.status(404).json({ error: "Bulgu bulunamadı" });
+    await writeAudit("gozcu_snooze", rows[0].check_name, `${hours}sa erteleme by ${who}`);
+    res.json({ ok: true });
   } catch (e) { next(e); }
 });
 

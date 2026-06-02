@@ -21,6 +21,7 @@ import telegramRouter from "./routes/telegram.js";
 import v1CatalogRouter from "./routes/v1-catalog.js";
 import { apiKeyAuth } from "./middleware/api-key-auth.js";
 import { getStatusSnapshot } from "./services/status-service.js";
+import { recordHttp } from "./services/gozcu/metrics-collector.js";
 
 export function getGitSha(): string {
   try {
@@ -60,6 +61,13 @@ export function createApp(): express.Express {
   }));
   app.use(requestId);
   app.use(httpLogger);
+
+  // Gözcü: hafif in-memory istek sayacı (DB yazımı YOK). api_5xx_rate paydası +
+  // 5xx oranı. res.on("finish") engellemez; tüm /api, /v1, /status isteklerini sayar.
+  app.use((_req, res, next) => {
+    res.on("finish", () => recordHttp(res.statusCode));
+    next();
+  });
 
   // Health — NO auth, NO rate limit
   app.get("/health", async (_req, res) => {

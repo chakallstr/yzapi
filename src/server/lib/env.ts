@@ -129,6 +129,26 @@ const schema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
+
+  // ── Gözcü (Sentinel) — sistem nöbetçisi ───────────────────────────────────────
+  // Katman-2 LLM teşhis: boşsa aiProviderBaseUrl/Key fallback kullanılır (kendi gateway).
+  GOZCU_LLM_BASE_URL: z.string().optional(),
+  GOZCU_LLM_API_KEY: z.string().optional(),
+  // OmniRoute (VPS yerel router) model ID'leri — antigravity family çalışıyor + JSON döndürüyor.
+  GOZCU_LLM_TRIAGE_MODEL: z.string().default("antigravity/gemini-3-flash-preview"),
+  GOZCU_LLM_DEEP_MODEL: z.string().default("antigravity/claude-opus-4-6-thinking"),
+  GOZCU_LLM_MONTHLY_TOKENS: z.coerce.number().default(2_000_000),
+  GOZCU_ESCALATE_CONFIDENCE: z.coerce.number().default(0.6),
+  GOZCU_DIAGNOSE_COOLDOWN_HOURS: z.coerce.number().default(6),
+  // Katman-6 oto-müdahale: varsayılan KAPALI (kill-switch).
+  GOZCU_AUTOHEAL_ENABLED: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  GOZCU_HEAL_MAX_AFFECTED: z.coerce.number().default(50),
+  GOZCU_IBAN_STALE_DAYS: z.coerce.number().default(14),
+  // Kod dilimi okuma kökü (deploy: /opt/yapayzekalab; dev: cwd).
+  GOZCU_REPO_ROOT: z.string().default(process.cwd()),
+  // Dış heartbeat (scripts/gozcu-heartbeat.mjs okur; burada doğrulama amaçlı).
+  GOZCU_HEARTBEAT_URL: z.string().optional(),
+  GOZCU_HEARTBEAT_FAIL_THRESHOLD: z.coerce.number().default(3),
 }).superRefine((val, ctx) => {
   // Production-only secret-separation requirements. In dev/test we allow the
   // JWT_SECRET fallback so local setups stay frictionless.

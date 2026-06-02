@@ -289,11 +289,9 @@ function isImmediate(check: CheckResult): boolean {
   return false;
 }
 
-// ── Ana tarama ────────────────────────────────────────────────────────────────
-export async function runScan(trigger: "cron" | "on_demand" = "cron"): Promise<ScanResult> {
-  const start = Date.now();
-  const son = await getSonTarama();
-
+// Raw (histerezissiz) para kontrolleri — TEK kaynak. runScan ve Gözcü motoru ikisi de
+// bunu çağırır → SQL tek yerde, kopya/drift olmaz. Histerezis/verdict/persist çağıranın işi.
+export async function runMoneyChecks(): Promise<CheckResult[]> {
   const checks: CheckResult[] = [];
   checks.push(await safeCheck("ledger_drift", checkDrift));
   checks.push(await safeCheck("k1", checkK1));
@@ -306,6 +304,15 @@ export async function runScan(trigger: "cron" | "on_demand" = "cron"): Promise<S
   checks.push(...(await safeCheckMany("idempotency", checkIdempotency)));
   checks.push(await safeCheck("kdv", checkKdv));
   checks.push(await safeCheck("kur_saglik", checkKur));
+  return checks;
+}
+
+// ── Ana tarama ────────────────────────────────────────────────────────────────
+export async function runScan(trigger: "cron" | "on_demand" = "cron"): Promise<ScanResult> {
+  const start = Date.now();
+  const son = await getSonTarama();
+
+  const checks = await runMoneyChecks();
 
   // Histerezis: red kontrolleri önceki tarama severity'siyle değerlendir.
   const prevByName = new Map((son?.checksJson ?? []).map((c) => [c.name, c.severity]));

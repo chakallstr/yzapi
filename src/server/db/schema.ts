@@ -520,3 +520,70 @@ export const shopierOsbDeadLetters = pgTable(
   },
   (t) => [index("shopier_osb_dead_letters_durum_idx").on(t.durum)]
 );
+
+// ── Gözcü (Sentinel) — kalıcı sistem nöbetçisi ─────────────────────────────────
+// gozcu_findings: dedup_key başına TEK açık bulgu (re-tespit = upsert). gozcu_signals:
+// tarama başına zaman-serisi özeti. gozcu_llm_spend: Katman-2 LLM aylık bütçe defteri.
+// Hepsi additive; para tablolarına dokunmaz; secret kolon İÇERMEZ.
+export const gozcuFindings = pgTable(
+  "gozcu_findings",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    domain: text("domain").notNull(), // money | uptime | provider | security
+    checkName: text("check_name").notNull(),
+    severity: text("severity").notNull(), // green | yellow | red
+    status: text("status").notNull().default("open"), // open | ack | snoozed | resolved
+    dedupKey: text("dedup_key").notNull().unique(),
+    measured: text("measured").notNull(),
+    threshold: text("threshold").notNull(),
+    rootCause: text("root_cause"),
+    suggestedFix: text("suggested_fix"),
+    confidence: numeric("confidence", { precision: 4, scale: 3 }),
+    evidenceJson: jsonb("evidence_json"),
+    autohealAttempted: boolean("autoheal_attempted").notNull().default(false),
+    autohealResultJson: jsonb("autoheal_result_json"),
+    ackedBy: text("acked_by"),
+    snoozedUntil: timestamp("snoozed_until", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().default(sql`now()`),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().default(sql`now()`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [
+    index("gozcu_findings_status_idx").on(t.status, t.lastSeenAt),
+    index("gozcu_findings_domain_sev_idx").on(t.domain, t.severity, t.lastSeenAt),
+  ]
+);
+
+export const gozcuSignals = pgTable(
+  "gozcu_signals",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    scanAt: timestamp("scan_at", { withTimezone: true }).notNull().default(sql`now()`),
+    verdict: text("verdict").notNull(),
+    domainVerdictsJson: jsonb("domain_verdicts_json").notNull(),
+    metricsJson: jsonb("metrics_json"),
+    redCount: integer("red_count").notNull().default(0),
+    yellowCount: integer("yellow_count").notNull().default(0),
+    lastUsageTs: timestamp("last_usage_ts", { withTimezone: true }),
+    lastTxTs: timestamp("last_tx_ts", { withTimezone: true }),
+    scanTrigger: text("scan_trigger").notNull().default("cron"),
+    durationMs: integer("duration_ms").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [index("gozcu_signals_scan_at_idx").on(t.scanAt)]
+);
+
+export const gozcuLlmSpend = pgTable(
+  "gozcu_llm_spend",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    scanAt: timestamp("scan_at", { withTimezone: true }).notNull().default(sql`now()`),
+    checkName: text("check_name").notNull(),
+    model: text("model").notNull(),
+    tokensIn: integer("tokens_in").notNull().default(0),
+    tokensOut: integer("tokens_out").notNull().default(0),
+    billingMonth: text("billing_month").notNull(), // YYYY-MM
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [index("gozcu_llm_spend_month_idx").on(t.billingMonth)]
+);

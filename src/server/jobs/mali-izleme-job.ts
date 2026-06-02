@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import { runScanIfActivity } from "../services/mali-izleme-service.js";
+import { recordHeartbeat } from "../services/gozcu/heartbeat.js";
 import { logger } from "../lib/logger.js";
 import { env } from "../lib/env.js";
 
@@ -20,6 +21,7 @@ export function startMaliIzlemeJob(): void {
 
   // Her dakika başı (60sn periyot).
   cron.schedule("* * * * *", async () => {
+    recordHeartbeat("mali-izleme-job");
     try {
       const result = await runScanIfActivity("cron");
       if (result) {
