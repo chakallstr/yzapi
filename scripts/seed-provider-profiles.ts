@@ -91,13 +91,17 @@ const METRO_MODEL_MAP: Record<string, string> = {
   "claude-haiku-4-5-20251001": "claude-haiku-4.5",
 };
 
-// Standby (closerouter = Claude Popusk) supported ids = full master catalog minus
-// the upstream-disabled gemini-3-pro-preview, PLUS the added model claude-opus-4.8
-// (popusk's /v1/models serves opus-4.8; the wire id is the dash form, see modelMap
-// below). gemini-3.5-flash stays excluded (added model, not served by popusk).
+// Standby (closerouter = Claude Popusk) supported ids = Claude-only catalog for now;
+// GPT/Gemini/o-series closed until pricing is finalized (user decision 2026-06-02).
+// These are the previously-live wellflow-era Claude set, all deliberately priced.
+// claude-opus-4.8 is the added-model DOT id (exposed via the modelMap dot→dash
+// rewrite below); the other four are MASTER_MODELS dash ids.
 const STANDBY_SUPPORTED_MODEL_IDS = [
-  ...MASTER_MODELS.map((m) => m.id).filter((id) => id !== "gemini-3-pro-preview"),
   "claude-opus-4.8", // added model — exposed via the modelMap dot→dash rewrite
+  "claude-opus-4-7",
+  "claude-opus-4-6",
+  "claude-sonnet-4-6",
+  "claude-haiku-4-5-20251001",
 ];
 
 async function main() {

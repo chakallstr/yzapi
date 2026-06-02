@@ -22,13 +22,16 @@ const {
 // fiyat tutulur, yeni fiyat matematiği yok. Yalnızca aktif sağlayıcı (metro) bu
 // id'leri supported_model_ids ile listelediğinde görünür olurlar (Task 5).
 const METRO_ADDED_MODELS = [
-  { modelId: "claude-opus-4.8", name: "Claude Opus 4.8", providerLabel: "Anthropic", inputUsd: "1.40", outputUsd: "1.40" },
-  { modelId: "gemini-3.5-flash", name: "Gemini 3.5 Flash", providerLabel: "Google", inputUsd: "0.90", outputUsd: "0.90" },
+  // opus-4.8 advertises its real 1M context window (display-only). gemini-3.5-flash
+  // leaves context null → surfaces as "—" / null, unchanged.
+  { modelId: "claude-opus-4.8", name: "Claude Opus 4.8", providerLabel: "Anthropic", inputUsd: "1.40", outputUsd: "1.40", context: "1M", contextTokens: 1000000 },
+  { modelId: "gemini-3.5-flash", name: "Gemini 3.5 Flash", providerLabel: "Google", inputUsd: "0.90", outputUsd: "0.90", context: null, contextTokens: null },
 ] as const;
 
 // Idempotent seed: iki metro modelini added_models'a ekler (enabled=true). modelId
-// primary key olduğundan onConflictDoNothing tekrar çalıştırmada no-op'tur; mevcut
-// satırların fiyatını/etiketini EZMEZ.
+// primary key olduğundan tekrar çalıştırmada upsert yalnızca context/contextTokens
+// alanlarını günceller (advertised context penceresini geriye-dönük doldurur);
+// mevcut satırların FİYATINI/ETİKETİNİ/enabled durumunu EZMEZ.
 export async function seedMetroAddedModels(db: PostgresJsDatabase<typeof schema>): Promise<void> {
   for (const m of METRO_ADDED_MODELS) {
     await db
@@ -39,9 +42,14 @@ export async function seedMetroAddedModels(db: PostgresJsDatabase<typeof schema>
         providerLabel: m.providerLabel,
         inputUsd: m.inputUsd,
         outputUsd: m.outputUsd,
+        context: m.context,
+        contextTokens: m.contextTokens,
         enabled: true,
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: addedModels.modelId,
+        set: { context: m.context, contextTokens: m.contextTokens },
+      });
   }
 }
 

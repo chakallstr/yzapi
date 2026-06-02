@@ -181,6 +181,12 @@ export const addedModels = pgTable("added_models", {
   providerLabel: text("provider_label").notNull().default(""),
   inputUsd: numeric("input_usd", { precision: 14, scale: 8 }).notNull().default("0"),
   outputUsd: numeric("output_usd", { precision: 14, scale: 8 }).notNull().default("0"),
+  // Optional advertised context window. When present, surfaced verbatim by
+  // added-model-service (context display string + contextTokens). When NULL the
+  // service falls back to "—" / null, so models without a known window are
+  // unaffected. Display-only — does NOT touch billing/pricing.
+  context: text("context"),
+  contextTokens: integer("context_tokens"),
   enabled: boolean("enabled").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),

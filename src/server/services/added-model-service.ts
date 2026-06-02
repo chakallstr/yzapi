@@ -32,6 +32,10 @@ export interface AddedModelInput {
   inputUsd: number; // USD per million tokens (customer-facing price unit)
   outputUsd: number; // USD per million tokens (customer-facing price unit)
   enabled?: boolean; // default true
+  // Optional advertised context window (display-only). When omitted the
+  // synthesized MasterModel falls back to "—" / null.
+  context?: string | null;
+  contextTokens?: number | null;
 }
 
 export interface AddedModelRecord extends AddedModelInput {
@@ -80,6 +84,8 @@ function rowToRecord(row: AddedModelRow): AddedModelRecord {
     providerLabel: row.providerLabel,
     inputUsd: Number(row.inputUsd),
     outputUsd: Number(row.outputUsd),
+    context: row.context ?? null,
+    contextTokens: row.contextTokens ?? null,
     enabled: row.enabled,
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt),
@@ -157,8 +163,10 @@ export function addedModelToMasterModel(row: AddedModelRecord): MasterModel {
     provider: row.providerLabel,
     providerSlug: slugify(row.providerLabel),
     type: "Metin",
-    context: "—",
-    contextTokens: null,
+    // Surface the row's advertised context window when present; otherwise fall
+    // back to the "—" / null placeholder (display-only, no pricing impact).
+    context: row.context ?? "—",
+    contextTokens: row.contextTokens ?? null,
     maxOutputTokens: null,
     description: null,
     inputModalities: ["text"],

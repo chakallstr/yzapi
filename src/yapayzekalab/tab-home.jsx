@@ -16,7 +16,7 @@ import {
    ============================================ */
 
 // === RouteFlow — canlı sağlayıcı routing animasyonu ================
-// 4 farklı metin modeli: Anthropic, OpenAI, Google×2.
+// 4 farklı Claude metin modeli arasında routing (Opus/Sonnet/Haiku).
 const RouteFlow = ({ tweaks }) => {
   const dotCount = tweaks?.routeDotCount ?? 4;
   const dur = tweaks?.routeDur ?? 3.6;
@@ -25,16 +25,16 @@ const RouteFlow = ({ tweaks }) => {
   const pulse = tweaks?.routePulse ?? true;
 
   const paths = {
-    'claude-opus-4-7': "M70,130 L98,130 L178,130 C190,130 192,75 200,40",
-    'gpt-5.4': "M70,130 L98,130 L178,130 C190,130 192,108 200,90",
-    'gemini-3.1-pro-preview': "M70,130 L98,130 L178,130 C190,130 192,152 200,170",
-    'gemini-3-flash-preview': "M70,130 L98,130 L178,130 C190,130 192,205 200,220"
+    'claude-opus-4-6': "M70,130 L98,130 L178,130 C190,130 192,75 200,40",
+    'claude-opus-4-7': "M70,130 L98,130 L178,130 C190,130 192,108 200,90",
+    'claude-sonnet-4-6': "M70,130 L98,130 L178,130 C190,130 192,152 200,170",
+    'claude-haiku-4-5-20251001': "M70,130 L98,130 L178,130 C190,130 192,205 200,220"
   };
   const dests = [
-  { key: 'claude-opus-4-7', y: 26 },
-  { key: 'gpt-5.4', y: 76 },
-  { key: 'gemini-3.1-pro-preview', y: 156 },
-  { key: 'gemini-3-flash-preview', y: 206 }];
+  { key: 'claude-opus-4-6', y: 26 },
+  { key: 'claude-opus-4-7', y: 76 },
+  { key: 'claude-sonnet-4-6', y: 156 },
+  { key: 'claude-haiku-4-5-20251001', y: 206 }];
 
   const staggers = Array.from({ length: dotCount }, (_, i) => i * dur / dotCount);
 
@@ -217,7 +217,7 @@ const ValueBanner = ({ tweaks, onAction }) => {
 
           <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
             <div style={{ fontSize: 11.5, color: 'var(--ink-2)', lineHeight: 1.5, marginBottom: 10 }}>
-              Anthropic, OpenAI ve Google metin modelleri — hepsi tek noktadan.
+              Claude (Opus/Sonnet/Haiku) metin modelleri — hepsi tek noktadan.
             </div>
             <button onClick={() => onAction?.({ tab: 'account', section: 'account-balance' })} style={{
               background: 'var(--accent)', color: '#fff',
@@ -920,7 +920,7 @@ const CLIShowcase = () => (
       <div><span style={{ color: '#f59e0b' }}>$</span> yzlab models         <span style={{ color: '#64748b' }}># {MODELS.length} model, fiyat tablosu</span></div>
       <div><span style={{ color: '#f59e0b' }}>$</span> yzlab chat <span style={{ color: '#10b981' }}>"Hangi modelin daha hızlı?"</span></div>
       <div style={{ marginTop: 14, color: '#94a3b8' }}># Otomasyon için stream</div>
-      <div><span style={{ color: '#f59e0b' }}>$</span> yzlab chat --model o3 --stream <span style={{ color: '#10b981' }}>&lt; prompt.txt</span></div>
+      <div><span style={{ color: '#f59e0b' }}>$</span> yzlab chat --model claude-opus-4-7 --stream <span style={{ color: '#10b981' }}>&lt; prompt.txt</span></div>
     </div>
   </Card>
 );
@@ -956,7 +956,7 @@ const HomeTab = ({ ctx, onTab, onAction }) => {
               <p className="pretty" style={{
                 fontSize: 13, lineHeight: 1.6, color: 'var(--ink-2)', margin: 0
               }}>
-                Anthropic, OpenAI ve Google metin modelleri — hepsi <strong>tek API key</strong> ile. Bakiye yükle, kullandığın kadar öde.
+                Claude (Opus/Sonnet/Haiku) metin modelleri — hepsi <strong>tek API key</strong> ile. Bakiye yükle, kullandığın kadar öde.
               </p>
               <div style={{ display: 'flex', gap: 8, marginTop: 18, flexWrap: 'wrap' }}>
                 <button onClick={() => onTab('account')} style={{
