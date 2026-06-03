@@ -79,7 +79,7 @@ export const API_DOC_SECTIONS = [
     label: "Desteklenen istemciler",
     title: "Desteklenen istemciler ve bağlantı parametreleri",
     intro:
-      "Tüm OpenAI-uyumlu istemciler base URL + `yzk_live_` anahtarıyla çalışır (Codex CLI, Cline, Roo Code, Kilo Code, OpenCode, Cherry Studio, OpenAI SDK). Claude Code için Anthropic-uyumlu `/v1/messages` endpointi açıktır; `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ile bağlanılır. Aktif katalog Claude modelleridir (`claude-opus-4-7`, `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`); en sorunsuz deneyim Claude Code iledir.",
+      "Tüm OpenAI-uyumlu istemciler base URL + `yzk_live_` anahtarıyla çalışır (Codex CLI, Cline, Roo Code, Kilo Code, OpenCode, Cherry Studio, OpenAI SDK). Claude Code için Anthropic-uyumlu `/v1/messages` endpointi açıktır; `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ile bağlanılır. Aktif katalog Claude modelleridir (`claude-opus-4.8`, `claude-opus-4-7`, `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`); en sorunsuz deneyim Claude Code iledir.",
     clientCards: [
       {
         name: "Cline",
@@ -88,7 +88,7 @@ export const API_DOC_SECTIONS = [
           "API Provider olarak `OpenAI Compatible` seç.",
           "Base URL alanına `https://yapayzekalab.org/v1` yaz.",
           "API Key alanına `yzk_live_...` anahtarını gir.",
-          "Model ID olarak `claude-opus-4-7`, `claude-opus-4-6`, `claude-sonnet-4-6` veya `claude-haiku-4-5-20251001` seç.",
+          "Model ID olarak `claude-opus-4.8` (en güçlü), `claude-opus-4-7`, `claude-opus-4-6`, `claude-sonnet-4-6` veya `claude-haiku-4-5-20251001` seç.",
         ],
       },
       {
@@ -98,7 +98,7 @@ export const API_DOC_SECTIONS = [
           "API Provider olarak `OpenAI Compatible` seç (yeni arayüzde `Custom provider`).",
           "Base URL `https://yapayzekalab.org/v1`.",
           "API Key senin `yzk_live_...` anahtarın.",
-          "Model olarak aktif katalogdan bir ID seç (örn. `claude-opus-4-7`, `claude-sonnet-4-6`).",
+          "Model olarak aktif katalogdan bir ID seç (örn. `claude-opus-4.8` en güçlü, `claude-opus-4-7`, `claude-sonnet-4-6`).",
         ],
       },
       {
@@ -107,7 +107,7 @@ export const API_DOC_SECTIONS = [
         steps: [
           "Provider `@ai-sdk/openai-compatible` ile tanımlanır.",
           "Base URL `https://yapayzekalab.org/v1`.",
-          "Model listene `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-opus-4-6` gibi aktif modelleri ekle.",
+          "Model listene `claude-opus-4.8`, `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-opus-4-6` gibi aktif modelleri ekle.",
         ],
         code: `{
   "$schema": "https://opencode.ai/config.json",
@@ -119,6 +119,7 @@ export const API_DOC_SECTIONS = [
         "apiKey": "yzk_live_YOUR_KEY"
       },
       "models": {
+        "claude-opus-4.8": { "name": "claude-opus-4.8" },
         "claude-opus-4-7": { "name": "claude-opus-4-7" },
         "claude-sonnet-4-6": { "name": "claude-sonnet-4-6" },
         "claude-opus-4-6": { "name": "claude-opus-4-6" }
@@ -131,11 +132,12 @@ export const API_DOC_SECTIONS = [
         name: "Roo Code",
         type: "VS Code · OpenAI-compatible",
         steps: [
-          "Settings → Providers içine gir.",
-          "API Provider tipi `OpenAI Compatible` olsun.",
-          "Base URL `https://yapayzekalab.org/v1`.",
-          "API Key olarak `yzk_live_...` kullan.",
-          "Model olarak `/v1/models` listesinden bir ID seç (örn. `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`).",
+          "Settings → Providers → API Provider tipini `OpenAI Compatible` seç.",
+          "Base URL TAM olarak `https://yapayzekalab.org/v1` olmalı (sonunda `/v1` ŞART).",
+          "⚠️ KÖK adresi (`https://yapayzekalab.org`) YAZMA — o kural yalnızca Claude Code içindir. Roo Code'da kök yazarsan model listesi yüklenir ama her mesaj 404 verir; müşterilerin 'bağlanıyor ama cevap gelmiyor' şikayeti tam olarak budur. `/chat/completions` de EKLEME, Roo onu kendi ekler.",
+          "API Key alanına `yzk_live_...` anahtarını gir.",
+          "Model ID: `/v1/models` listesinden seç — en güçlü `claude-opus-4.8`, hızlı/ekonomik `claude-sonnet-4-6` ya da `claude-haiku-4-5-20251001` (`claude-opus-4-7` / `claude-opus-4-6` de geçerli).",
+          "Cevap gelmiyorsa hızlı teşhis: 404 → Base URL yanlış (büyük ihtimalle kök yazdın, `/v1` ekle) · 402 → panelden TL bakiye yükle · 403 → erişim/doğrulama (hesap doğrulaman açıksa doğrula, değilse API key'i kontrol et).",
         ],
       },
       {
@@ -143,8 +145,8 @@ export const API_DOC_SECTIONS = [
         type: "Desktop · OpenAI-compatible",
         steps: [
           "Model sağlayıcısı olarak OpenAI-compatible profil aç.",
-          "API adresine KÖK adresi yaz: `https://yapayzekalab.org` — Cherry `/v1/chat/completions` yolunu kendisi ekler.",
-          "Alternatif: tam yolu `#` ile bitir → `https://yapayzekalab.org/v1/chat/completions#` (Cherry adresi aynen kullanır).",
+          "API adresine TAM yolu yaz ve `#` ile bitir → `https://yapayzekalab.org/v1/chat/completions#` (Cherry adresi aynen kullanır; en güvenli ve sürümden bağımsız yöntem budur).",
+          "Alternatif: KÖK adresi yaz `https://yapayzekalab.org` — Cherry sürümün `/v1/chat/completions` yolunu otomatik ekler. Cevap gelmezse yukarıdaki `#`'li tam yola geç.",
           "API Key olarak `yzk_live_...` kullan.",
           "Model olarak `/v1/models`'tan gördüğün bir ID seç (örn. `claude-sonnet-4-6`).",
         ],
@@ -156,12 +158,12 @@ export const API_DOC_SECTIONS = [
           "Kurulum: `npm install -g @openai/codex`.",
           "Ortam değişkenlerini işletim sistemine göre ayarla (aşağıdaki sekmelerden kendi OS'unu seç).",
           "Veya `~/.codex/config.toml` içinde `model_provider` olarak base_url `https://yapayzekalab.org/v1` tanımla.",
-          "Model olarak aktif katalogdan bir Claude ID kullan: `claude-opus-4-7`, `claude-sonnet-4-6` veya `claude-haiku-4-5-20251001`.",
+          "Model olarak aktif katalogdan bir Claude ID kullan: `claude-opus-4.8` (en güçlü), `claude-opus-4-7`, `claude-sonnet-4-6` veya `claude-haiku-4-5-20251001`.",
           "Not: Codex bir OpenAI aracıdır; Claude modellerinde metadata uyarısı verebilir. Claude ile en sorunsuz deneyim için aşağıdaki Claude Code kartını tercih et.",
           "`codex` komutuyla başlat.",
         ],
         code: `# ~/.codex/config.toml
-model = "claude-opus-4-7"
+model = "claude-opus-4.8"
 model_provider = "yapayzekalab"
 
 [model_providers.yapayzekalab]
