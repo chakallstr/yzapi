@@ -44,6 +44,23 @@ export interface EffectiveProviderConfig {
   };
 }
 
+// Per-model resolved upstream context (per-model-routing). Carries the baseUrl +
+// decrypted key + the model_map of the provider that serves THIS model. NEVER
+// returned to clients; only the forwarders consume it. profileId is the matched
+// provider_profiles.id, or null when no enabled profile pins the model and we
+// fell back to the active/db/env config (i.e. the previous single-active
+// behaviour). See resolveProviderForModel().
+export interface ProviderContext {
+  profileId: string | null;
+  baseUrl: string;
+  apiKey: string | undefined;
+  modelMap: Record<string, string>;
+  source: {
+    baseUrl: "model_profile" | "active_profile" | "db" | "env";
+    apiKey: "model_profile" | "active_profile" | "db" | "env" | "none";
+  };
+}
+
 // The active provider profile, parsed safely from provider_profiles. Used by the
 // Task 5 catalog filter (supportedModelIds) and the closerouter model mapping
 // (modelMap). NEVER carries the cipher or the plaintext key.
@@ -93,10 +110,25 @@ interface CacheEntry {
 // Module-level cache. Holds the decrypted key in memory only; never logged.
 let cache: CacheEntry | null = null;
 
+// Parsed view of an enabled provider_profiles row, used by the per-model router.
+// Holds the decrypted key in memory only; never logged.
+interface ParsedProfile {
+  id: string;
+  baseUrl: string;
+  apiKey: string | undefined;
+  supportedModelIds: string[];
+  modelMap: Record<string, string>;
+}
+
+// All-enabled-profiles cache (per-model routing + UNION catalog). Shares the
+// same 5s TTL as `cache` and is cleared by the same invalidate call.
+let profilesCache: { profiles: ParsedProfile[]; at: number } | null = null;
+
 // Clears the in-process cache so the next resolve reads fresh DB state.
 // Called by the admin save handler (Requirement 3.5).
 export function invalidateProviderConfigCache(): void {
   cache = null;
+  profilesCache = null;
 }
 
 // ── DB read helpers ──────────────────────────────────────────────────────────
@@ -183,6 +215,41 @@ function parseStringRecord(value: unknown): Record<string, string> {
     if (typeof v === "string") out[k] = v;
   }
   return out;
+}
+
+// ── All-enabled-profiles read (per-model routing + UNION catalog) ─────────────
+
+// Reads every enabled provider_profiles row with a non-empty base URL, parsed +
+// decrypted, sorted deterministically by id. The deterministic sort makes the
+// per-model first-match resolution stable even if two profiles accidentally list
+// the same model id (the seed keeps the supportedModelIds a disjoint partition,
+// so first-match is normally unambiguous). Returns [] when provider_profiles is
+// unreachable (pre-migration 0013 / unit tests without a live DB), which keeps
+// the catalog + routing on the existing system_api_config → env path.
+async function readAllEnabledProfiles(): Promise<ParsedProfile[]> {
+  if (profilesCache && Date.now() - profilesCache.at < CACHE_TTL_MS) {
+    return profilesCache.profiles;
+  }
+  let rows: (typeof providerProfiles.$inferSelect)[] = [];
+  try {
+    rows = await db.select().from(providerProfiles);
+  } catch {
+    rows = [];
+  }
+  const profiles: ParsedProfile[] = rows
+    .filter((r) => r.enabled === true && isNonEmptyString(r.baseUrl))
+    .map((r) => ({
+      id: r.id,
+      baseUrl: r.baseUrl,
+      // Decrypt with the rotation fallback order; an undecryptable cipher yields
+      // undefined so the router falls back rather than forwarding a broken key.
+      apiKey: isNonEmptyString(r.apiKeyCipher) ? (decryptApiKey(r.apiKeyCipher) ?? undefined) : undefined,
+      supportedModelIds: parseStringArray(r.supportedModelIds),
+      modelMap: parseStringRecord(r.modelMap),
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  profilesCache = { profiles, at: Date.now() };
+  return profiles;
 }
 
 // ── Resolution (DB-first, env fallback) ──────────────────────────────────────
@@ -279,12 +346,61 @@ export async function resolveActiveModelMap(): Promise<Record<string, string>> {
   return profile ? profile.modelMap : {};
 }
 
-// The active profile's supported catalog ids, or null when there is no active
-// profile. null means "no profile restriction → show all" (backward compat); an
-// empty array means the profile explicitly supports no models.
+// The customer-visible catalog ids = the UNION of supportedModelIds across ALL
+// enabled provider profiles (per-model routing: each provider serves its own
+// slice, the catalog is everything any enabled provider serves). Returns null
+// only when there are zero enabled profiles — null means "no profile restriction
+// → show all" (backward compat; every fake-db unit test relies on this path). An
+// empty union (profiles exist but none lists a model) returns [] (show nothing).
 export async function resolveSupportedModelIds(): Promise<string[] | null> {
-  const profile = await resolveActiveProfile();
-  return profile ? profile.supportedModelIds : null;
+  const profiles = await readAllEnabledProfiles();
+  if (profiles.length === 0) return null;
+  const union = new Set<string>();
+  for (const p of profiles) {
+    for (const id of p.supportedModelIds) union.add(id);
+  }
+  return [...union];
+}
+
+// ── Per-model upstream routing ────────────────────────────────────────────────
+
+// Resolves the upstream provider that serves a given (canonical) catalog model
+// id. Fallback chain:
+//   1. model → first enabled profile whose supportedModelIds contains the id AND
+//      has a usable (decryptable) key — uses that profile's baseUrl/key/modelMap.
+//   2/3/4. no pinning profile → the existing combined resolver (active profile →
+//      system_api_config → env) + the active profile's modelMap. This branch is
+//      byte-for-byte the previous single-active behaviour, so a model that is in
+//      no enabled profile's set routes exactly as it does today.
+// The canonicalModelId MUST be the same id used in supportedModelIds (i.e.
+// masterModel.id — dash form for masters, dot form for added models like
+// claude-opus-4.8); proxy.ts already sends that id upstream.
+export async function resolveProviderForModel(canonicalModelId: string): Promise<ProviderContext> {
+  const profiles = await readAllEnabledProfiles();
+  const match = profiles.find((p) => p.supportedModelIds.includes(canonicalModelId));
+  if (match && match.apiKey) {
+    return {
+      profileId: match.id,
+      baseUrl: match.baseUrl,
+      apiKey: match.apiKey,
+      modelMap: match.modelMap,
+      source: { baseUrl: "model_profile", apiKey: "model_profile" },
+    };
+  }
+
+  // Fallback: active profile → system_api_config → env (unchanged single-active).
+  const eff = await resolveEffectiveProviderConfig();
+  const activeMap = await resolveActiveModelMap();
+  return {
+    profileId: null,
+    baseUrl: eff.baseUrl,
+    apiKey: eff.apiKey,
+    modelMap: activeMap,
+    source: {
+      baseUrl: eff.source.baseUrl === "profile" ? "active_profile" : eff.source.baseUrl,
+      apiKey: eff.source.apiKey === "profile" ? "active_profile" : eff.source.apiKey,
+    },
+  };
 }
 
 // DB-first resolution with env fallback. Reads system_api_config (id = 1).

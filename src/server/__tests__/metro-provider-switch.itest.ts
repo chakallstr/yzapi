@@ -1,44 +1,47 @@
 /**
- * metro-provider-switch INTEGRATION test (real Postgres + mocked upstream).
+ * per-model PROVIDER ROUTING INTEGRATION test (real Postgres + mocked upstream).
  *
- * Task 7 of .kiro/specs/metro-provider-switch/tasks.md.
+ * Originally Task 7 of .kiro/specs/metro-provider-switch/tasks.md (single-active
+ * switch). Rewritten for PER-MODEL routing: each requested model is forwarded to
+ * the enabled provider_profiles row whose supported_model_ids contains it, and
+ * the customer catalog is the UNION of all enabled profiles' supported sets.
  * Runs only via `npm run itest` (needs a live DB from `npm run db:up` + migrate,
  * which must apply migration 0013_provider_profiles).
  *
- * Mirrors money-flow.itest.ts + provider-model-config.itest.ts: it drives the
- * production route tree (createApp) through supertest, mocks the provider
- * upstream with nock, and exercises the REAL services (provider-config-service,
- * added-model-service catalog filter, billing-service reserve→settle,
- * reconciliation-service). It verifies the user's core requirement — "metro
- * modelleri görünür, switch edince diğeri" — plus billing safety on top:
+ * Drives the production route tree (createApp) through supertest, mocks the
+ * provider upstreams with nock (two DISTINCT origins), and exercises the REAL
+ * services (provider-config-service resolveProviderForModel + UNION catalog
+ * filter, billing-service reserve→settle, reconciliation-service):
  *
- *   1. ACTIVE-PROFILE CATALOG FILTER: with metro active, GET /api/models returns
- *      ONLY metro's supported_model_ids (gpt-5.4 / claude-sonnet-4-6 / the added
- *      gemini-3.5-flash); gpt-5.4-mini, gpt-5-nano and the added claude-opus-4.8
- *      are absent. Switching to closerouter (a different supported set) flips the
- *      visible catalog accordingly.
- *   2. SWITCH RESOLUTION: setActiveProvider("metro") makes resolveProviderBaseUrl()
- *      return the metro base URL, and a billed /v1/chat/completions to a
- *      metro-supported model is forwarded to the metro origin (nock-scoped) →
- *      200 + balance deduction + usage success. setActiveProvider("closerouter")
- *      switches the resolved base URL to the closerouter origin.
- *   3. BILLING SAFETY: a billed metro call decrements balance via reserve→settle
- *      (usage success); a ledger-funded user contributes ZERO reconciliation
- *      drift; an upstream error charges nothing (K1).
- *   4. UNSUPPORTED MODEL: with metro active, a /v1 chat call for a model NOT in
- *      metro's supported set → 404 ModelNotFoundError, nothing billed.
+ *   1. UNION CATALOG: with metro AND closerouter both enabled, GET /api/models
+ *      returns BOTH supported sets at once (gpt-5.4 / claude-sonnet-4-6 / added
+ *      gemini-3.5-flash from metro + gpt-5.4-mini / gpt-5-nano from closerouter).
+ *      A master in neither set (gpt-5-mini) and the added claude-opus-4.8 (in
+ *      neither) are absent.
+ *   2. PER-MODEL ROUTING: with no switch, a billed /v1/chat/completions to a
+ *      metro-served model is forwarded to the metro origin, and a closerouter-
+ *      served model is forwarded to the closerouter origin — in the SAME run.
+ *   3. BILLING SAFETY: a billed call decrements balance via reserve→settle (usage
+ *      success); a ledger-funded user contributes ZERO reconciliation drift; an
+ *      upstream error charges nothing (K1). Billing is provider-identity-
+ *      independent, so routing to a different upstream never changes the charge.
+ *   4. UNSUPPORTED MODEL: a /v1 chat call for a model in NO enabled profile's set
+ *      → 404 ModelNotFoundError, nothing billed.
+ *
+ * DETERMINISM: the shared dev DB may carry OTHER enabled provider_profiles (real
+ * seeds). Since the UNION catalog spans all of them, this suite snapshots and
+ * temporarily DISABLES every other enabled profile in beforeAll and restores them
+ * verbatim in afterAll, so the union under test is exactly metro ∪ closerouter.
  *
  * NOTE (deviation, mirrors provider-model-config.itest.ts): the shared dev DB may
  * carry a pre-existing GLOBAL ledger drift from unrelated seed data, so a literal
- * `driftTL === 0` is impossible without destroying seed rows. The faithful
- * assertion is that THIS FEATURE introduces no drift: the ledger-funded user never
- * appears in userDrifts (per-user drift 0) and the global drift is unchanged by
- * the metro-billed request.
+ * `driftTL === 0` is impossible. The faithful assertion is that THIS FEATURE
+ * introduces no drift: the ledger-funded user never appears in userDrifts.
  *
  * CLEANUP: afterAll snapshot-restores system_api_config.activeProviderId +
- * provider_base_url/cipher and the provider_profiles rows it touched, deletes the
- * seeded added_models + test users, and snapshot-restores system_config pricing —
- * leaving the shared dev DB exactly as found.
+ * provider_base_url/cipher, the provider_profiles rows it touched (incl. the
+ * temporarily-disabled others), deletes the seeded added_models + test users, and
+ * snapshot-restores system_config pricing — leaving the shared dev DB as found.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import nock from "nock";
@@ -52,7 +55,6 @@ import {
   upsertProviderProfile,
   setActiveProvider,
   listProviderProfiles,
-  resolveProviderBaseUrl,
   invalidateProviderConfigCache,
 } from "../services/provider-config-service.js";
 import { seedMetroAddedModels } from "../db/seed.js";
@@ -60,8 +62,8 @@ import { getReconciliationReport } from "../services/reconciliation-service.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-// Metro upstream origin (active provider base URL under test). Distinct from the
-// closerouter origin so nock can prove the switch routes to the right upstream.
+// Metro upstream origin. Distinct from the closerouter origin so nock proves the
+// per-model router routed to the right upstream.
 const METRO_BASE_URL = "https://api.stepanovikov.uno";
 const METRO_ORIGIN = new URL(METRO_BASE_URL).origin;
 
@@ -69,22 +71,22 @@ const METRO_ORIGIN = new URL(METRO_BASE_URL).origin;
 const CLOSEROUTER_BASE_URL = process.env.CLOSEROUTER_BASE_URL || "https://api.closerouter.dev/v1";
 const CLOSEROUTER_ORIGIN = new URL(CLOSEROUTER_BASE_URL).origin;
 
-// Provider profile ids exercised by the switch (per the task spec).
+// Provider profile ids exercised by the router.
 const METRO_ID = "metro";
 const CLOSEROUTER_ID = "closerouter";
 
-// Metro's supported catalog ids: two master text models + one added model.
+// DISJOINT supported sets (a partition) — required for deterministic per-model
+// routing: each model is served by exactly one profile.
 const METRO_SUPPORTED = ["gpt-5.4", "claude-sonnet-4-6", "gemini-3.5-flash"] as const;
-// Closerouter's (different) supported set — used to prove the switch flips visibility.
 const CLOSEROUTER_SUPPORTED = ["gpt-5.4-mini", "gpt-5-nano"] as const;
 
-// A metro-supported master model used for billed /v1 calls.
+// A metro-served master model used for billed /v1 calls.
 const METRO_BILLED_MODEL = "gpt-5.4";
-// A closerouter-supported master model used to prove the base-url switch.
+// A closerouter-served master model used to prove per-model routing to the other origin.
 const CLOSEROUTER_BILLED_MODEL = "gpt-5.4-mini";
-// A master model NOT in metro's supported set → must 404 when metro is active.
-const METRO_UNSUPPORTED_MODEL = "gpt-5-nano";
-// The two added models seeded by seedMetroAddedModels (only one is metro-supported).
+// A master model in NEITHER set → must 404 (served by no enabled profile).
+const UNSUPPORTED_MODEL = "gpt-5-mini";
+// The two added models seeded by seedMetroAddedModels (only one is metro-served).
 const ADDED_VISIBLE = "gemini-3.5-flash";
 const ADDED_HIDDEN = "claude-opus-4.8";
 
@@ -107,7 +109,8 @@ let providerCfgSnapshot: {
   provider_api_key_cipher: string | null;
   provider_api_key_updated_at: Date | null;
 } | null = null;
-// Raw provider_profiles rows (if any) for METRO_ID / CLOSEROUTER_ID before the test.
+// Raw provider_profiles rows (if any) for METRO_ID / CLOSEROUTER_ID + any other
+// enabled profile we temporarily disable for catalog determinism.
 type RawProfileRow = {
   id: string;
   label: string;
@@ -120,6 +123,8 @@ type RawProfileRow = {
   updated_at: Date;
 };
 const profileSnapshots = new Map<string, RawProfileRow | null>();
+// Ids of OTHER enabled profiles disabled for the duration of this suite.
+const disabledOtherProfileIds: string[] = [];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -258,6 +263,18 @@ beforeAll(async () => {
   await snapshotProfile(METRO_ID);
   await snapshotProfile(CLOSEROUTER_ID);
 
+  // Determinism: disable every OTHER enabled profile so the UNION catalog under
+  // test is exactly metro ∪ closerouter. Snapshot each first; restore in afterAll.
+  const otherRows = await dbSql<{ id: string }[]>`
+    SELECT id FROM provider_profiles
+    WHERE enabled = true AND id NOT IN (${METRO_ID}, ${CLOSEROUTER_ID})
+  `;
+  for (const r of otherRows) {
+    await snapshotProfile(r.id);
+    disabledOtherProfileIds.push(r.id);
+    await dbSql`UPDATE provider_profiles SET enabled = false WHERE id = ${r.id}`;
+  }
+
   // Funded users. The billing user is funded directly (asserts a balance delta).
   await seedUser({ id: BILLING_USER_ID, email: "itest-metro-billing@test.local", balanceTL: "100.0000" });
   await seedKey(BILLING_USER_ID, BILLING_KEY, billingPrefix);
@@ -271,16 +288,17 @@ beforeAll(async () => {
     VALUES (${RECON_USER_ID}::uuid, 'itest-metro-recon@test.local', 'yukleme', 100, 0, 100, 'itest metro funding', ${`itest_metro_recon_fund_${RECON_USER_ID}`})
   `;
 
-  // Seed the two metro added models (idempotent). Only metro's supported set will
-  // surface them in the catalog.
+  // Seed the two metro added models (idempotent). The union catalog surfaces only
+  // the one in a served set (gemini-3.5-flash is metro-served; claude-opus-4.8 is not).
   await seedMetroAddedModels(db);
 
   // Make sure none of the models under test are disabled by an override.
-  for (const id of [METRO_BILLED_MODEL, CLOSEROUTER_BILLED_MODEL, METRO_UNSUPPORTED_MODEL, ADDED_VISIBLE, ADDED_HIDDEN]) {
+  for (const id of [METRO_BILLED_MODEL, CLOSEROUTER_BILLED_MODEL, UNSUPPORTED_MODEL, ADDED_VISIBLE, ADDED_HIDDEN]) {
     await dbSql`DELETE FROM model_overrides WHERE model_id = ${id}`;
   }
 
-  // Upsert the two provider profiles (write-only api keys exercise the cipher path).
+  // Upsert the two provider profiles (write-only api keys exercise the cipher
+  // path; both keys are required so resolveProviderForModel can route to each).
   await upsertProviderProfile({
     id: METRO_ID,
     label: "Metro",
@@ -300,6 +318,10 @@ beforeAll(async () => {
     modelMap: {},
   });
 
+  // Active provider is only the FALLBACK now (per-model routing pins each served
+  // model); pin it to metro so the isActive assertion + any unrouted fallback is
+  // deterministic.
+  await setActiveProvider(METRO_ID);
   invalidateProviderConfigCache();
 });
 
@@ -315,9 +337,13 @@ afterAll(async () => {
   // Delete the seeded added models (only those this suite seeds).
   await dbSql`DELETE FROM added_models WHERE model_id IN (${ADDED_VISIBLE}, ${ADDED_HIDDEN})`;
 
-  // Restore provider profiles (verbatim if they pre-existed, else removed).
+  // Restore provider profiles (verbatim if they pre-existed, else removed),
+  // including the OTHER profiles we temporarily disabled.
   await restoreProfile(METRO_ID);
   await restoreProfile(CLOSEROUTER_ID);
+  for (const id of disabledOtherProfileIds) {
+    await restoreProfile(id);
+  }
 
   // Restore active provider + provider config fields.
   if (providerCfgSnapshot) {
@@ -359,67 +385,47 @@ beforeEach(async () => {
   await dbSql`UPDATE users SET bakiye_tl = '100.0000' WHERE id = ${BILLING_USER_ID}::uuid`;
 });
 
-// ── 1. Active-profile catalog filter (the user's core requirement) ──────────────
+// ── 1. UNION catalog (the user's core requirement under per-model routing) ──────
 
-describe("active-profile catalog filter: metro shows its models, switch flips them", () => {
-  it("GET /api/models returns ONLY the active provider's supported_model_ids and reflects the switch", async () => {
-    // ── metro active ──────────────────────────────────────────────────────────
-    await setActiveProvider(METRO_ID);
-    invalidateProviderConfigCache();
+describe("UNION catalog: both enabled providers' supported sets are visible at once", () => {
+  it("GET /api/models returns metro ∪ closerouter; models in no served set are hidden", async () => {
+    const ids = await fetchPublicModelIds();
 
-    const metroIds = await fetchPublicModelIds();
-
-    // Exactly metro's supported set is visible (two masters + the added model).
+    // Both providers' supported sets are visible SIMULTANEOUSLY (no switch).
     for (const id of METRO_SUPPORTED) {
-      expect(metroIds.has(id)).toBe(true);
+      expect(ids.has(id)).toBe(true);
     }
-    // The added gemini-3.5-flash (metro-supported) IS present...
-    expect(metroIds.has(ADDED_VISIBLE)).toBe(true);
-    // ...but masters NOT in metro's set are hidden...
-    expect(metroIds.has("gpt-5.4-mini")).toBe(false);
-    expect(metroIds.has("gpt-5-nano")).toBe(false);
-    // ...and the added claude-opus-4.8 (NOT in metro's set) is hidden too.
-    expect(metroIds.has(ADDED_HIDDEN)).toBe(false);
-    // The catalog is exactly the supported set (nothing extra leaks through).
-    expect(metroIds.size).toBe(METRO_SUPPORTED.length);
-
-    // ── switch to closerouter ───────────────────────────────────────────────────
-    await setActiveProvider(CLOSEROUTER_ID);
-    invalidateProviderConfigCache();
-
-    const closeIds = await fetchPublicModelIds();
-
-    // Now the closerouter set is visible and the metro-only ids are gone.
     for (const id of CLOSEROUTER_SUPPORTED) {
-      expect(closeIds.has(id)).toBe(true);
+      expect(ids.has(id)).toBe(true);
     }
-    expect(closeIds.has("gpt-5.4")).toBe(false);
-    expect(closeIds.has("claude-sonnet-4-6")).toBe(false);
-    expect(closeIds.has(ADDED_VISIBLE)).toBe(false);
-    expect(closeIds.size).toBe(CLOSEROUTER_SUPPORTED.length);
+    // The added gemini-3.5-flash (metro-served) IS present...
+    expect(ids.has(ADDED_VISIBLE)).toBe(true);
+    // ...but a master in NEITHER served set is hidden...
+    expect(ids.has(UNSUPPORTED_MODEL)).toBe(false);
+    // ...and the added claude-opus-4.8 (in neither served set) is hidden too.
+    expect(ids.has(ADDED_HIDDEN)).toBe(false);
+    // The catalog is exactly the UNION (other profiles disabled for determinism).
+    expect(ids.size).toBe(METRO_SUPPORTED.length + CLOSEROUTER_SUPPORTED.length);
 
-    // listProviderProfiles marks exactly the active one.
+    // listProviderProfiles marks exactly the active (fallback) one; both enabled.
     const profiles = await listProviderProfiles();
     const metroView = profiles.find((p) => p.id === METRO_ID);
     const closeView = profiles.find((p) => p.id === CLOSEROUTER_ID);
-    expect(metroView?.isActive).toBe(false);
-    expect(closeView?.isActive).toBe(true);
+    expect(metroView?.isActive).toBe(true);
+    expect(metroView?.enabled).toBe(true);
+    expect(closeView?.isActive).toBe(false);
+    expect(closeView?.enabled).toBe(true);
     // The cipher/plaintext key is never exposed — only the masked form.
     expect(JSON.stringify(profiles)).not.toContain("sk-itest-metro-key");
     expect(JSON.stringify(profiles)).not.toContain("sk-itest-closerouter-key");
   });
 });
 
-// ── 2. Switch resolution: active provider drives the resolved base URL ──────────
+// ── 2. Per-model routing: the MODEL (not the active provider) picks the upstream ─
 
-describe("switch resolution: active provider drives resolveProviderBaseUrl + upstream routing", () => {
-  it("metro active → resolves the metro base URL and forwards a billed call to the metro origin", async () => {
-    await setActiveProvider(METRO_ID);
-    invalidateProviderConfigCache();
-
-    expect(await resolveProviderBaseUrl()).toBe(METRO_BASE_URL);
-
-    // The /v1 call must hit the METRO origin (proves the switch routed upstream).
+describe("per-model routing: each model is forwarded to its own provider's origin", () => {
+  it("a metro-served model is forwarded to the METRO origin (billed)", async () => {
+    // The /v1 call must hit the METRO origin (proves the model pinned the upstream).
     const scope = nockChatSuccess(METRO_ORIGIN);
 
     const before = await getBalance(BILLING_USER_ID);
@@ -443,12 +449,7 @@ describe("switch resolution: active provider drives resolveProviderBaseUrl + ups
     expect(before - after).toBeCloseTo(costHeader, 2);
   });
 
-  it("closerouter active → resolves the closerouter base URL and forwards there", async () => {
-    await setActiveProvider(CLOSEROUTER_ID);
-    invalidateProviderConfigCache();
-
-    expect(await resolveProviderBaseUrl()).toBe(CLOSEROUTER_BASE_URL);
-
+  it("a closerouter-served model is forwarded to the CLOSEROUTER origin (same run, no switch)", async () => {
     const scope = nockChatSuccess(CLOSEROUTER_ORIGIN);
 
     const before = await getBalance(BILLING_USER_ID);
@@ -469,10 +470,8 @@ describe("switch resolution: active provider drives resolveProviderBaseUrl + ups
 
 // ── 3. Billing safety (reserve→settle, K1, reconciliation drift) ────────────────
 
-describe("billing safety with metro active", () => {
-  it("a successful metro call decrements balance via reserve→settle (usage success)", async () => {
-    await setActiveProvider(METRO_ID);
-    invalidateProviderConfigCache();
+describe("billing safety under per-model routing", () => {
+  it("a successful metro-routed call decrements balance via reserve→settle (usage success)", async () => {
     nockChatSuccess(METRO_ORIGIN);
 
     const before = await getBalance(BILLING_USER_ID);
@@ -494,9 +493,7 @@ describe("billing safety with metro active", () => {
     expect(before - after).toBeCloseTo(costHeader, 2);
   });
 
-  it("does NOT charge when the metro upstream errors (502) — full refund (K1)", async () => {
-    await setActiveProvider(METRO_ID);
-    invalidateProviderConfigCache();
+  it("does NOT charge when the routed upstream errors (502) — full refund (K1)", async () => {
     nock(METRO_ORIGIN).post(/\/chat\/completions$/).reply(502, { error: "metro upstream boom" });
 
     const before = await getBalance(BILLING_USER_ID);
@@ -524,10 +521,7 @@ describe("billing safety with metro active", () => {
     expect(after).toBeCloseTo(before, 4);
   });
 
-  it("a ledger-funded user billed via metro contributes ZERO reconciliation drift", async () => {
-    await setActiveProvider(METRO_ID);
-    invalidateProviderConfigCache();
-
+  it("a ledger-funded user billed via a metro-routed call contributes ZERO reconciliation drift", async () => {
     const driftBefore = (await getReconciliationReport()).totals.driftTL;
 
     nockChatSuccess(METRO_ORIGIN);
@@ -550,13 +544,10 @@ describe("billing safety with metro active", () => {
   });
 });
 
-// ── 4. Unsupported model under the active provider ──────────────────────────────
+// ── 4. Unsupported model (served by no enabled profile) ─────────────────────────
 
-describe("unsupported model with metro active", () => {
-  it("a /v1 chat call for a model NOT in metro's supported set → 404 ModelNotFoundError, nothing billed", async () => {
-    await setActiveProvider(METRO_ID);
-    invalidateProviderConfigCache();
-
+describe("unsupported model under per-model routing", () => {
+  it("a /v1 chat call for a model in NO served set → 404 ModelNotFoundError, nothing billed", async () => {
     // No nock interceptor: the request must be rejected BEFORE any upstream call.
     const before = await getBalance(BILLING_USER_ID);
     const usageBefore = await countUsageRecords(BILLING_USER_ID);
@@ -564,7 +555,7 @@ describe("unsupported model with metro active", () => {
     const res = await request(app)
       .post("/v1/chat/completions")
       .set("Authorization", `Bearer ${BILLING_KEY}`)
-      .send({ model: METRO_UNSUPPORTED_MODEL, messages: [{ role: "user", content: "hi" }] });
+      .send({ model: UNSUPPORTED_MODEL, messages: [{ role: "user", content: "hi" }] });
 
     expect(res.status).toBe(404);
     expect(String(res.body.error)).toContain("Model not found");

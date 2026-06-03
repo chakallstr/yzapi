@@ -7,6 +7,7 @@ import { checkRateLimit } from "../services/rate-limit-service.js";
 import { reserveUsageBudget, settleReservedUsage } from "../services/billing-service.js";
 import { resolveActiveCatalogModel } from "../services/added-model-service.js";
 import { getActiveProviderAdapter } from "../services/provider-adapter.js";
+import { resolveProviderForModel } from "../services/provider-config-service.js";
 import { db } from "../db/client.js";
 import { modelOverrides, systemConfig, users } from "../db/schema.js";
 import { eq } from "drizzle-orm";
@@ -321,12 +322,14 @@ async function handleTextJsonEndpoint(
       ...guard.guardedBody,
       model: runtimeConfig.strictCanonicalModelIds ? masterModel.id : String(model || masterModel.id),
     };
+    // Per-model upstream routing: the model decides which provider profile serves
+    // it (Claude → wellflow, GPT/Gemini/o-series + opus-4.8 → popusk); falls back to
+    // the active provider when the model is pinned to no enabled profile.
+    const providerCtx = await resolveProviderForModel(masterModel.id);
     const activeProviderAdapter = await getActiveProviderAdapter();
-    const forwarder = endpoint === "responses"
-      ? activeProviderAdapter.forwardResponses.bind(activeProviderAdapter)
-      : activeProviderAdapter.forwardMessages.bind(activeProviderAdapter);
-
-    const { raw, usage } = await forwarder(providerBody);
+    const { raw, usage } = endpoint === "responses"
+      ? await activeProviderAdapter.forwardResponses(providerBody, providerCtx)
+      : await activeProviderAdapter.forwardMessages(providerBody, providerCtx);
     const responseMs = Date.now() - start;
 
     // Giriş token floor'u: yalnız sağlayıcı bozuk-düşük raporladığında devreye girer.
@@ -468,11 +471,13 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       ...guard.guardedBody,
       model: runtimeConfig.strictCanonicalModelIds ? masterModel.id : String(model || masterModel.id),
     };
+    // Per-model upstream routing (see handleTextJsonEndpoint): model → provider.
+    const providerCtx = await resolveProviderForModel(masterModel.id);
     const activeProviderAdapter = await getActiveProviderAdapter();
 
     if (isStream) {
       res.setHeader("X-YZ-Request-Id", requestId);
-      const usage = await activeProviderAdapter.forwardChatStream(providerBody as any, res);
+      const usage = await activeProviderAdapter.forwardChatStream(providerBody as any, res, providerCtx);
       const responseMs = Date.now() - start;
 
       const hasUsage = usage.promptTokens > 0 || usage.completionTokens > 0;
@@ -494,7 +499,7 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
         status: streamStatus,
       });
     } else {
-      const { raw, usage } = await activeProviderAdapter.forwardChat(providerBody as any);
+      const { raw, usage } = await activeProviderAdapter.forwardChat(providerBody as any, providerCtx);
       const responseMs = Date.now() - start;
 
       // Giriş token floor'u: yalnız sağlayıcı bozuk-düşük raporladığında (ör. cache alanı /

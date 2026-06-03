@@ -11,53 +11,56 @@ import {
   submitVideo,
 } from "./closerouter-service.js";
 import { getRuntimeApiConfig } from "./api-settings-service.js";
+import type { ProviderContext } from "./provider-config-service.js";
 
 export interface ProviderAdapter {
   readonly id: "closerouter" | "ninerouter";
-  forwardChat(body: ChatRequest): Promise<{ raw: unknown; usage: ChatUsage }>;
-  forwardChatStream(body: ChatRequest, res: Response): Promise<ChatUsage>;
-  forwardResponses(body: TextRequest): Promise<{ raw: unknown; usage: ChatUsage }>;
-  forwardMessages(body: TextRequest): Promise<{ raw: unknown; usage: ChatUsage }>;
+  forwardChat(body: ChatRequest, ctx: ProviderContext): Promise<{ raw: unknown; usage: ChatUsage }>;
+  forwardChatStream(body: ChatRequest, res: Response, ctx: ProviderContext): Promise<ChatUsage>;
+  forwardResponses(body: TextRequest, ctx: ProviderContext): Promise<{ raw: unknown; usage: ChatUsage }>;
+  forwardMessages(body: TextRequest, ctx: ProviderContext): Promise<{ raw: unknown; usage: ChatUsage }>;
   forwardImage(
     endpoint: "generations" | "edits",
-    body: Record<string, unknown>
+    body: Record<string, unknown>,
+    ctx: ProviderContext
   ): Promise<{ raw: unknown; imageCount: number }>;
-  submitVideo(body: Record<string, unknown>): Promise<{ taskId: string }>;
-  getVideoTask(taskId: string): Promise<Record<string, unknown>>;
+  submitVideo(body: Record<string, unknown>, ctx: ProviderContext): Promise<{ taskId: string }>;
+  getVideoTask(taskId: string, ctx: ProviderContext): Promise<Record<string, unknown>>;
 }
 
 export class CloseRouterAdapter implements ProviderAdapter {
   readonly id = "closerouter" as const;
 
-  forwardChat(body: ChatRequest): Promise<{ raw: unknown; usage: ChatUsage }> {
-    return forwardChat(body);
+  forwardChat(body: ChatRequest, ctx: ProviderContext): Promise<{ raw: unknown; usage: ChatUsage }> {
+    return forwardChat(body, ctx);
   }
 
-  forwardChatStream(body: ChatRequest, res: Response): Promise<ChatUsage> {
-    return forwardChatStream(body, res);
+  forwardChatStream(body: ChatRequest, res: Response, ctx: ProviderContext): Promise<ChatUsage> {
+    return forwardChatStream(body, res, ctx);
   }
 
-  forwardResponses(body: TextRequest): Promise<{ raw: unknown; usage: ChatUsage }> {
-    return forwardTextEndpoint("responses", body);
+  forwardResponses(body: TextRequest, ctx: ProviderContext): Promise<{ raw: unknown; usage: ChatUsage }> {
+    return forwardTextEndpoint("responses", body, ctx);
   }
 
-  forwardMessages(body: TextRequest): Promise<{ raw: unknown; usage: ChatUsage }> {
-    return forwardTextEndpoint("messages", body);
+  forwardMessages(body: TextRequest, ctx: ProviderContext): Promise<{ raw: unknown; usage: ChatUsage }> {
+    return forwardTextEndpoint("messages", body, ctx);
   }
 
   forwardImage(
     endpoint: "generations" | "edits",
-    body: Record<string, unknown>
+    body: Record<string, unknown>,
+    ctx: ProviderContext
   ): Promise<{ raw: unknown; imageCount: number }> {
-    return forwardImage(endpoint, body);
+    return forwardImage(endpoint, body, ctx);
   }
 
-  submitVideo(body: Record<string, unknown>): Promise<{ taskId: string }> {
-    return submitVideo(body);
+  submitVideo(body: Record<string, unknown>, ctx: ProviderContext): Promise<{ taskId: string }> {
+    return submitVideo(body, ctx);
   }
 
-  getVideoTask(taskId: string): Promise<Record<string, unknown>> {
-    return getVideoTask(taskId);
+  getVideoTask(taskId: string, ctx: ProviderContext): Promise<Record<string, unknown>> {
+    return getVideoTask(taskId, ctx);
   }
 }
 

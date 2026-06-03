@@ -4,7 +4,7 @@ import { aiProviderBaseUrl } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { canonicalizeModelId } from "../../master-models.js";
 import { getRuntimeApiConfig } from "./api-settings-service.js";
-import { resolveProviderBaseUrl, resolveProviderApiKey, resolveActiveModelMap } from "./provider-config-service.js";
+import type { ProviderContext } from "./provider-config-service.js";
 
 export interface ChatUsage {
   promptTokens: number;
@@ -142,17 +142,20 @@ function mapRequestBodyForProvider<T extends Record<string, unknown>>(
   return { ...body, model: mapped };
 }
 
-// Applies the active provider profile's model_map (catalog-id → upstream-id) to
-// the outgoing request body's model. An empty map (no active profile, or no
-// mapping for this model) leaves the model unchanged — fully backward compatible.
-// This runs IN ADDITION to the legacy OmniRoute map so each provider profile can
-// declare its own upstream model naming (e.g. metro expects "claude-sonnet-4.6"
-// while our canonical catalog id is "claude-sonnet-4-6"). Does NOT touch billing:
-// the master model / cost is already resolved upstream in proxy.ts from the
-// canonical id; only the wire name sent to the provider changes here.
-async function applyProfileModelMap<T extends Record<string, unknown>>(body: T): Promise<T> {
+// Applies the resolved provider profile's model_map (catalog-id → upstream-id) to
+// the outgoing request body's model. An empty map (no profile, or no mapping for
+// this model) leaves the model unchanged — fully backward compatible. The map is
+// supplied by the per-model ProviderContext so each provider profile declares its
+// own upstream model naming (e.g. metro expects "claude-sonnet-4.6" while our
+// canonical catalog id is "claude-sonnet-4-6"). This runs IN ADDITION to the
+// legacy OmniRoute map. Does NOT touch billing: the master model / cost is
+// already resolved upstream in proxy.ts from the canonical id; only the wire name
+// sent to the provider changes here.
+function applyProfileModelMap<T extends Record<string, unknown>>(
+  body: T,
+  map: Record<string, string>,
+): T {
   if (typeof body.model !== "string") return body;
-  const map = await resolveActiveModelMap();
   const mapped = map[body.model];
   if (!mapped || mapped === body.model) return body;
   return { ...body, model: mapped };
@@ -208,8 +211,7 @@ async function readProviderJson(res: globalThis.Response): Promise<Record<string
   return JSON.parse(text) as Record<string, unknown>;
 }
 
-async function baseHeaders(): Promise<Record<string, string>> {
-  const apiKey = await resolveProviderApiKey();
+function baseHeaders(apiKey: string | undefined): Record<string, string> {
   return {
     Authorization: `Bearer ${apiKey ?? ""}`,
     "Content-Type": "application/json",
@@ -232,19 +234,21 @@ async function fetchWithRuntimeTimeout(
 }
 
 export async function forwardChat(
-  body: ChatRequest
+  body: ChatRequest,
+  ctx: ProviderContext
 ): Promise<{ raw: unknown; usage: ChatUsage }> {
   const start = Date.now();
-  const baseUrl = await resolveProviderBaseUrl();
+  const baseUrl = ctx.baseUrl;
   const url = `${baseUrl}/chat/completions`;
-  const providerBody = await applyProfileModelMap(
+  const providerBody = applyProfileModelMap(
     mapRequestBodyForProvider({ ...body, stream: false }, baseUrl),
+    ctx.modelMap,
   );
   const runtimeConfig = await getRuntimeApiConfig();
 
   const res = await fetchWithRuntimeTimeout(url, {
     method: "POST",
-    headers: await baseHeaders(),
+    headers: baseHeaders(ctx.apiKey),
     body: JSON.stringify(providerBody),
   }, runtimeConfig.defaultRequestTimeoutMs);
 
@@ -268,19 +272,21 @@ export async function forwardChat(
 
 export async function forwardTextEndpoint(
   endpoint: "responses" | "messages",
-  body: TextRequest
+  body: TextRequest,
+  ctx: ProviderContext
 ): Promise<{ raw: unknown; usage: ChatUsage }> {
   const start = Date.now();
-  const baseUrl = await resolveProviderBaseUrl();
+  const baseUrl = ctx.baseUrl;
   const url = `${baseUrl}/${endpoint}`;
-  const providerBody = await applyProfileModelMap(
+  const providerBody = applyProfileModelMap(
     mapRequestBodyForProvider({ ...body, stream: false }, baseUrl),
+    ctx.modelMap,
   );
   const runtimeConfig = await getRuntimeApiConfig();
 
   const res = await fetchWithRuntimeTimeout(url, {
     method: "POST",
-    headers: await baseHeaders(),
+    headers: baseHeaders(ctx.apiKey),
     body: JSON.stringify(providerBody),
   }, runtimeConfig.defaultRequestTimeoutMs);
 
@@ -301,26 +307,28 @@ export async function forwardTextEndpoint(
 
 export async function forwardChatStream(
   body: ChatRequest,
-  res: Response
+  res: Response,
+  ctx: ProviderContext
 ): Promise<ChatUsage> {
-  const baseUrl = await resolveProviderBaseUrl();
+  const baseUrl = ctx.baseUrl;
   const url = `${baseUrl}/chat/completions`;
   // stream_options.include_usage: OpenAI-uyumlu sağlayıcının SON SSE chunk'ında
   // gerçek token usage'ını döndürmesini ister. Bu olmadan bazı sağlayıcılar stream'de
   // usage vermez ve biz char/4 TAHMİNİNE düşeriz — tahmin gerçek token'ın altında
   // kalırsa EKSİK TAHSİL (bizim zararımız) olur. Bu flag gerçek token'ı garantiye
   // alır; billing mantığına dokunmaz (yalnız sağlayıcıdan kesin usage talep eder).
-  const providerBody = await applyProfileModelMap(
+  const providerBody = applyProfileModelMap(
     mapRequestBodyForProvider(
       { ...body, stream: true, stream_options: { include_usage: true } },
       baseUrl,
     ),
+    ctx.modelMap,
   );
   const runtimeConfig = await getRuntimeApiConfig();
 
   const upstream = await fetchWithRuntimeTimeout(url, {
     method: "POST",
-    headers: { ...(await baseHeaders()), Accept: "text/event-stream" },
+    headers: { ...baseHeaders(ctx.apiKey), Accept: "text/event-stream" },
     body: JSON.stringify(providerBody),
   }, runtimeConfig.defaultStreamTimeoutMs);
 
@@ -441,16 +449,17 @@ export async function forwardChatStream(
 
 export async function forwardImage(
   endpoint: "generations" | "edits",
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  ctx: ProviderContext
 ): Promise<{ raw: unknown; imageCount: number }> {
   const start = Date.now();
-  const baseUrl = await resolveProviderBaseUrl();
+  const baseUrl = ctx.baseUrl;
   const url = `${baseUrl}/images/${endpoint}`;
   const runtimeConfig = await getRuntimeApiConfig();
 
   const res = await fetchWithRuntimeTimeout(url, {
     method: "POST",
-    headers: await baseHeaders(),
+    headers: baseHeaders(ctx.apiKey),
     body: JSON.stringify(body),
   }, runtimeConfig.defaultRequestTimeoutMs);
 
@@ -471,14 +480,15 @@ export async function forwardImage(
 }
 
 export async function submitVideo(
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  ctx: ProviderContext
 ): Promise<{ taskId: string }> {
-  const baseUrl = await resolveProviderBaseUrl();
+  const baseUrl = ctx.baseUrl;
   const url = `${baseUrl}/videos/submit`;
 
   const res = await fetch(url, {
     method: "POST",
-    headers: await baseHeaders(),
+    headers: baseHeaders(ctx.apiKey),
     body: JSON.stringify(body),
   });
 
@@ -494,10 +504,10 @@ export async function submitVideo(
   return { taskId: String(json.task_id) };
 }
 
-export async function getVideoTask(taskId: string): Promise<Record<string, unknown>> {
-  const baseUrl = await resolveProviderBaseUrl();
+export async function getVideoTask(taskId: string, ctx: ProviderContext): Promise<Record<string, unknown>> {
+  const baseUrl = ctx.baseUrl;
   const url = `${baseUrl}/videos/tasks/${taskId}`;
-  const apiKey = await resolveProviderApiKey();
+  const apiKey = ctx.apiKey;
 
   const res = await fetch(url, {
     method: "GET",

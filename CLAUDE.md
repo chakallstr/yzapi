@@ -199,7 +199,7 @@ Tek env erişim noktası (Zod-validated `env`); doğrudan `process.env` kullanma
 
 ## Test Katmanları
 - **Unit (`*.test.ts`):** `npm test` (`vitest run`, `vitest.config.ts`) — DB-mock'lu/saf logic; setup `src/server/__tests__/setup.ts`
-- **Contract (`*-contract.test.ts`):** bundle/sabit bütünlüğü (provider leak, fiyat parity, 42-lock, frontend display order, api-docs içerik)
+- **Contract (`*-contract.test.ts`):** bundle/sabit bütünlüğü (provider leak, fiyat parity, 42-lock, frontend display order, api-docs içerik). ⚠️ Dokümantasyon yüzeyi (`yapayzekalab/api-docs.js` + `tab-documents.jsx`) iki testle string/yapı-kilitli: `documents-content-contract` (zorunlu metinler: endpoint'ler, istemci adları, `ANTHROPIC_AUTH_TOKEN`, "Kod kopyala"/"Kopyalandı", TOC fn'leri) + `os-install-variants-contract` (her `osVariants` win/mac/linux dolu; Claude Code `$env:`/`setx`/`ANTHROPIC_AUTH_TOKEN`; Windows curl tek-satır `curl.exe`; her blokta `yzk_live_YOUR_KEY` placeholder). Dokümanı düzenlerken bunları koru.
 - **Integration (`*.itest.ts`):** `npm run itest` (`--config vitest.itest.config.ts`) — gerçek Postgres (`db:up` + `db:migrate`); `fileParallelism:false`, timeout 30s
 - **E2E:** `npm run e2e` (playwright chromium); setup `npm run e2e:up`
 - **Smoke (`scripts/`):** canlı/local prod build'e HTTP probe (`smoke:vps`, `qa:uat`, `preflight:live`)

@@ -1,54 +1,64 @@
 // scripts/seed-provider-profiles.ts
 //
-// One-shot operator script: seeds the two provider profiles for the
-// metro-provider-switch feature and (optionally) activates one.
+// One-shot operator script: seeds the provider profiles for PER-MODEL routing and
+// (re-)applies the fallback active provider. Each enabled profile's
+// supported_model_ids is a DISJOINT partition; the request's model picks the
+// upstream (resolveProviderForModel). PROBE-VERIFIED topology (2026-06-03):
 //
-//   metro       — ACTIVE upstream (api.stepanovikov.uno/v1). Serves a subset of
-//                 the catalog; some catalog ids need a wire-name rewrite
-//                 (model_map) because metro expects the nokta-form id.
-//   closerouter — STANDBY upstream (Claude Popusk, base https://api.claude-popusk.shop/v1
-//                 via env AI_PROVIDER_BASE_URL). Has its OWN dedicated reseller key
-//                 read from env POPUSK_API_KEY (set conditionally so an empty env
-//                 keeps the stored cipher). Serves the full master catalog minus
-//                 gemini-3-pro-preview, PLUS added model claude-opus-4.8 (dot→dash
-//                 wire rewrite via model_map).
+//   wellflow    — Claude family upstream (base https://api.wellflow.dev/v1). OWN
+//                 reseller key (wf_-prefixed) from env WELLFLOW_API_KEY (conditional,
+//                 empty env keeps stored cipher). Serves opus-4-7/4-6, sonnet-4-6,
+//                 haiku-4-5 (model_map → DOT wire names). It does NOT serve
+//                 opus-4.8 / Gemini / o-series / the broader GPT family.
+//   closerouter — "Popusk" multi-model upstream (base https://api.claude-popusk.shop/v1).
+//                 OWN reseller key from env POPUSK_API_KEY (conditional). Serves the
+//                 GPT-5 family + o-series + Gemini (the 3 it exposes) + claude-opus-4.8.
+//                 Wire names are verbatim (dash) EXCEPT opus-4.8: our canonical id is
+//                 the DOT form claude-opus-4.8, popusk serves it as claude-opus-4-8
+//                 (model_map dot→dash). Active fallback provider.
+//   metro       — DELETED. The old api.stepanovikov.uno profile is removed: GPT/Gemini
+//                 moved to popusk, Claude to wellflow (operator decision 2026-06-03).
 //
-// Provider keys are read from env (METRO_API_KEY, POPUSK_API_KEY) — never
-// hard-coded / committed. The active profile is set from env ACTIVE_PROVIDER
-// (default "metro"); this script only refreshes the closerouter row and re-applies
-// the active provider, so pass the CURRENT active provider to avoid switching.
+// Provider keys are read from env (WELLFLOW_API_KEY, POPUSK_API_KEY) — never
+// hard-coded / committed. The fallback active provider defaults to "closerouter"
+// (popusk) since it serves the bulk of the catalog; override with ACTIVE_PROVIDER.
+// Under per-model routing the active provider only serves models pinned to no
+// enabled profile (plus web-search / Gözcü probe / connection-test).
 //
 // Run on the server (reads .env.production for DATABASE_URL + secrets):
-//   ENV_FILE_PATH=.env.production NODE_ENV=production METRO_API_KEY='***' \
-//     ACTIVE_PROVIDER=metro npx tsx scripts/seed-provider-profiles.ts
+//   ENV_FILE_PATH=.env.production NODE_ENV=production \
+//     WELLFLOW_API_KEY='wf_***' POPUSK_API_KEY='***' \
+//     ACTIVE_PROVIDER=closerouter npx tsx scripts/seed-provider-profiles.ts
 //
-// Idempotent: re-running updates the rows in place (upsert) and re-applies the
-// active provider. Prints a masked summary; NEVER prints the plaintext key.
+// Idempotent: re-running upserts the rows in place, deletes any metro row, and
+// re-applies the active provider. Prints a masked summary; NEVER prints the key.
 
 import { config as loadEnv } from "dotenv";
 loadEnv({ path: process.env.ENV_FILE_PATH || ".env" });
 
-import { MASTER_MODELS } from "../src/master-models.js";
+import { eq } from "drizzle-orm";
 import {
   upsertProviderProfile,
   setActiveProvider,
   listProviderProfiles,
 } from "../src/server/services/provider-config-service.js";
-import { aiProviderBaseUrl } from "../src/server/lib/env.js";
 import { db, dbSql } from "../src/server/db/client.js";
-import { addedModels } from "../src/server/db/schema.js";
+import { addedModels, providerProfiles } from "../src/server/db/schema.js";
 
-// Metro added models (additive layer; MASTER_MODELS 42-kilit korunur). Seeded
-// inline (NOT imported from db/seed.ts, whose top-level main() would run as an
-// import side-effect). Idempotent via onConflictDoNothing — never overwrites an
-// existing row's price/label. Prices from the approved locked table (USD/1M).
-const METRO_ADDED_MODELS = [
+// Added models (additive layer; MASTER_MODELS 42-kilit korunur). Seeded inline
+// (NOT imported from db/seed.ts, whose top-level main() would run as an import
+// side-effect). Idempotent via onConflictDoNothing — never overwrites an existing
+// row's price/label. Prices from the approved locked table (USD/1M).
+// claude-opus-4.8 is served by popusk; gemini-3.5-flash is kept for catalog parity
+// but NO enabled profile serves it now (popusk doesn't expose it) → it stays hidden
+// from the UNION catalog until a provider lists it.
+const ADDED_MODELS = [
   { modelId: "claude-opus-4.8", name: "Claude Opus 4.8", providerLabel: "Anthropic", inputUsd: "1.40", outputUsd: "1.40" },
   { modelId: "gemini-3.5-flash", name: "Gemini 3.5 Flash", providerLabel: "Google", inputUsd: "0.90", outputUsd: "0.90" },
 ] as const;
 
 async function seedAddedModelsInline() {
-  for (const m of METRO_ADDED_MODELS) {
+  for (const m of ADDED_MODELS) {
     await db
       .insert(addedModels)
       .values({
@@ -63,101 +73,123 @@ async function seedAddedModelsInline() {
   }
 }
 
-// Metro upstream base URL (OpenAI-compatible, Bearer). The provider serves
-// /v1/chat/completions, so the base URL keeps the /v1 suffix.
-const METRO_BASE_URL = process.env.METRO_BASE_URL || "https://api.stepanovikov.uno/v1";
+// ── wellflow (Claude family) ──────────────────────────────────────────────────
+// PROBE-VERIFIED 2026-06-03: GET /v1/models, POST /v1/chat/completions and POST
+// /v1/messages all return 200 under the /v1 base (closerouter-service builds
+// `${base}/messages` → /v1/messages). The docs' "ANTHROPIC_BASE_URL without /v1"
+// is only because the Anthropic SDK auto-appends /v1.
+const WELLFLOW_BASE_URL = process.env.WELLFLOW_BASE_URL || "https://api.wellflow.dev/v1";
 
-// Metro's supported catalog ids (canonical). Verified live against metro's
-// chat/completions allow-list. Two of these are added_models (gemini-3.5-flash,
-// claude-opus-4.8); the rest are master ids.
-const METRO_SUPPORTED_MODEL_IDS = [
-  "gpt-5.5",
-  "gpt-5.4",
+const WELLFLOW_SUPPORTED_MODEL_IDS = [
   "claude-opus-4-7",
   "claude-opus-4-6",
   "claude-sonnet-4-6",
   "claude-haiku-4-5-20251001",
-  "gemini-3.1-pro-preview",
-  "gemini-3.5-flash", // added model
-  "claude-opus-4.8", // added model
 ];
 
-// Canonical catalog id → metro upstream wire name. Only ids whose canonical
-// (tire) form differs from metro's expected (nokta) form need an entry; the rest
-// are forwarded verbatim.
-const METRO_MODEL_MAP: Record<string, string> = {
+// Canonical catalog id → wellflow upstream wire name. PROBE-VERIFIED: GET /v1/models
+// exposes the DOT forms (claude-opus-4.7/4.6, claude-sonnet-4.6, claude-haiku-4.5).
+// wellflow normalizes dash↔dot for opus/sonnet, but our canonical haiku id is DATED
+// (claude-haiku-4-5-20251001) and MUST be rewritten to claude-haiku-4.5 — so all
+// four are mapped explicitly for safety/determinism.
+const WELLFLOW_MODEL_MAP: Record<string, string> = {
+  "claude-opus-4-7": "claude-opus-4.7",
   "claude-opus-4-6": "claude-opus-4.6",
   "claude-sonnet-4-6": "claude-sonnet-4.6",
   "claude-haiku-4-5-20251001": "claude-haiku-4.5",
 };
 
-// Standby (closerouter = Claude Popusk) supported ids = Claude-only catalog for now;
-// GPT/Gemini/o-series closed until pricing is finalized (user decision 2026-06-02).
-// These are the previously-live wellflow-era Claude set, all deliberately priced.
-// claude-opus-4.8 is the added-model DOT id (exposed via the modelMap dot→dash
-// rewrite below); the other four are MASTER_MODELS dash ids.
-const STANDBY_SUPPORTED_MODEL_IDS = [
-  "claude-opus-4.8", // added model — exposed via the modelMap dot→dash rewrite
-  "claude-opus-4-7",
-  "claude-opus-4-6",
-  "claude-sonnet-4-6",
-  "claude-haiku-4-5-20251001",
+// ── closerouter ("Popusk") — GPT + o-series + Gemini + opus-4.8 ─────────────────
+// PROBE-VERIFIED 2026-06-03 (GET https://api.claude-popusk.shop/v1/models): popusk
+// is a full multi-model router. The ids below are exactly those popusk exposes AND
+// that exist in our MASTER_MODELS (verified), plus the added claude-opus-4.8. Wire
+// names are verbatim (dash) — only opus-4.8 needs a dot→dash rewrite (see map).
+const POPUSK_BASE_URL = process.env.POPUSK_BASE_URL || "https://api.claude-popusk.shop/v1";
+
+const POPUSK_SUPPORTED_MODEL_IDS = [
+  // GPT-5 family (24)
+  "gpt-5.5", "gpt-5.5-2026-04-23",
+  "gpt-5.4", "gpt-5.4-2026-03-05",
+  "gpt-5.4-mini", "gpt-5.4-mini-2026-03-17",
+  "gpt-5.4-nano", "gpt-5.4-nano-2026-03-17",
+  "gpt-5.3-chat-latest",
+  "gpt-5.2", "gpt-5.2-2025-12-11", "gpt-5.2-chat-latest",
+  "gpt-5.1", "gpt-5.1-2025-11-13", "gpt-5.1-chat-latest",
+  "gpt-5", "gpt-5-2025-08-07", "gpt-5-chat-latest",
+  "gpt-5-mini", "gpt-5-mini-2025-08-07",
+  "gpt-5-nano", "gpt-5-nano-2025-08-07",
+  "gpt-5-search-api", "gpt-5-search-api-2025-10-14",
+  // o-series (6)
+  "o4-mini", "o4-mini-2025-04-16",
+  "o3", "o3-2025-04-16",
+  "o3-mini", "o3-mini-2025-01-31",
+  // Gemini (3 — exactly what popusk exposes)
+  "gemini-3.1-pro-preview", "gemini-3.1-pro-preview-customtools", "gemini-3-flash-preview",
+  // Claude added (1) — opus-4.8 lives here (wellflow can't serve it)
+  "claude-opus-4.8",
 ];
 
+// canonical id → popusk wire id. opus-4.8's canonical id is dot-form but popusk
+// serves it as the dash form; everything else forwards verbatim.
+const POPUSK_MODEL_MAP: Record<string, string> = {
+  "claude-opus-4.8": "claude-opus-4-8",
+};
+
 async function main() {
-  const metroKey = process.env.METRO_API_KEY;
-  const activeProvider = (process.env.ACTIVE_PROVIDER || "metro").trim();
+  // Active fallback provider. Default "closerouter" (popusk serves the bulk). If an
+  // operator passes the now-deleted "metro", coerce to closerouter so we never try
+  // to activate a profile we're about to delete.
+  let activeProvider = (process.env.ACTIVE_PROVIDER || "closerouter").trim();
+  if (activeProvider === "metro") {
+    console.log("  ACTIVE_PROVIDER=metro istendi ama metro siliniyor → closerouter'a çevrildi");
+    activeProvider = "closerouter";
+  }
 
   console.log("Seeding provider profiles...");
 
-  // ── added_models (metro yeni modelleri) ─────────────────────────────────────
-  // claude-opus-4.8 + gemini-3.5-flash added_models katmanından gelir (MASTER_MODELS
-  // 42-kilit korunur). deploy seed.ts'i çalıştırmadığı için burada idempotent seed
-  // edilir; metro profili bu id'leri supported_model_ids ile görünür kılar.
+  // ── added_models ────────────────────────────────────────────────────────────
   await seedAddedModelsInline();
-  console.log("  added_models (metro) seeded (claude-opus-4.8, gemini-3.5-flash)");
+  console.log("  added_models seeded (claude-opus-4.8 [popusk], gemini-3.5-flash [hidden — no provider])");
 
-  // ── metro (active upstream) — METRO_API_KEY yoksa ATLA (popusk-only refresh) ──
-  if (metroKey && metroKey.trim()) {
-    await upsertProviderProfile({
-      id: "metro",
-      label: "Metro",
-      baseUrl: METRO_BASE_URL,
-      apiKey: metroKey,
-      enabled: true,
-      supportedModelIds: METRO_SUPPORTED_MODEL_IDS,
-      modelMap: METRO_MODEL_MAP,
-    });
-    console.log(`  metro upserted (base=${METRO_BASE_URL}, ${METRO_SUPPORTED_MODEL_IDS.length} models, ${Object.keys(METRO_MODEL_MAP).length} mapped)`);
-  } else {
-    console.log("  metro ATLANDI (METRO_API_KEY yok) — mevcut DB satırı korunur (popusk-only refresh)");
-  }
+  // ── wellflow (Claude family) ─────────────────────────────────────────────────
+  // OWN reseller key (wf_-prefixed) from env WELLFLOW_API_KEY, conditional so an
+  // empty env preserves any stored cipher. ⚠️ The key MUST be present (stored or
+  // env) — a keyless enabled profile makes resolveProviderForModel fall back to the
+  // active provider for Claude, which (popusk) would mis-serve the wire names.
+  await upsertProviderProfile({
+    id: "wellflow",
+    label: "Wellflow",
+    baseUrl: WELLFLOW_BASE_URL,
+    ...(process.env.WELLFLOW_API_KEY ? { apiKey: process.env.WELLFLOW_API_KEY } : {}),
+    enabled: true,
+    supportedModelIds: WELLFLOW_SUPPORTED_MODEL_IDS,
+    modelMap: WELLFLOW_MODEL_MAP,
+  });
+  console.log(`  wellflow upserted (base=${WELLFLOW_BASE_URL}, ${WELLFLOW_SUPPORTED_MODEL_IDS.length} models, ${Object.keys(WELLFLOW_MODEL_MAP).length} mapped, key=${process.env.WELLFLOW_API_KEY ? "WELLFLOW_API_KEY" : "(unchanged)"})`);
 
-  // ── closerouter (standby upstream = Claude Popusk) ──────────────────────────
-  // KEY: popusk has its OWN reseller key, read from env POPUSK_API_KEY (never
-  // hard-coded / committed; mirrors the METRO_API_KEY handling above). Set it
-  // conditionally so an empty env preserves any existing stored cipher instead
-  // of nulling it. NOTE: the old behaviour (omit apiKey → fall back to the env
-  // AI_PROVIDER_API_KEY) is WRONG now that the active provider's key lives there.
-  // closerouter(popusk) base'i EXPLICIT — AI_PROVIDER_BASE_URL aktif (wellflow) sağlayıcıya
-  // ait olabilir; aiProviderBaseUrl() kullanmak popusk profilini yanlış URL'e set ederdi.
-  const standbyBase = process.env.POPUSK_BASE_URL || "https://api.claude-popusk.shop/v1";
+  // ── closerouter ("Popusk") — GPT + o-series + Gemini + opus-4.8 ───────────────
+  // OWN reseller key from env POPUSK_API_KEY (conditional; empty env keeps the
+  // stored cipher). Base EXPLICIT — never derived from aiProviderBaseUrl().
   await upsertProviderProfile({
     id: "closerouter",
-    label: "Claude Popusk (standby)",
-    baseUrl: standbyBase,
+    label: "Popusk",
+    baseUrl: POPUSK_BASE_URL,
     ...(process.env.POPUSK_API_KEY ? { apiKey: process.env.POPUSK_API_KEY } : {}),
     enabled: true,
-    supportedModelIds: STANDBY_SUPPORTED_MODEL_IDS,
-    // canonical id → popusk wire id. opus-4.8's canonical id is dot-form but
-    // popusk serves it as the dash form; the rest forward verbatim.
-    modelMap: { "claude-opus-4.8": "claude-opus-4-8" },
+    supportedModelIds: POPUSK_SUPPORTED_MODEL_IDS,
+    modelMap: POPUSK_MODEL_MAP,
   });
-  console.log(`  closerouter upserted (base=${standbyBase}, ${STANDBY_SUPPORTED_MODEL_IDS.length} models, key=${process.env.POPUSK_API_KEY ? "POPUSK_API_KEY" : "(unchanged)"})`);
+  console.log(`  closerouter(Popusk) upserted (base=${POPUSK_BASE_URL}, ${POPUSK_SUPPORTED_MODEL_IDS.length} models, ${Object.keys(POPUSK_MODEL_MAP).length} mapped, key=${process.env.POPUSK_API_KEY ? "POPUSK_API_KEY" : "(unchanged)"})`);
 
-  // ── activate ─────────────────────────────────────────────────────────────────
+  // ── activate (before deleting metro so active_provider_id never dangles) ──────
   await setActiveProvider(activeProvider);
   console.log(`  active provider => ${activeProvider}`);
+
+  // ── delete metro (operator decision: komple sil) ──────────────────────────────
+  // Done AFTER activation so system_api_config.active_provider_id is already off
+  // metro. provider_profiles has no FK referencing it, so a plain delete is safe.
+  const delRes = await db.delete(providerProfiles).where(eq(providerProfiles.id, "metro"));
+  console.log(`  metro profile deleted (rows=${(delRes as { count?: number }).count ?? "?"})`);
 
   // ── masked summary ──────────────────────────────────────────────────────────
   const profiles = await listProviderProfiles();
