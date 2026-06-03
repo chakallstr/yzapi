@@ -79,7 +79,7 @@ export const API_DOC_SECTIONS = [
     label: "Desteklenen istemciler",
     title: "Desteklenen istemciler ve bağlantı parametreleri",
     intro:
-      "Tüm OpenAI-uyumlu istemciler base URL + `yzk_live_` anahtarıyla çalışır (Codex CLI, Cline, Roo Code, Kilo Code, OpenCode, Cherry Studio, OpenAI SDK). Claude Code için Anthropic-uyumlu `/v1/messages` endpointi açıktır; `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ile bağlanılır. Aktif katalog Claude modelleridir (`claude-opus-4.8`, `claude-opus-4-7`, `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`); en sorunsuz deneyim Claude Code iledir.",
+      "Tüm OpenAI-uyumlu istemciler base URL + `yzk_live_` anahtarıyla çalışır (Codex CLI, Cline, Roo Code, Kilo Code, OpenCode, Cherry Studio, OpenAI SDK). Claude Code için Anthropic-uyumlu `/v1/messages` endpointi açıktır; `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ile bağlanılır. Aktif katalog Claude modelleridir (`claude-opus-4.8`, `claude-opus-4-7`, `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`); en sorunsuz deneyim Claude Code iledir. Tüm adresler `https://` olmalı — `http://` yazarsan istek yönlenirken kimlik doğrulama header'ı düşer ve istek 401 olur / akış asılı kalır.",
     clientCards: [
       {
         name: "Cline",
@@ -133,7 +133,7 @@ export const API_DOC_SECTIONS = [
         type: "VS Code · OpenAI-compatible",
         steps: [
           "Settings → Providers → API Provider tipini `OpenAI Compatible` seç.",
-          "Base URL TAM olarak `https://yapayzekalab.org/v1` olmalı (sonunda `/v1` ŞART).",
+          "Base URL TAM olarak `https://yapayzekalab.org/v1` olmalı — `https://` ile başlamalı ve sonunda `/v1` olmalı. ⚠️ `http://` YAZMA: istek https'e yönlenirken Authorization header düşer → 401, Roo Code 'API İsteği...' ekranında asılı kalır (ekrandaki donma tam budur).",
           "⚠️ KÖK adresi (`https://yapayzekalab.org`) YAZMA — o kural yalnızca Claude Code içindir. Roo Code'da kök yazarsan model listesi yüklenir ama her mesaj 404 verir; müşterilerin 'bağlanıyor ama cevap gelmiyor' şikayeti tam olarak budur. `/chat/completions` de EKLEME, Roo onu kendi ekler.",
           "API Key alanına `yzk_live_...` anahtarını gir.",
           "Model ID: `/v1/models` listesinden seç — en güçlü `claude-opus-4.8`, hızlı/ekonomik `claude-sonnet-4-6` ya da `claude-haiku-4-5-20251001` (`claude-opus-4-7` / `claude-opus-4-6` de geçerli).",
