@@ -152,4 +152,55 @@ describe("public /v1 catalog contract", () => {
       });
     }
   });
+
+  it("collapses a duplicated /v1/v1 prefix so ANTHROPIC_BASE_URL works with or without /v1", async () => {
+    const app = express();
+    app.use(express.json());
+    // app.ts ile aynı: baştaki fazladan tek "/v1" segmentini sadeleştir
+    app.use((req, _res, next) => {
+      if (req.url.startsWith("/v1/v1/")) req.url = req.url.slice(3);
+      next();
+    });
+    app.use("/v1", createV1CatalogRouter(async () => sampleEntries));
+    app.use("/v1", (req, res, next) => {
+      const knownRoutes = [/^\/balance$/, /^\/chat\/completions$/, /^\/messages$/];
+      if (knownRoutes.some((route) => route.test(req.path))) { next(); return; }
+      res.status(404).json({ error: "Not found", code: 404, requestId: "test" });
+    });
+    app.use("/v1", (_req, res) => {
+      res.status(401).json({ error: "Invalid API key", code: "invalid_api_key" });
+    });
+
+    const server = createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("test server address unavailable");
+    }
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+
+    try {
+      // ANTHROPIC_BASE_URL=".../v1" + Anthropic SDK "/v1/messages" eki => "/v1/v1/messages"
+      // Çift /v1 sadeleşip /messages route'una düşmeli (auth katmanı 401), 404 DEĞİL.
+      const dupMessages = await fetch(`${baseUrl}/v1/v1/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-opus-4-8", messages: [] }),
+      });
+      expect(dupMessages.status).toBe(401);
+
+      // /v1/v1/models de public katalogu kök ile aynı şekilde döndürmeli
+      const dupModels = await fetch(`${baseUrl}/v1/v1/models`);
+      expect(dupModels.status).toBe(200);
+      expect(await dupModels.json()).toMatchObject({ object: "list", data: expect.any(Array) });
+
+      // tek /v1 (OpenAI istemcileri) etkilenmemeli — hâlâ public katalog
+      const single = await fetch(`${baseUrl}/v1/models`);
+      expect(single.status).toBe(200);
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve());
+      });
+    }
+  });
 });

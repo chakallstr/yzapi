@@ -144,6 +144,18 @@ export function createApp(): express.Express {
   app.use("/api/payments", paymentsRouter);
   app.use("/api/telegram", telegramRouter);
 
+  // Müşteriler ANTHROPIC_BASE_URL'i HEM kök (https://yapayzekalab.org) HEM /v1
+  // (https://yapayzekalab.org/v1) girebilsin. Anthropic SDK/Claude Code base URL'e
+  // "/v1/messages" eklediği için /v1 girilince yol "/v1/v1/messages" olur (çift /v1
+  // → 404). Baştaki fazladan tek "/v1" segmentini sadeleştir. OpenAI istemcileri
+  // (/v1/chat/completions) etkilenmez — onlarda çift /v1 oluşmaz.
+  app.use((req, _res, next) => {
+    if (req.url.startsWith("/v1/v1/")) {
+      req.url = req.url.slice(3); // "/v1/v1/messages?x" -> "/v1/messages?x"
+    }
+    next();
+  });
+
   // Proxy routes — require yzk_* API key, mounted at /v1 before Vite catch-all
   app.use("/v1", v1CatalogRouter);
   app.use("/v1", (req, res, next) => {
