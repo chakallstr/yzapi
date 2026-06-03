@@ -1,213 +1,29 @@
+// API dokümantasyon içeriği. tab-documents.jsx bu diziyi sırayla "Adım 1, 2, 3…"
+// kartları olarak render eder — yani buradaki dizi sırası = sayfadaki adım sırası.
+// Yeni kullanıcı önce aracını bağlamak ister; bu yüzden "clients" (istemci kurulumu)
+// bilerek EN BAŞTA (Adım 1) tutulur.
 export const API_DOC_SECTIONS = [
   {
-    key: "quickstart",
-    label: "Hızlı başlangıç",
-    title: "API bağlantısını 5 dakikada kur",
-    intro:
-      "YapayZekaLab, geniş bir model kataloğunu tek API anahtarıyla sunar. Kendi hesabından `yzk_live_` anahtarını üret, bakiyeni yükle ve doğrudan üretim endpointlerine bağlan.",
-    bullets: [
-      "Base URL: `https://yapayzekalab.org/v1`",
-      "Yetkilendirme: `Authorization: Bearer yzk_live_YOUR_KEY`",
-      "Ana metin endpointi: `/v1/chat/completions`",
-      "Bakiye sorgu endpointi: `/v1/balance`",
-      "Modelleri canlı çekmek için: `/v1/models`",
-      "Başlamadan önce panelden kendi API anahtarını oluştur ve hesabında kullanılabilir bakiye bulundur.",
-    ],
-    codeBlocks: [
-      {
-        language: "bash",
-        title: "İlk test isteği",
-        code: `curl -X POST https://yapayzekalab.org/v1/chat/completions \\
-  -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "claude-opus-4-7",
-    "messages": [
-      { "role": "user", "content": "Merhaba, kısa bir test yanıtı ver." }
-    ],
-    "max_tokens": 120
-  }'`,
-        osVariants: {
-          windows: `curl.exe -X POST https://yapayzekalab.org/v1/chat/completions -H "Authorization: Bearer yzk_live_YOUR_KEY" -H "Content-Type: application/json" -d "{\\"model\\":\\"claude-opus-4-7\\",\\"messages\\":[{\\"role\\":\\"user\\",\\"content\\":\\"Merhaba, kisa bir test yaniti ver.\\"}],\\"max_tokens\\":120}"`,
-          macos: `curl -X POST https://yapayzekalab.org/v1/chat/completions \\
-  -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "claude-opus-4-7",
-    "messages": [
-      { "role": "user", "content": "Merhaba, kısa bir test yanıtı ver." }
-    ],
-    "max_tokens": 120
-  }'`,
-          linux: `curl -X POST https://yapayzekalab.org/v1/chat/completions \\
-  -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "claude-opus-4-7",
-    "messages": [
-      { "role": "user", "content": "Merhaba, kısa bir test yanıtı ver." }
-    ],
-    "max_tokens": 120
-  }'`,
-        },
-      },
-    ],
-  },
-  {
-    key: "auth",
-    label: "Kimlik doğrulama",
-    title: "API anahtarı ve bağlantı mantığı",
-    intro:
-      "YapayZekaLab herkese açık ortak bir anahtar kullanmaz. Her kullanıcı kendi panelinden ürettiği `yzk_live_` anahtarıyla bağlanır. Bu anahtar kullanıcı bakiyesine, kullanım kayıtlarına ve limit kontrolüne bağlıdır.",
-    bullets: [
-      "Anahtar biçimi `yzk_live_` ile başlar.",
-      "Anahtar yalnız sana aittir; başka kullanıcı verisine erişim vermez.",
-      "Bakiyen biterse istekler durur; sistem ücretsiz sınırsız kullanım açmaz.",
-      "Geçersiz, iptal edilmiş veya askıya alınmış anahtar `401` alır.",
-      "Admin panelinde oluşturulan anahtarlar da kullanıcı hesabına bağlı çalışır.",
-    ],
-    codeBlocks: [
-      {
-        language: "bash",
-        title: "Header örneği",
-        code: `Authorization: Bearer yzk_live_YOUR_KEY`,
-      },
-    ],
-  },
-  {
     key: "clients",
-    label: "Desteklenen istemciler",
-    title: "Desteklenen istemciler ve bağlantı parametreleri",
+    label: "Aracını bağla",
+    title: "Aracını YapayZekaLab'e bağla (istemci kurulumu)",
     intro:
-      "Tüm OpenAI-uyumlu istemciler base URL + `yzk_live_` anahtarıyla çalışır (Codex CLI, Cline, Roo Code, Kilo Code, OpenCode, Cherry Studio, OpenAI SDK). Claude Code için Anthropic-uyumlu `/v1/messages` endpointi açıktır; `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ile bağlanılır. Aktif katalog Claude modelleridir (`claude-opus-4.8`, `claude-opus-4-7`, `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`); en sorunsuz deneyim Claude Code iledir. Tüm adresler `https://` olmalı — `http://` yazarsan istek yönlenirken kimlik doğrulama header'ı düşer ve istek 401 olur / akış asılı kalır.",
+      "Buradan bilgisayarındaki yapay zekâ aracını YapayZekaLab'e bağlarsın. Bağlamak için iki şey gerekir: bir **Base URL** (bağlanılacak adres) ve senin **API anahtarın** (`yzk_live_` ile başlar). Henüz anahtarın yoksa: önce **Hesap** sayfasından bir anahtar oluştur ve TL bakiye yükle, sonra buraya dön. Giriş yaptıysan aşağıdaki örneklere kendi anahtarın otomatik gömülür. İki tür araç var: (1) **Terminal araçları** (Claude Code, Codex, OpenCode) — aşağıdaki kod bloğunu olduğu gibi kopyala, terminale yapıştır, Enter'a bas; hiçbir şey kurulu olmasa bile blok kendisi kurar. (2) **Editör eklentileri** (Cline, Kilo Code, Roo Code, Cherry Studio) — ayar ekranına Base URL ve anahtarı yapıştırırsın. Tek kural: adres her zaman `https://` ile başlamalı; `http://` yazma — istek yönlenirken anahtarın düşer ve bağlantı 401 verir ya da yanıt asılı kalır.",
     clientCards: [
       {
-        name: "Cline",
-        type: "VS Code · OpenAI-compatible",
-        steps: [
-          "API Provider olarak `OpenAI Compatible` seç.",
-          "Base URL alanına `https://yapayzekalab.org/v1` yaz.",
-          "API Key alanına `yzk_live_...` anahtarını gir.",
-          "Model ID olarak `claude-opus-4.8` (en güçlü), `claude-opus-4-7`, `claude-opus-4-6`, `claude-sonnet-4-6` veya `claude-haiku-4-5-20251001` seç.",
-        ],
-      },
-      {
-        name: "Kilo Code",
-        type: "VS Code · OpenAI-compatible",
-        steps: [
-          "API Provider olarak `OpenAI Compatible` seç (yeni arayüzde `Custom provider`).",
-          "Base URL `https://yapayzekalab.org/v1`.",
-          "API Key senin `yzk_live_...` anahtarın.",
-          "Model olarak aktif katalogdan bir ID seç (örn. `claude-opus-4.8` en güçlü, `claude-opus-4-7`, `claude-sonnet-4-6`).",
-        ],
-      },
-      {
-        name: "OpenCode",
-        type: "CLI · OpenAI-compatible",
-        steps: [
-          "Provider `@ai-sdk/openai-compatible` ile tanımlanır.",
-          "Base URL `https://yapayzekalab.org/v1`.",
-          "Model listene `claude-opus-4.8`, `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-opus-4-6` gibi aktif modelleri ekle.",
-        ],
-        code: `{
-  "$schema": "https://opencode.ai/config.json",
-  "provider": {
-    "yapayzekalab": {
-      "npm": "@ai-sdk/openai-compatible",
-      "options": {
-        "baseURL": "https://yapayzekalab.org/v1",
-        "apiKey": "yzk_live_YOUR_KEY"
-      },
-      "models": {
-        "claude-opus-4.8": { "name": "claude-opus-4.8" },
-        "claude-opus-4-7": { "name": "claude-opus-4-7" },
-        "claude-sonnet-4-6": { "name": "claude-sonnet-4-6" },
-        "claude-opus-4-6": { "name": "claude-opus-4-6" }
-      }
-    }
-  }
-}`,
-      },
-      {
-        name: "Roo Code",
-        type: "VS Code · OpenAI-compatible",
-        steps: [
-          "Settings → Providers → API Provider tipini `OpenAI Compatible` seç.",
-          "Base URL TAM olarak `https://yapayzekalab.org/v1` olmalı — `https://` ile başlamalı ve sonunda `/v1` olmalı. ⚠️ `http://` YAZMA: istek https'e yönlenirken Authorization header düşer → 401, Roo Code 'API İsteği...' ekranında asılı kalır (ekrandaki donma tam budur).",
-          "⚠️ KÖK adresi (`https://yapayzekalab.org`) YAZMA — o kural yalnızca Claude Code içindir. Roo Code'da kök yazarsan model listesi yüklenir ama her mesaj 404 verir; müşterilerin 'bağlanıyor ama cevap gelmiyor' şikayeti tam olarak budur. `/chat/completions` de EKLEME, Roo onu kendi ekler.",
-          "API Key alanına `yzk_live_...` anahtarını gir.",
-          "Model ID: `/v1/models` listesinden seç — en güçlü `claude-opus-4.8`, hızlı/ekonomik `claude-sonnet-4-6` ya da `claude-haiku-4-5-20251001` (`claude-opus-4-7` / `claude-opus-4-6` de geçerli).",
-          "Cevap gelmiyorsa hızlı teşhis: 404 → Base URL yanlış (büyük ihtimalle kök yazdın, `/v1` ekle) · 402 → panelden TL bakiye yükle · 403 → erişim/doğrulama (hesap doğrulaman açıksa doğrula, değilse API key'i kontrol et).",
-        ],
-      },
-      {
-        name: "Cherry Studio",
-        type: "Desktop · OpenAI-compatible",
-        steps: [
-          "Model sağlayıcısı olarak OpenAI-compatible profil aç.",
-          "API adresine TAM yolu yaz ve `#` ile bitir → `https://yapayzekalab.org/v1/chat/completions#` (Cherry adresi aynen kullanır; en güvenli ve sürümden bağımsız yöntem budur).",
-          "Alternatif: KÖK adresi yaz `https://yapayzekalab.org` — Cherry sürümün `/v1/chat/completions` yolunu otomatik ekler. Cevap gelmezse yukarıdaki `#`'li tam yola geç.",
-          "API Key olarak `yzk_live_...` kullan.",
-          "Model olarak `/v1/models`'tan gördüğün bir ID seç (örn. `claude-sonnet-4-6`).",
-        ],
-      },
-      {
-        name: "Codex CLI",
-        type: "CLI · OpenAI-compatible",
-        steps: [
-          "Kurulum: `npm install -g @openai/codex`.",
-          "Ortam değişkenlerini işletim sistemine göre ayarla (aşağıdaki sekmelerden kendi OS'unu seç).",
-          "Veya `~/.codex/config.toml` içinde `model_provider` olarak base_url `https://yapayzekalab.org/v1` tanımla.",
-          "Model olarak aktif katalogdan bir Claude ID kullan: `claude-opus-4.8` (en güçlü), `claude-opus-4-7`, `claude-sonnet-4-6` veya `claude-haiku-4-5-20251001`.",
-          "Not: Codex bir OpenAI aracıdır; Claude modellerinde metadata uyarısı verebilir. Claude ile en sorunsuz deneyim için aşağıdaki Claude Code kartını tercih et.",
-          "`codex` komutuyla başlat.",
-        ],
-        code: `# ~/.codex/config.toml
-model = "claude-opus-4.8"
-model_provider = "yapayzekalab"
-
-[model_providers.yapayzekalab]
-name = "YapayZekaLab"
-base_url = "https://yapayzekalab.org/v1"
-env_key = "OPENAI_API_KEY"`,
-        osVariants: {
-          windows: `# PowerShell (bu oturum için)
-# Önceki AI sağlayıcıdan kalan OPENAI_* değişkenlerini temizle:
-Remove-Item Env:\\OPENAI_BASE_URL -ErrorAction SilentlyContinue; Remove-Item Env:\\OPENAI_API_KEY -ErrorAction SilentlyContinue
-$env:OPENAI_BASE_URL="https://yapayzekalab.org/v1"
-$env:OPENAI_API_KEY="yzk_live_YOUR_KEY"
-
-# Kalıcı (kapat-aç sonrası geçerli):
-setx OPENAI_BASE_URL "https://yapayzekalab.org/v1"
-setx OPENAI_API_KEY "yzk_live_YOUR_KEY"
-
-codex`,
-          macos: `# Önceki AI sağlayıcıdan kalan OPENAI_* değişkenlerini temizle (bu kabuk):
-unset OPENAI_BASE_URL OPENAI_API_KEY
-export OPENAI_BASE_URL="https://yapayzekalab.org/v1"
-export OPENAI_API_KEY="yzk_live_YOUR_KEY"
-codex`,
-          linux: `# Önceki AI sağlayıcıdan kalan OPENAI_* değişkenlerini temizle (bu kabuk):
-unset OPENAI_BASE_URL OPENAI_API_KEY
-export OPENAI_BASE_URL="https://yapayzekalab.org/v1"
-export OPENAI_API_KEY="yzk_live_YOUR_KEY"
-codex`,
-        },
-      },
-      {
         name: "Claude Code",
-        type: "CLI · Anthropic-compatible",
+        type: "Terminal (CLI) · Anthropic uyumlu · en sorunsuz deneyim",
+        surface: "cli",
         steps: [
-          "Kurulum: `npm install -g @anthropic-ai/claude-code`.",
-          "Ortam değişkenlerini işletim sistemine göre ayarla (aşağıdaki Windows / macOS / Linux sekmelerinden kendi OS'unu seç — sözdizimi farklıdır).",
-          "Base URL KÖK olmalı: `https://yapayzekalab.org` — `/v1` EKLEME, Claude Code yolu kendisi ekler.",
-          "Anahtar `ANTHROPIC_AUTH_TOKEN`'a girer (Bearer olarak gider). `ANTHROPIC_API_KEY` KULLANMA — yanlış header gönderir ve auth çakışması olur.",
-          "Daha önce başka bir AI sağlayıcı kullandıysan, eski `ANTHROPIC_*` ortam değişkenlerini ve `~/.claude/settings.json` içindeki eski `env` ayarlarını TEMİZLE — bunlar aşağıdaki ayarları ezip bağlantı hatasına yol açar (aşağıdaki sekmedeki temizleme satırları bunu yapar).",
-          "`claude` komutuyla başlat. Not: `/v1/messages` akışsız (non-streaming) yanıt döner.",
+          "İşletim sistemini seç (Windows / macOS / Linux) — alttaki sekmeler. Komut sözdizimi her sistemde farklıdır.",
+          "Seçtiğin sekmedeki bloğun TAMAMINI kopyala, terminale (Windows'ta PowerShell) yapıştır ve Enter'a bas. Bilgisayarında Node.js veya Claude Code kurulu olmasa bile blok önce onu kurar, sonra ayarları yapar.",
+          "Blokta yalnızca `yzk_live_YOUR_KEY` yazan yeri kendi anahtarınla değiştir. (Giriş yaptıysan zaten senin anahtarın gömülüdür, dokunmana gerek yok.)",
+          "Blok bitince ekranda `claude` başlar. Bundan sonra her terminalde `claude` yazıp Enter'la açarsın.",
+          "Önemli: Claude Code'da adres KÖK olmalı — `https://yapayzekalab.org` (sonuna `/v1` EKLEME, Claude Code yolu kendi ekler). Anahtar `ANTHROPIC_AUTH_TOKEN`'a girer, `ANTHROPIC_API_KEY`'e DEĞİL.",
         ],
         code: `export ANTHROPIC_BASE_URL="https://yapayzekalab.org"
 export ANTHROPIC_AUTH_TOKEN="yzk_live_YOUR_KEY"
-export ANTHROPIC_MODEL="claude-sonnet-4-6"
+export ANTHROPIC_MODEL="claude-opus-4-8"
 export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
 claude`,
         osVariants: {
@@ -341,6 +157,367 @@ which claude && claude --version
 claude`,
         },
       },
+      {
+        name: "Codex CLI",
+        type: "Terminal (CLI) · OpenAI uyumlu",
+        surface: "cli",
+        steps: [
+          "İşletim sistemini seç (Windows / macOS / Linux), bloğun tamamını kopyala, terminale yapıştır, Enter'a bas. Codex kurulu değilse blok `npm install -g @openai/codex` ile kurar.",
+          "Blok senin için `~/.codex/config.toml` dosyasına YapayZekaLab sağlayıcısını yazar ve anahtarını ayarlar (varsa eski config'i `.bak` olarak yedekler).",
+          "Yalnızca `yzk_live_YOUR_KEY` yazan yeri kendi anahtarınla değiştir.",
+          "Blok bitince `codex` başlar. Not: Codex bir OpenAI aracıdır; Claude modellerinde ufak uyumluluk uyarısı verebilir — en sorunsuz deneyim için yukarıdaki Claude Code kartını tercih et.",
+        ],
+        osVariants: {
+          windows: `# PowerShell — tum blogu yapistir, Enter tusuna bas. Hicbir sey kurulu degilse bile calisir.
+
+# Codex kur (Node gerekir)
+if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
+  if (Get-Command npm -ErrorAction SilentlyContinue) {
+    npm install -g @openai/codex
+  } else {
+    winget install -e --id OpenJS.NodeJS.LTS
+    Write-Host "Node kuruldu. PowerShell'i kapat-ac, bu blogu tekrar calistir."
+    exit
+  }
+}
+
+# YapayZekaLab saglayicisini ~/.codex/config.toml'a yaz (varsa yedekle)
+$cfgDir = "$env:USERPROFILE\\.codex"
+New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
+if (Test-Path "$cfgDir\\config.toml") { Copy-Item "$cfgDir\\config.toml" "$cfgDir\\config.toml.bak" -Force }
+@'
+model = "claude-opus-4-8"
+model_provider = "yapayzekalab"
+
+[model_providers.yapayzekalab]
+name = "YapayZekaLab"
+base_url = "https://yapayzekalab.org/v1"
+env_key = "OPENAI_API_KEY"
+'@ | Set-Content -Encoding utf8 "$cfgDir\\config.toml"
+
+# Anahtari ayarla (Codex bunu config'teki env_key ile okur)
+$env:OPENAI_API_KEY = "yzk_live_YOUR_KEY"
+setx OPENAI_API_KEY "yzk_live_YOUR_KEY" >$null
+
+codex --version
+codex`,
+          macos: `setopt interactive_comments 2>/dev/null
+# bash/zsh — tum blogu yapistir, Enter tusuna bas. Hicbir sey kurulu degilse bile calisir.
+
+# Codex kur (Node gerekir)
+if ! command -v codex >/dev/null 2>&1; then
+  if command -v npm >/dev/null 2>&1; then
+    npm install -g @openai/codex
+  else
+    echo "Once Node.js kur (https://nodejs.org), sonra bu blogu tekrar calistir."
+  fi
+fi
+
+# YapayZekaLab saglayicisini ~/.codex/config.toml'a yaz (varsa yedekle)
+mkdir -p ~/.codex
+[ -f ~/.codex/config.toml ] && cp ~/.codex/config.toml ~/.codex/config.toml.bak
+cat > ~/.codex/config.toml <<'TOML'
+model = "claude-opus-4-8"
+model_provider = "yapayzekalab"
+
+[model_providers.yapayzekalab]
+name = "YapayZekaLab"
+base_url = "https://yapayzekalab.org/v1"
+env_key = "OPENAI_API_KEY"
+TOML
+
+# Anahtari ayarla (Codex bunu config'teki env_key ile okur)
+export OPENAI_API_KEY="yzk_live_YOUR_KEY"
+
+codex --version
+codex`,
+          linux: `setopt interactive_comments 2>/dev/null
+# bash/zsh — tum blogu yapistir, Enter tusuna bas. Hicbir sey kurulu degilse bile calisir.
+
+# Codex kur (Node gerekir)
+if ! command -v codex >/dev/null 2>&1; then
+  if command -v npm >/dev/null 2>&1; then
+    npm install -g @openai/codex
+  else
+    echo "Once Node.js kur (https://nodejs.org), sonra bu blogu tekrar calistir."
+  fi
+fi
+
+# YapayZekaLab saglayicisini ~/.codex/config.toml'a yaz (varsa yedekle)
+mkdir -p ~/.codex
+[ -f ~/.codex/config.toml ] && cp ~/.codex/config.toml ~/.codex/config.toml.bak
+cat > ~/.codex/config.toml <<'TOML'
+model = "claude-opus-4-8"
+model_provider = "yapayzekalab"
+
+[model_providers.yapayzekalab]
+name = "YapayZekaLab"
+base_url = "https://yapayzekalab.org/v1"
+env_key = "OPENAI_API_KEY"
+TOML
+
+# Anahtari ayarla (Codex bunu config'teki env_key ile okur)
+export OPENAI_API_KEY="yzk_live_YOUR_KEY"
+
+codex --version
+codex`,
+        },
+      },
+      {
+        name: "OpenCode",
+        type: "Terminal (CLI) · OpenAI uyumlu",
+        surface: "cli",
+        steps: [
+          "İşletim sistemini seç, bloğun tamamını kopyala, terminale yapıştır, Enter'a bas. OpenCode kurulu değilse blok kurar (npm paketinin adı `opencode-ai`, `opencode` değil).",
+          "Blok senin için global yapılandırmayı (`~/.config/opencode/opencode.json`) YapayZekaLab sağlayıcısıyla yazar.",
+          "Yalnızca `yzk_live_YOUR_KEY` yazan yeri kendi anahtarınla değiştir.",
+          "Blok bitince `opencode` başlar; model olarak `yapayzekalab/claude-opus-4-8` ya da `yapayzekalab/claude-sonnet-4-6` seçebilirsin.",
+        ],
+        osVariants: {
+          windows: `# PowerShell — tum blogu yapistir, Enter tusuna bas. Hicbir sey kurulu degilse bile calisir.
+
+# OpenCode kur (paket adi opencode-ai)
+if (-not (Get-Command opencode -ErrorAction SilentlyContinue)) {
+  if (Get-Command npm -ErrorAction SilentlyContinue) {
+    npm install -g opencode-ai@latest
+  } else {
+    winget install -e --id OpenJS.NodeJS.LTS
+    Write-Host "Node kuruldu. PowerShell'i kapat-ac, bu blogu tekrar calistir."
+    exit
+  }
+}
+
+# YapayZekaLab provider'ini global config'e yaz
+$cfgDir = "$env:USERPROFILE\\.config\\opencode"
+New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
+@'
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "yapayzekalab": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://yapayzekalab.org/v1",
+        "apiKey": "yzk_live_YOUR_KEY"
+      },
+      "models": {
+        "claude-opus-4-8": { "name": "claude-opus-4-8" },
+        "claude-sonnet-4-6": { "name": "claude-sonnet-4-6" }
+      }
+    }
+  }
+}
+'@ | Set-Content -Encoding utf8 "$cfgDir\\opencode.json"
+
+opencode`,
+          macos: `setopt interactive_comments 2>/dev/null
+# bash/zsh — tum blogu yapistir, Enter tusuna bas. Hicbir sey kurulu degilse bile calisir.
+
+# OpenCode kur (paket adi opencode-ai)
+if ! command -v opencode >/dev/null 2>&1; then
+  curl -fsSL https://opencode.ai/install | bash
+fi
+
+# YapayZekaLab provider'ini global config'e yaz
+mkdir -p ~/.config/opencode
+cat > ~/.config/opencode/opencode.json <<'JSON'
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "yapayzekalab": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://yapayzekalab.org/v1",
+        "apiKey": "yzk_live_YOUR_KEY"
+      },
+      "models": {
+        "claude-opus-4-8": { "name": "claude-opus-4-8" },
+        "claude-sonnet-4-6": { "name": "claude-sonnet-4-6" }
+      }
+    }
+  }
+}
+JSON
+
+opencode`,
+          linux: `setopt interactive_comments 2>/dev/null
+# bash/zsh — tum blogu yapistir, Enter tusuna bas. Hicbir sey kurulu degilse bile calisir.
+
+# OpenCode kur (paket adi opencode-ai)
+if ! command -v opencode >/dev/null 2>&1; then
+  curl -fsSL https://opencode.ai/install | bash
+fi
+
+# YapayZekaLab provider'ini global config'e yaz
+mkdir -p ~/.config/opencode
+cat > ~/.config/opencode/opencode.json <<'JSON'
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "yapayzekalab": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://yapayzekalab.org/v1",
+        "apiKey": "yzk_live_YOUR_KEY"
+      },
+      "models": {
+        "claude-opus-4-8": { "name": "claude-opus-4-8" },
+        "claude-sonnet-4-6": { "name": "claude-sonnet-4-6" }
+      }
+    }
+  }
+}
+JSON
+
+opencode`,
+        },
+      },
+      {
+        name: "Cline",
+        type: "VS Code eklentisi · tıkla-ayarla",
+        surface: "gui",
+        steps: [
+          "VS Code'u aç → Eklentiler (Extensions) panelinde `Cline` ara → Install.",
+          "Cline panelini aç → ayarlar (dişli) → `API Provider` listesinden `OpenAI Compatible` seç.",
+          "`Base URL` alanına aşağıdaki adresi yapıştır (kopyala düğmesini kullan).",
+          "`API Key` alanına kendi `yzk_live_...` anahtarını yapıştır.",
+          "`Model ID` alanına aşağıdaki modellerden birini yaz, kaydet ve sohbete başla.",
+        ],
+        values: [
+          { label: "Base URL", value: "https://yapayzekalab.org/v1" },
+          { label: "API Key", value: "yzk_live_YOUR_KEY" },
+          { label: "Model — en güçlü", value: "claude-opus-4-8" },
+          { label: "Model — hızlı/ekonomik", value: "claude-sonnet-4-6" },
+        ],
+      },
+      {
+        name: "Kilo Code",
+        type: "VS Code eklentisi · tıkla-ayarla",
+        surface: "gui",
+        steps: [
+          "VS Code'da `Kilo Code` eklentisini kur ve panelini aç.",
+          "Ayarlarda `API Provider` olarak `OpenAI Compatible` seç (yeni arayüzde adı `Custom provider` olabilir).",
+          "`Base URL` alanına aşağıdaki adresi yapıştır.",
+          "`API Key` alanına kendi `yzk_live_...` anahtarını yapıştır.",
+          "`Model` alanına aşağıdaki ID'lerden birini yaz ve kaydet.",
+        ],
+        values: [
+          { label: "Base URL", value: "https://yapayzekalab.org/v1" },
+          { label: "API Key", value: "yzk_live_YOUR_KEY" },
+          { label: "Model — en güçlü", value: "claude-opus-4-8" },
+          { label: "Model — hızlı/ekonomik", value: "claude-sonnet-4-6" },
+        ],
+      },
+      {
+        name: "Roo Code",
+        type: "VS Code eklentisi · tıkla-ayarla",
+        surface: "gui",
+        steps: [
+          "VS Code'da `Roo Code` eklentisini kur → `Settings → Providers` aç → `API Provider` tipini `OpenAI Compatible` seç.",
+          "`Base URL` alanına aşağıdaki adresi TAM olarak yapıştır: `https://` ile başlar ve `/v1` ile biter. ⚠️ `http://` YAZMA — istek https'e yönlenirken anahtar düşer, Roo 'API İsteği...' ekranında asılı kalır.",
+          "⚠️ KÖK adresi (`https://yapayzekalab.org`) YAZMA — o kural sadece Claude Code içindir. Roo'da kök yazarsan model listesi gelir ama her mesaj 404 verir ('bağlanıyor ama cevap gelmiyor' tam olarak budur). Sona `/chat/completions` de EKLEME, Roo onu kendi ekler.",
+          "`API Key` alanına kendi `yzk_live_...` anahtarını yapıştır.",
+          "`Model` alanına aşağıdaki ID'lerden birini yaz. Cevap gelmiyorsa: 404 → Base URL yanlış (büyük ihtimalle kök yazdın, `/v1` ekle) · 402 → bakiye yükle · 403 → hesap doğrulama/anahtar.",
+        ],
+        values: [
+          { label: "Base URL", value: "https://yapayzekalab.org/v1" },
+          { label: "API Key", value: "yzk_live_YOUR_KEY" },
+          { label: "Model — en güçlü", value: "claude-opus-4-8" },
+          { label: "Model — hızlı/ekonomik", value: "claude-sonnet-4-6" },
+        ],
+      },
+      {
+        name: "Cherry Studio",
+        type: "Masaüstü uygulaması · tıkla-ayarla",
+        surface: "gui",
+        steps: [
+          "Cherry Studio'da yeni bir OpenAI-uyumlu model sağlayıcısı ekle.",
+          "`API adresi` alanına TAM yolu yaz ve sonuna `#` koy: `https://yapayzekalab.org/v1/chat/completions#`. Cherry, adresi `#` ile bittiğinde aynen kullanır — bu en güvenli ve sürümden bağımsız yöntemdir.",
+          "Alternatif: sadece KÖK adresi yaz `https://yapayzekalab.org` — Cherry, `/v1/chat/completions` yolunu kendi ekler. Cevap gelmezse yukarıdaki `#`'li tam yola geç.",
+          "`API Key` alanına kendi `yzk_live_...` anahtarını yapıştır.",
+          "Model olarak aşağıdaki ID'lerden birini seç ve kaydet.",
+        ],
+        values: [
+          { label: "API adresi (önerilen)", value: "https://yapayzekalab.org/v1/chat/completions#" },
+          { label: "API Key", value: "yzk_live_YOUR_KEY" },
+          { label: "Model — hızlı/ekonomik", value: "claude-sonnet-4-6" },
+        ],
+      },
+    ],
+  },
+  {
+    key: "quickstart",
+    label: "Hızlı başlangıç",
+    title: "API bağlantısını 5 dakikada kur",
+    intro:
+      "Kendi uygulamandan ya da terminalden bağlanmak istiyorsan en hızlı yol budur. Hatırlanacak üç şey var: bağlanılacak adres `https://yapayzekalab.org/v1`, yetki başlığı `Authorization: Bearer yzk_live_YOUR_KEY`, ve ana metin ucu `/v1/chat/completions`. Başlamadan önce panelden `yzk_live_` anahtarını oluştur ve hesabında bakiye bulundur.",
+    bullets: [
+      "Base URL: `https://yapayzekalab.org/v1`",
+      "Yetkilendirme: `Authorization: Bearer yzk_live_YOUR_KEY`",
+      "Ana metin endpointi: `/v1/chat/completions`",
+      "Bakiye sorgu endpointi: `/v1/balance`",
+      "Modelleri canlı çekmek için: `/v1/models`",
+      "Başlamadan önce panelden kendi API anahtarını oluştur ve hesabında kullanılabilir bakiye bulundur.",
+    ],
+    codeBlocks: [
+      {
+        language: "bash",
+        title: "İlk test isteği",
+        code: `curl -X POST https://yapayzekalab.org/v1/chat/completions \\
+  -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "claude-opus-4-8",
+    "messages": [
+      { "role": "user", "content": "Merhaba, kısa bir test yanıtı ver." }
+    ],
+    "max_tokens": 120
+  }'`,
+        osVariants: {
+          windows: `curl.exe -X POST https://yapayzekalab.org/v1/chat/completions -H "Authorization: Bearer yzk_live_YOUR_KEY" -H "Content-Type: application/json" -d "{\\"model\\":\\"claude-opus-4-8\\",\\"messages\\":[{\\"role\\":\\"user\\",\\"content\\":\\"Merhaba, kisa bir test yaniti ver.\\"}],\\"max_tokens\\":120}"`,
+          macos: `curl -X POST https://yapayzekalab.org/v1/chat/completions \\
+  -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "claude-opus-4-8",
+    "messages": [
+      { "role": "user", "content": "Merhaba, kısa bir test yanıtı ver." }
+    ],
+    "max_tokens": 120
+  }'`,
+          linux: `curl -X POST https://yapayzekalab.org/v1/chat/completions \\
+  -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "claude-opus-4-8",
+    "messages": [
+      { "role": "user", "content": "Merhaba, kısa bir test yanıtı ver." }
+    ],
+    "max_tokens": 120
+  }'`,
+        },
+      },
+    ],
+  },
+  {
+    key: "auth",
+    label: "Kimlik doğrulama",
+    title: "API anahtarı ve bağlantı mantığı",
+    intro:
+      "YapayZekaLab herkese açık ortak bir anahtar kullanmaz. Her kullanıcı kendi panelinden ürettiği `yzk_live_` anahtarıyla bağlanır. Bu anahtar senin bakiyene, kullanım kayıtlarına ve limitlerine bağlıdır — yani anahtarın = senin hesabın.",
+    bullets: [
+      "Anahtar biçimi `yzk_live_` ile başlar.",
+      "Anahtar yalnız sana aittir; başka kullanıcı verisine erişim vermez.",
+      "Bakiyen biterse istekler durur; sistem ücretsiz sınırsız kullanım açmaz.",
+      "Geçersiz, iptal edilmiş veya askıya alınmış anahtar `401` alır.",
+      "Admin panelinde oluşturulan anahtarlar da kullanıcı hesabına bağlı çalışır.",
+    ],
+    codeBlocks: [
+      {
+        language: "bash",
+        title: "Header örneği",
+        code: `Authorization: Bearer yzk_live_YOUR_KEY`,
+      },
     ],
   },
   {
@@ -348,7 +525,7 @@ claude`,
     label: "SDK örnekleri",
     title: "cURL, Node.js ve Python ile bağlan",
     intro:
-      "En hızlı başlangıç cURL ile olur. Uygulamaya geçerken OpenAI uyumlu istemcilerde yalnızca base URL ve model adını değiştirmen yeterlidir.",
+      "Kendi uygulamanı yazıyorsan örnekler aşağıda. OpenAI uyumlu istemcilerde tek yapman gereken base URL'i ve model adını değiştirmek; gerisi aynı kalır.",
     codeBlocks: [
       {
         language: "bash",
@@ -357,7 +534,7 @@ claude`,
   -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "claude-opus-4-7",
+    "model": "claude-opus-4-8",
     "messages": [
       { "role": "system", "content": "Kısa ve net yanıt ver." },
       { "role": "user", "content": "Bir satırlık selam ver." }
@@ -365,12 +542,12 @@ claude`,
     "max_tokens": 120
   }'`,
         osVariants: {
-          windows: `curl.exe -X POST https://yapayzekalab.org/v1/chat/completions -H "Authorization: Bearer yzk_live_YOUR_KEY" -H "Content-Type: application/json" -d "{\\"model\\":\\"claude-opus-4-7\\",\\"messages\\":[{\\"role\\":\\"system\\",\\"content\\":\\"Kisa ve net yanit ver.\\"},{\\"role\\":\\"user\\",\\"content\\":\\"Bir satirlik selam ver.\\"}],\\"max_tokens\\":120}"`,
+          windows: `curl.exe -X POST https://yapayzekalab.org/v1/chat/completions -H "Authorization: Bearer yzk_live_YOUR_KEY" -H "Content-Type: application/json" -d "{\\"model\\":\\"claude-opus-4-8\\",\\"messages\\":[{\\"role\\":\\"system\\",\\"content\\":\\"Kisa ve net yanit ver.\\"},{\\"role\\":\\"user\\",\\"content\\":\\"Bir satirlik selam ver.\\"}],\\"max_tokens\\":120}"`,
           macos: `curl -X POST https://yapayzekalab.org/v1/chat/completions \\
   -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "claude-opus-4-7",
+    "model": "claude-opus-4-8",
     "messages": [
       { "role": "system", "content": "Kısa ve net yanıt ver." },
       { "role": "user", "content": "Bir satırlık selam ver." }
@@ -381,7 +558,7 @@ claude`,
   -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "claude-opus-4-7",
+    "model": "claude-opus-4-8",
     "messages": [
       { "role": "system", "content": "Kısa ve net yanıt ver." },
       { "role": "user", "content": "Bir satırlık selam ver." }
@@ -437,7 +614,7 @@ print(response.choices[0].message.content)`,
     label: "Endpoint yüzeyi",
     title: "Aktif endpointler ve davranışları",
     intro:
-      "Dış yüzey tek v1 gateway’dir. Auth’suz istekler reddedilir. Başarılı JSON yanıtlarında maliyet ve kalan bakiye header’ları döner.",
+      "Dış yüzey tek bir v1 gateway'idir. Yetkisiz (anahtarsız) istekler reddedilir. Başarılı JSON yanıtlarında maliyet ve kalan bakiye bilgisi yanıt header'larında döner.",
     referenceRows: [
       { key: "GET /v1/models", value: "Aktif model kataloğu" },
       { key: "GET /v1/models/count", value: "Aktif model adedi" },
@@ -487,14 +664,14 @@ print(response.choices[0].message.content)`,
     label: "Bakiye ve billing",
     title: "Maliyet ve kalan bakiye nasıl izlenir",
     intro:
-      "Başarılı çağrılarda yanıt header’ları bakiye takibi için yeterlidir. Kullanıcı bakiyesi bittiğinde sistem isteği upstream maliyet doğurmadan önce bloklar.",
+      "Her başarılı çağrıda yanıt header'ları sana ne kadar harcadığını ve ne kadar bakiyen kaldığını söyler. Bakiyen bittiğinde sistem isteği, sağlayıcıya gitmeden önce bloklar — yani borç birikmez.",
     bullets: [
       "`X-YZ-Cost-TL` → çağrının TL maliyeti",
       "`X-YZ-Remaining-TL` → çağrı sonrası kalan TL bakiye",
       "`X-YZ-Remaining-USD` → çağrı sonrası kalan USD eşdeğeri",
       "`X-YZ-Request-Id` → destek ve log eşleştirme kimliği",
       "Geçersiz veya bakiyesi bitmiş anahtar `401` ya da güvenli yetersiz bakiye hatası alır.",
-      "Başarılı JSON çağrılarında bu header’lar döner; hata senaryolarında güvenli JSON cevap üretilir.",
+      "Başarılı JSON çağrılarında bu header'lar döner; hata senaryolarında güvenli JSON cevap üretilir.",
     ],
     codeBlocks: [
       {
@@ -512,7 +689,7 @@ X-YZ-Request-Id: req_123456789`,
     label: "Web arama (güncel bilgi)",
     title: "Web arama ile güncel bilgi (web_search)",
     intro:
-      "Modelin eğitim verisi dışındaki güncel bilgileri (kim, son durum, fiyat, sürüm, haber) cevaplaması için iki yol var: (1) `chat/completions` isteğine `web_search: true` ekleyerek otomatik zenginleştirme — güncel bir soru sezilirse arka planda arama yapılır, sonuçlar modele kaynak olarak verilir ve model atıflı ([1], [2]) cevap üretir; (2) ayrı `POST /v1/web-search` ucu — yalnız arama sonuçlarını döndürür. Her ikisinde de arama başına sabit ücret alınır (token ücretinden ayrı).",
+      "Modelin eğitildiği tarihten sonraki güncel bilgileri (son durum, fiyat, sürüm, haber) cevaplayabilmesi için iki yol var: (1) `chat/completions` isteğine `web_search: true` ekle — güncel bir soru sezilirse arka planda arama yapılır, sonuçlar modele kaynak verilir ve model atıflı ([1], [2]) yanıtlar; (2) ayrı `POST /v1/web-search` ucu — yalnız arama sonuçlarını döndürür. Her ikisinde de arama başına sabit ücret alınır (token ücretinden ayrı).",
     referenceRows: [
       { key: "web_search: true", value: "chat/completions içinde otomatik mod (güncel soruda arar)" },
       { key: 'web_search: { mode: "always" }', value: "Her istekte arama yapar" },
@@ -522,7 +699,7 @@ X-YZ-Request-Id: req_123456789`,
     ],
     bullets: [
       "`web_search: true` varsayılan olarak `auto` moddur: yalnız güncel/aktüel görünen sorularda arama tetiklenir, sıradan sorularda arama yapılmaz (gereksiz ücret oluşmaz).",
-      "Otomatik modda arama maliyeti, normal token maliyetine EK olarak arama başına 0.001 USD’dir; enjekte edilen sonuçlar girişi büyüttüğü için token maliyeti de bir miktar artar.",
+      "Otomatik modda arama maliyeti, normal token maliyetine EK olarak arama başına 0.001 USD'dir; enjekte edilen sonuçlar girişi büyüttüğü için token maliyeti de bir miktar artar.",
       "Arama sonuç döndürmezse ücret alınmaz; yanıt yine üretilir.",
       "Standalone `/v1/web-search` yalnız başlık, bağlantı ve özet döndürür; modeli çağırmaz.",
       "Streaming (`stream: true`) isteklerinde otomatik web arama uygulanmaz; standalone ucu veya akışsız çağrıyı kullanın.",
@@ -569,7 +746,7 @@ X-YZ-Request-Id: req_123456789`,
     label: "Streaming",
     title: "Streaming çağrılarında davranış",
     intro:
-      "Streaming isteklerinde sistem önce güvenli rezervasyon yapar, sonra gerçek kullanım geldiğinde mahsuplaşır. Bu yüzden bakiye bittiğinde ücretsiz uzun akış açık kalmaz.",
+      "Yanıtı parça parça (streaming) almak istersen sistem önce güvenli bir rezervasyon yapar, sonra gerçek kullanım gelince mahsuplaşır. Bu yüzden bakiyen bittiğinde ücretsiz uzun akış açık kalmaz.",
     bullets: [
       "İstek başlamadan önce güvenli kullanım rezervi hesaplanır.",
       "Provider son kullanım bilgisi verirse gerçek kullanım üzerinden kayıt tutulur.",
@@ -583,12 +760,12 @@ X-YZ-Request-Id: req_123456789`,
     label: "Model kataloğu",
     title: "Aktif modeller",
     intro:
-      "Aşağıdaki liste şu an aktif sağlayıcıda kullanılabilen modelleri gösterir. Tam ve güncel liste için her zaman `/v1/models` ucunu kullan — aktif sağlayıcı değişirse liste de değişir.",
+      "Aşağıdaki liste şu an kullanılabilen modelleri gösterir. Tam ve güncel liste için her zaman `/v1/models` ucunu kullan — aktif sağlayıcı değişirse liste de değişir. (Model adında nokta veya tire fark etmez; ikisi de kabul edilir.)",
     modelGroups: [
       {
         family: "Claude (Anthropic)",
         models: [
-          "claude-opus-4.8",
+          "claude-opus-4-8",
           "claude-opus-4-7",
           "claude-opus-4-6",
           "claude-sonnet-4-6",
@@ -602,11 +779,11 @@ X-YZ-Request-Id: req_123456789`,
     label: "Hatalar",
     title: "Sık görülen hata cevapları",
     intro:
-      "İstemcini kurarken en çok yetkilendirme, bakiye ve desteklenmeyen endpoint durumlarıyla karşılaşırsın. Aşağıdaki özet beklenen güvenli davranışı gösterir.",
+      "İstemcini kurarken en çok yetkilendirme, bakiye ve desteklenmeyen endpoint durumlarıyla karşılaşırsın. Aşağıdaki özet, hangi kodun ne demek olduğunu gösterir.",
     referenceRows: [
       { key: "401", value: "API key yok, hatalı, askıda veya iptal edilmiş" },
       { key: "402 / güvenli bakiye hatası", value: "Kullanım için yeterli bakiye yok" },
-      { key: "404", value: "Bilinmeyen / desteklenmeyen v1 route" },
+      { key: "404", value: "Bilinmeyen / desteklenmeyen v1 route (çoğu zaman Base URL yanlış)" },
       { key: "501", value: "Görsel veya video endpointi bu geçişte kapalı" },
       { key: "503", value: "Upstream proxy veya özel entegrasyon henüz yapılandırılmamış" },
     ],
@@ -616,7 +793,7 @@ X-YZ-Request-Id: req_123456789`,
     label: "Kurulum akışı",
     title: "Sıfırdan çalışan kurulum sırası",
     intro:
-      "Dökümanı ilk kez okuyan biri için en kısa güvenli akış aşağıdaki gibidir.",
+      "İlk kez kuruyorsan en kısa güvenli sıra aşağıdaki gibidir.",
     ordered: true,
     bullets: [
       "Google ile giriş yap.",
@@ -625,7 +802,7 @@ X-YZ-Request-Id: req_123456789`,
       "`/v1/balance` ile kalan bakiyeni doğrula.",
       "`/v1/models` ile aktif modeli seç.",
       "`/v1/chat/completions` ile ilk küçük metin çağrını yap.",
-      "Gerekirse istemcini kalıcı kur: Codex CLI veya Claude Code (CLI), ya da `Cline`, `Kilo Code`, `OpenCode`, `Roo Code` (VS Code/CLI).",
+      "Aracını kalıcı bağla: yukarıdaki Adım 1 (Aracını bağla) — Claude Code, Codex, OpenCode, Cline, Kilo Code, Roo Code veya Cherry Studio.",
     ],
   },
   {
@@ -633,7 +810,7 @@ X-YZ-Request-Id: req_123456789`,
     label: "Önemli notlar",
     title: "Kullanım notları ve sınırlar",
     intro:
-      "Dokümantasyon sade tutuldu, ama davranış nettir: kritik limitler backend’de uygulanır ve frontend kopyası tek başına güvence sayılmaz.",
+      "Dokümantasyon sade tutuldu, ama davranış nettir: kritik limitler arka planda (backend'de) uygulanır; ekrandaki metin tek başına garanti değildir.",
     bullets: [
       "API anahtarı formatı `yzk_live_` ile başlar.",
       "Yeni entegrasyonda önce `/v1/models` ve `/v1/balance` ile doğrulama yap.",
@@ -678,6 +855,9 @@ export const buildApiDocsPlainText = () =>
       section.clientCards.forEach((card) => {
         parts.push("", `${card.name} — ${card.type}`);
         card.steps.forEach((step) => parts.push(`- ${step}`));
+        if (card.values?.length) {
+          card.values.forEach((val) => parts.push(`- ${val.label}: ${val.value}`));
+        }
         if (card.osVariants || card.code) parts.push("", codeToPlainText(card));
       });
     }
