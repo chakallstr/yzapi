@@ -99,6 +99,36 @@ const RouteFlow = ({ tweaks }) => {
 
 };
 
+// "Bu ay TR toplam istek" — ay başına demirlenmiş, gerçek-zamanla artan canlı
+// sayaç. Her F5'te baştan sarmaz: değer (ay başından beri geçen saniye × oran +
+// taban) ile hesaplanır ve localStorage tabanıyla asla geri gitmez. Sekme kapalı
+// kalsa bile bir sonraki açılışta zaman ilerlemiş olur → "sürekli ediyor" hissi.
+// Sabitler tunable; ay sonunda doğal sıfırlanır ("bu ay" semantiği).
+const TR_REQ_KEY = 'yz_home_tr_requests_v1';
+const TR_REQ_BASE = 238000; // ay başı taban
+const TR_REQ_RATE = 0.18;   // ~istek/sn artış
+function trRequestsTimeFloor() {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
+  const secs = Math.max(0, (Date.now() - monthStart) / 1000);
+  return Math.floor(TR_REQ_BASE + secs * TR_REQ_RATE);
+}
+function trRequestsReadFloor() {
+  try {
+    const raw = window.localStorage?.getItem(TR_REQ_KEY);
+    if (raw) {
+      const o = JSON.parse(raw);
+      if (o && o.month === new Date().getMonth() && Number.isFinite(o.value)) return o.value;
+    }
+  } catch { /* yok say */ }
+  return 0;
+}
+function trRequestsWriteFloor(value) {
+  try {
+    window.localStorage?.setItem(TR_REQ_KEY, JSON.stringify({ month: new Date().getMonth(), value }));
+  } catch { /* yok say */ }
+}
+
 // === ValueBanner — 3-up değer önerisi banner =======================
 const ValueBanner = ({ tweaks, onAction }) => {
   const animSpeed = tweaks?.animSpeed ?? 1;
@@ -106,12 +136,18 @@ const ValueBanner = ({ tweaks, onAction }) => {
   const tickerMs = tweaks?.priceTickerMs ?? 700;
   const tickerInc = tweaks?.priceTickerInc ?? 0.5;
 
-  // Live "Türkiye toplam istek" ticker
-  const [requests, setRequests] = useState(284917);
+  // Live "Türkiye toplam istek" ticker — F5'te sıfırlanmaz, hep artar.
+  const [requests, setRequests] = useState(() => Math.max(trRequestsTimeFloor(), trRequestsReadFloor()));
   useEffect(() => {
     if (!tickerOn) return;
     const t = setInterval(() => {
-      setRequests((n) => n + Math.max(1, Math.round(tickerInc * (0.6 + Math.random() * 1.2))));
+      setRequests((n) => {
+        const inc = Math.max(1, Math.round(tickerInc * (0.6 + Math.random() * 1.2)));
+        // Zaman tabanının altına asla düşme (idle sonrası ileri sıçrar), üstüne canlı artış.
+        const next = Math.max(n + inc, trRequestsTimeFloor());
+        trRequestsWriteFloor(next);
+        return next;
+      });
     }, Math.max(80, tickerMs / Math.max(0.1, animSpeed)));
     return () => clearInterval(t);
   }, [tickerOn, tickerMs, tickerInc, animSpeed]);

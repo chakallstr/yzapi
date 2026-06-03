@@ -1123,7 +1123,8 @@ const App = ({ initialTab = 'home' }) => {
   // Streaming logs — running based on streamRate tweak
   const rateMap = { off: { running: false, mul: 1 }, slow: { running: true, mul: 0.5 }, normal: { running: true, mul: 1 }, fast: { running: true, mul: 2.5 } };
   const rate = rateMap[t.streamRate] || rateMap.normal;
-  const logs = useLogStream({ running: rate.running, intervalMs: 3000, speedMul: rate.mul, max: 80 });
+  // persistKey → akış localStorage'da tutulur; F5'te baştan sarmaz, "API Aktivitesi" sürekli akıyor görünür.
+  const logs = useLogStream({ running: rate.running, intervalMs: 3000, speedMul: rate.mul, max: 80, persistKey: 'yz_activity_stream_v1' });
 
   const ctx = { skeleton, logs, tweaks: t, setTweak, goto };
 

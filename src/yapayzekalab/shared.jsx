@@ -290,9 +290,27 @@ function nowTime() {
   return [d.getHours(), d.getMinutes(), d.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
 }
 
-function useLogStream({ seed = mockLogs, running = true, intervalMs = 3000, speedMul = 1, max = 60 }) {
-  const [logs, setLogs] = useState(seed);
-  const idRef = useRef(seed.length);
+function useLogStream({ seed = mockLogs, running = true, intervalMs = 3000, speedMul = 1, max = 60, persistKey = null }) {
+  // persistKey verildiğinde akış localStorage'a yazılır ve mount'ta geri yüklenir
+  // → F5'te baştan sarmaz, kaldığı yerden "sürekli akıyor" hissiyle devam eder.
+  // persistKey yoksa davranış eskisiyle birebir aynı (geriye uyumlu).
+  const restore = () => {
+    if (!persistKey) return seed;
+    try {
+      const raw = window.localStorage?.getItem(persistKey);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.length) return arr.slice(0, max);
+      }
+    } catch { /* yok say */ }
+    return seed;
+  };
+  const [logs, setLogs] = useState(restore);
+  // id sayacını geri yüklenen en yüksek 'r-NNN' değerinden sürdür (çakışma olmasın).
+  const idRef = useRef(logs.reduce((mx, l) => {
+    const n = parseInt(String(l?.id ?? '').replace(/\D/g, ''), 10);
+    return Number.isFinite(n) && n > mx ? n : mx;
+  }, 0));
   useEffect(() => {
     if (!running) return;
     const t = setInterval(() => {
@@ -300,17 +318,23 @@ function useLogStream({ seed = mockLogs, running = true, intervalMs = 3000, spee
       idRef.current += 1;
       const tokens = 800 + Math.floor(Math.random() * 6700);
       const ms = Math.max(120, Math.round(pick.ms + (Math.random() - 0.5) * pick.ms * 0.5));
-      setLogs(prev => [{
-        id: 'r-' + String(idRef.current).padStart(3, '0'),
-        prompt: pick.p,
-        model: pick.id,
-        ms,
-        cost: pick.cost,
-        tokens,
-        ctx: ctxFor(pick.id),
-        time: nowTime(),
-        status: Math.random() > 0.96 ? 'slow' : 'ok',
-      }, ...prev].slice(0, max));
+      setLogs(prev => {
+        const next = [{
+          id: 'r-' + String(idRef.current).padStart(3, '0'),
+          prompt: pick.p,
+          model: pick.id,
+          ms,
+          cost: pick.cost,
+          tokens,
+          ctx: ctxFor(pick.id),
+          time: nowTime(),
+          status: Math.random() > 0.96 ? 'slow' : 'ok',
+        }, ...prev].slice(0, max);
+        if (persistKey) {
+          try { window.localStorage?.setItem(persistKey, JSON.stringify(next)); } catch { /* yok say */ }
+        }
+        return next;
+      });
     }, Math.max(400, intervalMs / Math.max(0.1, speedMul)));
     return () => clearInterval(t);
   }, [running, intervalMs, speedMul]);
