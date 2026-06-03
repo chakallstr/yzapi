@@ -335,6 +335,10 @@ export async function forwardChatStream(
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
+  // Proxy (nginx) SSE buffer'ını kapat + header'ları HEMEN gönder ki istemci
+  // (Roo Code vb.) "API request"te beklemeden ilk byte'ı alabilsin.
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
 
   return new Promise<ChatUsage>((resolve, reject) => {
     if (!upstream.body) {
@@ -352,6 +356,7 @@ export async function forwardChatStream(
     const finalize = () => {
       if (settled) return;
       settled = true;
+      clearIdle();
       if (usage.promptTokens <= 0) {
         usage.promptTokens = estimateTextTokens(providerBody.messages ?? "");
       }
@@ -361,7 +366,26 @@ export async function forwardChatStream(
       resolve(usage);
     };
 
+    // Idle watchdog: upstream bağlıyken belirli süre VERİ AKMAZSA istemci
+    // sonsuza kadar "API request"te asılı kalmasın — stream'i temiz kapat.
+    // (defaultStreamTimeoutMs zaten header bekleme süresi; bu, akış ortasında
+    // upstream susarsa devreye girer.)
+    const idleMs = runtimeConfig.defaultStreamTimeoutMs ?? 120_000;
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    function clearIdle() { if (idleTimer) clearTimeout(idleTimer); }
+    function resetIdle() {
+      clearIdle();
+      idleTimer = setTimeout(() => {
+        logger.error({ url, idleMs }, "ai provider stream idle timeout — upstream veri göndermedi");
+        nodeStream.destroy();
+        try { res.end(); } catch { /* zaten kapalı */ }
+        finalize();
+      }, idleMs);
+    }
+    resetIdle();
+
     nodeStream.on("data", (chunk: Buffer) => {
+      resetIdle();
       const text = chunk.toString();
       buffer += text;
 
