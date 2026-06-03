@@ -4,6 +4,7 @@ import {
   PROVIDERS, MODELS, MODELS_BY_ID, MODEL_KEYS, modelMeta,
   modelsByType, modelsByProvider, ctxFor,
   computeOurUsd, usdToTL, computeTLPrice, fmt,
+  OPUS48_LABEL, usdToOpusTokens,
   mockLogs, promptPool, useCountUp, useLogStream, nowTime,
 } from './shared.jsx';
 import { apiJson, authFetch, getAccessToken, hasStoredAuth } from './auth-client.js';
@@ -537,6 +538,9 @@ const TopUpAmount = ({ amount, selected, onSelect, tlRate }) => (
       ${amount}
     </div>
     <div style={{ fontSize: 9.5, color: selected ? 'var(--accent-ink)' : 'var(--ink-3)', marginTop: 2, fontFamily: 'var(--font-mono)' }} className="tnum">
+      ≈ {fmt.tokens(usdToOpusTokens(amount))} token
+    </div>
+    <div style={{ fontSize: 9, color: 'var(--ink-4)', marginTop: 1, fontFamily: 'var(--font-mono)' }} className="tnum">
       ≈ ₺{(amount * tlRate).toFixed(0)}
     </div>
   </button>
@@ -1107,6 +1111,9 @@ const AccountTab = ({ ctx }) => {
               <>
                 <div style={{ fontSize: 52, fontWeight: 600, letterSpacing: -2.2, lineHeight: 1, marginTop: 14, fontFamily: 'var(--font-sans)' }} className="tnum">
                   ${balanceUSD.toFixed(2)}
+                </div>
+                <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.82)', marginTop: 8, fontFamily: 'var(--font-mono)' }} className="tnum">
+                  ≈ {fmt.tokens(usdToOpusTokens(balanceUSD))} {OPUS48_LABEL} tokeni <span style={{ opacity: 0.55 }}>· ortalama</span>
                 </div>
                 <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: 'var(--font-mono)' }} className="tnum">
                   ≈ ₺{(balanceUSD * tlRate).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · bilgi · kur ₺{tlRate.toFixed(2)}

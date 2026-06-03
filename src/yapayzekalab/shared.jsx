@@ -193,6 +193,16 @@ const computeTLPrice = (usdPrice, type, { rate, textMul, mediaMul }) => {
   return usdToTL(computeOurUsd(usdPrice, type, { textMul, mediaMul }), rate);
 };
 
+// --- Token eşdeğeri (referans: ortalama Opus 4.8) ------------------
+// Bakiyeyi "kaç token eder" diye göstermek için referans model:
+// Claude Opus 4.8 müşteri satış fiyatı $1.10 / 1M token (input=output, blended ortalama).
+// Fiyat değişirse tek değiştirilecek yer burası.
+const OPUS48_USD_PER_1M = 1.10;
+const OPUS48_LABEL = 'Opus 4.8';
+// USD bakiyenin ortalama Opus 4.8 token karşılığı (kaba tahmin — input/output ortalaması).
+const usdToOpusTokens = (usd) =>
+  Math.max(0, ((Number(usd) || 0) / OPUS48_USD_PER_1M) * 1_000_000);
+
 // Pretty USD/TL formatting
 const fmt = {
   usd:   (n) => '$' + (n < 1 ? n.toFixed(n < 0.01 ? 4 : 2) : n.toFixed(2)),
@@ -202,6 +212,13 @@ const fmt = {
   num:   (n) => n.toLocaleString('tr-TR'),
   ms:    (n) => Math.round(n) + 'ms',
   cost:  (n) => '$' + n.toFixed(5),
+  // İnsan-dostu token sayısı: "9,1 milyon" / "454 bin" / "812".
+  tokens:(n) => {
+    const v = Math.max(0, Math.round(Number(n) || 0));
+    if (v >= 1_000_000) return (v / 1_000_000).toLocaleString('tr-TR', { maximumFractionDigits: 1 }) + ' milyon';
+    if (v >= 1_000)     return (v / 1_000).toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' bin';
+    return v.toLocaleString('tr-TR');
+  },
 };
 
 // --- Streaming prompt pool ----------------------------------------
@@ -439,6 +456,7 @@ export {
   PROVIDERS, MODELS, MODELS_BY_ID, MODEL_KEYS, modelMeta,
   modelsByType, modelsByProvider, ctxFor,
   computeOurUsd, usdToTL, computeTLPrice, fmt,
+  OPUS48_USD_PER_1M, OPUS48_LABEL, usdToOpusTokens,
   mockLogs, promptPool,
   useCountUp, useLogStream, nowTime,
   mockUsers, mockUsageRecords, mockPayments, mockAnnouncements,

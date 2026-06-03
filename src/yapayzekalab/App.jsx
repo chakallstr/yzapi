@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import './tokens.css';
 import {
   I, Card, Chip, Caption, PulseDot, Dot, PROVIDERS,
+  fmt, OPUS48_LABEL, usdToOpusTokens,
   mockLogs, mockProviderStatus, useLogStream,
 } from './shared.jsx';
 import { AccountTab } from './tab-account.jsx';
@@ -690,8 +691,10 @@ const TopBar = ({ active, onTab, balanceUSD, tlRate, onUserAction, isAuthenticat
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }} className="yz-topbar-actions">
         {isAuthenticated ? (
           <>
-            {/* Balance pill — USD birincil, TL bilgi */}
-            <button onClick={() => onTab('account')} style={{
+            {/* Balance pill — USD birincil, TL bilgi, token tooltip */}
+            <button onClick={() => onTab('account')}
+              title={`Ortalama ~${fmt.tokens(usdToOpusTokens(balanceUSD ?? 0))} ${OPUS48_LABEL} tokeni eder`}
+              style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '6px 12px', borderRadius: 999,
               background: 'var(--accent-bg)', border: '1px solid var(--accent-border)',
@@ -1242,7 +1245,7 @@ const App = ({ initialTab = 'home' }) => {
                 </>
               ) : (
                 <>
-                  <strong>Bakiyen düşük:</strong> ${balance.toFixed(2)} kaldı. Ortalama maliyetle bu ~{Math.round(balance * 200)} istek demek.
+                  <strong>Bakiyen düşük:</strong> ${balance.toFixed(2)} kaldı — ortalama ~{fmt.tokens(usdToOpusTokens(balance))} {OPUS48_LABEL} tokeni eder.
                 </>
               )}
             </div>
