@@ -1899,7 +1899,7 @@ const AdminPaymentSettings = ({ config, token, refresh }) => {
                 {row.userAdSoyad || '—'} · {row.userEmail || row.userId}
               </div>
               <div style={{ fontSize: 10.5, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)' }}>
-                ref {row.referansKodu} · {safeDate(row.olusturma)}
+                {safeDate(row.olusturma)}
               </div>
               <input
                 value={rejectNotes[row.id] || ''}
@@ -2003,7 +2003,7 @@ const AdminPaymentSettings = ({ config, token, refresh }) => {
               <Caption>Manuel kripto cüzdanı</Caption>
               <div style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>USDT adresi</div>
               <div style={{ fontSize: 11.5, color: 'var(--ink-2)', lineHeight: 1.6, marginTop: 6 }}>
-                Cryptomus kapalıysa bu alan aktif olduğunda kullanıcıya cüzdan, ağ, referans ve WhatsApp bildirimi gösterilir. Bakiye otomatik eklenmez.
+                Cryptomus kapalıysa bu alan aktif olduğunda kullanıcıya cüzdan, ağ ve WhatsApp bildirimi gösterilir. Bakiye otomatik eklenmez.
               </div>
             </div>
             <button onClick={() => setField('cryptoWalletEnabled', !form.cryptoWalletEnabled)} style={{

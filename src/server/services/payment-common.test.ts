@@ -132,7 +132,7 @@ describe("creditUserBalance — usable TL balance", () => {
 
     const { creditUserBalance } = await import("./payment-common.js");
 
-    const result = await creditUserBalance("user-1", "pay-1", 120, "iban", "YZ-ABC123");
+    const result = await creditUserBalance("user-1", "pay-1", 120, "iban", "KEY-ABC123");
 
     expect(result).toEqual({ success: true, txId: "tx-123" });
     expect(mocks.txInsertValues).toHaveBeenCalledWith(expect.objectContaining({
@@ -140,7 +140,7 @@ describe("creditUserBalance — usable TL balance", () => {
       miktarTL: "120",
       oncekiBakiye: "40",
       sonrakiBakiye: "160",
-      idempotencyKey: "pay_YZ-ABC123",
+      idempotencyKey: "pay_KEY-ABC123",
     }));
   });
 
@@ -151,7 +151,7 @@ describe("creditUserBalance — usable TL balance", () => {
 
     const { creditUserBalance } = await import("./payment-common.js");
 
-    await creditUserBalance("user-1", "pay-1", 120, "iban", "YZ-ABC123");
+    await creditUserBalance("user-1", "pay-1", 120, "iban", "KEY-ABC123");
 
     const balanceUpdate = mocks.txUpdateSet.mock.calls[0]?.[0];
     expect(balanceUpdate).toBeDefined();
@@ -164,7 +164,7 @@ describe("creditUserBalance — usable TL balance", () => {
 
     const { creditUserBalance } = await import("./payment-common.js");
 
-    const result = await creditUserBalance("user-1", "pay-1", 120, "iban", "YZ-ABC123");
+    const result = await creditUserBalance("user-1", "pay-1", 120, "iban", "KEY-ABC123");
 
     expect(result).toEqual({ success: true, alreadyCredited: true, txId: "tx-existing" });
     expect(mocks.transaction).not.toHaveBeenCalled();

@@ -20,10 +20,13 @@ import { buildUsdTopupQuote } from "../services/payment-pricing.js";
 const router = Router();
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-function generateReferansKodu(): string {
+// Müşteriye GÖRÜNMEYEN iç eşleştirme/idempotency anahtarı: bir `payments` satırını
+// ilgili `pending_iban_payments` satırına bağlar (admin onay/red mutabakatı).
+// Müşteriye asla "referans" olarak gösterilmez ve havale açıklamasına yazılmaz.
+function generateIdempotencyKey(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "YZ-";
-  for (let i = 0; i < 8; i++) {
+  let code = "";
+  for (let i = 0; i < 12; i++) {
     code += chars[Math.floor(Math.random() * chars.length)];
   }
   return code;
@@ -82,7 +85,6 @@ function normalizeWhatsappNumber(value: string): string {
 
 function buildPaymentNotification(opts: {
   method: string;
-  reference: string;
   amountUsd: number;
   payableLabel: string;
   userEmail?: string;
@@ -92,7 +94,6 @@ function buildPaymentNotification(opts: {
   const whatsappMessage = [
     "YapayZekaLab ödeme bildirimi",
     `Yöntem: ${opts.method}`,
-    `Referans: ${opts.reference}`,
     `Bakiye: $${opts.amountUsd.toFixed(2)}`,
     `Ödeme: ${opts.payableLabel}`,
     opts.userEmail ? `Hesap: ${opts.userEmail}` : null,
@@ -719,7 +720,8 @@ router.post("/iban/init", userAuth, requireWhatsappVerified, async (req, res, ne
     }
 
     const kdv = calcKdv(quote.payableTL);
-    const referansKodu = generateReferansKodu();
+    // Müşteriye görünmeyen iç eşleştirme anahtarı (payments ↔ pending_iban_payments).
+    const idempotencyKey = generateIdempotencyKey();
 
     // Create payment row
     const paymentInserted = await db.insert(payments).values({
@@ -734,7 +736,7 @@ router.post("/iban/init", userAuth, requireWhatsappVerified, async (req, res, ne
       kurAtPayment: String(quote.kur),
       roundingTL: String(quote.roundingTL),
       durum: "bekliyor",
-      idempotencyKey: referansKodu,
+      idempotencyKey,
     }).returning({ id: payments.id });
 
     const paymentId = paymentInserted[0].id;
@@ -753,7 +755,7 @@ router.post("/iban/init", userAuth, requireWhatsappVerified, async (req, res, ne
       creditTL: String(quote.creditTL),
       kurAtPayment: String(quote.kur),
       roundingTL: String(quote.roundingTL),
-      referansKodu,
+      referansKodu: idempotencyKey,
     });
 
     adminPaymentNotificationEmail({
@@ -763,7 +765,6 @@ router.post("/iban/init", userAuth, requireWhatsappVerified, async (req, res, ne
       amountUsd: quote.amountUsd,
       payableTL: quote.payableTL,
       creditTL: quote.creditTL,
-      reference: referansKodu,
       status: "bekliyor",
     }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
     notifyAdmin({
@@ -772,13 +773,11 @@ router.post("/iban/init", userAuth, requireWhatsappVerified, async (req, res, ne
       userEmail: userRows[0]?.email,
       method: "iban",
       amountTL: quote.payableTL,
-      reference: referansKodu,
       status: "bekliyor",
     }).catch((e: unknown) => logger.error({ err: e }, "admin notify (iban init) failed"));
 
     res.json({
       paymentId,
-      referansKodu,
       kdv,
       quote,
       iban: {
@@ -788,13 +787,12 @@ router.post("/iban/init", userAuth, requireWhatsappVerified, async (req, res, ne
       },
       whatsapp: buildPaymentNotification({
         method: "IBAN Havalesi",
-        reference: referansKodu,
         amountUsd: quote.amountUsd,
         payableLabel: `₺${quote.payableTL.toFixed(0)}`,
         userEmail: userRows[0]?.email,
         settings,
       }),
-      aciklama: `Ödeme bildirimi için referans kodunuz oluşturuldu: ${referansKodu}`,
+      aciklama: "Havale/EFT açıklama kısmını lütfen BOŞ bırakın. Ödeme sonrası WhatsApp ile bildirim yapabilirsiniz.",
     });
   } catch (e) { next(e); }
 });
@@ -819,7 +817,8 @@ router.post("/crypto/init", userAuth, requireWhatsappVerified, async (req, res, 
     const kdv = calcKdv(quote.payableTL);
     const userRows = await db.select({ email: users.email })
       .from(users).where(eq(users.id, req.user!.id)).limit(1);
-    const manualReference = generateReferansKodu();
+    // Müşteriye görünmeyen iç eşleştirme anahtarı (manuel kripto için idempotency).
+    const idempotencyKey = generateIdempotencyKey();
 
     // Create payment row first
     const inserted = await db.insert(payments).values({
@@ -834,7 +833,7 @@ router.post("/crypto/init", userAuth, requireWhatsappVerified, async (req, res, 
       kurAtPayment: String(quote.kur),
       roundingTL: String(quote.roundingTL),
       durum: "bekliyor",
-      idempotencyKey: cryptomusProviderEnabled ? undefined : manualReference,
+      idempotencyKey: cryptomusProviderEnabled ? undefined : idempotencyKey,
     }).returning({ id: payments.id });
 
     const paymentId = inserted[0].id;
@@ -845,14 +844,13 @@ router.post("/crypto/init", userAuth, requireWhatsappVerified, async (req, res, 
       userEmail: userRows[0]?.email,
       method: cryptomusProviderEnabled ? "cryptomus" : "crypto_manual",
       amountTL: quote.payableTL,
-      reference: cryptomusProviderEnabled ? paymentId : manualReference,
+      reference: cryptomusProviderEnabled ? paymentId : undefined,
     }).catch((e: unknown) => logger.error({ err: e }, "admin notify (crypto init) failed"));
 
     if (!cryptomusProviderEnabled) {
       res.json({
         paymentId,
         manual: true,
-        referansKodu: manualReference,
         kdv,
         quote,
         cryptoWallet: {
@@ -863,13 +861,12 @@ router.post("/crypto/init", userAuth, requireWhatsappVerified, async (req, res, 
         },
         whatsapp: buildPaymentNotification({
           method: `${settings.cryptoWalletAsset} ${settings.cryptoWalletNetwork}`,
-          reference: manualReference,
           amountUsd: quote.amountUsd,
           payableLabel: `$${quote.amountUsd.toFixed(2)} ${settings.cryptoWalletAsset}`,
           userEmail: userRows[0]?.email,
           settings,
         }),
-        aciklama: `Kripto ödeme bildirimi için referans kodunuz oluşturuldu: ${manualReference}`,
+        aciklama: "Ödeme sonrası WhatsApp ile bildirim yapabilirsiniz.",
       });
       return;
     }

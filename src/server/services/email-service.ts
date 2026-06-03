@@ -150,7 +150,7 @@ export async function paymentReceiptEmail(
     <tr><td style="color:#6b7280;padding:4px 0">Net Tutar</td><td style="text-align:right;color:#374151">₺${payment.netTL.toFixed(2)}</td></tr>
     <tr style="border-top:1px solid #bbf7d0"><td style="color:#15803d;font-weight:bold;padding:8px 0">Kullanılabilir Bakiye</td><td style="text-align:right;color:#15803d;font-weight:bold">₺${payment.miktarTL.toFixed(2)}</td></tr>
   </table>
-  <p style="color:#6b7280;font-size:12px">Referans Kodu: <code>${payment.refKod}</code>${payment.transactionId ? ` &nbsp;|&nbsp; İşlem ID: <code>${payment.transactionId}</code>` : ""}</p>
+  ${payment.transactionId ? `<p style="color:#6b7280;font-size:12px">İşlem ID: <code>${payment.transactionId}</code></p>` : ""}
 </div>`;
   await sendEmail(user.email, "YapayZekaLab — Ödeme Makbuzu", html);
 }

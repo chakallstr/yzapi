@@ -969,7 +969,6 @@ const AccountTab = ({ ctx }) => {
         setPaymentInstruction({
           method: 'iban',
           title: 'IBAN ödeme bilgileri',
-          reference: result?.referansKodu || '',
           quote: result?.quote,
           payableLabel: `₺${Number(result?.quote?.payableTL || payableTL).toFixed(0)}`,
           balanceLabel: `$${Number(result?.quote?.amountUsd || effectiveAmount).toFixed(2)}`,
@@ -985,7 +984,6 @@ const AccountTab = ({ ctx }) => {
         setPaymentInstruction({
           method: 'crypto',
           title: 'Kripto cüzdan bilgileri',
-          reference: result?.referansKodu || '',
           quote: result?.quote,
           payableLabel: `$${Number(result?.quote?.amountUsd || effectiveAmount).toFixed(2)} ${result?.cryptoWallet?.asset || 'USDT'}`,
           balanceLabel: `$${Number(result?.quote?.amountUsd || effectiveAmount).toFixed(2)}`,
@@ -1254,7 +1252,6 @@ const AccountTab = ({ ctx }) => {
                     Bakiye {paymentInstruction.balanceLabel} · Ödenecek {paymentInstruction.payableLabel}
                   </div>
                 </div>
-                <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5 }}>{paymentInstruction.reference || 'referans'}</Chip>
               </div>
 
               {paymentInstruction.iban && (
@@ -1262,7 +1259,7 @@ const AccountTab = ({ ctx }) => {
                   <div><strong>Banka:</strong> {paymentInstruction.iban.bankName || 'Tanımlı değil'}</div>
                   <div><strong>Alıcı:</strong> {paymentInstruction.iban.owner || 'Tanımlı değil'}</div>
                   <div style={{ fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}><strong>IBAN:</strong> {paymentInstruction.iban.ibanNumber || 'Tanımlı değil'}</div>
-                  <div><strong>Referans:</strong> {paymentInstruction.reference}</div>
+                  <div style={{ color: 'var(--accent)', fontWeight: 600 }}>Havale/EFT açıklama kısmını lütfen boş bırakın.</div>
                 </div>
               )}
 
@@ -1272,7 +1269,6 @@ const AccountTab = ({ ctx }) => {
                   <div><strong>Varlık:</strong> {paymentInstruction.cryptoWallet.asset || 'USDT'}</div>
                   <div style={{ fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}><strong>Cüzdan:</strong> {paymentInstruction.cryptoWallet.address || 'Tanımlı değil'}</div>
                   {paymentInstruction.cryptoWallet.memo && <div><strong>Memo:</strong> {paymentInstruction.cryptoWallet.memo}</div>}
-                  <div><strong>Referans:</strong> {paymentInstruction.reference}</div>
                 </div>
               )}
 
@@ -1295,9 +1291,6 @@ const AccountTab = ({ ctx }) => {
                     WhatsApp bildirim numarası henüz tanımlı değil; ödeme sonrası destek ekibiyle iletişime geçin.
                   </span>
                 )}
-                <button onClick={() => navigator.clipboard?.writeText(paymentInstruction.reference || '')} style={{ padding: '8px 10px', borderRadius: 9, border: '1px solid var(--border)', fontSize: 11.5 }}>
-                  Referansı kopyala
-                </button>
               </div>
             </div>
           )}

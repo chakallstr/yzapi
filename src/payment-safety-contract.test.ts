@@ -52,7 +52,7 @@ describe("payment safety contract", () => {
     expect(account).toContain("Banka");
     expect(account).toContain("IBAN");
     expect(account).toContain("Alıcı");
-    expect(account).toContain("Referans");
+    expect(account).toMatch(/açıklama kısmını lütfen boş bırak/i);
     expect(account).toContain("WhatsApp");
     expect(account).not.toContain("IBAN ödeme bildirimi oluşturuldu.");
     expect(account).not.toMatch(/referans kodunu ödeme açıklamasına yaz/i);
