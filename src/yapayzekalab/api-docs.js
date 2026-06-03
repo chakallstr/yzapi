@@ -209,7 +209,7 @@ export ANTHROPIC_MODEL="claude-sonnet-4-6"
 export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
 claude`,
         osVariants: {
-          windows: `# PowerShell — tum blogu yapistir, Enter'a bas. Hicbir sey kurulu degilse bile calisir.
+          windows: `# PowerShell — tum blogu yapistir, Enter tusuna bas. Hicbir sey kurulu degilse bile calisir.
 
 # Claude Code kur / onar
 irm https://claude.ai/install.ps1 | iex
@@ -257,7 +257,8 @@ setx ANTHROPIC_SMALL_FAST_MODEL "claude-sonnet-4-6" >$null
 where.exe claude
 claude --version
 claude`,
-          macos: `# bash/zsh — tum blogu yapistir, Enter'a bas. Hicbir sey kurulu degilse bile calisir.
+          macos: `setopt interactive_comments 2>/dev/null
+# bash/zsh — tum blogu yapistir, Enter tusuna bas. Hicbir sey kurulu degilse bile calisir.
 
 # Claude Code kur / onar
 curl -fsSL https://claude.ai/install.sh | bash
@@ -296,7 +297,8 @@ export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
 
 which claude && claude --version
 claude`,
-          linux: `# bash — tum blogu yapistir, Enter'a bas. Hicbir sey kurulu degilse bile calisir.
+          linux: `setopt interactive_comments 2>/dev/null
+# bash/zsh — tum blogu yapistir, Enter tusuna bas. Hicbir sey kurulu degilse bile calisir.
 
 # Claude Code kur / onar
 curl -fsSL https://claude.ai/install.sh | bash
