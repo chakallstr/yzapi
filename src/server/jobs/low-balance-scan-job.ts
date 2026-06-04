@@ -31,6 +31,7 @@ export function startLowBalanceScanJob(): void {
           email: users.email,
           adSoyad: users.adSoyad,
           bakiyeTL: users.bakiyeTL,
+          lang: users.lang,
         })
         .from(users)
         .where(
@@ -39,7 +40,7 @@ export function startLowBalanceScanJob(): void {
 
       for (const user of alertUsers) {
         await lowBalanceEmail(
-          { email: user.email, adSoyad: user.adSoyad },
+          { email: user.email, adSoyad: user.adSoyad, lang: user.lang === "en" ? "en" : "tr" },
           Number(user.bakiyeTL),
           threshold,
         ).catch((e) => logger.error({ err: e, userId: user.id }, "[low-balance-job] email failed"));

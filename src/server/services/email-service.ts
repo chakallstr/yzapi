@@ -4,7 +4,12 @@ import { env } from "../lib/env.js";
 export interface EmailUser {
   email: string;
   adSoyad: string;
+  /** Recipient language for customer emails; defaults to tr when omitted. */
+  lang?: "tr" | "en";
 }
+
+type EmailLang = "tr" | "en";
+const emailLang = (u: EmailUser): EmailLang => (u.lang === "en" ? "en" : "tr");
 
 export interface EmailPayment {
   miktarTL: number;
@@ -87,20 +92,81 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
 
 // ── Templates ─────────────────────────────────────────────────────────────────
 
-export async function welcomeEmail(user: EmailUser): Promise<void> {
+export function buildWelcomeEmail(user: EmailUser): { subject: string; html: string } {
+  const lang = emailLang(user);
+  const T = lang === "en"
+    ? {
+        subject: "Welcome to YapayZekaLab!",
+        greeting: "Hello",
+        body: "Your account has been created successfully. Sign in now to start using our AI models.",
+        cta: "Get Started",
+        supportPre: "For questions, email",
+        supportPost: ".",
+      }
+    : {
+        subject: "YapayZekaLab'a Hoş Geldiniz!",
+        greeting: "Merhaba",
+        body: "Hesabınız başarıyla oluşturuldu. Hemen giriş yaparak yapay zeka modellerimizi kullanmaya başlayabilirsiniz.",
+        cta: "Hemen Başla",
+        supportPre: "Sorularınız için",
+        supportPost: "adresine yazabilirsiniz.",
+      };
   const html = `
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9fafb;border-radius:8px">
-  <h2 style="color:#1d4ed8;margin-bottom:8px">YapayZekaLab'a Hoş Geldiniz!</h2>
-  <p style="color:#374151">Merhaba <strong>${user.adSoyad}</strong>,</p>
-  <p style="color:#374151">Hesabınız başarıyla oluşturuldu. Hemen giriş yaparak yapay zeka modellerimizi kullanmaya başlayabilirsiniz.</p>
+  <h2 style="color:#1d4ed8;margin-bottom:8px">${T.subject}</h2>
+  <p style="color:#374151">${T.greeting} <strong>${user.adSoyad}</strong>,</p>
+  <p style="color:#374151">${T.body}</p>
   <div style="margin:24px 0">
     <a href="${env.APP_BASE_URL}" style="background:#1d4ed8;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold">
-      Hemen Başla
+      ${T.cta}
     </a>
   </div>
-  <p style="color:#6b7280;font-size:13px">Sorularınız için <a href="mailto:destek@yapayzekalab.com" style="color:#1d4ed8">destek@yapayzekalab.com</a> adresine yazabilirsiniz.</p>
+  <p style="color:#6b7280;font-size:13px">${T.supportPre} <a href="mailto:destek@yapayzekalab.com" style="color:#1d4ed8">destek@yapayzekalab.com</a> ${T.supportPost}</p>
 </div>`;
-  await sendEmail(user.email, "YapayZekaLab'a Hoş Geldiniz!", html);
+  return { subject: T.subject, html };
+}
+
+export async function welcomeEmail(user: EmailUser): Promise<void> {
+  const { subject, html } = buildWelcomeEmail(user);
+  await sendEmail(user.email, subject, html);
+}
+
+export function buildLowBalanceEmail(
+  user: EmailUser,
+  balance: number,
+  threshold: number,
+): { subject: string; html: string } {
+  const lang = emailLang(user);
+  const T = lang === "en"
+    ? {
+        subject: "YapayZekaLab — Low Balance Alert",
+        heading: "Balance Alert",
+        greeting: "Hello",
+        body: `Your account balance is <strong>₺${balance.toFixed(2)}</strong>, which has fallen below the configured threshold of <strong>₺${threshold.toFixed(2)}</strong>.`,
+        body2: "Please top up your balance to avoid any service interruption.",
+        cta: "Top Up",
+      }
+    : {
+        subject: "YapayZekaLab — Düşük Bakiye Uyarısı",
+        heading: "Bakiye Uyarısı",
+        greeting: "Merhaba",
+        body: `Hesabınızdaki bakiye <strong>₺${balance.toFixed(2)}</strong> olup belirlenen <strong>₺${threshold.toFixed(2)}</strong> eşiğinin altına düşmüştür.`,
+        body2: "Hizmet kesintisi yaşamamak için lütfen bakiyenizi yükleyin.",
+        cta: "Bakiye Yükle",
+      };
+  const html = `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px">
+  <h2 style="color:#c2410c;margin-bottom:8px">${T.heading}</h2>
+  <p style="color:#374151">${T.greeting} <strong>${user.adSoyad}</strong>,</p>
+  <p style="color:#374151">${T.body}</p>
+  <p style="color:#374151">${T.body2}</p>
+  <div style="margin:24px 0">
+    <a href="${env.APP_BASE_URL}/bakiye-yukle" style="background:#ea580c;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold">
+      ${T.cta}
+    </a>
+  </div>
+</div>`;
+  return { subject: T.subject, html };
 }
 
 export async function lowBalanceEmail(
@@ -108,51 +174,80 @@ export async function lowBalanceEmail(
   balance: number,
   threshold: number,
 ): Promise<void> {
+  const { subject, html } = buildLowBalanceEmail(user, balance, threshold);
+  await sendEmail(user.email, subject, html);
+}
+
+export function buildPaymentReceiptEmail(
+  user: EmailUser,
+  payment: EmailPayment,
+): { subject: string; html: string } {
+  const lang = emailLang(user);
+  const T = lang === "en"
+    ? {
+        subject: "YapayZekaLab — Payment Receipt",
+        heading: "Payment Received",
+        greeting: "Hello",
+        body: `Your payment was processed successfully. <strong>₺${payment.miktarTL.toFixed(2)}</strong> was added to your available balance.`,
+        method: "Payment Method",
+        paid: "Amount Paid",
+        usdCredit: "USD credit received",
+        rate: "Exchange rate",
+        rounding: "TRY rounding",
+        kdv: "VAT",
+        net: "Net Amount",
+        available: "Available Balance",
+        txId: "Transaction ID",
+      }
+    : {
+        subject: "YapayZekaLab — Ödeme Makbuzu",
+        heading: "Ödeme Alındı",
+        greeting: "Merhaba",
+        body: `Ödemeniz başarıyla işlendi. Kullanılabilir bakiyenize <strong>₺${payment.miktarTL.toFixed(2)}</strong> eklendi.`,
+        method: "Ödeme Yöntemi",
+        paid: "Ödenen Tutar",
+        usdCredit: "Alınan USD bakiye",
+        rate: "İşlem kuru",
+        rounding: "TL yuvarlama",
+        kdv: "KDV",
+        net: "Net Tutar",
+        available: "Kullanılabilir Bakiye",
+        txId: "İşlem ID",
+      };
+  const paidTL = payment.paidTL ?? payment.miktarTL;
+  const usdRows = payment.amountUsd && payment.kurAtPayment
+    ? `
+    <tr><td style="color:#6b7280;padding:4px 0">${T.usdCredit}</td><td style="text-align:right;color:#374151">$${payment.amountUsd.toFixed(2)}</td></tr>
+    <tr><td style="color:#6b7280;padding:4px 0">${T.rate}</td><td style="text-align:right;color:#374151">₺${payment.kurAtPayment.toFixed(4)}</td></tr>
+    ${payment.roundingTL && payment.roundingTL > 0 ? `<tr><td style="color:#6b7280;padding:4px 0">${T.rounding}</td><td style="text-align:right;color:#374151">₺${payment.roundingTL.toFixed(2)}</td></tr>` : ""}`
+    : "";
+  const kdvRow = payment.kdvTL > 0
+    ? `<tr><td style="color:#6b7280;padding:4px 0">${T.kdv}</td><td style="text-align:right;color:#374151">₺${payment.kdvTL.toFixed(2)}</td></tr>`
+    : "";
   const html = `
-<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px">
-  <h2 style="color:#c2410c;margin-bottom:8px">Bakiye Uyarısı</h2>
-  <p style="color:#374151">Merhaba <strong>${user.adSoyad}</strong>,</p>
-  <p style="color:#374151">Hesabınızdaki bakiye <strong>₺${balance.toFixed(2)}</strong> olup belirlenen <strong>₺${threshold.toFixed(2)}</strong> eşiğinin altına düşmüştür.</p>
-  <p style="color:#374151">Hizmet kesintisi yaşamamak için lütfen bakiyenizi yükleyin.</p>
-  <div style="margin:24px 0">
-    <a href="${env.APP_BASE_URL}/bakiye-yukle" style="background:#ea580c;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold">
-      Bakiye Yükle
-    </a>
-  </div>
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px">
+  <h2 style="color:#15803d;margin-bottom:8px">${T.heading}</h2>
+  <p style="color:#374151">${T.greeting} <strong>${user.adSoyad}</strong>,</p>
+  <p style="color:#374151">${T.body}</p>
+  <table style="width:100%;border-collapse:collapse;margin:16px 0">
+    <tr><td style="color:#6b7280;padding:4px 0">${T.method}</td><td style="text-align:right;color:#374151">${payment.metod}</td></tr>
+    <tr><td style="color:#6b7280;padding:4px 0">${T.paid}</td><td style="text-align:right;color:#374151">₺${paidTL.toFixed(2)}</td></tr>
+    ${usdRows}
+    ${kdvRow}
+    <tr><td style="color:#6b7280;padding:4px 0">${T.net}</td><td style="text-align:right;color:#374151">₺${payment.netTL.toFixed(2)}</td></tr>
+    <tr style="border-top:1px solid #bbf7d0"><td style="color:#15803d;font-weight:bold;padding:8px 0">${T.available}</td><td style="text-align:right;color:#15803d;font-weight:bold">₺${payment.miktarTL.toFixed(2)}</td></tr>
+  </table>
+  ${payment.transactionId ? `<p style="color:#6b7280;font-size:12px">${T.txId}: <code>${payment.transactionId}</code></p>` : ""}
 </div>`;
-  await sendEmail(user.email, "YapayZekaLab — Düşük Bakiye Uyarısı", html);
+  return { subject: T.subject, html };
 }
 
 export async function paymentReceiptEmail(
   user: EmailUser,
   payment: EmailPayment,
 ): Promise<void> {
-  const paidTL = payment.paidTL ?? payment.miktarTL;
-  const usdRows = payment.amountUsd && payment.kurAtPayment
-    ? `
-    <tr><td style="color:#6b7280;padding:4px 0">Alınan USD bakiye</td><td style="text-align:right;color:#374151">$${payment.amountUsd.toFixed(2)}</td></tr>
-    <tr><td style="color:#6b7280;padding:4px 0">İşlem kuru</td><td style="text-align:right;color:#374151">₺${payment.kurAtPayment.toFixed(4)}</td></tr>
-    ${payment.roundingTL && payment.roundingTL > 0 ? `<tr><td style="color:#6b7280;padding:4px 0">TL yuvarlama</td><td style="text-align:right;color:#374151">₺${payment.roundingTL.toFixed(2)}</td></tr>` : ""}`
-    : "";
-  const kdvRow = payment.kdvTL > 0
-    ? `<tr><td style="color:#6b7280;padding:4px 0">KDV</td><td style="text-align:right;color:#374151">₺${payment.kdvTL.toFixed(2)}</td></tr>`
-    : "";
-  const html = `
-<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px">
-  <h2 style="color:#15803d;margin-bottom:8px">Ödeme Alındı</h2>
-  <p style="color:#374151">Merhaba <strong>${user.adSoyad}</strong>,</p>
-  <p style="color:#374151">Ödemeniz başarıyla işlendi. Kullanılabilir bakiyenize <strong>₺${payment.miktarTL.toFixed(2)}</strong> eklendi.</p>
-  <table style="width:100%;border-collapse:collapse;margin:16px 0">
-    <tr><td style="color:#6b7280;padding:4px 0">Ödeme Yöntemi</td><td style="text-align:right;color:#374151">${payment.metod}</td></tr>
-    <tr><td style="color:#6b7280;padding:4px 0">Ödenen Tutar</td><td style="text-align:right;color:#374151">₺${paidTL.toFixed(2)}</td></tr>
-    ${usdRows}
-    ${kdvRow}
-    <tr><td style="color:#6b7280;padding:4px 0">Net Tutar</td><td style="text-align:right;color:#374151">₺${payment.netTL.toFixed(2)}</td></tr>
-    <tr style="border-top:1px solid #bbf7d0"><td style="color:#15803d;font-weight:bold;padding:8px 0">Kullanılabilir Bakiye</td><td style="text-align:right;color:#15803d;font-weight:bold">₺${payment.miktarTL.toFixed(2)}</td></tr>
-  </table>
-  ${payment.transactionId ? `<p style="color:#6b7280;font-size:12px">İşlem ID: <code>${payment.transactionId}</code></p>` : ""}
-</div>`;
-  await sendEmail(user.email, "YapayZekaLab — Ödeme Makbuzu", html);
+  const { subject, html } = buildPaymentReceiptEmail(user, payment);
+  await sendEmail(user.email, subject, html);
 }
 
 export async function adminPaymentNotificationEmail(event: {

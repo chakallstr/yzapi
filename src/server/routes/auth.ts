@@ -97,7 +97,7 @@ router.get("/github/callback", async (req, res, next) => {
       }).returning();
       userId = inserted[0].id;
       isNew = true;
-      welcomeEmail({ email: profile.email, adSoyad: profile.name || profile.email }).catch((e) =>
+      welcomeEmail({ email: profile.email, adSoyad: profile.name || profile.email, lang: req.lang === "en" ? "en" : "tr" }).catch((e) =>
         logger.error({ err: e }, "[auth] welcome email failed"),
       );
       notifyAdmin({ kind: "yeni_uye", title: "Yeni üye kaydı", userEmail: profile.email }).catch((e) =>
@@ -190,7 +190,7 @@ router.get("/google/callback", async (req, res, next) => {
       isNew = true;
 
       // Fire-and-forget welcome email — must NOT block auth flow
-      welcomeEmail({ email: profile.email, adSoyad: profile.name || profile.email }).catch((e) =>
+      welcomeEmail({ email: profile.email, adSoyad: profile.name || profile.email, lang: req.lang === "en" ? "en" : "tr" }).catch((e) =>
         logger.error({ err: e }, "[auth] welcome email failed"),
       );
 

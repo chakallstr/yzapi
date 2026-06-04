@@ -65,7 +65,7 @@ export async function creditUserBalance(
     let txId: string | undefined;
     let oncekiBakiye = 0;
     let sonrakiBakiye = 0;
-    let receiptUser: { email: string; adSoyad: string } | null = null;
+    let receiptUser: { email: string; adSoyad: string; lang?: "tr" | "en" } | null = null;
 
     await db.transaction(async (tx) => {
       // Atomic increment prevents stale balance overwrites under concurrent approvals.
@@ -73,11 +73,11 @@ export async function creditUserBalance(
         .update(users)
         .set({ bakiyeTL: sql`${users.bakiyeTL} + ${miktarTL}`, updatedAt: new Date() })
         .where(eq(users.id, userId))
-        .returning({ email: users.email, adSoyad: users.adSoyad, bakiyeTL: users.bakiyeTL });
+        .returning({ email: users.email, adSoyad: users.adSoyad, bakiyeTL: users.bakiyeTL, lang: users.lang });
 
       if (!updatedUsers.length) throw new Error(`User ${userId} not found`);
       const updatedUser = updatedUsers[0];
-      receiptUser = { email: updatedUser.email, adSoyad: updatedUser.adSoyad };
+      receiptUser = { email: updatedUser.email, adSoyad: updatedUser.adSoyad, lang: updatedUser.lang === "en" ? "en" : "tr" };
       sonrakiBakiye = Number(updatedUser.bakiyeTL);
       oncekiBakiye = sonrakiBakiye - miktarTL;
 
