@@ -7,7 +7,7 @@
 ## Temel gerçekler
 
 - **AI gateway**, tek endpoint, OpenAI + Anthropic formatı. Prepaid bakiye.
-- Base URL: `https://api.wellflow.dev` (Anthropic/Claude Code `/v1` OLMADAN; OpenAI formatı `/v1` ile).
+- Base URL: `https://apiawellflow.dev` (Anthropic/Claude Code `/v1` OLMADAN; OpenAI formatı `/v1` ile).
 - Key formatı: `wf_` + 48 karakter.
 - Router providerları: Wellflow Router (GPT/Claude/Llama/Gemini) + Anthropic (direct Claude).
 
