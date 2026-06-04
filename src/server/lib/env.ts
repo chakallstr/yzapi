@@ -90,6 +90,12 @@ const schema = z.object({
   CRYPTOMUS_RETURN_URL: z.string().optional(),
   CRYPTOMUS_WEBHOOK_URL: z.string().optional(),
 
+  // DodoPayments (optional — returns 503 when unset; wire when keys provided)
+  DODO_API_KEY: z.string().optional(),
+  DODO_WEBHOOK_SECRET: z.string().optional(),
+  DODO_API_BASE: z.string().optional(),
+  DODO_RETURN_URL: z.string().optional(),
+
   // Telegram + Crypto Pay bot channel (optional — endpoints return 503 when unset)
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_BOT_USERNAME: z.string().optional(),

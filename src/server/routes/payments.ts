@@ -16,6 +16,7 @@ import { isIbanConfigured, validatePaymentAmount } from "../services/payment-gua
 import { adminPaymentNotificationEmail } from "../services/email-service.js";
 import { notifyAdmin } from "../services/admin-notify-service.js";
 import { buildUsdTopupQuote } from "../services/payment-pricing.js";
+import { dodoConfigured, initDodoPayment, verifyDodoWebhook } from "../services/dodopayments-service.js";
 
 const router = Router();
 
@@ -1297,6 +1298,111 @@ router.post("/admin/osb-dead-letters/:id/ignore", adminAuth, async (req, res, ne
       cozumNotu: not ?? null,
     }).where(eq(shopierOsbDeadLetters.id, id));
     await writeAudit("osb_dead_letter_ignore", rows[0].buyerEmail ?? "", `OSB dead-letter yoksayıldı: ${rows[0].shopierOrderId}`, req.admin?.sub);
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// ── DodoPayments (Faz 2 iskelet — anahtar gelince aktif; Shopier'in yanına ek kart) ──
+router.post("/dodo/init", userAuth, requireWhatsappVerified, async (req, res, next) => {
+  try {
+    if (!dodoConfigured()) {
+      res.status(503).json({ error: "Dodo ödeme yöntemi şu an kullanılamıyor." });
+      return;
+    }
+    const { quote, amountValidation } = await buildQuoteFromRequest(req.body as Record<string, unknown>);
+    if (!amountValidation.ok) {
+      res.status(amountValidation.status).json({ error: amountValidation.error });
+      return;
+    }
+    const kdv = calcKdv(quote.payableTL);
+    const userRows = await db.select({ email: users.email }).from(users).where(eq(users.id, req.user!.id)).limit(1);
+    const inserted = await db.insert(payments).values({
+      userId: req.user!.id,
+      metod: "dodo",
+      miktarTL: String(quote.payableTL),
+      kdvTL: String(kdv.kdvTL),
+      netTL: String(kdv.netTL),
+      amountUsd: String(quote.amountUsd),
+      payableTL: String(quote.payableTL),
+      creditTL: String(quote.creditTL),
+      kurAtPayment: String(quote.kur),
+      roundingTL: String(quote.roundingTL),
+      durum: "bekliyor",
+    }).returning({ id: payments.id });
+    const paymentId = inserted[0].id;
+
+    const dodo = await initDodoPayment({
+      paymentId,
+      amountUsd: quote.amountUsd,
+      customerEmail: userRows[0]?.email,
+    });
+    await db.update(payments).set({ idempotencyKey: dodo.id || `dodo_${paymentId}` }).where(eq(payments.id, paymentId));
+
+    res.json({ paymentId, url: dodo.url, kdv, quote });
+  } catch (e) { next(e); }
+});
+
+router.post("/dodo/webhook", async (req, res, next) => {
+  try {
+    const rawBody = (req as unknown as { rawBody?: string }).rawBody ?? JSON.stringify(req.body ?? {});
+    const verify = verifyDodoWebhook(
+      {
+        id: req.header("webhook-id") || undefined,
+        timestamp: req.header("webhook-timestamp") || undefined,
+        signature: req.header("webhook-signature") || undefined,
+      },
+      rawBody,
+    );
+    if (!verify.valid) {
+      res.status(401).json({ error: "Invalid signature" });
+      return;
+    }
+
+    const body = req.body as { type?: string; data?: Record<string, unknown> };
+    const type = String(body.type ?? "");
+    if (!/succeeded|completed|paid/i.test(type)) {
+      res.json({ ok: true });
+      return;
+    }
+
+    const data = body.data ?? {};
+    const meta = (data.metadata ?? {}) as Record<string, unknown>;
+    const paymentId = String(meta.paymentId ?? data.payment_id ?? "");
+    if (!paymentId) {
+      logger.warn({ type }, "[dodo] webhook: paymentId yok");
+      res.json({ ok: true });
+      return;
+    }
+
+    const rows = await db.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
+    if (!rows.length) {
+      logger.warn({ paymentId }, "[dodo] webhook: payment bulunamadı");
+      res.json({ ok: true });
+      return;
+    }
+    const payment = rows[0];
+    const creditTL = Number(payment.creditTL ?? payment.miktarTL);
+    const eventId = req.header("webhook-id") || paymentId;
+
+    const credit = await creditUserBalance(
+      payment.userId,
+      payment.id,
+      creditTL,
+      "dodo",
+      `dodo_${eventId}`,
+      safeProviderPayload(body as Record<string, unknown>),
+      {
+        paidTL: Number(payment.payableTL ?? payment.miktarTL),
+        amountUsd: payment.amountUsd === null ? undefined : Number(payment.amountUsd),
+        kurAtPayment: payment.kurAtPayment === null ? undefined : Number(payment.kurAtPayment),
+        roundingTL: payment.roundingTL === null ? undefined : Number(payment.roundingTL),
+      },
+    );
+
+    if (!credit.success && !credit.alreadyCredited) {
+      res.status(500).json({ error: "Bakiye yüklenirken hata oluştu." });
+      return;
+    }
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
