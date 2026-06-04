@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pickLang, translate } from "./index.jsx";
-import { tr } from "./tr.js";
-import { en } from "./en.js";
+import { pickLang, translate, messagesTr as tr, messagesEn as en } from "./index.jsx";
 
 describe("i18n pickLang", () => {
   it("prefers a valid stored preference over browser language", () => {

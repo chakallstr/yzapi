@@ -1,14 +1,36 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { tr } from './tr.js';
-import { en } from './en.js';
+import { tr as baseTr } from './tr.js';
+import { en as baseEn } from './en.js';
+import appShell from './strings/app-shell.js';
+import packages from './strings/packages.js';
+import aiChat from './strings/ai-chat.js';
+import studio from './strings/studio.js';
+import status from './strings/status.js';
+import support from './strings/support.js';
+import home from './strings/home.js';
+import account from './strings/account.js';
+import activity from './strings/activity.js';
+import models from './strings/models.js';
+import shared from './strings/shared.js';
+import telegramTopup from './strings/telegram-topup.js';
 
 /* ============================================
    YapayZekaLab — lightweight i18n (0-dep)
    TR (default) + EN. Custom React Context + useT() hook.
+   Dictionaries are split into per-surface fragments (./strings/*.js) so files
+   can be translated independently without merge conflicts; merged here.
    Keep dictionaries provider-codename free (scan:public).
    ============================================ */
 
-const DICTS = { tr, en };
+const FRAGMENTS = [
+  appShell, packages, aiChat, studio, status, support,
+  home, account, activity, models, shared, telegramTopup,
+];
+
+export const messagesTr = Object.assign({}, baseTr, ...FRAGMENTS.map((f) => f.tr || {}));
+export const messagesEn = Object.assign({}, baseEn, ...FRAGMENTS.map((f) => f.en || {}));
+
+const DICTS = { tr: messagesTr, en: messagesEn };
 export const STORAGE_KEY = 'yz_lang';
 export const SUPPORTED_LANGS = ['tr', 'en'];
 
