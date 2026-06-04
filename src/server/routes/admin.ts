@@ -41,6 +41,7 @@ import {
   deletePackage,
 } from "../services/package-service.js";
 import { generateRedeemCodes, listRedeemCodes, setRedeemCodeEnabled } from "../services/redeem-code-service.js";
+import { listAllDeliveryOrders, markDeliveryDelivered, cancelDeliveryWithRefund } from "../services/account-delivery-service.js";
 import {
   getProviderConfigAdminView,
   saveProviderConfig,
@@ -1304,6 +1305,41 @@ router.post("/redeem-codes/:id/toggle", async (req, res, next) => {
     await setRedeemCodeEnabled(req.params.id, enabled);
     await writeAudit("admin_redeem_code_toggle", req.params.id, `Kod ${enabled ? "açıldı" : "kapatıldı"}`, req.user!.id);
     res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ── Hesap-teslim siparişleri (Faz 6) ─────────────────────────────────────────
+router.get("/delivery-orders", async (_req, res, next) => {
+  try {
+    res.json(await listAllDeliveryOrders());
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/delivery-orders/:id/deliver", async (req, res, next) => {
+  try {
+    const b = req.body as { teslimPayload?: string; not?: string };
+    if (!b?.teslimPayload?.trim()) {
+      res.status(400).json({ error: "teslimPayload (kimlik/aktivasyon) zorunlu" });
+      return;
+    }
+    await markDeliveryDelivered(req.params.id, req.user!.id, b.teslimPayload, b.not);
+    await writeAudit("delivery_mark_delivered", req.params.id, "Hesap-teslim siparişi teslim edildi", req.user!.id);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/delivery-orders/:id/cancel", async (req, res, next) => {
+  try {
+    const b = req.body as { not?: string };
+    const result = await cancelDeliveryWithRefund(req.params.id, req.user!.id, b?.not);
+    await writeAudit("delivery_cancel_refund", req.params.id, `İptal + iade ₺${result.refundedTL}`, req.user!.id);
+    res.json({ ok: true, ...result });
   } catch (e) {
     next(e);
   }

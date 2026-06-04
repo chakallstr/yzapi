@@ -17,6 +17,7 @@ import { listUserEntitlements } from "../services/entitlement-service.js";
 import { purchasePackageWithBalance } from "../services/package-purchase-service.js";
 import { packagesFeatureEnabled } from "../services/package-service.js";
 import { redeemCode } from "../services/redeem-code-service.js";
+import { listUserDeliveryOrders } from "../services/account-delivery-service.js";
 import { env } from "../lib/env.js";
 
 const router = Router();
@@ -118,6 +119,14 @@ router.post("/redeem", async (req, res, next) => {
   }
 });
 
+router.get("/delivery-orders", async (req, res, next) => {
+  try {
+    res.json(await listUserDeliveryOrders(req.user!.id));
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.get("/entitlements", async (req, res, next) => {
   try {
     res.json(await listUserEntitlements(req.user!.id));
@@ -133,7 +142,8 @@ router.post("/packages/:id/purchase", async (req, res, next) => {
       return;
     }
     const idempotencyKey = req.header("Idempotency-Key") || undefined;
-    const result = await purchasePackageWithBalance(req.user!.id, req.params.id, idempotencyKey);
+    const contact = (req.body as { contact?: string })?.contact;
+    const result = await purchasePackageWithBalance(req.user!.id, req.params.id, idempotencyKey, contact);
     res.status(201).json(result);
   } catch (e) {
     next(e);

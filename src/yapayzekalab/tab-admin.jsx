@@ -21,6 +21,7 @@ const ADMIN_SECTIONS = [
   { id: 'overrides', label: 'Modeller', Ico: I.Layers },
   { id: 'packages', label: 'Paketler', Ico: I.Wallet },
   { id: 'codes', label: 'Kodlar', Ico: I.Key },
+  { id: 'teslimler', label: 'Teslimler', Ico: I.Wallet },
   { id: 'announce', label: 'Duyurular', Ico: I.Megaphone },
   { id: 'providers', label: 'Sağlayıcı', Ico: I.Server },
   { id: 'kur', label: 'Kur', Ico: I.Coins },
@@ -720,6 +721,59 @@ const AdminOverrides = ({ overrides, token, refresh }) => {
         })}
       </Card>
     </div>
+  );
+};
+
+const AdminDeliveryOrders = ({ token }) => {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    setLoading(true); setError('');
+    try { const list = await adminRequest('/api/admin/delivery-orders', token); setRows(Array.isArray(list) ? list : []); }
+    catch (e) { setError(e.message || 'Siparişler alınamadı.'); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); }, [token]);
+
+  const deliver = async (row) => {
+    const payload = window.prompt(`${row.paketAdi || row.packageId} — teslim bilgisi (kimlik/aktivasyon kodu):`, '');
+    if (!payload) return;
+    try { await adminRequest(`/api/admin/delivery-orders/${row.id}/deliver`, token, { method: 'POST', body: { teslimPayload: payload } }); await load(); }
+    catch (e) { setError(e.message || 'Teslim işaretlenemedi.'); }
+  };
+  const cancel = async (row) => {
+    if (!window.confirm(`${row.paketAdi || row.packageId} siparişi iptal edilip ₺${row.amountTL} iade edilsin mi?`)) return;
+    try { await adminRequest(`/api/admin/delivery-orders/${row.id}/cancel`, token, { method: 'POST', body: { not: 'admin iptal' } }); await load(); }
+    catch (e) { setError(e.message || 'İptal edilemedi.'); }
+  };
+
+  return (
+    <Card pad={18}>
+      <Caption>Hesap-Teslim Siparişleri</Caption>
+      {error && <div style={{ color: 'var(--danger, #e5484d)', marginTop: 6 }}>{error}</div>}
+      {loading ? <div style={{ marginTop: 12 }}>Yükleniyor…</div> : (
+        <table style={{ width: '100%', marginTop: 12, fontSize: 13 }}>
+          <thead><tr style={{ textAlign: 'left' }}><th>paket</th><th>kullanıcı</th><th>iletişim</th><th>₺</th><th>durum</th><th></th></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id}>
+                <td>{r.paketAdi || r.packageId}</td><td>{r.userEmail}</td><td>{r.contact}</td><td>{r.amountTL}</td><td>{r.durum}</td>
+                <td style={{ display: 'flex', gap: 6 }}>
+                  {r.durum === 'bekliyor' && (
+                    <>
+                      <button onClick={() => deliver(r)}>Teslim et</button>
+                      <button onClick={() => cancel(r)}>İptal+iade</button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Card>
   );
 };
 
@@ -2685,6 +2739,7 @@ const AdminTab = ({ ctx = {} }) => {
         {section === 'payments' && <AdminPaymentSettings config={data.config} token={token} refresh={refresh} />}
         {section === 'packages' && <AdminPackages token={token} />}
         {section === 'codes' && <AdminRedeemCodes token={token} />}
+        {section === 'teslimler' && <AdminDeliveryOrders token={token} />}
         {section === 'telegram' && <AdminTelegram token={token} />}
         {section === 'apikeys' && <AdminApiKeys apiKeys={data.apiKeys || []} users={data.users || []} token={token} refresh={refresh} filterUserId={trafficApiKeyJump.userId} filterApiKeyId={trafficApiKeyJump.apiKeyId} filterNonce={trafficApiKeyJump.nonce} />}
         {section === 'logs' && <AdminLogs reconciliation={data.reconciliation} auditLogs={data.auditLogs || []} token={token} />}

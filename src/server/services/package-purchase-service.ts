@@ -4,7 +4,9 @@ import { InsufficientBalanceError, AppError } from "../lib/errors.js";
 import { grantPackageEntitlement } from "./entitlement-service.js";
 
 export interface PurchaseResult {
-  entitlementId: string;
+  entitlementId?: string;
+  deliveryOrderId?: string;
+  tip?: "request_limit" | "account_delivery";
   newBalanceTL: number;
   duplicate?: boolean;
 }
@@ -36,6 +38,7 @@ export async function purchasePackageWithBalance(
   userId: string,
   packageId: string,
   idempotencyKey?: string,
+  contact?: string,
 ): Promise<PurchaseResult> {
   const txKey = "pkg_purchase_" + (idempotencyKey && idempotencyKey.trim() ? idempotencyKey.trim() : randomUUID());
 
@@ -54,7 +57,9 @@ export async function purchasePackageWithBalance(
   if (!pkgRows.length) throw new AppError(404, "Paket bulunamadı");
   const pkg = pkgRows[0];
   if (!pkg.enabled) throw new AppError(400, "Paket satışta değil");
-  if (pkg.tip !== "request_limit") throw new AppError(400, "Bu paket tipi henüz desteklenmiyor");
+  if (pkg.tip !== "request_limit" && pkg.tip !== "account_delivery") {
+    throw new AppError(400, "Bu paket tipi henüz desteklenmiyor");
+  }
 
   const fiyatTL = Number(pkg.fiyat_tl);
 
@@ -83,6 +88,17 @@ export async function purchasePackageWithBalance(
       `;
       const txId = txRows[0].id;
 
+      if (pkg.tip === "account_delivery") {
+        const ord = await txSql<{ id: string }[]>`
+          INSERT INTO account_delivery_orders
+            (user_id, package_id, amount_tl, contact, durum, purchase_transaction_id)
+          VALUES
+            (${userId}::uuid, ${packageId}, ${fiyatTL}::numeric, ${contact ?? ""}, 'bekliyor', ${txId}::uuid)
+          RETURNING id
+        `;
+        return { deliveryOrderId: ord[0].id, newBalanceTL: newBalance, tip: "account_delivery" as const };
+      }
+
       const entitlementId = await grantPackageEntitlement(txSql, {
         userId,
         packageId,
@@ -91,7 +107,7 @@ export async function purchasePackageWithBalance(
         allowedModels: pkg.allowed_models ?? [],
         purchaseTransactionId: txId,
       });
-      return { entitlementId, newBalanceTL: newBalance };
+      return { entitlementId, newBalanceTL: newBalance, tip: "request_limit" as const };
     });
   } catch (e) {
     // Eşzamanlı mükerrer (UNIQUE idempotency_key) → çift tahsil olmadı; mevcut durumu döndür.

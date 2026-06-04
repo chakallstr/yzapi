@@ -13,16 +13,19 @@ export function PackagesTab() {
   const [code, setCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
   const [redeemMsg, setRedeemMsg] = useState('');
+  const [orders, setOrders] = useState([]);
 
   const load = async () => {
     setLoading(true); setError('');
     try {
-      const [pkgs, entitlements] = await Promise.all([
+      const [pkgs, entitlements, dorders] = await Promise.all([
         fetch('/api/packages').then((r) => (r.ok ? r.json() : [])).catch(() => []),
         apiJson('/api/user/entitlements').catch(() => []),
+        apiJson('/api/user/delivery-orders').catch(() => []),
       ]);
       setPackages(Array.isArray(pkgs) ? pkgs : []);
       setEnts(Array.isArray(entitlements) ? entitlements : []);
+      setOrders(Array.isArray(dorders) ? dorders : []);
     } catch (e) { setError(e.message || 'Paketler alınamadı.'); }
     finally { setLoading(false); }
   };
@@ -37,13 +40,22 @@ export function PackagesTab() {
   const visible = cat === 'Tümü' ? packages : packages.filter((p) => p.kategori === cat);
 
   const buy = async (id) => {
+    const pkg = packages.find((p) => p.id === id);
+    let contact;
+    if (pkg?.tip === 'account_delivery') {
+      contact = window.prompt('Teslimat için iletişim (Gmail / WhatsApp numarası):', '');
+      if (contact === null) return; // iptal
+    }
     setBusyId(id); setError('');
     // Aynı satın alma niyeti için sabit idempotency key: retry'de aynı kalır (çift tahsil
     // önlenir), başarıda temizlenir → sonraki kasıtlı alım yeni key alır.
     const key = keysRef.current[id] || (keysRef.current[id] = (window.crypto?.randomUUID?.() || `${id}-${Date.now()}`));
     try {
-      await apiJson(`/api/user/packages/${encodeURIComponent(id)}/purchase`, { method: 'POST', headers: { 'Idempotency-Key': key } });
+      const r = await apiJson(`/api/user/packages/${encodeURIComponent(id)}/purchase`, {
+        method: 'POST', headers: { 'Idempotency-Key': key }, body: contact ? { contact } : undefined,
+      });
       delete keysRef.current[id];
+      if (r?.tip === 'account_delivery') setRedeemMsg('Sipariş alındı. Teslimat için ekibimiz iletişime geçecek.');
       await load();
     } catch (e) {
       if (e.status === 402) setError('Yetersiz bakiye. Önce bakiye yükleyin.');
@@ -88,6 +100,25 @@ export function PackagesTab() {
               <span style={{ color: 'var(--ink-2)' }}>
                 Bugün kalan: {e.kalanBugun}/{e.gunlukLimit} · bitiş: {new Date(e.expiresAt).toLocaleDateString('tr-TR')}
               </span>
+            </div>
+          ))}
+        </Card>
+      )}
+
+      {orders.length > 0 && (
+        <Card pad={16}>
+          <Caption>Siparişlerim (Hesap Teslim)</Caption>
+          {orders.map((o) => (
+            <div key={o.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <span>{o.paketAdi || o.packageId} <Chip>{o.durum}</Chip></span>
+                <span style={{ color: 'var(--ink-2)' }}>₺{o.amountTL} · {new Date(o.olusturma).toLocaleDateString('tr-TR')}</span>
+              </div>
+              {o.durum === 'teslim_edildi' && o.teslimPayload && (
+                <div style={{ marginTop: 4, fontSize: 13, background: 'var(--surface-2,#f5f5f7)', padding: '6px 10px', borderRadius: 8, whiteSpace: 'pre-wrap' }}>{o.teslimPayload}</div>
+              )}
+              {o.durum === 'bekliyor' && <div style={{ marginTop: 4, fontSize: 12, color: 'var(--ink-3)' }}>Teslimat için ekibimiz iletişime geçecek.</div>}
+              {o.durum === 'iptal' && <div style={{ marginTop: 4, fontSize: 12, color: 'var(--ink-3)' }}>İptal edildi, tutar bakiyenize iade edildi.</div>}
             </div>
           ))}
         </Card>

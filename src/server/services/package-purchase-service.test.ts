@@ -41,7 +41,20 @@ describe("purchasePackageWithBalance", () => {
       .mockResolvedValueOnce([{ id: "ent1" }]); // insert entitlement
     const { purchasePackageWithBalance } = await import("./package-purchase-service.js");
     const res = await purchasePackageWithBalance("u1", "p1", "key-2");
-    expect(res).toEqual({ entitlementId: "ent1", newBalanceTL: 60 });
+    expect(res).toEqual({ entitlementId: "ent1", newBalanceTL: 60, tip: "request_limit" });
+  });
+
+  it("account_delivery package debits balance and creates a delivery order", async () => {
+    mockDbSql
+      .mockResolvedValueOnce([]) // dup-check
+      .mockResolvedValueOnce([{ ...PKG, tip: "account_delivery" }]); // package lookup
+    mockTxSql
+      .mockResolvedValueOnce([{ bakiye_tl: "60", email: "u@x.com" }]) // debit
+      .mockResolvedValueOnce([{ id: "tx1" }]) // transactions insert
+      .mockResolvedValueOnce([{ id: "ord1" }]); // delivery order insert
+    const { purchasePackageWithBalance } = await import("./package-purchase-service.js");
+    const res = await purchasePackageWithBalance("u1", "p1", "key-ad", "user@gmail.com");
+    expect(res).toEqual({ deliveryOrderId: "ord1", newBalanceTL: 60, tip: "account_delivery" });
   });
 
   it("is idempotent: a duplicate key does NOT debit again", async () => {
