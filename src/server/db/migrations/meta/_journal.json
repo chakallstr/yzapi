@@ -141,6 +141,13 @@
       "when": 1780953600000,
       "tag": "0019_packages",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1781040000000,
+      "tag": "0020_redeem_codes",
+      "breakpoints": true
     }
   ]
 }

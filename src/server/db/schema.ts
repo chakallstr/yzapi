@@ -638,3 +638,33 @@ export const userPackageEntitlements = pgTable(
     index("upe_status_expires_idx").on(t.status, t.expiresAt),
   ]
 );
+
+// ── redeem/gift codes (Faz 2) ────────────────────────────────────────────────
+export const redeemCodes = pgTable("redeem_codes", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  tip: text("tip").notNull(), // balance | package
+  amountTL: numeric("amount_tl", { precision: 14, scale: 4 }),
+  packageId: text("package_id").references(() => packages.id),
+  maxUses: integer("max_uses").notNull().default(1),
+  usedCount: integer("used_count").notNull().default(0),
+  perUserOnce: boolean("per_user_once").notNull().default(true),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  enabled: boolean("enabled").notNull().default(true),
+  aciklama: text("aciklama").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+});
+
+export const redeemCodeUses = pgTable(
+  "redeem_code_uses",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    codeId: uuid("code_id").notNull().references(() => redeemCodes.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    redeemedAt: timestamp("redeemed_at", { withTimezone: true }).notNull().default(sql`now()`),
+    transactionId: uuid("transaction_id").references(() => transactions.id),
+    entitlementId: uuid("entitlement_id").references(() => userPackageEntitlements.id),
+  },
+  (t) => [uniqueIndex("redeem_code_uses_code_user_idx").on(t.codeId, t.userId)]
+);
