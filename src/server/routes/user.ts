@@ -17,6 +17,7 @@ import { listUserEntitlements } from "../services/entitlement-service.js";
 import { purchasePackageWithBalance } from "../services/package-purchase-service.js";
 import { packagesFeatureEnabled } from "../services/package-service.js";
 import { redeemCode } from "../services/redeem-code-service.js";
+import { env } from "../lib/env.js";
 
 const router = Router();
 
@@ -25,6 +26,51 @@ const router = Router();
 export { extractUsageBreakdown } from "../services/usage-breakdown.js";
 
 // ── Paketler (Faz 1) ─────────────────────────────────────────────────────────
+// ── AI Chat playground (Faz 3) ───────────────────────────────────────────────
+// Panel proxy: kullanıcının aktif yzk_live_ key'ini SUNUCUDA çözer ve kendi
+// /v1/chat/completions ucuna iç-forward eder (mevcut billing/paket akışı aynen).
+// API key TARAYICIYA çıkmaz. Billing normal (playground = gerçek kullanım).
+router.post("/ai-chat", async (req, res, next) => {
+  try {
+    const keyRows = await db
+      .select({ fullKeyCipher: apiKeys.fullKeyCipher })
+      .from(apiKeys)
+      .where(and(eq(apiKeys.userId, req.user!.id), eq(apiKeys.aktif, true)))
+      .limit(1);
+    if (!keyRows.length || !keyRows[0].fullKeyCipher) {
+      res.status(400).json({ error: "Aktif API anahtarı yok. Önce bir API anahtarı oluşturun." });
+      return;
+    }
+    const fullKey = decryptApiKey(keyRows[0].fullKeyCipher);
+    const wantStream = (req.body as { stream?: boolean })?.stream === true;
+
+    const upstream = await fetch(`http://127.0.0.1:${env.PORT}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${fullKey}` },
+      body: JSON.stringify(req.body ?? {}),
+    });
+
+    res.status(upstream.status);
+    const ct = upstream.headers.get("content-type");
+    if (ct) res.setHeader("Content-Type", ct);
+
+    if (wantStream && upstream.body) {
+      const reader = (upstream.body as ReadableStream<Uint8Array>).getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) res.write(Buffer.from(value));
+      }
+      res.end();
+    } else {
+      const text = await upstream.text();
+      res.send(text);
+    }
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.post("/redeem", async (req, res, next) => {
   try {
     const { code } = req.body as { code?: string };
