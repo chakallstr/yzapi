@@ -86,6 +86,56 @@ export async function recordPackageUsage(opts: {
   }).onConflictDoNothing({ target: usageRecords.requestId });
 }
 
+/**
+ * Bir kullanıcıya paket entitlement'ı VER (aktif aynı paket varsa süreyi uzat, yoksa oluştur).
+ * Bir transaction içinde çağrılır (txSql). purchase (bakiye) ve redeem (kod) ORTAK kullanır.
+ * Snapshot (daily_limit, allowed_models) burada dondurulur. Para taşımaz.
+ */
+export async function grantPackageEntitlement(
+  txSql: any,
+  params: {
+    userId: string;
+    packageId: string;
+    sureGun: number;
+    gunlukIstekLimiti: number;
+    allowedModels: unknown;
+    purchaseTransactionId?: string | null;
+  },
+): Promise<string> {
+  const allowedJson = JSON.stringify(params.allowedModels ?? []);
+  const txId = params.purchaseTransactionId ?? null;
+
+  const existing = await txSql<{ id: string }[]>`
+    SELECT id FROM user_package_entitlements
+    WHERE user_id = ${params.userId}::uuid AND package_id = ${params.packageId}
+      AND status = 'active' AND expires_at > now()
+    ORDER BY expires_at DESC LIMIT 1
+  `;
+  if (existing.length) {
+    const ext = await txSql<{ id: string }[]>`
+      UPDATE user_package_entitlements
+      SET expires_at = expires_at + (${params.sureGun}::int * interval '1 day'),
+          daily_limit_snapshot = ${params.gunlukIstekLimiti}::int,
+          allowed_models_snapshot = ${allowedJson}::jsonb,
+          purchase_transaction_id = ${txId}::uuid,
+          updated_at = now()
+      WHERE id = ${existing[0].id}::uuid
+      RETURNING id
+    `;
+    return ext[0].id;
+  }
+  const ins = await txSql<{ id: string }[]>`
+    INSERT INTO user_package_entitlements
+      (user_id, package_id, daily_limit_snapshot, allowed_models_snapshot,
+       activated_at, expires_at, status, requests_today, last_reset_date, purchase_transaction_id)
+    VALUES
+      (${params.userId}::uuid, ${params.packageId}, ${params.gunlukIstekLimiti}::int, ${allowedJson}::jsonb,
+       now(), now() + (${params.sureGun}::int * interval '1 day'), 'active', 0, CURRENT_DATE, ${txId}::uuid)
+    RETURNING id
+  `;
+  return ins[0].id;
+}
+
 export interface ActiveEntitlement {
   id: string;
   packageId: string;

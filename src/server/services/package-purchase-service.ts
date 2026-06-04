@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { dbSql } from "../db/client.js";
 import { InsufficientBalanceError, AppError } from "../lib/errors.js";
+import { grantPackageEntitlement } from "./entitlement-service.js";
 
 export interface PurchaseResult {
   entitlementId: string;
@@ -56,7 +57,6 @@ export async function purchasePackageWithBalance(
   if (pkg.tip !== "request_limit") throw new AppError(400, "Bu paket tipi henüz desteklenmiyor");
 
   const fiyatTL = Number(pkg.fiyat_tl);
-  const allowedJson = JSON.stringify(pkg.allowed_models ?? []);
 
   try {
     return await dbSql.begin(async (txSql) => {
@@ -83,38 +83,14 @@ export async function purchasePackageWithBalance(
       `;
       const txId = txRows[0].id;
 
-      const existing = await txSql<{ id: string }[]>`
-        SELECT id FROM user_package_entitlements
-        WHERE user_id = ${userId}::uuid AND package_id = ${packageId}
-          AND status = 'active' AND expires_at > now()
-        ORDER BY expires_at DESC LIMIT 1
-      `;
-
-      let entitlementId: string;
-      if (existing.length) {
-        const ext = await txSql<{ id: string }[]>`
-          UPDATE user_package_entitlements
-          SET expires_at = expires_at + (${pkg.sure_gun}::int * interval '1 day'),
-              daily_limit_snapshot = ${pkg.gunluk_istek_limiti}::int,
-              allowed_models_snapshot = ${allowedJson}::jsonb,
-              purchase_transaction_id = ${txId}::uuid,
-              updated_at = now()
-          WHERE id = ${existing[0].id}::uuid
-          RETURNING id
-        `;
-        entitlementId = ext[0].id;
-      } else {
-        const ins = await txSql<{ id: string }[]>`
-          INSERT INTO user_package_entitlements
-            (user_id, package_id, daily_limit_snapshot, allowed_models_snapshot,
-             activated_at, expires_at, status, requests_today, last_reset_date, purchase_transaction_id)
-          VALUES
-            (${userId}::uuid, ${packageId}, ${pkg.gunluk_istek_limiti}::int, ${allowedJson}::jsonb,
-             now(), now() + (${pkg.sure_gun}::int * interval '1 day'), 'active', 0, CURRENT_DATE, ${txId}::uuid)
-          RETURNING id
-        `;
-        entitlementId = ins[0].id;
-      }
+      const entitlementId = await grantPackageEntitlement(txSql, {
+        userId,
+        packageId,
+        sureGun: pkg.sure_gun,
+        gunlukIstekLimiti: pkg.gunluk_istek_limiti,
+        allowedModels: pkg.allowed_models ?? [],
+        purchaseTransactionId: txId,
+      });
       return { entitlementId, newBalanceTL: newBalance };
     });
   } catch (e) {
