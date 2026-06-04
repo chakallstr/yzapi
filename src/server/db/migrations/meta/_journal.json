@@ -148,6 +148,13 @@
       "when": 1781040000000,
       "tag": "0020_redeem_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1781126400000,
+      "tag": "0021_added_model_image",
+      "breakpoints": true
     }
   ]
 }

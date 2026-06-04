@@ -36,6 +36,8 @@ export interface AddedModelInput {
   // synthesized MasterModel falls back to "—" / null.
   context?: string | null;
   contextTokens?: number | null;
+  type?: "Metin" | "Görsel"; // default "Metin"
+  imagePriceUsd?: number; // per-image PROVIDER USD (müşteri = ×imageCarpan); yalnız Görsel
 }
 
 export interface AddedModelRecord extends AddedModelInput {
@@ -57,6 +59,14 @@ const TEXT_ENDPOINT_DETAILS: MasterModelEndpoint[] = [
 ];
 const TEXT_ENDPOINTS = TEXT_ENDPOINT_DETAILS.map((endpoint) => endpoint.type);
 const TEXT_SUPPORTED_PARAMETERS = Array.from(new Set(TEXT_ENDPOINT_DETAILS.flatMap((endpoint) => endpoint.supportedParameters)));
+
+// Image-model shape (Faz 4a) — görsel üretim uçları.
+const IMAGE_PARAMS = ["model", "prompt", "n", "size", "quality", "response_format"];
+const IMAGE_ENDPOINT_DETAILS: MasterModelEndpoint[] = [
+  { type: "images", supportsStreaming: false, supportedParameters: IMAGE_PARAMS },
+];
+const IMAGE_ENDPOINTS = IMAGE_ENDPOINT_DETAILS.map((endpoint) => endpoint.type);
+const IMAGE_SUPPORTED_PARAMETERS = Array.from(new Set(IMAGE_ENDPOINT_DETAILS.flatMap((endpoint) => endpoint.supportedParameters)));
 
 // Set of canonical MASTER_MODELS ids for fast membership checks.
 const MASTER_MODEL_IDS = new Set(MASTER_MODELS.map((model) => model.id));
@@ -86,6 +96,8 @@ function rowToRecord(row: AddedModelRow): AddedModelRecord {
     outputUsd: Number(row.outputUsd),
     context: row.context ?? null,
     contextTokens: row.contextTokens ?? null,
+    type: row.type === "Görsel" ? "Görsel" : "Metin",
+    imagePriceUsd: Number(row.imagePriceUsd ?? 0),
     enabled: row.enabled,
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt),
@@ -132,6 +144,8 @@ export async function createAddedModel(input: AddedModelInput): Promise<AddedMod
       providerLabel: input.providerLabel,
       inputUsd: String(input.inputUsd),
       outputUsd: String(input.outputUsd),
+      type: input.type === "Görsel" ? "Görsel" : "Metin",
+      imagePriceUsd: String(input.imagePriceUsd ?? 0),
       enabled: input.enabled ?? true,
     })
     .returning();
@@ -157,6 +171,25 @@ export async function deleteAddedModel(modelId: string): Promise<void> {
 // pricing/serialization reuse it (type "Metin", usd_per_million_tokens).
 // NEVER mutates MASTER_MODELS (Requirement 12.3).
 export function addedModelToMasterModel(row: AddedModelRecord): MasterModel {
+  if (row.type === "Görsel") {
+    return {
+      id: row.modelId,
+      name: row.name,
+      provider: row.providerLabel,
+      providerSlug: slugify(row.providerLabel),
+      type: "Görsel",
+      context: row.context ?? "—",
+      contextTokens: row.contextTokens ?? null,
+      maxOutputTokens: null,
+      description: null,
+      inputModalities: ["text"],
+      outputModalities: ["image"],
+      endpoints: IMAGE_ENDPOINTS,
+      endpointDetails: IMAGE_ENDPOINT_DETAILS,
+      supportedParameters: IMAGE_SUPPORTED_PARAMETERS,
+      providerImageInputUsd: row.imagePriceUsd ?? 0,
+    };
+  }
   return {
     id: row.modelId,
     name: row.name,

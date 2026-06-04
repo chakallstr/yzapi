@@ -189,6 +189,8 @@ export const addedModels = pgTable("added_models", {
   // unaffected. Display-only — does NOT touch billing/pricing.
   context: text("context"),
   contextTokens: integer("context_tokens"),
+  type: text("type").notNull().default("Metin"),
+  imagePriceUsd: numeric("image_price_usd", { precision: 14, scale: 8 }).notNull().default("0"),
   enabled: boolean("enabled").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
