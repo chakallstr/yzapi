@@ -11,6 +11,8 @@ import {
   releasePackageSlot,
   recordPackageUsage,
 } from "../services/entitlement-service.js";
+import { chargeImage } from "../services/image-billing-service.js";
+import { withImageSlot } from "../services/image-queue.js";
 import { resolveActiveCatalogModel } from "../services/added-model-service.js";
 import { getActiveProviderAdapter } from "../services/provider-adapter.js";
 import { resolveProviderForModel } from "../services/provider-config-service.js";
@@ -951,14 +953,98 @@ router.post("/web-search", requireProxy, async (req: Request, res: Response, nex
   }
 });
 
+// Görsel üretim handler (Faz 4a). Token-guard'ı BYPASS eder (web-search gibi) —
+// görsel istekleri token reserve/settle yoluna girmez; sabit per-image ücret (chargeImage).
+// billing-service DOKUNULMAZ. Gerçek üretim upstream görsel desteğine bağlı.
+async function handleImageEndpoint(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+  endpoint: "generations" | "edits",
+): Promise<void> {
+  const userId = req.user!.id;
+  const apiKeyId = req.apiKey!.id;
+  const requestId = (req as any).id as string;
+  const start = Date.now();
+  const { model } = req.body as { model?: string };
+  let masterModel: MasterModel | undefined;
+  let runtimeConfig: RuntimeApiConfig | undefined;
+
+  try {
+    runtimeConfig = await getRuntimeApiConfig();
+    if (runtimeConfig.maintenanceModeForApi) {
+      throw new AppError(503, runtimeConfig.maintenanceMessage);
+    }
+
+    const resolved = await resolveEnabledModel(model, "images");
+    masterModel = resolved.masterModel;
+    if (masterModel.type !== "Görsel") {
+      throw new BadRequestError(`Model görsel üretimi desteklemiyor: ${masterModel.id}`);
+    }
+
+    const rl = await checkRateLimit(apiKeyId, userId, req.ip);
+    if (!rl.allowed) {
+      throw new RateLimitError("Rate limit exceeded", rl.retryAfter);
+    }
+
+    const balRows = await db.select({ bakiye: users.bakiyeTL }).from(users).where(eq(users.id, userId)).limit(1);
+    const balance = Number(balRows[0]?.bakiye ?? 0);
+    if (runtimeConfig.insufficientBalanceBlockEnabled && balance <= 0) {
+      throw new InsufficientBalanceError("Insufficient balance to process image request");
+    }
+
+    const providerCtx = await resolveProviderForModel(masterModel.id);
+    const adapter = await getActiveProviderAdapter();
+    const providerBody = { ...(req.body as Record<string, unknown>), model: masterModel.id };
+
+    // Global eşzamanlılık kapısı (kuyruk) + upstream forward.
+    const { raw, imageCount } = await withImageSlot(() => adapter.forwardImage(endpoint, providerBody, providerCtx));
+    const responseMs = Date.now() - start;
+
+    const charge = await chargeImage({
+      userId,
+      apiKeyId,
+      model: masterModel,
+      imageRequestId: `img_${requestId}`,
+      imageCount,
+      responseMs,
+      status: imageCount > 0 ? "success" : "no_charge",
+    });
+
+    const { remainingUSD } = await getUserBalanceSnapshot(userId);
+    setExtendedBillingHeaders(res, charge.costTL, charge.remainingTL, remainingUSD, requestId);
+    res.json(raw);
+  } catch (err) {
+    if (
+      err instanceof InsufficientBalanceError ||
+      err instanceof RateLimitError ||
+      err instanceof ModelNotFoundError ||
+      err instanceof ModelDisabledError ||
+      err instanceof BadRequestError
+    ) {
+      return next(err);
+    }
+    // Upstream hatası → ÜCRET KESME (no_charge usage kaydı), hatayı ilet.
+    if (masterModel) {
+      const responseMs = Date.now() - start;
+      chargeImage({
+        userId, apiKeyId, model: masterModel, imageRequestId: `img_${requestId}`,
+        imageCount: 0, responseMs, status: "no_charge",
+      }).catch((e2) => logger.error({ err: e2 }, "image error usage record failed"));
+    }
+    if (runtimeConfig && forwardUpstreamError(err, res, runtimeConfig)) return;
+    return next(err);
+  }
+}
+
 // POST /v1/images/generations
-router.post("/images/generations", requireProxy, (_req: Request, res: Response) => {
-  res.status(501).json({ error: "Image generation is disabled during provider migration.", code: "media_disabled" });
+router.post("/images/generations", requireProxy, (req: Request, res: Response, next: NextFunction) => {
+  void handleImageEndpoint(req, res, next, "generations");
 });
 
 // POST /v1/images/edits
-router.post("/images/edits", requireProxy, (_req: Request, res: Response) => {
-  res.status(501).json({ error: "Image editing is disabled during provider migration.", code: "media_disabled" });
+router.post("/images/edits", requireProxy, (req: Request, res: Response, next: NextFunction) => {
+  void handleImageEndpoint(req, res, next, "edits");
 });
 
 // POST /v1/videos/submit — stub (501)
