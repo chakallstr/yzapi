@@ -1381,6 +1381,21 @@ router.post("/dodo/webhook", async (req, res, next) => {
       return;
     }
     const payment = rows[0];
+
+    // Defansif tutar cross-check (sağlayıcıya körü körüne güvenme — review I2).
+    // Dodo amount'unun cents olduğu varsayımıyla; alan adı netleşince (I3) sağlamlaştırılır.
+    // Kredi her durumda DB'deki creditTL'den verilir (webhook'tan DEĞİL) → şişirme imkânsız;
+    // bu kontrol eksik/yanlış tutarlı "succeeded" event'inde krediyi engeller.
+    const reportedAmount = Number((data as Record<string, unknown>).amount ?? (data as Record<string, unknown>).total_amount ?? NaN);
+    if (Number.isFinite(reportedAmount) && reportedAmount > 0 && payment.amountUsd != null) {
+      const expectedCents = Math.round(Number(payment.amountUsd) * 100);
+      if (Math.abs(reportedAmount - expectedCents) > 1) {
+        logger.warn({ paymentId, reportedAmount, expectedCents }, "[dodo] webhook amount mismatch — credit atlandı");
+        res.json({ ok: true });
+        return;
+      }
+    }
+
     const creditTL = Number(payment.creditTL ?? payment.miktarTL);
     const eventId = req.header("webhook-id") || paymentId;
 

@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { dbSql } from "../db/client.js";
 import { AppError } from "../lib/errors.js";
 import { grantPackageEntitlement } from "./entitlement-service.js";
@@ -114,7 +115,7 @@ export interface GenerateInput {
 function randomCode(prefix: string): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let s = "";
-  for (let i = 0; i < 10; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 10; i++) s += chars[randomInt(chars.length)];
   const p = (prefix || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   return p ? `${p}-${s}` : s;
 }
