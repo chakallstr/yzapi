@@ -6,6 +6,7 @@ import { startOrphanReservationReaperJob } from "./orphan-reservation-reaper-job
 import { startMaliIzlemeJob } from "./mali-izleme-job.js";
 import { startGozcuJob } from "./gozcu-job.js";
 import { startGozcuDigestJob } from "./gozcu-digest-job.js";
+import { startPackageMaintenanceJob } from "./package-maintenance-job.js";
 import { markJobsStarted } from "../services/gozcu/heartbeat.js";
 
 export function startAllJobs(): void {
@@ -17,5 +18,6 @@ export function startAllJobs(): void {
   startMaliIzlemeJob();
   startGozcuJob();
   startGozcuDigestJob();
+  startPackageMaintenanceJob();
   markJobsStarted();
 }
