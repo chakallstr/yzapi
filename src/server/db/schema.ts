@@ -7,6 +7,7 @@ import {
   timestamp,
   uuid,
   jsonb,
+  date,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -39,6 +40,7 @@ export const systemConfig = pgTable("system_config", {
   signupBonusEnabled: boolean("signup_bonus_enabled").notNull().default(false),
   signupBonusTL: numeric("signup_bonus_tl", { precision: 14, scale: 4 }).notNull().default("10"),
   signupBonusMaxPerIp: integer("signup_bonus_max_per_ip").notNull().default(3),
+  packagesEnabled: boolean("packages_enabled").notNull().default(true),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });
 
@@ -332,6 +334,8 @@ export const usageRecords = pgTable(
     errorCode: text("error_code"),
     responseMs: integer("response_ms").notNull().default(0),
     status: text("status").notNull().default("success"),
+    billedVia: text("billed_via").notNull().default("balance"),
+    entitlementId: uuid("entitlement_id"),
     timestamp: timestamp("timestamp", { withTimezone: true }).notNull().default(sql`now()`),
   },
   (t) => [
@@ -592,4 +596,45 @@ export const gozcuLlmSpend = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   },
   (t) => [index("gozcu_llm_spend_month_idx").on(t.billingMonth)]
+);
+
+// ── packages (Faz 1: prepaid request-limit paketleri) ────────────────────────────
+export const packages = pgTable("packages", {
+  id: text("id").primaryKey(),
+  ad: text("ad").notNull(),
+  kategori: text("kategori").notNull(),
+  aciklama: text("aciklama").notNull().default(""),
+  tip: text("tip").notNull().default("request_limit"),
+  gunlukIstekLimiti: integer("gunluk_istek_limiti").notNull(),
+  sureGun: integer("sure_gun").notNull(),
+  allowedModels: jsonb("allowed_models").notNull().default(sql`'[]'::jsonb`),
+  fiyatTL: numeric("fiyat_tl", { precision: 14, scale: 4 }).notNull(),
+  fiyatUsd: numeric("fiyat_usd", { precision: 14, scale: 4 }),
+  enabled: boolean("enabled").notNull().default(true),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+});
+
+export const userPackageEntitlements = pgTable(
+  "user_package_entitlements",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    packageId: text("package_id").notNull().references(() => packages.id),
+    dailyLimitSnapshot: integer("daily_limit_snapshot").notNull(),
+    allowedModelsSnapshot: jsonb("allowed_models_snapshot").notNull().default(sql`'[]'::jsonb`),
+    activatedAt: timestamp("activated_at", { withTimezone: true }).notNull().default(sql`now()`),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    status: text("status").notNull().default("active"),
+    requestsToday: integer("requests_today").notNull().default(0),
+    lastResetDate: date("last_reset_date").notNull().default(sql`CURRENT_DATE`),
+    purchaseTransactionId: uuid("purchase_transaction_id").references(() => transactions.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [
+    index("upe_user_status_idx").on(t.userId, t.status),
+    index("upe_status_expires_idx").on(t.status, t.expiresAt),
+  ]
 );
