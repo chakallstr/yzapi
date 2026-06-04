@@ -11,6 +11,7 @@ import { AdminTab } from './tab-admin.jsx';
 import { DocumentsTab } from './tab-documents.jsx';
 import { HomeTab } from './tab-home.jsx';
 import { ModelsTab } from './tab-models.jsx';
+import { PackagesTab } from './tab-packages.jsx';
 import { LEGAL_DOCS } from './legal-docs.js';
 import {
   apiJson,
@@ -649,6 +650,7 @@ const TopBar = ({ active, onTab, balanceUSD, tlRate, onUserAction, isAuthenticat
   const tabs = [
     { id: 'home',     label: 'Ana Sayfa',  Ico: I.Home },
     { id: 'models',   label: 'Modeller',   Ico: I.Layers },
+    { id: 'packages', label: 'Paketler',   Ico: I.Wallet },
     { id: 'documents',label: 'Documents',  Ico: I.File },
     { id: 'activity', label: 'Aktivite',   Ico: I.Activity },
     { id: 'account',  label: 'Hesap',      Ico: I.Wallet },
@@ -1266,6 +1268,7 @@ const App = ({ initialTab = 'home' }) => {
       <main key={tab} className="fade-in yz-main" style={{ flex: 1, padding: '24px', maxWidth: 1400, margin: '0 auto', width: '100%' }}>
         {tab === 'home'     && <HomeTab     ctx={ctx} onTab={selectTab} onAction={onUserAction} />}
         {tab === 'models'   && <ModelsTab   ctx={ctx} />}
+        {tab === 'packages' && <PackagesTab />}
         {tab === 'activity' && <ActivityTab ctx={ctx} />}
         {tab === 'documents' && <DocumentsTab />}
         {tab === 'account'  && <AccountTab  ctx={ctx} />}

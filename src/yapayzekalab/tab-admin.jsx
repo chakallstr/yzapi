@@ -19,6 +19,7 @@ const ADMIN_SECTIONS = [
   { id: 'api', label: 'API Yönetimi', Ico: I.Server },
   { id: 'users', label: 'Kullanıcılar', Ico: I.Users },
   { id: 'overrides', label: 'Modeller', Ico: I.Layers },
+  { id: 'packages', label: 'Paketler', Ico: I.Wallet },
   { id: 'announce', label: 'Duyurular', Ico: I.Megaphone },
   { id: 'providers', label: 'Sağlayıcı', Ico: I.Server },
   { id: 'kur', label: 'Kur', Ico: I.Coins },
@@ -718,6 +719,93 @@ const AdminOverrides = ({ overrides, token, refresh }) => {
         })}
       </Card>
     </div>
+  );
+};
+
+const AdminPackages = ({ token }) => {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [form, setForm] = useState({ id: '', ad: '', kategori: '', aciklama: '', gunlukIstekLimiti: '', sureGun: '', allowedModels: '', fiyatTL: '', displayOrder: '0' });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState('');
+
+  const load = async () => {
+    setLoading(true); setError('');
+    try {
+      const list = await adminRequest('/api/admin/packages', token);
+      setRows(Array.isArray(list) ? list : []);
+    } catch (e) { setError(e.message || 'Paketler alınamadı.'); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); }, [token]);
+
+  const create = async () => {
+    if (!form.id.trim() || !form.ad.trim() || !form.kategori.trim()) { setError('id, ad, kategori zorunlu'); return; }
+    setSaving(true); setError(''); setSaved('');
+    try {
+      await adminRequest('/api/admin/packages', token, { method: 'POST', body: {
+        id: form.id.trim(), ad: form.ad.trim(), kategori: form.kategori.trim(), aciklama: form.aciklama,
+        gunlukIstekLimiti: Number(form.gunlukIstekLimiti), sureGun: Number(form.sureGun),
+        allowedModels: form.allowedModels.split(',').map((s) => s.trim()).filter(Boolean),
+        fiyatTL: Number(form.fiyatTL), displayOrder: Number(form.displayOrder || 0),
+      } });
+      setForm({ id: '', ad: '', kategori: '', aciklama: '', gunlukIstekLimiti: '', sureGun: '', allowedModels: '', fiyatTL: '', displayOrder: '0' });
+      setSaved('Paket eklendi.'); await load();
+    } catch (e) { setError(e.message || 'Paket eklenemedi.'); }
+    finally { setSaving(false); }
+  };
+
+  const toggle = async (row) => {
+    try {
+      await adminRequest(`/api/admin/packages/${encodeURIComponent(row.id)}/toggle`, token, { method: 'POST', body: { enabled: !row.enabled } });
+      await load();
+    } catch (e) { setError(e.message || 'Durum değiştirilemedi.'); }
+  };
+
+  const remove = async (row) => {
+    if (!window.confirm(`${row.id} paketi kapatılsın mı?`)) return;
+    try {
+      await adminRequest(`/api/admin/packages/${encodeURIComponent(row.id)}`, token, { method: 'DELETE' });
+      await load();
+    } catch (e) { setError(e.message || 'Paket silinemedi.'); }
+  };
+
+  return (
+    <Card pad={18}>
+      <Caption>Paketler</Caption>
+      {error && <div style={{ color: 'var(--danger, #e5484d)', marginTop: 6 }}>{error}</div>}
+      {saved && <div style={{ color: 'var(--ok, #30a46c)', marginTop: 6 }}>{saved}</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 8, margin: '12px 0' }}>
+        <input placeholder="id (slug)" value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value })} />
+        <input placeholder="ad" value={form.ad} onChange={(e) => setForm({ ...form, ad: e.target.value })} />
+        <input placeholder="kategori" value={form.kategori} onChange={(e) => setForm({ ...form, kategori: e.target.value })} />
+        <input placeholder="günlük istek" value={form.gunlukIstekLimiti} onChange={(e) => setForm({ ...form, gunlukIstekLimiti: e.target.value })} />
+        <input placeholder="süre (gün)" value={form.sureGun} onChange={(e) => setForm({ ...form, sureGun: e.target.value })} />
+        <input placeholder="fiyat ₺" value={form.fiyatTL} onChange={(e) => setForm({ ...form, fiyatTL: e.target.value })} />
+        <input placeholder="modeller (virgülle)" value={form.allowedModels} onChange={(e) => setForm({ ...form, allowedModels: e.target.value })} />
+        <input placeholder="sıra" value={form.displayOrder} onChange={(e) => setForm({ ...form, displayOrder: e.target.value })} />
+      </div>
+      <button disabled={saving} onClick={create}>{saving ? 'Ekleniyor…' : 'Paket Ekle'}</button>
+      {loading ? <div style={{ marginTop: 12 }}>Yükleniyor…</div> : (
+        <table style={{ width: '100%', marginTop: 12, fontSize: 13 }}>
+          <thead><tr style={{ textAlign: 'left' }}><th>id</th><th>ad</th><th>kategori</th><th>limit/gün</th><th>süre</th><th>₺</th><th>durum</th><th></th></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id}>
+                <td>{r.id}</td><td>{r.ad}</td><td><Chip>{r.kategori}</Chip></td>
+                <td>{r.gunlukIstekLimiti}</td><td>{r.sureGun}g</td><td>{Number(r.fiyatTL)}</td>
+                <td>{r.enabled ? 'Açık' : 'Kapalı'}</td>
+                <td style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => toggle(r)}>{r.enabled ? 'Kapat' : 'Aç'}</button>
+                  <button onClick={() => remove(r)}>Sil</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Card>
   );
 };
 
@@ -2501,6 +2589,7 @@ const AdminTab = ({ ctx = {} }) => {
         {section === 'providers' && <AdminProviders providers={data.providers || []} token={token} refresh={refresh} />}
         {section === 'kur' && <AdminKur config={data.config} kurHistory={data.kurHistory || []} token={token} refresh={refresh} />}
         {section === 'payments' && <AdminPaymentSettings config={data.config} token={token} refresh={refresh} />}
+        {section === 'packages' && <AdminPackages token={token} />}
         {section === 'telegram' && <AdminTelegram token={token} />}
         {section === 'apikeys' && <AdminApiKeys apiKeys={data.apiKeys || []} users={data.users || []} token={token} refresh={refresh} filterUserId={trafficApiKeyJump.userId} filterApiKeyId={trafficApiKeyJump.apiKeyId} filterNonce={trafficApiKeyJump.nonce} />}
         {section === 'logs' && <AdminLogs reconciliation={data.reconciliation} auditLogs={data.auditLogs || []} token={token} />}
