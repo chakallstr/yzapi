@@ -5,6 +5,12 @@ import { AppError, BadRequestError, InsufficientBalanceError, ModelDisabledError
 import { canonicalizeModelId, type MasterModel } from "../../master-models.js";
 import { checkRateLimit } from "../services/rate-limit-service.js";
 import { reserveUsageBudget, settleReservedUsage } from "../services/billing-service.js";
+import {
+  checkPackageCoverage,
+  tryReservePackageSlot,
+  releasePackageSlot,
+  recordPackageUsage,
+} from "../services/entitlement-service.js";
 import { resolveActiveCatalogModel } from "../services/added-model-service.js";
 import { getActiveProviderAdapter } from "../services/provider-adapter.js";
 import { resolveProviderForModel } from "../services/provider-config-service.js";
@@ -188,7 +194,10 @@ async function enforceRequestGuards(opts: {
     .where(eq(users.id, opts.userId))
     .limit(1);
   const balance = Number(balRows[0]?.bakiye ?? 0);
-  if (runtimeConfig.insufficientBalanceBlockEnabled && balance <= 0) {
+  // Faz 1: aktif bir paket bu modeli kapsıyorsa bakiye=0 olsa bile isteği engelleme
+  // (kota dalı bakiyeye dokunmadan karşılar). Kesin rezerv handler'da atomik yapılır.
+  const packageCovers = await checkPackageCoverage(opts.userId, masterModel.id);
+  if (runtimeConfig.insufficientBalanceBlockEnabled && balance <= 0 && !packageCovers) {
     throw new InsufficientBalanceError("Insufficient balance to process request");
   }
 
@@ -233,6 +242,62 @@ function setExtendedBillingHeaders(
   res.setHeader("X-YZ-Remaining-USD", remainingUSD.toFixed(4));
 }
 
+/**
+ * Faz 1 paket dalı: istek bir paket entitlement'ından karşılanıyorsa (billedViaPackage)
+ * bakiye reserve/settle YAPILMAZ — sadece kota usage'ı yazılır (costTL=0), hatada slot iade.
+ * Aksi halde mevcut PAYG settleReservedUsage (DOKUNULMAZ) aynen çağrılır.
+ */
+async function settleBilling(opts: {
+  billedViaPackage: boolean;
+  entitlementId?: string;
+  userId: string;
+  apiKeyId: string;
+  model: MasterModel;
+  usage: { promptTokens: number; completionTokens: number };
+  requestId: string;
+  upstreamRequestId?: string;
+  rawUsageJson?: unknown;
+  responseMs: number;
+  status: "success" | "error" | "stream_missing_usage";
+  errorCode?: string;
+}): Promise<{ costTL: number; remainingTL: number }> {
+  if (opts.billedViaPackage) {
+    const isError = opts.status === "error";
+    if (isError && opts.entitlementId) {
+      await releasePackageSlot(opts.entitlementId);
+    }
+    if (opts.entitlementId) {
+      await recordPackageUsage({
+        userId: opts.userId,
+        apiKeyId: opts.apiKeyId,
+        modelId: opts.model.id,
+        entitlementId: opts.entitlementId,
+        inputUsage: opts.usage.promptTokens,
+        outputUsage: opts.usage.completionTokens,
+        responseMs: opts.responseMs,
+        status: isError ? "error" : "success",
+        requestId: opts.requestId,
+        upstreamRequestId: opts.upstreamRequestId,
+        errorCode: isError ? opts.errorCode : undefined,
+      });
+    }
+    const snap = await getUserBalanceSnapshot(opts.userId);
+    return { costTL: 0, remainingTL: snap.remainingTL };
+  }
+  return await settleReservedUsage({
+    userId: opts.userId,
+    apiKeyId: opts.apiKeyId,
+    model: opts.model,
+    usage: opts.usage,
+    requestId: opts.requestId,
+    upstreamRequestId: opts.upstreamRequestId,
+    rawUsageJson: opts.rawUsageJson,
+    responseMs: opts.responseMs,
+    status: opts.status,
+    errorCode: opts.errorCode,
+  });
+}
+
 function upstreamErrorCode(err: unknown): string {
   const e = err as Error & { status?: number };
   return e.status ? `upstream_${e.status}` : "upstream_error";
@@ -269,6 +334,8 @@ async function handleTextJsonEndpoint(
   let masterModel: MasterModel | undefined;
   let guard: RequestGuardResult | undefined;
   let runtimeConfig: RuntimeApiConfig | undefined;
+  let billedViaPackage = false;
+  let entitlementId: string | undefined;
 
   try {
     const enforcement = await enforceRequestGuards({
@@ -312,13 +379,21 @@ async function handleTextJsonEndpoint(
       topPMin: enforcement.runtimeConfig.defaultTopPMin,
       topPMax: enforcement.runtimeConfig.defaultTopPMax,
     });
-    await reserveUsageBudget({
-      userId,
-      apiKeyId,
-      model: masterModel,
-      usage: { promptTokens: guard.contextTokens, completionTokens: guard.reservedCompletionTokens },
-      requestId,
-    });
+    // Faz 1 paket kota dalı (reserve'den ÖNCE): istek bir paket entitlement'ının
+    // kapsadığı modeldeyse ve günlük kota varsa atomik slot rezerve edilir ve bakiye
+    // reserve'i ATLANIR. Aksi halde mevcut PAYG reserveUsageBudget (DOKUNULMAZ) çalışır.
+    const pkgSlot = await tryReservePackageSlot(userId, masterModel.id);
+    billedViaPackage = pkgSlot.covered;
+    entitlementId = pkgSlot.entitlementId;
+    if (!billedViaPackage) {
+      await reserveUsageBudget({
+        userId,
+        apiKeyId,
+        model: masterModel,
+        usage: { promptTokens: guard.contextTokens, completionTokens: guard.reservedCompletionTokens },
+        requestId,
+      });
+    }
     const providerBody = {
       ...guard.guardedBody,
       model: runtimeConfig.strictCanonicalModelIds ? masterModel.id : String(model || masterModel.id),
@@ -338,7 +413,9 @@ async function handleTextJsonEndpoint(
     // büyük-JSON fazla-faturalama düzeltmesi). Bkz resolveBilledPromptTokens.
     const billedPromptTokens = resolveBilledPromptTokens(usage.promptTokens, guard.contextTokens);
 
-    const { costTL, remainingTL } = await settleReservedUsage({
+    const { costTL, remainingTL } = await settleBilling({
+      billedViaPackage,
+      entitlementId,
       userId,
       apiKeyId,
       model: masterModel,
@@ -358,7 +435,9 @@ async function handleTextJsonEndpoint(
     }
     if (masterModel && guard) {
       const responseMs = Date.now() - start;
-      settleReservedUsage({
+      settleBilling({
+        billedViaPackage,
+        entitlementId,
         userId,
         apiKeyId,
         model: masterModel,
@@ -388,6 +467,8 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
   let masterModel: MasterModel | undefined;
   let guard: RequestGuardResult | undefined;
   let runtimeConfig: RuntimeApiConfig | undefined;
+  let billedViaPackage = false;
+  let entitlementId: string | undefined;
   let webSearchPerformed = false;
   let webSearchResultCount = 0;
 
@@ -461,13 +542,21 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       topPMin: enforcement.runtimeConfig.defaultTopPMin,
       topPMax: enforcement.runtimeConfig.defaultTopPMax,
     });
-    await reserveUsageBudget({
-      userId,
-      apiKeyId,
-      model: masterModel,
-      usage: { promptTokens: guard.contextTokens, completionTokens: guard.reservedCompletionTokens },
-      requestId,
-    });
+    // Faz 1 paket kota dalı (reserve'den ÖNCE): istek bir paket entitlement'ının
+    // kapsadığı modeldeyse ve günlük kota varsa atomik slot rezerve edilir ve bakiye
+    // reserve'i ATLANIR. Aksi halde mevcut PAYG reserveUsageBudget (DOKUNULMAZ) çalışır.
+    const pkgSlot = await tryReservePackageSlot(userId, masterModel.id);
+    billedViaPackage = pkgSlot.covered;
+    entitlementId = pkgSlot.entitlementId;
+    if (!billedViaPackage) {
+      await reserveUsageBudget({
+        userId,
+        apiKeyId,
+        model: masterModel,
+        usage: { promptTokens: guard.contextTokens, completionTokens: guard.reservedCompletionTokens },
+        requestId,
+      });
+    }
     const providerBody = {
       ...guard.guardedBody,
       model: runtimeConfig.strictCanonicalModelIds ? masterModel.id : String(model || masterModel.id),
@@ -488,7 +577,9 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       // Giriş token floor'u: yalnız sağlayıcı bozuk-düşük raporladığında devreye girer
       // (geçerli raporda char/4 ile şişirmez). Bkz resolveBilledPromptTokens.
       const billedPromptTokens = resolveBilledPromptTokens(usage.promptTokens, guard.contextTokens);
-      await settleReservedUsage({
+      await settleBilling({
+        billedViaPackage,
+        entitlementId,
         userId,
         apiKeyId,
         model: masterModel,
@@ -510,7 +601,9 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       // Bkz resolveBilledPromptTokens. Faturalanan değer asla sağlayıcı normalize'ın altına düşmez.
       const billedPromptTokens = resolveBilledPromptTokens(usage.promptTokens, guard.contextTokens);
 
-      const { costTL } = await settleReservedUsage({
+      const { costTL } = await settleBilling({
+        billedViaPackage,
+        entitlementId,
         userId,
         apiKeyId,
         model: masterModel,
@@ -560,7 +653,9 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
 
     if (masterModel && guard) {
       const responseMs = Date.now() - start;
-      settleReservedUsage({
+      settleBilling({
+        billedViaPackage,
+        entitlementId,
         userId,
         apiKeyId,
         model: masterModel,
@@ -622,6 +717,8 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
   let masterModel: MasterModel | undefined;
   let guard: RequestGuardResult | undefined;
   let runtimeConfig: RuntimeApiConfig | undefined;
+  let billedViaPackage = false;
+  let entitlementId: string | undefined;
 
   try {
     // 1) Responses isteğini chat/completions şemasına çevir (model slug alias dahil).
@@ -673,13 +770,21 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
       topPMax: enforcement.runtimeConfig.defaultTopPMax,
     });
 
-    await reserveUsageBudget({
-      userId,
-      apiKeyId,
-      model: masterModel,
-      usage: { promptTokens: guard.contextTokens, completionTokens: guard.reservedCompletionTokens },
-      requestId,
-    });
+    // Faz 1 paket kota dalı (reserve'den ÖNCE): istek bir paket entitlement'ının
+    // kapsadığı modeldeyse ve günlük kota varsa atomik slot rezerve edilir ve bakiye
+    // reserve'i ATLANIR. Aksi halde mevcut PAYG reserveUsageBudget (DOKUNULMAZ) çalışır.
+    const pkgSlot = await tryReservePackageSlot(userId, masterModel.id);
+    billedViaPackage = pkgSlot.covered;
+    entitlementId = pkgSlot.entitlementId;
+    if (!billedViaPackage) {
+      await reserveUsageBudget({
+        userId,
+        apiKeyId,
+        model: masterModel,
+        usage: { promptTokens: guard.contextTokens, completionTokens: guard.reservedCompletionTokens },
+        requestId,
+      });
+    }
 
     const providerBody = {
       ...guard.guardedBody,
@@ -703,7 +808,9 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
         ? "success"
         : (runtimeConfig?.streamMissingUsageFallbackEnabled === false ? "error" : "stream_missing_usage");
       const billedPromptTokens = resolveBilledPromptTokens(usage.promptTokens, guard.contextTokens);
-      await settleReservedUsage({
+      await settleBilling({
+        billedViaPackage,
+        entitlementId,
         userId,
         apiKeyId,
         model: masterModel,
@@ -719,7 +826,9 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
       const responseMs = Date.now() - start;
 
       const billedPromptTokens = resolveBilledPromptTokens(usage.promptTokens, guard.contextTokens);
-      const { costTL, remainingTL } = await settleReservedUsage({
+      const { costTL, remainingTL } = await settleBilling({
+        billedViaPackage,
+        entitlementId,
         userId,
         apiKeyId,
         model: masterModel,
@@ -740,7 +849,9 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
     }
     if (masterModel && guard) {
       const responseMs = Date.now() - start;
-      settleReservedUsage({
+      settleBilling({
+        billedViaPackage,
+        entitlementId,
         userId,
         apiKeyId,
         model: masterModel,
