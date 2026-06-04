@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync("src/yapayzekalab/tab-activity.jsx", "utf8");
+// i18n: user-facing strings moved to the activity dictionary fragment.
+const source = readFileSync("src/yapayzekalab/tab-activity.jsx", "utf8")
+  + "\n" + readFileSync("src/yapayzekalab/i18n/strings/activity.js", "utf8");
 
 describe("activity tab real data contract", () => {
   it("reads real usage records instead of fake counters", () => {

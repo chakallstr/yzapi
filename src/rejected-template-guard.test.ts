@@ -14,6 +14,14 @@ const activeFrontendSources = () => {
       if (/\.(jsx|tsx|ts|css)$/.test(entry)) files.push(join(themeDir, entry));
     }
   }
+  // i18n dictionary fragments are part of the active frontend: customer-facing
+  // theme strings now live here, so the theme-fingerprint scan must include them.
+  for (const i18nDir of ["src/yapayzekalab/i18n", "src/yapayzekalab/i18n/strings"]) {
+    if (!existsSync(i18nDir)) continue;
+    for (const entry of readdirSync(i18nDir)) {
+      if (/\.(jsx|tsx|ts|js)$/.test(entry)) files.push(join(i18nDir, entry));
+    }
+  }
   return files;
 };
 

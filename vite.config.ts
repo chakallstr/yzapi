@@ -56,6 +56,15 @@ function sourceFiles(root: string) {
       if (/\.(jsx|tsx|ts|css)$/.test(entry)) files.push(path.join(themeDir, entry));
     }
   }
+  // i18n dictionary fragments hold customer-facing theme strings after TR/EN
+  // extraction, so the approved-theme fingerprint scan must include them.
+  for (const sub of ["src/yapayzekalab/i18n", "src/yapayzekalab/i18n/strings"]) {
+    const dir = path.resolve(root, sub);
+    if (!fs.existsSync(dir)) continue;
+    for (const entry of fs.readdirSync(dir)) {
+      if (/\.(jsx|tsx|ts|js)$/.test(entry)) files.push(path.join(dir, entry));
+    }
+  }
   return files;
 }
 

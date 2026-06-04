@@ -7,10 +7,16 @@ const appSource = [
   "src/yapayzekalab/tab-home.jsx",
   "src/yapayzekalab/tab-models.jsx",
   "src/yapayzekalab/tab-account.jsx",
+  // i18n: customer-facing doc/UI copy now lives in the dictionary fragments.
+  "src/yapayzekalab/i18n/strings/home.js",
+  "src/yapayzekalab/i18n/strings/models.js",
+  "src/yapayzekalab/i18n/strings/account.js",
 ].map((file) => readFileSync(file, "utf8")).join("\n");
 
-const modelsSource = readFileSync("src/yapayzekalab/tab-models.jsx", "utf8");
-const accountSource = readFileSync("src/yapayzekalab/tab-account.jsx", "utf8");
+const modelsSource = readFileSync("src/yapayzekalab/tab-models.jsx", "utf8")
+  + "\n" + readFileSync("src/yapayzekalab/i18n/strings/models.js", "utf8");
+const accountSource = readFileSync("src/yapayzekalab/tab-account.jsx", "utf8")
+  + "\n" + readFileSync("src/yapayzekalab/i18n/strings/account.js", "utf8");
 
 describe("API docs content contract", () => {
   it("uses the production YapayZekaLab v1 base URL and live key prefix in examples", () => {

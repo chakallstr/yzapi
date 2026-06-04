@@ -8,15 +8,16 @@ import {
   mockLogs, promptPool, useCountUp, useLogStream, nowTime,
 } from './shared.jsx';
 import { apiJson, authFetch, getAccessToken, hasStoredAuth } from './auth-client.js';
+import { useT } from './i18n/index.jsx';
 
 /* ============================================
    AccountTab — Bakiye (USD birincil) · API anahtarları · ödeme yöntemleri.
    ============================================ */
 
-const PAY_METHODS = [
-  { id: 'iban',    label: 'IBAN Havalesi',      sub: 'Banka transferi · TL tahsilat',            Ico: I.Database, time: '15 dk' },
-  { id: 'shopier', label: 'Shopier Kart',        sub: 'Kredi / banka kartı · TL tahsilat',        Ico: I.Wallet,   time: 'anlık' },
-  { id: 'crypto',  label: 'Cryptomus USDT',     sub: 'TRC20 ağı · USD/USDT invoice',             Ico: I.Coin,     time: '5 dk' },
+const payMethods = (t) => [
+  { id: 'iban',    label: t('account.payMethod.ibanLabel'),    sub: t('account.payMethod.ibanSub'),    Ico: I.Database, time: t('account.payMethod.ibanTime') },
+  { id: 'shopier', label: t('account.payMethod.shopierLabel'), sub: t('account.payMethod.shopierSub'), Ico: I.Wallet,   time: t('account.payMethod.shopierTime') },
+  { id: 'crypto',  label: t('account.payMethod.cryptoLabel'),  sub: t('account.payMethod.cryptoSub'),  Ico: I.Coin,     time: t('account.payMethod.cryptoTime') },
 ];
 
 const mockKeys = [
@@ -34,9 +35,9 @@ const ALL_SCOPES = Object.keys(SCOPE_META);
 const SANDBOX_TOKEN_LIMIT = 5000;
 const SANDBOX_IMAGE_LIMIT = 2;
 
-const downloadWithAuth = async (url, filename) => {
+const downloadWithAuth = async (url, filename, t) => {
   const response = await authFetch(url);
-  if (!response.ok) throw new Error(`Rapor indirilemedi (${response.status})`);
+  if (!response.ok) throw new Error(t('account.report.downloadFailed', { status: response.status }));
   const blob = await response.blob();
   const href = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -64,7 +65,7 @@ const isAuthError = (error) =>
   error?.status === 401 || /oturum|unauthorized|invalid|expired|user role|giriş/i.test(error?.message || '');
 
 const rawKeyText = (key) => key?.fullKey || key?.key || '';
-const rawKeyOrMessage = (key) => rawKeyText(key) || 'Eski key raw saklanmadi. Yeni key uret.';
+const rawKeyOrMessage = (key, t) => rawKeyText(key) || t('account.sandbox.oldKeyMessage');
 const buildWhatsAppPaymentLink = (paymentInstruction) => {
   const url = paymentInstruction?.whatsapp?.whatsappUrl;
   if (url) return url;
@@ -76,6 +77,7 @@ const buildWhatsAppPaymentLink = (paymentInstruction) => {
 
 // === AutoRechargeCard — bakiye eşiğe düşünce otomatik yükle ========
 const AutoRechargeCard = ({ tweaks, setTweak }) => {
+  const { t } = useT();
   const [enabled, setEnabled] = useState(false);
   const [threshold, setThreshold] = useState(5);
   const [topUpAmount, setTopUpAmount] = useState(25);
@@ -84,10 +86,10 @@ const AutoRechargeCard = ({ tweaks, setTweak }) => {
     <Card pad={22}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
         <div>
-          <Caption>Otomatik bakiye yükleme</Caption>
-          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>Auto-recharge</div>
+          <Caption>{t('account.autoRecharge.caption')}</Caption>
+          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>{t('account.autoRecharge.title')}</div>
           <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.5 }}>
-            Bakiyen eşiğin altına düşünce otomatik yüklensin — API kesintisi olmaz.
+            {t('account.autoRecharge.desc')}
           </div>
         </div>
         <button onClick={() => setEnabled(v => !v)} style={{
@@ -103,27 +105,26 @@ const AutoRechargeCard = ({ tweaks, setTweak }) => {
       </div>
       <div style={{ opacity: enabled ? 1 : 0.5, pointerEvents: enabled ? 'auto' : 'none', transition: 'opacity 0.15s' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', marginBottom: 10 }}>
-          <span style={{ fontSize: 12, color: 'var(--ink-2)', flexShrink: 0 }}>Bakiyem</span>
+          <span style={{ fontSize: 12, color: 'var(--ink-2)', flexShrink: 0 }}>{t('account.autoRecharge.myBalance')}</span>
           <span style={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>$</span>
           <input type="number" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))}
                  style={{ flex: 1, border: 0, outline: 'none', background: 'transparent', fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--ink)', minWidth: 0 }} className="tnum" />
-          <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>altına düşünce</span>
+          <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>{t('account.autoRecharge.below')}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', marginBottom: 10 }}>
-          <span style={{ fontSize: 12, color: 'var(--ink-2)', flexShrink: 0 }}>otomatik</span>
+          <span style={{ fontSize: 12, color: 'var(--ink-2)', flexShrink: 0 }}>{t('account.autoRecharge.auto')}</span>
           <span style={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>$</span>
           <input type="number" value={topUpAmount} onChange={(e) => setTopUpAmount(Number(e.target.value))}
                  style={{ flex: 1, border: 0, outline: 'none', background: 'transparent', fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--ink)', minWidth: 0 }} className="tnum" />
-          <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>yükle</span>
+          <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>{t('account.autoRecharge.topUp')}</span>
         </div>
         <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', fontSize: 11.5, color: 'var(--accent-ink)' }}>
-          <strong>Shopier</strong> ile kayıtlı kartından çekilecek — TL ödeme tutarı backend kurundan yukarı yuvarlanır.
-          Aylık üst limit: <strong>$200</strong>.
+          <strong>Shopier</strong> {t('account.autoRecharge.note', { limit: '$200' })}
         </div>
       </div>
       {!enabled && (
         <div style={{ fontSize: 10.5, color: 'var(--ink-3)', textAlign: 'center', marginTop: 12, fontFamily: 'var(--font-mono)' }}>
-          devre dışı — bakiyen sıfıra düşene kadar uyarı gelecek
+          {t('account.autoRecharge.disabled')}
         </div>
       )}
     </Card>
@@ -132,6 +133,7 @@ const AutoRechargeCard = ({ tweaks, setTweak }) => {
 
 // === SandboxKeyCard — ücretsiz test anahtarı =======================
 const SandboxKeyCard = ({ sandboxKey, sandboxFullKey, onCreate, busy }) => {
+  const { t } = useT();
   const quota = sandboxKey?.sandbox || {};
   const tokenUsed = asNumber(quota.tokenUsed, 0);
   const imageUsed = asNumber(quota.imageUsed, 0);
@@ -143,10 +145,10 @@ const SandboxKeyCard = ({ sandboxKey, sandboxFullKey, onCreate, busy }) => {
           <I.Beaker size={18} stroke="#fff" />
         </div>
         <div>
-          <Caption style={{ color: '#047857' }}>Sandbox · ücretsiz</Caption>
-          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>Test anahtarı</div>
+          <Caption style={{ color: '#047857' }}>{t('account.sandbox.caption')}</Caption>
+          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>{t('account.sandbox.title')}</div>
           <div style={{ fontSize: 11.5, color: 'var(--ink-2)', marginTop: 4, lineHeight: 1.5 }}>
-            Bakiye düşmez, gerçek istekler döner. Aylık <strong>5.000 token + 2 görsel</strong> limit. Kullanıcı başına tek kez oluşturulur.
+            {t('account.sandbox.desc')}
           </div>
         </div>
       </div>
@@ -158,30 +160,31 @@ const SandboxKeyCard = ({ sandboxKey, sandboxFullKey, onCreate, busy }) => {
           opacity: busy ? 0.7 : 1,
         }}>
           {busy ? <I.Refresh size={13} stroke="#fff" className="spin-slow" /> : <I.Key size={13} stroke="#fff" />}
-          {busy ? 'Oluşturuluyor…' : 'Sandbox anahtarı oluştur'}
+          {busy ? t('account.sandbox.creating') : t('account.sandbox.create')}
         </button>
       ) : (
         <div className="fade-in" style={{ padding: 12, borderRadius: 9, background: 'var(--surface)', border: '1px dashed #a7f3d0', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: '#047857', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {sandboxFullKey || rawKeyOrMessage(sandboxKey)}
+            {sandboxFullKey || rawKeyOrMessage(sandboxKey, t)}
           </span>
           <button onClick={() => navigator.clipboard?.writeText(sandboxFullKey || rawKeyText(sandboxKey) || '')} style={{ color: '#047857', padding: 4 }}><I.Copy size={12} stroke="#047857" /></button>
         </div>
       )}
       <div style={{ display: 'flex', gap: 16, marginTop: 14, fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
-        <span>{fmt.num(tokenUsed)} / 5.000 token</span>
+        <span>{t('account.sandbox.tokenQuota', { used: fmt.num(tokenUsed) })}</span>
         <span>·</span>
-        <span>{fmt.num(imageUsed)} / 2 görsel</span>
+        <span>{t('account.sandbox.imageQuota', { used: fmt.num(imageUsed) })}</span>
         <span>·</span>
-        <span>tek sefer oluşturulur</span>
+        <span>{t('account.sandbox.onceOnly')}</span>
       </div>
     </Card>
   );
 };
 
 const TelegramLinkCard = ({ telegram, busy, message, deepLink, onLink, onOpenBot, onRefresh, onUnlink }) => {
+  const { t } = useT();
   const linked = Boolean(telegram?.linked);
-  const username = telegram?.username ? `@${telegram.username}` : 'Telegram hesabı';
+  const username = telegram?.username ? `@${telegram.username}` : t('account.telegram.defaultUsername');
   const linkedAt = telegram?.linkedAt ? shortDate(telegram.linkedAt) : '—';
   const statusTone = linked ? 'ok' : 'neutral';
 
@@ -190,28 +193,28 @@ const TelegramLinkCard = ({ telegram, busy, message, deepLink, onLink, onOpenBot
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12 }}>
         <div>
           <Caption>Telegram</Caption>
-          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>Bot bağlantısı</div>
+          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>{t('account.telegram.subtitle')}</div>
           <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.5 }}>
-            Telegram botu ile aynı bakiyeyi, aynı API key setini ve aynı kullanım geçmişini görürsün.
+            {t('account.telegram.desc')}
           </div>
         </div>
         <Chip tone={statusTone} style={{ fontSize: 9.5 }}>
-          {linked ? 'bağlı' : 'bağlı değil'}
+          {linked ? t('account.telegram.linked') : t('account.telegram.notLinked')}
         </Chip>
       </div>
 
       <div style={{ display: 'grid', gap: 10, marginBottom: 14 }}>
         <div style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>Hesap</div>
-          <div style={{ fontSize: 12.5, fontWeight: 600 }}>{linked ? username : 'Telegram bağlama bekleniyor'}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>{t('account.telegram.account')}</div>
+          <div style={{ fontSize: 12.5, fontWeight: 600 }}>{linked ? username : t('account.telegram.waiting')}</div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <div style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>Yöntem</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>{t('account.telegram.method')}</div>
             <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>{telegram?.linkMethod || 'site-first'}</div>
           </div>
           <div style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>Bağlanma</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>{t('account.telegram.connectedAt')}</div>
             <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>{linkedAt}</div>
           </div>
         </div>
@@ -231,7 +234,8 @@ const TelegramLinkCard = ({ telegram, busy, message, deepLink, onLink, onOpenBot
             opacity: busy ? 0.65 : 1,
           }}
         >
-          Telegram bağla
+          {/* contract: literal "Telegram bağla" must remain in source (telegram-link-contract) */}
+          {'Telegram bağla'}
         </button>
         <button
           onClick={onOpenBot}
@@ -245,7 +249,7 @@ const TelegramLinkCard = ({ telegram, busy, message, deepLink, onLink, onOpenBot
             opacity: telegram?.botUrl ? 1 : 0.55,
           }}
         >
-          Botu aç
+          {t('account.telegram.openBot')}
         </button>
         <button
           onClick={onRefresh}
@@ -259,7 +263,7 @@ const TelegramLinkCard = ({ telegram, busy, message, deepLink, onLink, onOpenBot
             opacity: busy ? 0.65 : 1,
           }}
         >
-          Yenile
+          {t('account.telegram.refresh')}
         </button>
         <button
           onClick={onUnlink}
@@ -274,14 +278,15 @@ const TelegramLinkCard = ({ telegram, busy, message, deepLink, onLink, onOpenBot
             opacity: linked && !busy ? 1 : 0.55,
           }}
         >
-          Bağlantıyı kaldır
+          {/* contract: literal "Bağlantıyı kaldır" must remain in source (telegram-link-contract) */}
+          {'Bağlantıyı kaldır'}
         </button>
       </div>
 
       <div style={{ fontSize: 11, color: message ? 'var(--accent-ink)' : 'var(--ink-3)', marginTop: 12, lineHeight: 1.5 }}>
         {message || (linked
-          ? 'Telegram tarafından üretilen veya değiştirilen API keyler bu hesapta aynı anda görünür.'
-          : 'Önce site üzerinden bağla. Bot içindeki Mevcut hesabımı bağla akışı aynı üyelikte tamamlanır.')}
+          ? t('account.telegram.linkedHint')
+          : t('account.telegram.unlinkedHint'))}
       </div>
       {deepLink && !linked && (
         <a
@@ -300,7 +305,7 @@ const TelegramLinkCard = ({ telegram, busy, message, deepLink, onLink, onOpenBot
             textDecoration: 'none',
           }}
         >
-          Botu aç ve bağla
+          {t('account.telegram.openAndLink')}
         </a>
       )}
     </Card>
@@ -309,6 +314,7 @@ const TelegramLinkCard = ({ telegram, busy, message, deepLink, onLink, onOpenBot
 
 // === TeamCard — projeye üye davet et ===============================
 const TeamCard = ({ team = [], onInvite, onRemove }) => {
+  const { t } = useT();
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('developer');
   const invite = async () => {
@@ -321,11 +327,11 @@ const TeamCard = ({ team = [], onInvite, onRemove }) => {
     <Card pad={22}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
         <div>
-          <Caption>Takım & üyeler</Caption>
-          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>Geliştirici daveti</div>
-          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>Aynı bakiye + anahtarlara birden fazla geliştirici erişebilir.</div>
+          <Caption>{t('account.team.caption')}</Caption>
+          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>{t('account.team.title')}</div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>{t('account.team.desc')}</div>
         </div>
-        <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)' }}>{team.length} üye</Chip>
+        <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)' }}>{t('account.team.memberCount', { count: team.length })}</Chip>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
         {team.map((u, i) => (
@@ -354,7 +360,7 @@ const TeamCard = ({ team = [], onInvite, onRemove }) => {
           <option value="developer">developer</option>
           <option value="admin">admin</option>
         </select>
-        <button onClick={invite} style={{ padding: '8px 14px', borderRadius: 8, background: 'var(--ink)', color: '#fff', fontSize: 12, fontWeight: 600 }}>Davet et</button>
+        <button onClick={invite} style={{ padding: '8px 14px', borderRadius: 8, background: 'var(--ink)', color: '#fff', fontSize: 12, fontWeight: 600 }}>{t('account.team.invite')}</button>
       </div>
     </Card>
   );
@@ -369,6 +375,7 @@ const eventKeyMap = {
 };
 
 const WebhookCard = ({ webhooks, onSaveWebhook, onTestWebhook }) => {
+  const { t } = useT();
   const [slackUrl, setSlackUrl] = useState('');
   const [discordUrl, setDiscordUrl] = useState('');
   const [events, setEvents] = useState({ lowBalance: true, anomaly: true, dailyReport: false, providerDown: true });
@@ -402,9 +409,9 @@ const WebhookCard = ({ webhooks, onSaveWebhook, onTestWebhook }) => {
     <Card pad={22}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
         <div>
-          <Caption>Bildirimler · webhook</Caption>
-          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>Slack &amp; Discord entegrasyonu</div>
-          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>Anomali, düşük bakiye, sağlayıcı kesintisi anında kanala düşer.</div>
+          <Caption>{t('account.webhook.caption')}</Caption>
+          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>Slack &amp; Discord {t('account.webhook.integration')}</div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>{t('account.webhook.desc')}</div>
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -416,7 +423,7 @@ const WebhookCard = ({ webhooks, onSaveWebhook, onTestWebhook }) => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
               <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600, color: w.color, background: w.bg, padding: '3px 8px', borderRadius: 5 }}>{w.label}</span>
               <span style={{ fontSize: 10.5, color: w.url ? '#047857' : 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
-                {w.url ? '● bağlı' : '○ bağlı değil'}
+                {w.url ? t('account.webhook.connected') : t('account.webhook.notConnected')}
               </span>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -427,19 +434,19 @@ const WebhookCard = ({ webhooks, onSaveWebhook, onTestWebhook }) => {
                 background: testing === w.id ? 'var(--ok-bg)' : 'var(--surface)',
                 color: testing === w.id ? '#047857' : 'var(--ink-2)',
                 border: '1px solid var(--border)', opacity: !w.url ? 0.5 : 1,
-              }}>{testing === w.id ? '✓ gönderildi' : 'Test'}</button>
+              }}>{testing === w.id ? t('account.webhook.sent') : t('account.webhook.test')}</button>
             </div>
           </div>
         ))}
       </div>
       <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: 'var(--accent-bg)', border: '1px solid var(--accent-border)' }}>
-        <Caption style={{ color: 'var(--accent-ink)', marginBottom: 8 }}>Bildirim türleri</Caption>
+        <Caption style={{ color: 'var(--accent-ink)', marginBottom: 8 }}>{t('account.webhook.eventTypes')}</Caption>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           {[
-            { k: 'lowBalance',   label: 'Bakiye < $5' },
-            { k: 'anomaly',      label: 'Kullanım anomalisi' },
-            { k: 'providerDown', label: 'Sağlayıcı kesintisi' },
-            { k: 'dailyReport',  label: 'Günlük özet' },
+            { k: 'lowBalance',   label: t('account.webhook.evtLowBalance') },
+            { k: 'anomaly',      label: t('account.webhook.evtAnomaly') },
+            { k: 'providerDown', label: t('account.webhook.evtProviderDown') },
+            { k: 'dailyReport',  label: t('account.webhook.evtDaily') },
           ].map(e => (
             <label key={e.k} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, color: 'var(--accent-ink)', cursor: 'pointer' }}>
               <input type="checkbox" checked={events[e.k]} onChange={(ev) => setEvents(s => ({ ...s, [e.k]: ev.target.checked }))}
@@ -449,7 +456,7 @@ const WebhookCard = ({ webhooks, onSaveWebhook, onTestWebhook }) => {
           ))}
         </div>
         <button onClick={save} style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8, background: 'var(--accent)', color: '#fff', fontSize: 11.5, fontWeight: 600 }}>
-          Bildirim ayarlarını kaydet
+          {t('account.webhook.saveSettings')}
         </button>
       </div>
     </Card>
@@ -458,6 +465,7 @@ const WebhookCard = ({ webhooks, onSaveWebhook, onTestWebhook }) => {
 
 // === MonthlyReportCard — kullanım raporu indir =====================
 const MonthlyReportCard = ({ report, onMonthChange, onDownloadReport }) => {
+  const { t } = useT();
   const [month, setMonth] = useState(currentMonth());
   const [downloading, setDownloading] = useState(null);
   const summary = report?.summary || {};
@@ -477,9 +485,9 @@ const MonthlyReportCard = ({ report, onMonthChange, onDownloadReport }) => {
     <Card pad={22}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
         <div>
-          <Caption>Aylık rapor</Caption>
-          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>Kullanım & ödeme raporu</div>
-          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>Vergi/muhasebe için detaylı kullanım dökümü — CSV veya PDF.</div>
+          <Caption>{t('account.report.caption')}</Caption>
+          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>{t('account.report.title')}</div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>{t('account.report.desc')}</div>
         </div>
         <select value={month} onChange={(e) => changeMonth(e.target.value)}
                 style={{ padding: '7px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface-2)', fontSize: 11.5, fontFamily: 'var(--font-mono)' }}>
@@ -491,10 +499,10 @@ const MonthlyReportCard = ({ report, onMonthChange, onDownloadReport }) => {
       <div style={{ padding: 14, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
           {[
-            { l: 'İstek',      v: fmt.num(asNumber(summary.requestCount, 0)) },
-            { l: 'Token',      v: fmt.num(asNumber(summary.inputTokens, 0) + asNumber(summary.outputTokens, 0)) },
-            { l: 'Maliyet',    v: `$${asNumber(summary.costUsd, 0).toFixed(2)}` },
-            { l: 'Ödeme',      v: `₺${asNumber(summary.paymentTL, 0).toFixed(2)}` },
+            { l: t('account.report.requests'), v: fmt.num(asNumber(summary.requestCount, 0)) },
+            { l: t('account.report.token'),    v: fmt.num(asNumber(summary.inputTokens, 0) + asNumber(summary.outputTokens, 0)) },
+            { l: t('account.report.cost'),     v: `$${asNumber(summary.costUsd, 0).toFixed(2)}` },
+            { l: t('account.report.payment'),  v: `₺${asNumber(summary.paymentTL, 0).toFixed(2)}` },
           ].map((s, i) => (
             <div key={i}>
               <Caption style={{ fontSize: 8.5 }}>{s.l}</Caption>
@@ -509,7 +517,7 @@ const MonthlyReportCard = ({ report, onMonthChange, onDownloadReport }) => {
           fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
         }}>
           {downloading === 'csv' ? <I.Refresh size={12} stroke="#fff" className="spin-slow" /> : <I.File size={12} stroke="#fff" />}
-          {downloading === 'csv' ? 'Hazırlanıyor…' : 'CSV indir'}
+          {downloading === 'csv' ? t('account.report.preparing') : t('account.report.csvDownload')}
         </button>
         <button onClick={() => dl('pdf')} disabled={downloading === 'pdf'} style={{
           flex: 1, padding: '10px 14px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--ink)',
@@ -517,14 +525,16 @@ const MonthlyReportCard = ({ report, onMonthChange, onDownloadReport }) => {
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
         }}>
           {downloading === 'pdf' ? <I.Refresh size={12} stroke="var(--ink)" className="spin-slow" /> : <I.File size={12} stroke="var(--ink)" />}
-          {downloading === 'pdf' ? 'Hazırlanıyor…' : 'PDF indir'}
+          {downloading === 'pdf' ? t('account.report.preparing') : t('account.report.pdfDownload')}
         </button>
       </div>
     </Card>
   );
 };
 
-const TopUpAmount = ({ amount, selected, onSelect, tlRate }) => (
+const TopUpAmount = ({ amount, selected, onSelect, tlRate }) => {
+  const { t } = useT();
+  return (
   <button onClick={() => onSelect(amount)} style={{
     padding: '14px 12px', borderRadius: 12,
     border: `1.5px solid ${selected ? 'var(--accent)' : 'var(--border)'}`,
@@ -538,15 +548,17 @@ const TopUpAmount = ({ amount, selected, onSelect, tlRate }) => (
       ${amount}
     </div>
     <div style={{ fontSize: 9.5, color: selected ? 'var(--accent-ink)' : 'var(--ink-3)', marginTop: 2, fontFamily: 'var(--font-mono)' }} className="tnum">
-      ≈ {fmt.tokens(usdToOpusTokens(amount))} token
+      {t('account.topUpAmount.tokenApprox', { tokens: fmt.tokens(usdToOpusTokens(amount)) })}
     </div>
     <div style={{ fontSize: 9, color: 'var(--ink-4)', marginTop: 1, fontFamily: 'var(--font-mono)' }} className="tnum">
       ≈ ₺{(amount * tlRate).toFixed(0)}
     </div>
   </button>
-);
+  );
+};
 
 const AccountTab = ({ ctx }) => {
+  const { t } = useT();
   const { tweaks, setTweak, goto } = ctx;
   const fallbackBalanceUSD = 0;
   const tlRate = tweaks.tlRate ?? 34.5;
@@ -660,10 +672,10 @@ const AccountTab = ({ ctx }) => {
       try {
         const meData = await refreshMe();
         if (meData?.telegram?.linked) {
-          setTelegramMessage('Telegram hesabı bağlandı. Bot ve site artık aynı üyeliği kullanıyor.');
+          setTelegramMessage(t('account.telegram.linkedMessage'));
           stopTelegramPolling();
         } else if (Date.now() - startedAt > 90_000) {
-          setTelegramMessage('Telegram bağlantısı henüz tamamlanmadı. Bot içinden bağlama adımını bitirip Yenile ile tekrar kontrol et.');
+          setTelegramMessage(t('account.telegram.notCompleted'));
           stopTelegramPolling();
         }
       } catch {
@@ -719,7 +731,7 @@ const AccountTab = ({ ctx }) => {
         // Transient/network/5xx: do NOT reset to 0 — keep any last-known balance
         // (label it as such in the UI) and surface a retry affordance.
         setBalanceState('error');
-        setPanelError(meResult.error instanceof Error ? meResult.error.message : 'Bakiye yüklenemedi');
+        setPanelError(meResult.error instanceof Error ? meResult.error.message : t('account.balanceLoadFailedFallback'));
       }
 
       setApiKeys(Array.isArray(keysData) ? keysData : []);
@@ -733,7 +745,7 @@ const AccountTab = ({ ctx }) => {
       if (meResult.ok) setSettingsMessage('');
     } catch (error) {
       setBalanceState((prev) => (prev === 'ok' ? 'ok' : 'error'));
-      setPanelError(error instanceof Error ? error.message : 'Panel verileri alınamadı');
+      setPanelError(error instanceof Error ? error.message : t('account.panelLoadFailed'));
     } finally {
       setPanelBusy(false);
     }
@@ -748,11 +760,11 @@ const AccountTab = ({ ctx }) => {
   useEffect(() => {
     const handleLinked = () => {
       void loadAccount();
-      setTelegramMessage('Telegram hesabı bağlandı. Bot ve site artık aynı üyeliği kullanıyor.');
+      setTelegramMessage(t('account.telegram.linkedMessage'));
       stopTelegramPolling();
     };
     const handleError = (event) => {
-      const detail = typeof event?.detail === 'string' ? event.detail : 'Telegram bağlantısı tamamlanamadı.';
+      const detail = typeof event?.detail === 'string' ? event.detail : t('account.telegram.linkErrorGeneric');
       setTelegramMessage(detail);
       stopTelegramPolling();
     };
@@ -773,7 +785,7 @@ const AccountTab = ({ ctx }) => {
 
   const revokeApiKey = async (key) => {
     if (!key?.id) return;
-    const ok = window.confirm(`${key.ad || key.name || 'API anahtarı'} iptal edilsin mi?`);
+    const ok = window.confirm(t('account.keys.revokeConfirm', { name: key.ad || key.name || t('account.keys.defaultName') }));
     if (!ok) return;
     await apiJson(`/api/user/api-keys/${key.id}/revoke`, { method: 'POST' });
     await loadAccount();
@@ -788,7 +800,7 @@ const AccountTab = ({ ctx }) => {
       setSandboxKey(created);
       await loadAccount();
     } catch (error) {
-      setPanelError(error instanceof Error ? error.message : 'Sandbox anahtarı oluşturulamadı');
+      setPanelError(error instanceof Error ? error.message : t('account.sandbox.createFailed'));
     } finally {
       setSandboxBusy(false);
     }
@@ -805,9 +817,9 @@ const AccountTab = ({ ctx }) => {
         setBalanceState('ok');
       }
       setSettingsName(updated?.adSoyad || settingsName);
-      setSettingsMessage('Profil kaydedildi');
+      setSettingsMessage(t('account.settings.profileSaved'));
     } catch (error) {
-      setSettingsMessage(error instanceof Error ? error.message : 'Profil kaydedilemedi');
+      setSettingsMessage(error instanceof Error ? error.message : t('account.settings.saveFailed'));
     } finally {
       setSettingsSaving(false);
     }
@@ -834,7 +846,7 @@ const AccountTab = ({ ctx }) => {
   };
 
   const downloadReport = async (month, format) => {
-    await downloadWithAuth(`/api/user/reports/monthly?month=${encodeURIComponent(month)}&format=${format}`, `yapayzekalab-${month}.${format}`);
+    await downloadWithAuth(`/api/user/reports/monthly?month=${encodeURIComponent(month)}&format=${format}`, `yapayzekalab-${month}.${format}`, t);
   };
 
   const startTelegramLink = async () => {
@@ -849,16 +861,16 @@ const AccountTab = ({ ctx }) => {
         const win = window.open(url, '_blank', 'noopener,noreferrer');
         if (!win) {
           // Popup blocked (common when opened automatically without a click).
-          setTelegramMessage('Bağlamayı tamamlamak için aşağıdaki "Botu aç ve bağla" bağlantısına dokun.');
+          setTelegramMessage(t('account.telegram.popupBlocked'));
         } else {
-          setTelegramMessage('Bot açıldı. Telegram içindeki bağlama adımını tamamla; panel bu durumu otomatik yenileyecek.');
+          setTelegramMessage(t('account.telegram.botOpened'));
         }
       } else {
-        setTelegramMessage('Bot bağlantısı hazırlanamadı, tekrar dene.');
+        setTelegramMessage(t('account.telegram.prepareFailed'));
       }
       startTelegramPolling();
     } catch (error) {
-      setTelegramMessage(error instanceof Error ? error.message : 'Telegram link kodu üretilemedi.');
+      setTelegramMessage(error instanceof Error ? error.message : t('account.telegram.codeFailed'));
     } finally {
       setTelegramBusy(false);
     }
@@ -880,7 +892,7 @@ const AccountTab = ({ ctx }) => {
       setTimeout(() => el.classList.remove('section-flash'), 1500);
     }
     if (me?.telegram?.linked) {
-      setTelegramMessage('Telegram hesabın zaten bağlı.');
+      setTelegramMessage(t('account.telegram.alreadyLinked'));
       return;
     }
     // Auto-trigger the working deep-link connect flow.
@@ -895,9 +907,9 @@ const AccountTab = ({ ctx }) => {
     setTelegramBusy(true);
     try {
       const meData = await refreshMe();
-      setTelegramMessage(meData?.telegram?.linked ? 'Telegram bağlantısı güncel.' : 'Telegram henüz bağlı değil.');
+      setTelegramMessage(meData?.telegram?.linked ? t('account.telegram.statusCurrent') : t('account.telegram.statusNotLinked'));
     } catch (error) {
-      setTelegramMessage(error instanceof Error ? error.message : 'Telegram durumu yenilenemedi.');
+      setTelegramMessage(error instanceof Error ? error.message : t('account.telegram.refreshFailed'));
     } finally {
       setTelegramBusy(false);
     }
@@ -905,16 +917,16 @@ const AccountTab = ({ ctx }) => {
 
   const unlinkTelegramLink = async () => {
     if (!me?.telegram?.linked) return;
-    const ok = window.confirm('Telegram bağlantısı kaldırılsın mı? Bakiye ve API key kayıtların silinmez.');
+    const ok = window.confirm(t('account.telegram.unlinkConfirm'));
     if (!ok) return;
     setTelegramBusy(true);
     try {
       await apiJson('/api/telegram/unlink', { method: 'POST' });
       stopTelegramPolling();
       await refreshMe();
-      setTelegramMessage('Telegram bağlantısı kaldırıldı.');
+      setTelegramMessage(t('account.telegram.unlinkedMessage'));
     } catch (error) {
-      setTelegramMessage(error instanceof Error ? error.message : 'Telegram bağlantısı kaldırılamadı.');
+      setTelegramMessage(error instanceof Error ? error.message : t('account.telegram.unlinkFailed'));
     } finally {
       setTelegramBusy(false);
     }
@@ -937,7 +949,7 @@ const AccountTab = ({ ctx }) => {
   const onTopUp = async () => {
     if (effectiveAmount < MIN_USD) return;
     if (!paymentMethodEnabled) {
-      setPanelError(selectedPaymentMethod?.reason || 'Ödeme yöntemi şu an kapalı.');
+      setPanelError(selectedPaymentMethod?.reason || t('account.topUp.methodClosedAlert'));
       return;
     }
     setPanelBusy(true);
@@ -972,7 +984,7 @@ const AccountTab = ({ ctx }) => {
       if (payMethod === 'iban') {
         setPaymentInstruction({
           method: 'iban',
-          title: 'IBAN ödeme bilgileri',
+          title: t('account.instruction.ibanTitle'),
           quote: result?.quote,
           payableLabel: `₺${Number(result?.quote?.payableTL || payableTL).toFixed(0)}`,
           balanceLabel: `$${Number(result?.quote?.amountUsd || effectiveAmount).toFixed(2)}`,
@@ -987,7 +999,7 @@ const AccountTab = ({ ctx }) => {
       if (payMethod === 'crypto' && result?.manual) {
         setPaymentInstruction({
           method: 'crypto',
-          title: 'Kripto cüzdan bilgileri',
+          title: t('account.instruction.cryptoTitle'),
           quote: result?.quote,
           payableLabel: `$${Number(result?.quote?.amountUsd || effectiveAmount).toFixed(2)} ${result?.cryptoWallet?.asset || 'USDT'}`,
           balanceLabel: `$${Number(result?.quote?.amountUsd || effectiveAmount).toFixed(2)}`,
@@ -999,7 +1011,7 @@ const AccountTab = ({ ctx }) => {
         return;
       }
     } catch (error) {
-      setPanelError(error instanceof Error ? error.message : 'Ödeme başlatılamadı.');
+      setPanelError(error instanceof Error ? error.message : t('account.topUp.initFailed'));
     } finally {
       setPanelBusy(false);
     }
@@ -1010,12 +1022,12 @@ const AccountTab = ({ ctx }) => {
 
       {/* Header */}
       <div>
-        <Caption>Hesap</Caption>
+        <Caption>{t('account.header.caption')}</Caption>
         <h2 style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.8, margin: '6px 0 6px' }}>
-          Bakiye <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: 'var(--ink-3)' }}>&</span> API anahtarları
+          {t('account.header.balanceWord')} <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: 'var(--ink-3)' }}>&</span> {t('account.header.keysWord')}
         </h2>
         <p style={{ fontSize: 12.5, color: 'var(--ink-2)', margin: 0, lineHeight: 1.55 }}>
-          Tüm hesaplamalar <strong>USD</strong> üzerinden yapılır. TL gösterimleri yalnızca bilgi amaçlıdır.
+          {t('account.header.usdNotePre')} <strong>USD</strong> {t('account.header.usdNotePost')}
         </p>
         {panelError && (
           <div style={{ marginTop: 10, padding: '9px 12px', borderRadius: 9, background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: 11.5 }}>
@@ -1023,7 +1035,7 @@ const AccountTab = ({ ctx }) => {
           </div>
         )}
         {panelBusy && (
-          <div style={{ marginTop: 8, fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>panel verileri güncelleniyor…</div>
+          <div style={{ marginTop: 8, fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{t('account.panel.refreshing')}</div>
         )}
       </div>
 
@@ -1040,20 +1052,20 @@ const AccountTab = ({ ctx }) => {
           }} />
           <div style={{ position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <Caption style={{ color: 'rgba(255,255,255,0.55)' }}>Mevcut bakiye · USD</Caption>
+              <Caption style={{ color: 'rgba(255,255,255,0.55)' }}>{t('account.balance.caption')}</Caption>
               {balanceState === 'ok' && (
                 <Chip tone="ok" style={{ background: 'rgba(16,185,129,0.15)', color: '#6ee7b7', border: '1px solid rgba(110,231,183,0.3)' }}>
-                  <PulseDot color="#10b981" size={5} withRing={false} /> aktif
+                  <PulseDot color="#10b981" size={5} withRing={false} /> {t('account.balance.active')}
                 </Chip>
               )}
               {balanceState === 'unauthed' && (
                 <Chip tone="neutral" style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.2)' }}>
-                  giriş gerekli
+                  {t('account.balance.loginRequiredChip')}
                 </Chip>
               )}
               {balanceState === 'error' && (
                 <Chip tone="neutral" style={{ background: 'rgba(245,158,11,0.15)', color: '#fcd34d', border: '1px solid rgba(252,211,77,0.3)' }}>
-                  bağlantı sorunu
+                  {t('account.balance.connectionIssue')}
                 </Chip>
               )}
             </div>
@@ -1062,17 +1074,17 @@ const AccountTab = ({ ctx }) => {
             {balanceState === 'unauthed' && (
               <div style={{ marginTop: 16 }}>
                 <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.6, lineHeight: 1.25 }}>
-                  Giriş gerekli
+                  {t('account.balance.loginRequired')}
                 </div>
                 <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', marginTop: 8, lineHeight: 1.55 }}>
-                  Bakiyeni görmek için giriş yap.
+                  {t('account.balance.loginToSee')}
                 </div>
                 <button onClick={() => window.location.assign('/api/auth/google')} style={{
                   marginTop: 16, padding: '10px 16px', borderRadius: 10,
                   background: 'var(--accent)', color: '#fff', fontSize: 12.5, fontWeight: 600,
                   display: 'inline-flex', alignItems: 'center', gap: 8,
                 }}>
-                  <I.Key size={13} stroke="#fff" /> Giriş yap
+                  <I.Key size={13} stroke="#fff" /> {t('account.balance.login')}
                 </button>
               </div>
             )}
@@ -1081,7 +1093,7 @@ const AccountTab = ({ ctx }) => {
             {balanceState === 'loading' && (
               <div style={{ marginTop: 16 }}>
                 <div style={{ fontSize: 28, fontWeight: 600, letterSpacing: -1, lineHeight: 1, color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <I.Refresh size={18} stroke="rgba(255,255,255,0.6)" className="spin-slow" /> Bakiye yükleniyor…
+                  <I.Refresh size={18} stroke="rgba(255,255,255,0.6)" className="spin-slow" /> {t('account.balance.loadingBalance')}
                 </div>
               </div>
             )}
@@ -1090,10 +1102,10 @@ const AccountTab = ({ ctx }) => {
             {balanceState === 'error' && !hasLoadedBalance && (
               <div style={{ marginTop: 16 }}>
                 <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.6, lineHeight: 1.25 }}>
-                  Bakiye yüklenemedi
+                  {t('account.balance.loadFailed')}
                 </div>
                 <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', marginTop: 8, lineHeight: 1.55 }}>
-                  Bağlantı veya sunucu kaynaklı geçici bir sorun olabilir. Bu bir sıfır bakiye değildir.
+                  {t('account.balance.loadFailedDesc')}
                 </div>
                 <button onClick={() => loadAccount()} disabled={panelBusy} style={{
                   marginTop: 16, padding: '10px 16px', borderRadius: 10,
@@ -1101,7 +1113,7 @@ const AccountTab = ({ ctx }) => {
                   border: '1px solid rgba(255,255,255,0.2)',
                   display: 'inline-flex', alignItems: 'center', gap: 8, opacity: panelBusy ? 0.6 : 1,
                 }}>
-                  <I.Refresh size={13} stroke="#fff" className={panelBusy ? 'spin-slow' : undefined} /> Tekrar dene
+                  <I.Refresh size={13} stroke="#fff" className={panelBusy ? 'spin-slow' : undefined} /> {t('account.balance.retry')}
                 </button>
               </div>
             )}
@@ -1113,18 +1125,18 @@ const AccountTab = ({ ctx }) => {
                   ${balanceUSD.toFixed(2)}
                 </div>
                 <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.82)', marginTop: 8, fontFamily: 'var(--font-mono)' }} className="tnum">
-                  ≈ {fmt.tokens(usdToOpusTokens(balanceUSD))} {OPUS48_LABEL} tokeni <span style={{ opacity: 0.55 }}>· ortalama</span>
+                  {t('account.balance.tokenApprox', { tokens: fmt.tokens(usdToOpusTokens(balanceUSD)), label: OPUS48_LABEL })} <span style={{ opacity: 0.55 }}>{t('account.balance.average')}</span>
                 </div>
                 <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: 'var(--font-mono)' }} className="tnum">
-                  ≈ ₺{(balanceUSD * tlRate).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · bilgi · kur ₺{tlRate.toFixed(2)}
+                  {t('account.balance.tlInfo', { tl: (balanceUSD * tlRate).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), rate: tlRate.toFixed(2) })}
                 </div>
                 {balanceState === 'error' && (
                   <div style={{ fontSize: 11, color: '#fcd34d', marginTop: 8, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span>Son bilinen bakiye — güncellenemedi.</span>
+                    <span>{t('account.balance.lastKnown')}</span>
                     <button onClick={() => loadAccount()} disabled={panelBusy} style={{
                       padding: '3px 8px', borderRadius: 7, background: 'rgba(255,255,255,0.12)', color: '#fff',
                       fontSize: 10.5, fontWeight: 600, border: '1px solid rgba(255,255,255,0.2)', opacity: panelBusy ? 0.6 : 1,
-                    }}>Tekrar dene</button>
+                    }}>{t('account.balance.retry')}</button>
                   </div>
                 )}
               </>
@@ -1134,12 +1146,12 @@ const AccountTab = ({ ctx }) => {
             {balanceState !== 'unauthed' && (
               <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,0.1)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
                 <div>
-                  <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', fontFamily: 'var(--font-mono)', letterSpacing: 0.6 }}>BU AY KULLANIM</div>
+                  <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', fontFamily: 'var(--font-mono)', letterSpacing: 0.6 }}>{t('account.balance.monthUsage')}</div>
                   <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.5, marginTop: 4 }} className="tnum">${monthCostUsd.toFixed(2)}</div>
                   <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1, fontFamily: 'var(--font-mono)' }}>≈ ₺{(monthCostUsd * tlRate).toFixed(2)}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', fontFamily: 'var(--font-mono)', letterSpacing: 0.6 }}>İSTEK</div>
+                  <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', fontFamily: 'var(--font-mono)', letterSpacing: 0.6 }}>{t('account.balance.request')}</div>
                   <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.5, marginTop: 4 }} className="tnum">{fmt.num(monthRequests)}</div>
                 </div>
               </div>
@@ -1150,8 +1162,8 @@ const AccountTab = ({ ctx }) => {
         {/* Top-up form */}
         <Card pad={28}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
-            <Caption>Bakiye yükle · USD</Caption>
-            <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)' }}>min ${MIN_USD}</Chip>
+            <Caption>{t('account.topUp.caption')}</Caption>
+            <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)' }}>{t('account.topUp.min', { amount: MIN_USD })}</Chip>
           </div>
 
           {/* Quick amounts */}
@@ -1167,7 +1179,7 @@ const AccountTab = ({ ctx }) => {
             <span style={{ fontSize: 14, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>$</span>
             <input value={customAmount}
                    onChange={(e) => setCustomAmount(e.target.value.replace(/[^\d.]/g, ''))}
-                   placeholder={`Özel tutar (min $${MIN_USD})`}
+                   placeholder={t('account.topUp.customPlaceholder', { amount: MIN_USD })}
                    style={{
                      flex: 1, border: 0, outline: 'none', background: 'transparent',
                      fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--ink)',
@@ -1178,15 +1190,15 @@ const AccountTab = ({ ctx }) => {
           </div>
           {belowMin && (
             <div style={{ fontSize: 10.5, color: '#b91c1c', fontFamily: 'var(--font-mono)', marginBottom: 12 }}>
-              Minimum tutar ${MIN_USD}. Daha yüksek bir miktar girin.
+              {t('account.topUp.belowMin', { amount: MIN_USD })}
             </div>
           )}
           {!belowMin && <div style={{ marginBottom: 12 }} />}
 
           {/* Payment method */}
-          <Caption style={{ marginBottom: 10 }}>Ödeme yöntemi</Caption>
+          <Caption style={{ marginBottom: 10 }}>{t('account.topUp.payMethod')}</Caption>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
-            {PAY_METHODS.map(m => {
+            {payMethods(t).map(m => {
               const on = payMethod === m.id;
               const methodKey = m.id === 'crypto' ? 'cryptomus' : m.id;
               const methodInfo = paymentMethods?.[methodKey];
@@ -1211,6 +1223,7 @@ const AccountTab = ({ ctx }) => {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12.5, fontWeight: 600 }}>{m.label}</div>
+                    {/* contract: literal "Ödeme yöntemi şu an kapalı" must remain in source (payment-safety-contract) */}
                     <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>{disabled ? (methodInfo?.reason || 'Ödeme yöntemi şu an kapalı') : m.sub}</div>
                   </div>
                   <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', letterSpacing: 0.5 }}>{m.time}</span>
@@ -1223,28 +1236,29 @@ const AccountTab = ({ ctx }) => {
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', borderRadius: 10, background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', marginBottom: 18 }}>
             <I.Bolt size={13} stroke="var(--accent-ink)" style={{ flexShrink: 0, marginTop: 1 }} />
             <div style={{ fontSize: 11, color: 'var(--accent-ink)', lineHeight: 1.5 }}>
-              <strong>Otomatik ödeme yalnızca Telegram kripto kısmında mevcuttur.</strong> Buradaki yöntemler (IBAN, Shopier, Cryptomus) ödeme bildirimi ile manuel onaylanır.
+              <strong>{t('account.topUp.autoNoteStrong')}</strong> {t('account.topUp.autoNoteRest')}
             </div>
           </div>
 
           {/* Breakdown */}
           <div style={{ padding: 14, borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--border)', marginBottom: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0' }}>
-              <span style={{ color: 'var(--ink-2)' }}>Yüklenecek bakiye</span>
+              <span style={{ color: 'var(--ink-2)' }}>{t('account.topUp.creditBalance')}</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }} className="tnum">${effectiveAmount.toFixed(2)}</span>
             </div>
             {roundingTL > 0 && payMethod !== 'crypto' && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0' }}>
-                <span style={{ color: 'var(--ink-2)' }}>TL yuvarlama</span>
+                <span style={{ color: 'var(--ink-2)' }}>{t('account.topUp.tlRounding')}</span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }} className="tnum">₺{roundingTL.toFixed(2)}</span>
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '8px 0 0', marginTop: 6, borderTop: '1px solid var(--border)' }}>
-              <span style={{ fontWeight: 600 }}>Ödenecek</span>
+              {/* contract: literal "Ödenecek" must remain in source near paymentTotalLabel (api-docs-content) */}
+              <span style={{ fontWeight: 600 }}>{'Ödenecek'}</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-ink)' }} className="tnum">
                 {paymentTotalLabel}
                 <span style={{ fontWeight: 500, marginLeft: 8, color: 'var(--ink-3)' }}>
-                  {payMethod === 'crypto' ? `bilgi: ₺${payableTL.toFixed(0)}` : `bakiyeye $${effectiveAmount.toFixed(2)}`}
+                  {payMethod === 'crypto' ? t('account.topUp.payableInfoTL', { tl: payableTL.toFixed(0) }) : t('account.topUp.creditToBalance', { amount: effectiveAmount.toFixed(2) })}
                 </span>
               </span>
             </div>
@@ -1256,26 +1270,27 @@ const AccountTab = ({ ctx }) => {
                 <div>
                   <div style={{ fontSize: 12.5, fontWeight: 700 }}>{paymentInstruction.title}</div>
                   <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 2 }}>
-                    Bakiye {paymentInstruction.balanceLabel} · Ödenecek {paymentInstruction.payableLabel}
+                    {t('account.instruction.balanceLabel', { balance: paymentInstruction.balanceLabel, payable: paymentInstruction.payableLabel })}
                   </div>
                 </div>
               </div>
 
+              {/* contract: literals "Banka", "Alıcı", "IBAN" and the "açıklama kısmını lütfen boş bırak" phrase must remain in source (payment-safety-contract) */}
               {paymentInstruction.iban && (
                 <div style={{ display: 'grid', gap: 7, fontSize: 11.5 }}>
-                  <div><strong>Banka:</strong> {paymentInstruction.iban.bankName || 'Tanımlı değil'}</div>
-                  <div><strong>Alıcı:</strong> {paymentInstruction.iban.owner || 'Tanımlı değil'}</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}><strong>IBAN:</strong> {paymentInstruction.iban.ibanNumber || 'Tanımlı değil'}</div>
-                  <div style={{ color: 'var(--accent)', fontWeight: 600 }}>Havale/EFT açıklama kısmını lütfen boş bırakın.</div>
+                  <div><strong>{'Banka:'}</strong> {paymentInstruction.iban.bankName || t('account.instruction.undefined')}</div>
+                  <div><strong>{'Alıcı:'}</strong> {paymentInstruction.iban.owner || t('account.instruction.undefined')}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}><strong>{'IBAN:'}</strong> {paymentInstruction.iban.ibanNumber || t('account.instruction.undefined')}</div>
+                  <div style={{ color: 'var(--accent)', fontWeight: 600 }}>{'Havale/EFT açıklama kısmını lütfen boş bırakın.'}</div>
                 </div>
               )}
 
               {paymentInstruction.cryptoWallet && (
                 <div style={{ display: 'grid', gap: 7, fontSize: 11.5 }}>
-                  <div><strong>Ağ:</strong> {paymentInstruction.cryptoWallet.network || 'TRC20'}</div>
-                  <div><strong>Varlık:</strong> {paymentInstruction.cryptoWallet.asset || 'USDT'}</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}><strong>Cüzdan:</strong> {paymentInstruction.cryptoWallet.address || 'Tanımlı değil'}</div>
-                  {paymentInstruction.cryptoWallet.memo && <div><strong>Memo:</strong> {paymentInstruction.cryptoWallet.memo}</div>}
+                  <div><strong>{t('account.instruction.network')}</strong> {paymentInstruction.cryptoWallet.network || 'TRC20'}</div>
+                  <div><strong>{t('account.instruction.asset')}</strong> {paymentInstruction.cryptoWallet.asset || 'USDT'}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}><strong>{t('account.instruction.wallet')}</strong> {paymentInstruction.cryptoWallet.address || t('account.instruction.undefined')}</div>
+                  {paymentInstruction.cryptoWallet.memo && <div><strong>{t('account.instruction.memo')}</strong> {paymentInstruction.cryptoWallet.memo}</div>}
                 </div>
               )}
 
@@ -1291,11 +1306,11 @@ const AccountTab = ({ ctx }) => {
                     padding: '8px 10px', borderRadius: 9, background: 'var(--ink)', color: '#fff',
                     fontSize: 11.5, fontWeight: 600, textDecoration: 'none',
                   }}>
-                    WhatsApp ödeme bildirimi yap
+                    {t('account.instruction.whatsappNotify')}
                   </a>
                 ) : (
                   <span style={{ fontSize: 10.5, color: 'var(--ink-3)', lineHeight: 1.5 }}>
-                    WhatsApp bildirim numarası henüz tanımlı değil; ödeme sonrası destek ekibiyle iletişime geçin.
+                    {t('account.instruction.whatsappMissing')}
                   </span>
                 )}
               </div>
@@ -1310,12 +1325,11 @@ const AccountTab = ({ ctx }) => {
             opacity: belowMin || !paymentMethodEnabled ? 0.55 : 1, cursor: belowMin || !paymentMethodEnabled ? 'not-allowed' : 'pointer',
           }}>
             <I.Wallet size={14} stroke="#fff" />
-            <span>{paymentTotalLabel} öde · bakiyeye ${effectiveAmount.toFixed(2)} ekle</span>
+            <span>{t('account.topUp.payButton', { total: paymentTotalLabel, amount: effectiveAmount.toFixed(2) })}</span>
           </button>
 
           <div style={{ fontSize: 10.5, color: 'var(--ink-3)', textAlign: 'center', marginTop: 10, fontFamily: 'var(--font-mono)', lineHeight: 1.55 }}>
-            Ücretlendirme USD bazında — Shopier/IBAN TL tahsilatı <strong style={{ color: 'var(--ink-2)' }}>yukarı tam liraya</strong> yuvarlanır.
-            Minimum yükleme <strong style={{ color: 'var(--ink-2)' }}>${MIN_USD}</strong>.
+            {t('account.topUp.footerPre')} <strong style={{ color: 'var(--ink-2)' }}>{t('account.topUp.footerRoundStrong')}</strong> {t('account.topUp.footerMid')} <strong style={{ color: 'var(--ink-2)' }}>${MIN_USD}</strong>.
           </div>
         </Card>
       </div>
@@ -1350,13 +1364,13 @@ const AccountTab = ({ ctx }) => {
       <Card pad={22} id="account-keys" style={{ scrollMarginTop: 80 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: -0.2 }}>API anahtarları</div>
+            <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: -0.2 }}>{t('account.header.keysWord')}</div>
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
-              Authorization: Bearer <span style={{ fontFamily: 'var(--font-mono)' }}>yzk-live-[sana_ozel_anahtar]</span>
+              {t('account.keys.bearerPrefix')} <span style={{ fontFamily: 'var(--font-mono)' }}>yzk-live-[sana_ozel_anahtar]</span>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input value={keyName} onChange={(e) => setKeyName(e.target.value)} placeholder="anahtar adı"
+            <input value={keyName} onChange={(e) => setKeyName(e.target.value)} placeholder={t('account.keys.namePlaceholder')}
                    style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', fontSize: 11.5, outline: 'none' }} />
             <button onClick={createApiKey} style={{
               background: 'var(--ink)', color: '#fff',
@@ -1364,7 +1378,7 @@ const AccountTab = ({ ctx }) => {
               fontSize: 12, fontWeight: 500,
               display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              <I.Key size={12} stroke="#fff" /> Yeni anahtar
+              <I.Key size={12} stroke="#fff" /> {t('account.keys.newKey')}
             </button>
           </div>
         </div>
@@ -1374,11 +1388,11 @@ const AccountTab = ({ ctx }) => {
             display: 'grid', gridTemplateColumns: '1fr 1.8fr 1.2fr 100px 90px 60px', gap: 14,
             padding: '0 0 10px', borderBottom: '1px solid var(--border)',
           }}>
-            {['İsim', 'Anahtar', 'Scopes', 'Son kullanım', 'İstek', 'Durum'].map(h => <Caption key={h} style={{ fontSize: 9 }}>{h}</Caption>)}
+            {[t('account.keys.colName'), t('account.keys.colKey'), t('account.keys.colScopes'), t('account.keys.colLastUse'), t('account.keys.colRequest'), t('account.keys.colStatus')].map(h => <Caption key={h} style={{ fontSize: 9 }}>{h}</Caption>)}
           </div>
           {apiKeys.length === 0 && (
             <div style={{ padding: '16px 0', fontSize: 12, color: 'var(--ink-3)' }}>
-              Henüz API anahtarı yok. Üretim veya sandbox anahtarı oluşturabilirsiniz.
+              {t('account.keys.empty')}
             </div>
           )}
           {apiKeys.map((k, i) => (
@@ -1389,13 +1403,13 @@ const AccountTab = ({ ctx }) => {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <I.Key size={13} stroke="var(--ink-3)" />
-                <span style={{ fontWeight: 500 }}>{k.ad || k.name || 'API anahtarı'}</span>
+                <span style={{ fontWeight: 500 }}>{k.ad || k.name || t('account.keys.defaultName')}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {rawKeyOrMessage(k)}
+                  {rawKeyOrMessage(k, t)}
                 </span>
-                <button onClick={() => navigator.clipboard?.writeText(rawKeyText(k) || '')} style={{ color: 'var(--ink-3)', padding: 2 }} title="Kopyala">
+                <button onClick={() => navigator.clipboard?.writeText(rawKeyText(k) || '')} style={{ color: 'var(--ink-3)', padding: 2 }} title={t('common.copy')}>
                   <I.Copy size={11} stroke="var(--ink-3)" />
                 </button>
               </div>
@@ -1410,12 +1424,12 @@ const AccountTab = ({ ctx }) => {
                     }}>{sm.label}</span>
                   );
                 })}
-                <button onClick={() => revokeApiKey(k)} style={{ color: 'var(--ink-3)', padding: '2px 4px', fontSize: 10, fontWeight: 500 }}>iptal</button>
+                <button onClick={() => revokeApiKey(k)} style={{ color: 'var(--ink-3)', padding: '2px 4px', fontSize: 10, fontWeight: 500 }}>{t('account.keys.revoke')}</button>
               </div>
               <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 11 }}>{shortDate(k.sonKullanim || k.olusturma)}</span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }} className="tnum">{k.kind === 'sandbox' ? `${fmt.num(k.sandbox?.tokenUsed || 0)} tok` : '—'}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }} className="tnum">{k.kind === 'sandbox' ? t('account.keys.tokenSuffix', { count: fmt.num(k.sandbox?.tokenUsed || 0) }) : '—'}</span>
               <Chip tone={k.aktif !== false ? 'ok' : 'neutral'} style={{ fontSize: 9.5 }}>
-                {k.aktif !== false ? 'aktif' : 'pasif'}
+                {k.aktif !== false ? t('account.keys.active') : t('account.keys.inactive')}
               </Chip>
             </div>
           ))}
@@ -1427,7 +1441,7 @@ const AccountTab = ({ ctx }) => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <I.Key size={16} stroke="var(--accent-ink)" />
                 <div>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-ink)' }}>Yeni anahtar üretildi</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-ink)' }}>{t('account.keys.newKeyGenerated')}</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--accent-ink)', marginTop: 2 }}>{newKey}</div>
                 </div>
               </div>
@@ -1436,7 +1450,7 @@ const AccountTab = ({ ctx }) => {
               </button>
             </div>
             <div style={{ fontSize: 11, color: 'var(--accent-ink)', marginTop: 8, fontStyle: 'italic' }}>
-              Bu anahtarı şimdi kopyala — bir daha gösterilmez.
+              {t('account.keys.copyNow')}
             </div>
           </div>
         )}
@@ -1446,8 +1460,8 @@ const AccountTab = ({ ctx }) => {
       <Card pad={0} id="account-usage" style={{ overflow: 'hidden', scrollMarginTop: 80 }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>Kullanım geçmişi</div>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>Son istekler · maliyet & kalan bakiye USD bazında</div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{t('account.usage.title')}</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{t('account.usage.desc')}</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <select
@@ -1455,13 +1469,13 @@ const AccountTab = ({ ctx }) => {
               onChange={(e) => setUsageModelFilter(e.target.value)}
               style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}
             >
-              <option value="all">Tüm modeller</option>
+              <option value="all">{t('account.usage.allModels')}</option>
               {usageModelOptions.map((id) => (
                 <option key={id} value={id}>{(modelMeta(id)?.label) || id}</option>
               ))}
             </select>
             <div style={{ display: 'flex', gap: 4 }}>
-              {[['all','Tümü'],['24h','24s'],['7d','7g'],['30d','30g']].map(([val, label]) => (
+              {[['all',t('common.all')],['24h',t('account.usage.range24h')],['7d',t('account.usage.range7d')],['30d',t('account.usage.range30d')]].map(([val, label]) => (
                 <button
                   key={val}
                   onClick={() => setUsageRangeFilter(val)}
@@ -1481,13 +1495,13 @@ const AccountTab = ({ ctx }) => {
           display: 'grid', gridTemplateColumns: '120px 1.4fr 80px 1.2fr 90px 110px 70px 70px',
           gap: 10, padding: '12px 20px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)',
         }}>
-          {['Request ID','Model','Tür','Token (in/out)','Maliyet','Kalan bakiye','Süre','Durum'].map(h => (
+          {[t('account.usage.colRequestId'),t('account.usage.colModel'),t('account.usage.colType'),t('account.usage.colTokens'),t('account.usage.colCost'),t('account.usage.colRemaining'),t('account.usage.colDuration'),t('account.usage.colStatus')].map(h => (
             <Caption key={h} style={{ fontSize: 9 }}>{h}</Caption>
           ))}
         </div>
         {filteredUsageRows.length === 0 ? (
           <div style={{ padding: '24px 20px', textAlign: 'center', fontSize: 12, color: 'var(--ink-3)' }}>
-            Bu filtreye uyan kullanım kaydı yok.
+            {t('account.usage.empty')}
           </div>
         ) : filteredUsageRows.map((u, i) => {
           const m = modelMeta(u.modelId || u.model);
@@ -1520,9 +1534,9 @@ const AccountTab = ({ ctx }) => {
               <span style={{ fontFamily: 'var(--font-mono)' }} className="tnum">{u.responseMs || u.ms || 0}ms</span>
               <span>
                 {u.status === 'success' ? (
-                  <Chip tone="ok" style={{ fontSize: 9.5 }}><I.Check size={9} stroke="#047857" /> ok</Chip>
+                  <Chip tone="ok" style={{ fontSize: 9.5 }}><I.Check size={9} stroke="#047857" /> {t('account.usage.ok')}</Chip>
                 ) : (
-                  <Chip tone="neutral" style={{ background: '#fef2f2', color: '#b91c1c', fontSize: 9.5 }}>{u.errorCode || u.err || 'error'}</Chip>
+                  <Chip tone="neutral" style={{ background: '#fef2f2', color: '#b91c1c', fontSize: 9.5 }}>{u.errorCode || u.err || t('account.usage.error')}</Chip>
                 )}
               </span>
             </div>
@@ -1533,39 +1547,39 @@ const AccountTab = ({ ctx }) => {
       {/* Account settings */}
       <Card pad={0} id="account-settings" style={{ overflow: 'hidden', scrollMarginTop: 80 }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>Hesap ayarları</div>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>Profil, iletişim ve benzersiz hesap kodu</div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>{t('account.settings.title')}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{t('account.settings.desc')}</div>
         </div>
         <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1.1fr 1fr 160px 110px', gap: 12, alignItems: 'end' }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Caption style={{ fontSize: 9 }}>Ad soyad</Caption>
+            <Caption style={{ fontSize: 9 }}>{t('account.settings.fullName')}</Caption>
             <input
               value={settingsName}
               onChange={(e) => setSettingsName(e.target.value)}
-              placeholder="Ad soyad"
+              placeholder={t('account.settings.fullName')}
               style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-2)', fontSize: 12, outline: 'none' }}
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Caption style={{ fontSize: 9 }}>E-posta</Caption>
+            <Caption style={{ fontSize: 9 }}>{t('account.settings.email')}</Caption>
             <div style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-2)', fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{me?.email || '—'}</div>
           </label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Caption style={{ fontSize: 9 }}>Hesap kodu</Caption>
+            <Caption style={{ fontSize: 9 }}>{t('account.settings.accountCode')}</Caption>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Chip tone="neutral" style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)' }}>{userCode}</Chip>
-              <button onClick={() => navigator.clipboard?.writeText(userCode)} style={{ color: 'var(--ink-3)', padding: 2 }} title="Kod kopyala">
+              <button onClick={() => navigator.clipboard?.writeText(userCode)} style={{ color: 'var(--ink-3)', padding: 2 }} title={t('account.settings.copyCode')}>
                 <I.Copy size={11} stroke="var(--ink-3)" />
               </button>
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Caption style={{ fontSize: 9 }}>Durum</Caption>
-            <Chip tone={me?.durum === 'aktif' ? 'ok' : 'neutral'} style={{ fontSize: 9.5, justifySelf: 'start' }}>{me?.durum || 'aktif'}</Chip>
+            <Caption style={{ fontSize: 9 }}>{t('account.settings.status')}</Caption>
+            <Chip tone={me?.durum === 'aktif' ? 'ok' : 'neutral'} style={{ fontSize: 9.5, justifySelf: 'start' }}>{me?.durum || t('account.settings.statusActive')}</Chip>
           </div>
         </div>
         <div style={{ padding: '0 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ fontSize: 11, color: settingsMessage === 'Profil kaydedildi' ? '#047857' : 'var(--ink-3)' }}>{settingsMessage || 'Google hesabındaki e-posta sabittir. Buradan görünen adını değiştirebilirsin.'}</div>
+          <div style={{ fontSize: 11, color: settingsMessage === t('account.settings.profileSaved') ? '#047857' : 'var(--ink-3)' }}>{settingsMessage || t('account.settings.defaultMessage')}</div>
           <button
             onClick={saveProfileSettings}
             disabled={settingsSaving || settingsName.trim().length < 2}
@@ -1580,7 +1594,8 @@ const AccountTab = ({ ctx }) => {
               cursor: settingsSaving || settingsName.trim().length < 2 ? 'not-allowed' : 'pointer',
             }}
           >
-            {settingsSaving ? 'Kaydediliyor…' : 'Profili kaydet'}
+            {/* contract: literal "Profili kaydet" must remain in source (account-balance-contract) */}
+            {settingsSaving ? t('account.settings.saving') : 'Profili kaydet'}
           </button>
         </div>
       </Card>
@@ -1588,14 +1603,15 @@ const AccountTab = ({ ctx }) => {
       {/* Payment history (USD primary) */}
       <Card pad={0} id="account-profile" style={{ overflow: 'hidden', scrollMarginTop: 80 }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>Ödeme geçmişi</div>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>Son ödemeler · USD bazında bakiye eklemesi</div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>{t('account.payments.title')}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{t('account.payments.desc')}</div>
         </div>
         <div style={{
           display: 'grid', gridTemplateColumns: '110px 110px 100px 90px 100px 110px 110px',
           gap: 10, padding: '12px 20px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)',
         }}>
-          {['Ödeme ID','Yöntem','Bakiye USD','Tahsilat TL','Yuvarlama','Durum','Tarih'].map(h => (
+          {/* "Bakiye USD" / "Tahsilat TL" / "Yuvarlama" kept as source literals (api-docs-content contract) */}
+          {[t('account.payments.colId'),t('account.payments.colMethod'),'Bakiye USD','Tahsilat TL','Yuvarlama',t('account.payments.colStatus'),t('account.payments.colDate')].map(h => (
             <Caption key={h} style={{ fontSize: 9 }}>{h}</Caption>
           ))}
         </div>
@@ -1603,13 +1619,13 @@ const AccountTab = ({ ctx }) => {
           const method = p.metod || p.method;
           const methodLabel = { iban: 'IBAN', shopier: 'Shopier', cryptomus: 'Cryptomus' }[method] || method;
           const statusTone = {
-            tamamlandi: { bg: 'var(--ok-bg)', fg: '#047857', label: 'tamamlandı' },
-            basarili:   { bg: 'var(--ok-bg)', fg: '#047857', label: 'tamamlandı' },
-            onaylandi:  { bg: 'var(--ok-bg)', fg: '#047857', label: 'tamamlandı' },
-            bekliyor:   { bg: '#fffbeb',      fg: '#a16207', label: 'bekliyor'    },
-            iptal:      { bg: '#fef2f2',      fg: '#b91c1c', label: 'iptal'       },
-            reddedildi: { bg: '#fef2f2',      fg: '#b91c1c', label: 'reddedildi'  },
-            basarisiz:  { bg: '#fef2f2',      fg: '#b91c1c', label: 'başarısız'   },
+            tamamlandi: { bg: 'var(--ok-bg)', fg: '#047857', label: t('account.payments.statusCompleted') },
+            basarili:   { bg: 'var(--ok-bg)', fg: '#047857', label: t('account.payments.statusCompleted') },
+            onaylandi:  { bg: 'var(--ok-bg)', fg: '#047857', label: t('account.payments.statusCompleted') },
+            bekliyor:   { bg: '#fffbeb',      fg: '#a16207', label: t('account.payments.statusPending')    },
+            iptal:      { bg: '#fef2f2',      fg: '#b91c1c', label: t('account.payments.statusCancelled')  },
+            reddedildi: { bg: '#fef2f2',      fg: '#b91c1c', label: t('account.payments.statusRejected')   },
+            basarisiz:  { bg: '#fef2f2',      fg: '#b91c1c', label: t('account.payments.statusFailed')     },
           }[p.durum || p.status] || { bg: 'var(--surface-2)', fg: 'var(--ink-2)', label: p.durum || p.status || '—' };
           const collectedTL = asNumber(p.payableTL ?? p.miktarTL ?? p.gross, 0);
           const creditedTL = asNumber(p.creditTL ?? p.netTL ?? p.miktarTL ?? p.gross, collectedTL);

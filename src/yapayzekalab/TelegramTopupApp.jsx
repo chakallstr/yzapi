@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useT } from './i18n/index.jsx';
 
 const nfTL = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 2 });
 const nfUsd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
@@ -18,7 +19,7 @@ const getTelegramInitData = () => {
   return hash.get('tgWebAppData') || search.get('tgWebAppData') || '';
 };
 
-async function telegramFetch(path, initData, options = {}) {
+async function telegramFetch(path, initData, options = {}, t) {
   const response = await fetch(path, {
     ...options,
     headers: {
@@ -29,11 +30,12 @@ async function telegramFetch(path, initData, options = {}) {
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
   const data = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(data?.error || `İstek başarısız (${response.status})`);
+  if (!response.ok) throw new Error(data?.error || t('telegramTopup.requestFailed', { status: response.status }));
   return data;
 }
 
 export default function TelegramTopupApp() {
+  const { t } = useT();
   const [initData, setInitData] = useState('');
   const [profile, setProfile] = useState(null);
   const [amount, setAmount] = useState('10');
@@ -52,12 +54,12 @@ export default function TelegramTopupApp() {
     const signedInitData = getTelegramInitData();
     setInitData(signedInitData);
     if (!signedInitData) {
-      setError('Bu panel Telegram içinden açılmalı.');
+      setError(t('telegramTopup.mustOpenInTelegram'));
       setLoading(false);
       return;
     }
 
-    telegramFetch('/api/telegram/webapp/me', signedInitData)
+    telegramFetch('/api/telegram/webapp/me', signedInitData, {}, t)
       .then(setProfile)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -82,7 +84,7 @@ export default function TelegramTopupApp() {
       const nextInvoice = await telegramFetch('/api/telegram/webapp/invoices', initData, {
         method: 'POST',
         body: { amountUsd: amount },
-      });
+      }, t);
       setInvoice(nextInvoice);
     } catch (err) {
       setError(err.message);
@@ -190,18 +192,18 @@ export default function TelegramTopupApp() {
       `}</style>
       <section className="tg-topup-card">
         <div className="tg-kicker">YapayZekaLab Crypto Topup</div>
-        <h1>USD seç, bakiyen otomatik yüklensin.</h1>
-        <p className="tg-muted">Crypto Bot ile ödeme sonrası bakiye mevcut YapayZekaLab hesabına işlenir. Ayrı bakiye tutulmaz.</p>
+        <h1>{t('telegramTopup.heading')}</h1>
+        <p className="tg-muted">{t('telegramTopup.description')}</p>
 
-        {loading && <p className="tg-muted">Panel hazırlanıyor...</p>}
+        {loading && <p className="tg-muted">{t('telegramTopup.preparing')}</p>}
 
         {!loading && profile && (
           <>
             <div className="tg-stat-grid">
-              <div className="tg-stat"><span>Bakiye</span><strong>{nfTL.format(profile.balanceTL)}</strong></div>
-              <div className="tg-stat"><span>Kur</span><strong>{nfTL.format(profile.kur)} / USD</strong></div>
-              <div className="tg-stat"><span>Minimum</span><strong>{nfTL.format(profile.minBakiyeTL)}</strong></div>
-              <div className="tg-stat"><span>Maksimum</span><strong>{nfTL.format(profile.maxBakiyeTL)}</strong></div>
+              <div className="tg-stat"><span>{t('telegramTopup.statBalance')}</span><strong>{nfTL.format(profile.balanceTL)}</strong></div>
+              <div className="tg-stat"><span>{t('telegramTopup.statRate')}</span><strong>{nfTL.format(profile.kur)} / USD</strong></div>
+              <div className="tg-stat"><span>{t('telegramTopup.statMin')}</span><strong>{nfTL.format(profile.minBakiyeTL)}</strong></div>
+              <div className="tg-stat"><span>{t('telegramTopup.statMax')}</span><strong>{nfTL.format(profile.maxBakiyeTL)}</strong></div>
             </div>
 
             <div className="tg-chip-row">
@@ -223,7 +225,7 @@ export default function TelegramTopupApp() {
               inputMode="decimal"
               min="0"
               onChange={(event) => { setAmount(event.target.value.replace(',', '.')); setInvoice(null); }}
-              placeholder="Örn. 12.50"
+              placeholder={t('telegramTopup.amountPlaceholder')}
               step="0.01"
               type="number"
               value={amount}
@@ -231,19 +233,19 @@ export default function TelegramTopupApp() {
 
             {estimate && (
               <p className="tg-muted">
-                Yaklaşık kredi: {nfTL.format(estimate.creditTL)} · Tahsil: {nfTL.format(estimate.payableTL)}
+                {t('telegramTopup.estimateSummary', { creditTL: nfTL.format(estimate.creditTL), payableTL: nfTL.format(estimate.payableTL) })}
               </p>
             )}
 
             <button className="tg-button" disabled={submitting || !estimate?.insideLimits} onClick={createInvoice} type="button">
-              {submitting ? 'Invoice hazırlanıyor...' : 'Crypto Bot invoice oluştur'}
+              {submitting ? t('telegramTopup.creatingInvoice') : t('telegramTopup.createInvoiceBtn')}
             </button>
 
             {invoice && (
               <div className="tg-invoice">
-                <strong>{nfUsd.format(invoice.amountUsd)} invoice hazır.</strong>
-                <p className="tg-muted">{nfTL.format(invoice.creditTL)} kredi yüklenecek. Ödeme sonrası API teslim akışı otomatik çalışır.</p>
-                <button className="tg-button" onClick={openInvoice} type="button">Crypto Bot ile öde</button>
+                <strong>{t('telegramTopup.invoiceReady', { amountUsd: nfUsd.format(invoice.amountUsd) })}</strong>
+                <p className="tg-muted">{t('telegramTopup.invoiceDescription', { creditTL: nfTL.format(invoice.creditTL) })}</p>
+                <button className="tg-button" onClick={openInvoice} type="button">{t('telegramTopup.payWithCryptoBot')}</button>
               </div>
             )}
           </>

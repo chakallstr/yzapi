@@ -8,6 +8,7 @@ import {
   mockUsers, mockUsageRecords, mockPayments, mockAnnouncements,
   mockAuditLogs, mockKurHistory, mockProviderStatus,
 } from './shared.jsx';
+import { useT } from './i18n/index.jsx';
 
 /* ============================================
    HomeTab — YapayZekaLab anasayfa
@@ -18,6 +19,7 @@ import {
 // === RouteFlow — canlı sağlayıcı routing animasyonu ================
 // 4 farklı Claude metin modeli arasında routing (Opus/Sonnet/Haiku).
 const RouteFlow = ({ tweaks }) => {
+  const { t } = useT();
   const dotCount = tweaks?.routeDotCount ?? 4;
   const dur = tweaks?.routeDur ?? 3.6;
   const glow = tweaks?.routeGlow ?? true;
@@ -61,7 +63,7 @@ const RouteFlow = ({ tweaks }) => {
       <rect x="12" y="112" width="58" height="36" rx="10"
       fill="var(--surface)" stroke="var(--border-st)" strokeWidth="1" />
       <text x="41" y="135" textAnchor="middle" fontSize="10.5"
-      fontFamily="var(--font-mono)" fill="var(--ink-2)" fontWeight="500">{tweaks?.routeLblInput ?? 'İstek'}</text>
+      fontFamily="var(--font-mono)" fill="var(--ink-2)" fontWeight="500">{tweaks?.routeLblInput ?? t('home.routeLblInput')}</text>
       <text x="41" y="103" textAnchor="middle" fontSize="8.5"
       fontFamily="var(--font-mono)" fill="var(--ink-3)" letterSpacing="0.5">{tweaks?.routeLblInputSub ?? 'API KEY'}</text>
 
@@ -131,6 +133,7 @@ function trRequestsWriteFloor(value) {
 
 // === ValueBanner — 3-up değer önerisi banner =======================
 const ValueBanner = ({ tweaks, onAction }) => {
+  const { t } = useT();
   const animSpeed = tweaks?.animSpeed ?? 1;
   const tickerOn = tweaks?.priceTickerOn ?? true;
   const tickerMs = tweaks?.priceTickerMs ?? 700;
@@ -166,7 +169,7 @@ const ValueBanner = ({ tweaks, onAction }) => {
         {/* ===== LEFT: model catalog ===== */}
         <div style={{ padding: '26px 28px', borderRight: '1px solid var(--border)' }}>
           <Chip tone="ink" style={{ fontSize: 9.5, fontFamily: 'var(--font-mono)', letterSpacing: 1, marginBottom: 14 }}>
-            <I.Layers size={10} stroke="var(--surface)" /> ÇOKLU SAĞLAYICI
+            <I.Layers size={10} stroke="var(--surface)" /> {t('home.banner.multiProvider')}
           </Chip>
 
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
@@ -178,9 +181,9 @@ const ValueBanner = ({ tweaks, onAction }) => {
               backgroundClip: 'text'
             }} className="tnum">{MODELS.length}</div>
             <div style={{ fontSize: 14, lineHeight: 1.35, color: 'var(--ink-2)' }}>
-              <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, fontSize: 18, color: 'var(--ink)' }}>model</span><br />
-              3 sağlayıcıdan<br />
-              tek API key ile
+              <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, fontSize: 18, color: 'var(--ink)' }}>{t('home.banner.modelWord')}</span><br />
+              {t('home.banner.modelDesc1')}<br />
+              {t('home.banner.modelDesc2')}
             </div>
           </div>
 
@@ -198,22 +201,22 @@ const ValueBanner = ({ tweaks, onAction }) => {
         {/* ===== CENTER: "KOTA YOK" promises ===== */}
         <div style={{ padding: '26px 28px', borderRight: '1px solid var(--border)' }}>
           <Chip tone="ok" style={{ fontSize: 9.5, fontFamily: 'var(--font-mono)', letterSpacing: 1, marginBottom: 14 }}>
-            <I.Check size={10} stroke="#047857" /> BAKİYE SİSTEMİ
+            <I.Check size={10} stroke="#047857" /> {t('home.banner.balanceSystem')}
           </Chip>
 
           <div style={{
             fontSize: 38, fontWeight: 600, letterSpacing: -1.6, lineHeight: 1, color: 'var(--ink)',
             marginBottom: 14
           }}>
-            <span style={{ fontStyle: 'italic', fontWeight: 400, fontFamily: "\"Geist Mono\"" }}>Kota</span> yok.
+            <span style={{ fontStyle: 'italic', fontWeight: 400, fontFamily: "\"Geist Mono\"" }}>{t('home.banner.quotaWordItalic')}</span>{t('home.banner.quotaRest')}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[
-            { t: 'Aylık abonelik yok', d: 'Kullandığın kadar düşer' },
-            { t: 'Gizli limit yok', d: 'Sağlayıcı limitine kadar açık' },
-            { t: 'Süresiz geçerli bakiye', d: 'Kalanı her zaman kullanabilirsin' },
-            { t: 'Minimum $2 yükleme', d: 'Test için bile yeterli' }].
+            { t: t('home.banner.noSubTitle'), d: t('home.banner.noSubDesc') },
+            { t: t('home.banner.noLimitTitle'), d: t('home.banner.noLimitDesc') },
+            { t: t('home.banner.indefiniteTitle'), d: t('home.banner.indefiniteDesc') },
+            { t: t('home.banner.minTopupTitle'), d: t('home.banner.minTopupDesc') }].
             map((row, i) =>
             <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                 <span style={{
@@ -238,7 +241,7 @@ const ValueBanner = ({ tweaks, onAction }) => {
           display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
         }}>
           <div>
-            <Caption style={{ color: 'var(--accent-ink)' }}>Bu ay TR toplam istek</Caption>
+            <Caption style={{ color: 'var(--accent-ink)' }}>{t('home.banner.trRequests')}</Caption>
             <div style={{
               fontSize: 36, fontWeight: 600, letterSpacing: -1.4, lineHeight: 1.05,
               color: 'var(--ink)', marginTop: 10, fontFamily: 'var(--font-sans)'
@@ -247,13 +250,13 @@ const ValueBanner = ({ tweaks, onAction }) => {
             </div>
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6, fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <PulseDot color="#10b981" size={6} withRing={false} />
-              canlı sayaç · 1.842 aktif lab
+              {t('home.banner.liveCounter')}
             </div>
           </div>
 
           <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
             <div style={{ fontSize: 11.5, color: 'var(--ink-2)', lineHeight: 1.5, marginBottom: 10 }}>
-              Claude (Opus/Sonnet/Haiku) metin modelleri — hepsi tek noktadan.
+              {t('home.banner.claudeLine')}
             </div>
             <button onClick={() => onAction?.({ tab: 'account', section: 'account-balance' })} style={{
               background: 'var(--accent)', color: '#fff',
@@ -261,7 +264,7 @@ const ValueBanner = ({ tweaks, onAction }) => {
               fontSize: 12, fontWeight: 500, width: '100%',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7
             }}>
-              <span>Bakiye yükle</span><I.Arrow size={12} stroke="#fff" />
+              <span>{t('home.banner.topUpCta')}</span><I.Arrow size={12} stroke="#fff" />
             </button>
           </div>
         </div>
@@ -272,6 +275,7 @@ const ValueBanner = ({ tweaks, onAction }) => {
 
 // === Feed row — model adı başlık + ctx · token · ms + ✓ ============
 const FeedRow = ({ log, isNew, animateIn = true }) => {
+  const { t } = useT();
   const m = modelMeta(log.model);
   return (
     <div className={isNew && animateIn ? 'stream-in' : ''} style={{
@@ -291,7 +295,7 @@ const FeedRow = ({ log, isNew, animateIn = true }) => {
           fontSize: 10.5, color: 'var(--ink-3)', marginTop: 3,
           fontFamily: 'var(--font-mono)', letterSpacing: 0.1
         }}>
-          {log.ctx} ctx · {fmt.num(log.tokens)} token · {log.ms}ms
+          {t('home.feed.meta', { ctx: log.ctx, tokens: fmt.num(log.tokens), ms: log.ms })}
         </div>
       </div>
       <span style={{
@@ -367,11 +371,12 @@ function highlight(code, lang) {
 
 // === Quickstart playground =========================================
 const Quickstart = () => {
+  const { t } = useT();
   const [lang, setLang] = useState('python');
   const [copied, setCopied] = useState(false);
   const code = codeSnippets[lang]();
 
-  const [prompt, setPrompt] = useState('Türkçe ürün açıklamalarını İngilizce\'ye çevir');
+  const [prompt, setPrompt] = useState(t('home.quick.promptDefault'));
   const [thinking, setThinking] = useState(false);
   const [result, setResult] = useState(null);
   const [streamedText, setStreamedText] = useState('');
@@ -385,7 +390,7 @@ const Quickstart = () => {
     setStreamedText('');
     setTimeout(() => {
       setThinking(false);
-      const fullText = 'Tamam — kısa ve net çeviri yapıldı. 240 token kullanıldı; bakiyenden $0.000098 USD düşüldü (≈ ₺0.0034 bilgi amaçlı).';
+      const fullText = t('home.quick.resultText');
       setResult({
         model: 'claude-haiku-4-5-20251001',
         ms: 540 + Math.round(Math.random() * 220),
@@ -413,8 +418,8 @@ const Quickstart = () => {
     <Card pad={20}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: -0.2 }}>Hızlı başlangıç</div>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>OpenAI uyumlu — sadece base_url değiştir</div>
+          <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: -0.2 }}>{t('home.quick.title')}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{t('home.quick.subtitle')}</div>
         </div>
         <div style={{ display: 'flex', gap: 2, padding: 3, background: 'rgba(15,23,42,0.04)', borderRadius: 9, border: '1px solid var(--border)' }}>
           {[['python', 'Python'], ['nodejs', 'Node'], ['curl', 'cURL']].map(([k, l]) =>
@@ -441,7 +446,7 @@ const Quickstart = () => {
           padding: 6, borderRadius: 6,
           background: 'rgba(255,255,255,0.08)', color: '#cbd5e1',
           display: 'grid', placeItems: 'center'
-        }} title="Kopyala">
+        }} title={t('common.copy')}>
           {copied ? <I.Check size={13} stroke="#10b981" /> : <I.Copy size={13} stroke="#cbd5e1" />}
         </button>
         <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}
@@ -454,14 +459,14 @@ const Quickstart = () => {
         border: '1px solid var(--accent-border)'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <Caption style={{ color: 'var(--accent-ink)', fontSize: 9.5 }}>Playground · örnek akış</Caption>
+          <Caption style={{ color: 'var(--accent-ink)', fontSize: 9.5 }}>{t('home.quick.playgroundCaption')}</Caption>
           <Chip tone="accent" style={{ background: 'rgba(255,255,255,0.6)', fontFamily: 'var(--font-mono)' }}>
             yzk_live_YOUR_KEY
           </Chip>
         </div>
         <form onSubmit={submit} style={{ display: 'flex', gap: 8 }}>
           <input value={prompt} onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Bir prompt yazın…"
+          placeholder={t('home.quick.promptPlaceholder')}
           style={{
             flex: 1, padding: '8px 12px', borderRadius: 8,
             background: 'var(--surface)', border: '1px solid var(--accent-border)',
@@ -475,7 +480,7 @@ const Quickstart = () => {
             opacity: thinking ? 0.6 : 1, transition: 'opacity 0.15s'
           }}>
             {thinking ? <I.Refresh size={11} stroke="#fff" className="spin-slow" /> : <I.Play size={10} stroke="#fff" fill="#fff" />}
-            <span>{thinking ? 'Çalışıyor…' : 'Gönder'}</span>
+            <span>{thinking ? t('home.quick.running') : t('common.send')}</span>
           </button>
         </form>
 
@@ -484,7 +489,7 @@ const Quickstart = () => {
             <span className="think-dot" style={{ animationDelay: '0s' }}>●</span>
             <span className="think-dot" style={{ animationDelay: '0.15s' }}>●</span>
             <span className="think-dot" style={{ animationDelay: '0.30s' }}>●</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>örnek yanıt hazırlanıyor…</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{t('home.quick.preparing')}</span>
           </div>
         }
 
@@ -497,7 +502,7 @@ const Quickstart = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <I.Cpu size={14} stroke="var(--accent)" />
-                <span style={{ fontSize: 11.5, fontWeight: 500 }}>Yanıtlayan:</span>
+                <span style={{ fontSize: 11.5, fontWeight: 500 }}>{t('home.quick.answeredBy')}</span>
                 <Chip tone="accent" style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5 }}>
                   {result.model}
                 </Chip>
@@ -537,16 +542,18 @@ const FeatureCard = ({ tone, Ico, title, body }) =>
 
 
 // === HowItWorks 4-step =============================================
-const HowItWorks = () =>
+const HowItWorks = () => {
+  const { t } = useT();
+  return (
 <Card pad={28}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24 }}>
       <div>
-        <Caption>Başla</Caption>
+        <Caption>{t('home.how.caption')}</Caption>
         <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.6, margin: '6px 0 0' }}>
-          Nasıl çalışır?
+          {t('home.how.title')}
         </h2>
       </div>
-      <Chip tone="ok" style={{ fontFamily: 'var(--font-mono)' }}>5 dakika</Chip>
+      <Chip tone="ok" style={{ fontFamily: 'var(--font-mono)' }}>{t('home.how.fiveMin')}</Chip>
     </div>
 
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, position: 'relative' }}>
@@ -557,10 +564,10 @@ const HowItWorks = () =>
     }} />
 
       {[
-    { n: '01', title: 'Kayıt Ol', desc: 'Email veya Google ile 30 saniyede hesap aç' },
-    { n: '02', title: 'Bakiye Yükle', desc: 'IBAN havale, Shopier kart veya USDT' },
-    { n: '03', title: 'API Key Oluştur', desc: 'Dashboard\'dan yzk_live_… formatında key üret' },
-    { n: '04', title: 'İstek Gönder', desc: 'base_url: yapayzekalab.org/v1 yeterli' }].
+    { n: '01', title: t('home.how.step1Title'), desc: t('home.how.step1Desc') },
+    { n: '02', title: t('home.how.step2Title'), desc: t('home.how.step2Desc') },
+    { n: '03', title: t('home.how.step3Title'), desc: t('home.how.step3Desc') },
+    { n: '04', title: t('home.how.step4Title'), desc: t('home.how.step4Desc') }].
     map((s, i) =>
     <div key={i} style={{ position: 'relative', padding: '0 12px', textAlign: 'left' }}>
           <div style={{
@@ -576,7 +583,8 @@ const HowItWorks = () =>
         </div>
     )}
     </div>
-  </Card>;
+  </Card>);
+};
 
 
 // === FAQ accordion =================================================
@@ -606,23 +614,24 @@ const FAQItem = ({ q, a, open, onToggle }) =>
 
 
 const FAQ = () => {
+  const { t } = useT();
   const [openIdx, setOpenIdx] = useState(0);
   const items = [
-  { q: 'OpenAI SDK ile kullanabilir miyim?', a: 'Evet. base_url\'i https://yapayzekalab.org/v1 olarak ayarla, API key\'ini yaz, hazır. Model adları katalogdaki canonical ID ile kullanılır.' },
-  { q: 'Hangi API endpointleri destekleniyor?', a: 'Ana canlı endpoint /v1/chat/completions. Anthropic uyumlu kullanım için /v1/messages desteklenir. /v1/responses bu sağlayıcıda aktif değilse JSON hata döner ve ücret yazmaz. Görsel ve video endpointleri sağlayıcı geçişi boyunca 501 JSON hata döndürür ve ücret yazmaz.' },
-  { q: 'Bakiye kredi mi, istek mi?', a: 'Bakiye istek değildir. Para yüklersin, API kullandıkça modelin gerçek input/output maliyeti bakiyenden düşer. Aylık abonelik yoktur.' },
-  { q: 'Ücretlendirme USD mi yoksa TL mi?', a: 'Ücretlendirme USD bazındadır. Her API çağrısı USD olarak hesaplanıp bakiyenden USD olarak düşer. TL gösterimleri yalnızca bilgi amaçlıdır.' },
-  { q: 'Minimum bakiye ne kadar?', a: 'Minimum yükleme 2 USD. Üst limit yok. Bakiye USD bazında tutulur.' },
-  { q: 'Hangi ödeme yöntemleri var?', a: 'IBAN banka havalesi (komisyonsuz), Shopier ile kredi/banka kartı, Cryptomus ile USDT (TRC20). Yatırılan TL anlık kurdan USD\'ye çevrilip bakiyene eklenir.' },
-  { q: 'Görsel ve video API aktif mi?', a: 'Hayır. Bu geçişte aktif katalog yalnızca metin modelleridir; görsel/video endpointleri 501 döner ve ücretlendirilmez.' },
-  { q: 'Veri gizliliği nasıl sağlanıyor?', a: 'İstekler yalnızca ilgili sağlayıcıya iletilir ve loglanmaz. KVKK kapsamında kişisel veriler Türkiye\'de barındırılır.' }];
+  { q: t('home.faq.q1'), a: t('home.faq.a1') },
+  { q: t('home.faq.q2'), a: t('home.faq.a2') },
+  { q: t('home.faq.q3'), a: t('home.faq.a3') },
+  { q: t('home.faq.q4'), a: t('home.faq.a4') },
+  { q: t('home.faq.q5'), a: t('home.faq.a5') },
+  { q: t('home.faq.q6'), a: t('home.faq.a6') },
+  { q: t('home.faq.q7'), a: t('home.faq.a7') },
+  { q: t('home.faq.q8'), a: t('home.faq.a8') }];
 
   return (
     <Card pad={28}>
       <div style={{ marginBottom: 14 }}>
-        <Caption>Sıkça sorulanlar</Caption>
+        <Caption>{t('home.faq.caption')}</Caption>
         <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.6, margin: '6px 0 0' }}>
-          SSS
+          {t('home.faq.title')}
         </h2>
       </div>
       <div>
@@ -637,6 +646,7 @@ const FAQ = () => {
 
 // === CostCalculator — "ben şu kadar token kullansam ne öderim" ====
 const CostCalculator = ({ tweaks }) => {
+  const { t } = useT();
   const [modelId, setModelId] = useState('claude-opus-4-7');
   const [monthlyM, setMonthlyM] = useState(10); // million tokens/ay
   const m = modelMeta(modelId);
@@ -648,7 +658,7 @@ const CostCalculator = ({ tweaks }) => {
     'claude-opus-4-7': {
       directPerM: 30,
       ourPerM: 1,
-      directLabel: 'Claude liste fiyatı',
+      directLabel: t('home.calc.directLabel'),
       ourLabel: 'YAPAYZEKALAB',
     },
   };
@@ -664,7 +674,7 @@ const CostCalculator = ({ tweaks }) => {
   const monthlyDirect = directPerM * monthlyM;
   const savedPct = directPerM > 0 ? ((directPerM - ourPerM) / directPerM) * 100 : 0;
   const moreExpensivePct = ourPerM > directPerM ? ((ourPerM - directPerM) / directPerM) * 100 : 0;
-  const directLabel = priceOverride?.directLabel ?? 'Piyasa referansı';
+  const directLabel = priceOverride?.directLabel ?? t('home.calc.directLabelDefault');
   const ourLabel = priceOverride?.ourLabel ?? 'YAPAYZEKALAB';
 
   return (
@@ -675,22 +685,22 @@ const CostCalculator = ({ tweaks }) => {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <Caption style={{ color: 'var(--accent-ink)' }}>Bakiye kalkülatörü</Caption>
+            <Caption style={{ color: 'var(--accent-ink)' }}>{t('home.calc.caption')}</Caption>
             <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.4, marginTop: 5 }}>
-              Ayda ne kadar <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400 }}>ödersin?</span>
+              {t('home.calc.titlePrefix')}<span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400 }}>{t('home.calc.titleItalic')}</span>
             </div>
             <div style={{ fontSize: 11.5, color: 'var(--ink-2)', marginTop: 4 }}>
-              Sürgüleri oynat, gerçek aylık maliyet anında hesaplansın
+              {t('home.calc.subtitle')}
             </div>
           </div>
-          <Chip tone="accent">canlı hesap</Chip>
+          <Chip tone="accent">{t('home.calc.liveBadge')}</Chip>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 0 }}>
         {/* Controls */}
         <div style={{ padding: 22, borderRight: '1px solid var(--border)' }}>
-          <Caption style={{ marginBottom: 10 }}>Model</Caption>
+          <Caption style={{ marginBottom: 10 }}>{t('home.calc.modelLabel')}</Caption>
           <select value={modelId} onChange={(e) => setModelId(e.target.value)}
                   style={{
                     width: '100%', padding: '10px 12px', borderRadius: 10,
@@ -706,7 +716,7 @@ const CostCalculator = ({ tweaks }) => {
           </select>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-            <Caption>Aylık token (milyon)</Caption>
+            <Caption>{t('home.calc.monthlyTokens')}</Caption>
             <div style={{ fontFamily: 'var(--font-sans)', fontSize: 22, fontWeight: 600, letterSpacing: -0.6 }} className="tnum">
               {monthlyM}<span style={{ fontSize: 13, color: 'var(--ink-3)', marginLeft: 3 }}>M</span>
             </div>
@@ -719,7 +729,7 @@ const CostCalculator = ({ tweaks }) => {
           </div>
 
           <div style={{ marginTop: 18, padding: 14, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8, fontFamily: 'var(--font-mono)', letterSpacing: 0.5 }}>HIZLI SEÇİM</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8, fontFamily: 'var(--font-mono)', letterSpacing: 0.5 }}>{t('home.calc.quickSelect')}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {[1, 5, 10, 50, 100, 250].map(p => (
                 <button key={p} onClick={() => setMonthlyM(p)} style={{
@@ -735,7 +745,7 @@ const CostCalculator = ({ tweaks }) => {
 
         {/* Result */}
         <div style={{ padding: 22, background: 'var(--surface-2)' }}>
-          <Caption>Aylık maliyet · {directLabel}</Caption>
+          <Caption>{t('home.calc.monthlyCostFor', { label: directLabel })}</Caption>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 10 }}>
             <div style={{
               fontSize: 48, fontWeight: 600, letterSpacing: -2, lineHeight: 1,
@@ -748,7 +758,7 @@ const CostCalculator = ({ tweaks }) => {
             </div>
           </div>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6, fontFamily: 'var(--font-mono)' }}>
-            ${directPerM.toFixed(4)} / 1M token · piyasa liste fiyatı
+            {t('home.calc.perMillionList', { price: directPerM.toFixed(4) })}
           </div>
 
           <div style={{ marginTop: 18, padding: '12px 0', borderTop: '1px solid var(--border)' }}>
@@ -766,13 +776,13 @@ const CostCalculator = ({ tweaks }) => {
               {moreExpensivePct > 0 ? (
                 <>
                   <I.TrendUp size={12} stroke="#9a3412" />
-                  +%{moreExpensivePct.toFixed(0)} fark
-                  <span style={{ fontWeight: 400, opacity: 0.8 }}>(kolaylık ücreti — tek API, TL ödeme, KVKK)</span>
+                  {t('home.calc.diffPct', { pct: moreExpensivePct.toFixed(0) })}
+                  <span style={{ fontWeight: 400, opacity: 0.8 }}>{t('home.calc.diffNote')}</span>
                 </>
               ) : (
                 <>
                   <I.Check size={12} stroke="#047857" />
-                  %{savedPct.toFixed(0)} tasarruf · ${(monthlyDirect - monthlyOurs).toFixed(2)} daha az
+                  {t('home.calc.savedPct', { pct: savedPct.toFixed(0), amount: (monthlyDirect - monthlyOurs).toFixed(2) })}
                 </>
               )}
             </div>
@@ -785,6 +795,7 @@ const CostCalculator = ({ tweaks }) => {
 
 // === Onboarding wizard ============================================
 const OnboardingWizard = ({ onClose, onTab }) => {
+  const { t } = useT();
   const [step, setStep] = useState(0);
   const [keyName, setKeyName] = useState('production');
   const [topUp, setTopUp] = useState(10);
@@ -793,7 +804,7 @@ const OnboardingWizard = ({ onClose, onTab }) => {
   const [running, setRunning] = useState(false);
   const [response, setResponse] = useState('');
 
-  const steps = ['API anahtarı', 'Bakiye yükle', 'İlk istek'];
+  const steps = [t('home.wiz.step1'), t('home.wiz.step2'), t('home.wiz.step3')];
   const next = () => setStep(s => Math.min(2, s + 1));
 
   const genKey = () => { setKeyGenerated(true); onTab?.('account'); setTimeout(next, 600); };
@@ -802,7 +813,7 @@ const OnboardingWizard = ({ onClose, onTab }) => {
     setRunning(true); setResponse('');
     setTimeout(() => {
       setRunning(false);
-      const text = 'Merhaba! Bu YapayZekaLab örnek yanıtı.';
+      const text = t('home.wiz.sampleResponse');
       let i = 0; const it = setInterval(() => {
         i += 2; setResponse(text.slice(0, i));
         if (i >= text.length) clearInterval(it);
@@ -843,30 +854,30 @@ const OnboardingWizard = ({ onClose, onTab }) => {
         <div style={{ padding: 28 }}>
           {step === 0 && (
             <>
-              <Caption>Adım 1 · API anahtarı</Caption>
-              <h3 style={{ fontSize: 20, fontWeight: 600, letterSpacing: -0.5, margin: '6px 0 8px' }}>İlk anahtarı oluştur</h3>
+              <Caption>{t('home.wiz.s1Caption')}</Caption>
+              <h3 style={{ fontSize: 20, fontWeight: 600, letterSpacing: -0.5, margin: '6px 0 8px' }}>{t('home.wiz.s1Title')}</h3>
               <p style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.55, margin: '0 0 18px' }}>
-                Bu anahtar OpenAI uyumlu — tüm SDK'larla çalışır. <strong>yalnız bir kez gösterilir</strong>, hemen kopyala.
+                {t('home.wiz.s1LeadPrefix')}<strong>{t('home.wiz.s1LeadStrong')}</strong>{t('home.wiz.s1LeadSuffix')}
               </p>
-              <input value={keyName} onChange={(e) => setKeyName(e.target.value)} placeholder="Anahtar adı (örn. production)"
+              <input value={keyName} onChange={(e) => setKeyName(e.target.value)} placeholder={t('home.wiz.s1KeyName')}
                      style={{ width: '100%', padding: '10px 14px', borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface-2)', fontSize: 13, outline: 'none', marginBottom: 14 }} />
               {keyGenerated && (
                 <div className="fade-in" style={{ padding: 12, borderRadius: 9, background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', marginBottom: 14, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent-ink)' }}>
-                  API anahtarı paneli açıldı. Raw key yalnızca gerçek oluşturma anında gösterilir.
+                  {t('home.wiz.s1Generated')}
                 </div>
               )}
               <button onClick={genKey} disabled={keyGenerated} style={primaryBtn(keyGenerated)}>
                 <I.Key size={13} stroke="#fff" />
-                {keyGenerated ? 'API paneli açıldı — devam ediyorum…' : 'API anahtarı panelini aç'}
+                {keyGenerated ? t('home.wiz.s1BtnDone') : t('home.wiz.s1Btn')}
               </button>
             </>
           )}
           {step === 1 && (
             <>
-              <Caption>Adım 2 · Bakiye</Caption>
-              <h3 style={{ fontSize: 20, fontWeight: 600, letterSpacing: -0.5, margin: '6px 0 8px' }}>Bakiyeni yükle (min $2)</h3>
+              <Caption>{t('home.wiz.s2Caption')}</Caption>
+              <h3 style={{ fontSize: 20, fontWeight: 600, letterSpacing: -0.5, margin: '6px 0 8px' }}>{t('home.wiz.s2Title')}</h3>
               <p style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.55, margin: '0 0 18px' }}>
-                Bakiye USD bazında tutulur, kullandıkça düşer. Test için $10 yeterli.
+                {t('home.wiz.s2Lead')}
               </p>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
                 <span style={{ fontSize: 32, fontWeight: 600, fontFamily: 'var(--font-sans)' }} className="tnum">${topUp}</span>
@@ -875,16 +886,16 @@ const OnboardingWizard = ({ onClose, onTab }) => {
                      style={{ width: '100%', accentColor: 'var(--accent)', marginBottom: 18 }} />
               <button onClick={fund} disabled={funded} style={primaryBtn(funded)}>
                 <I.Wallet size={13} stroke="#fff" />
-                {funded ? 'Bakiye paneli açıldı — devam ediyorum…' : `${topUp} USD için ödeme bildirimi aç`}
+                {funded ? t('home.wiz.s2BtnDone') : t('home.wiz.s2Btn', { amount: topUp })}
               </button>
             </>
           )}
           {step === 2 && (
             <>
-              <Caption>Adım 3 · İlk istek</Caption>
-              <h3 style={{ fontSize: 20, fontWeight: 600, letterSpacing: -0.5, margin: '6px 0 8px' }}>API'ye bağlandığını test et</h3>
+              <Caption>{t('home.wiz.s3Caption')}</Caption>
+              <h3 style={{ fontSize: 20, fontWeight: 600, letterSpacing: -0.5, margin: '6px 0 8px' }}>{t('home.wiz.s3Title')}</h3>
               <p style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.55, margin: '0 0 14px' }}>
-                Aşağıdaki komut gerçek endpointi gösterir; çalıştırmak için kendi API anahtarın ve bakiye gerekir.
+                {t('home.wiz.s3Lead')}
               </p>
               <pre style={{ background: '#0f172a', color: '#e2e8f0', padding: 14, borderRadius: 10, fontSize: 11, fontFamily: 'var(--font-mono)', overflow: 'auto', margin: '0 0 14px' }}>
 {`curl -X POST https://yapayzekalab.org/v1/chat/completions \\
@@ -893,23 +904,23 @@ const OnboardingWizard = ({ onClose, onTab }) => {
               </pre>
               {response && (
                 <div className="fade-in" style={{ padding: 12, borderRadius: 9, background: 'var(--ok-bg)', border: '1px solid #a7f3d0', marginBottom: 14, fontSize: 12.5, color: '#047857' }}>
-                  <strong>✓ Bağlandı.</strong> {response}{response.length < 50 && <span className="caret" />}
+                  <strong>{t('home.wiz.s3Connected')}</strong> {response}{response.length < 50 && <span className="caret" />}
                 </div>
               )}
               {!response && !running && (
                 <button onClick={sendReq} style={primaryBtn(false)}>
-                  <I.Play size={11} stroke="#fff" fill="#fff" /> İlk isteği gönder
+                  <I.Play size={11} stroke="#fff" fill="#fff" /> {t('home.wiz.s3SendBtn')}
                 </button>
               )}
               {running && (
                 <div style={{ padding: 12, fontSize: 12, color: 'var(--accent-ink)', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <I.Refresh size={13} stroke="var(--accent-ink)" className="spin-slow" />
-                  Örnek yanıt hazırlanıyor…
+                  {t('home.wiz.s3Preparing')}
                 </div>
               )}
               {response && (
                 <button onClick={() => { onClose(); onTab('home'); }} style={primaryBtn(false)}>
-                  <I.Check size={13} stroke="#fff" /> Tamamlandı · panele dön
+                  <I.Check size={13} stroke="#fff" /> {t('home.wiz.s3DoneBtn')}
                 </button>
               )}
             </>
@@ -929,40 +940,44 @@ const primaryBtn = (disabled) => ({
 });
 
 // === CLI showcase ==================================================
-const CLIShowcase = () => (
+const CLIShowcase = () => {
+  const { t } = useT();
+  return (
   <Card pad={0} style={{ overflow: 'hidden', background: '#0f172a', color: '#e2e8f0' }}>
     <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
         <div>
-          <Caption style={{ color: '#94a3b8' }}>CLI · komut satırı</Caption>
+          <Caption style={{ color: '#94a3b8' }}>{t('home.cli.caption')}</Caption>
           <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.4, marginTop: 6, color: '#f1f5f9' }}>
-            <span style={{ fontFamily: 'var(--font-mono)' }}>yzlab</span> <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: '#cbd5e1' }}>komut satırı aracı</span>
+            <span style={{ fontFamily: 'var(--font-mono)' }}>yzlab</span> <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: '#cbd5e1' }}>{t('home.cli.titleSuffix')}</span>
           </div>
           <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 4 }}>
-            Bakiye sorgula, anahtar yönet, model çağır — terminalden ayrılma.
+            {t('home.cli.subtitle')}
           </div>
         </div>
-        <Chip tone="ok" style={{ background: 'rgba(16,185,129,0.15)', color: '#6ee7b7', border: '1px solid rgba(110,231,183,0.3)' }}>v0.9 beta</Chip>
+        <Chip tone="ok" style={{ background: 'rgba(16,185,129,0.15)', color: '#6ee7b7', border: '1px solid rgba(110,231,183,0.3)' }}>{t('home.cli.beta')}</Chip>
       </div>
     </div>
     <div style={{ padding: 22, fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.7 }}>
-      <div style={{ color: '#94a3b8' }}># Yükle</div>
+      <div style={{ color: '#94a3b8' }}>{t('home.cli.cmtInstall')}</div>
       <div><span style={{ color: '#a78bfa' }}>npm install</span> <span style={{ color: '#10b981' }}>-g @yapayzekalab/cli</span></div>
-      <div style={{ marginTop: 14, color: '#94a3b8' }}># Giriş yap (tarayıcıdan otomatik token alır)</div>
+      <div style={{ marginTop: 14, color: '#94a3b8' }}>{t('home.cli.cmtLogin')}</div>
       <div><span style={{ color: '#f59e0b' }}>$</span> yzlab login</div>
-      <div style={{ marginTop: 14, color: '#94a3b8' }}># Hızlı işlemler</div>
-      <div><span style={{ color: '#f59e0b' }}>$</span> yzlab balance        <span style={{ color: '#64748b' }}># $15.20 USD · ≈ ₺524</span></div>
-      <div><span style={{ color: '#f59e0b' }}>$</span> yzlab keys list      <span style={{ color: '#64748b' }}># 3 aktif anahtar</span></div>
-      <div><span style={{ color: '#f59e0b' }}>$</span> yzlab models         <span style={{ color: '#64748b' }}># {MODELS.length} model, fiyat tablosu</span></div>
-      <div><span style={{ color: '#f59e0b' }}>$</span> yzlab chat <span style={{ color: '#10b981' }}>"Hangi modelin daha hızlı?"</span></div>
-      <div style={{ marginTop: 14, color: '#94a3b8' }}># Otomasyon için stream</div>
+      <div style={{ marginTop: 14, color: '#94a3b8' }}>{t('home.cli.cmtQuick')}</div>
+      <div><span style={{ color: '#f59e0b' }}>$</span> yzlab balance        <span style={{ color: '#64748b' }}>{t('home.cli.cmtBalance')}</span></div>
+      <div><span style={{ color: '#f59e0b' }}>$</span> yzlab keys list      <span style={{ color: '#64748b' }}>{t('home.cli.cmtKeys')}</span></div>
+      <div><span style={{ color: '#f59e0b' }}>$</span> yzlab models         <span style={{ color: '#64748b' }}>{t('home.cli.cmtModels', { count: MODELS.length })}</span></div>
+      <div><span style={{ color: '#f59e0b' }}>$</span> yzlab chat <span style={{ color: '#10b981' }}>"{t('home.cli.chatPrompt')}"</span></div>
+      <div style={{ marginTop: 14, color: '#94a3b8' }}>{t('home.cli.cmtStream')}</div>
       <div><span style={{ color: '#f59e0b' }}>$</span> yzlab chat --model claude-opus-4-7 --stream <span style={{ color: '#10b981' }}>&lt; prompt.txt</span></div>
     </div>
   </Card>
-);
+  );
+};
 
 // === HomeTab =======================================================
 const HomeTab = ({ ctx, onTab, onAction }) => {
+  const { t } = useT();
   const { logs, tweaks } = ctx;
   const recentLogs = logs.slice(0, 4);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -984,15 +999,15 @@ const HomeTab = ({ ctx, onTab, onAction }) => {
                 fontSize: 34, lineHeight: 1.08, letterSpacing: -1.3,
                 fontWeight: 600, margin: '14px 0 10px', color: 'var(--ink)'
               }}>
-                Türkiye'nin <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, letterSpacing: -1 }}>Yapay Zekâ</span> API Geçidi
+                {t('home.hero.titlePrefix')}<span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, letterSpacing: -1 }}>{t('home.hero.titleItalic')}</span>{t('home.hero.titleSuffix')}
               </h1>
               <div style={{ fontSize: 14, color: 'var(--ink-2)', fontStyle: 'italic', fontFamily: 'var(--font-serif)', marginBottom: 10 }}>
-                Kota yok. Gizli limit yok. Aylık abonelik yok.
+                {t('home.hero.tagline')}
               </div>
               <p className="pretty" style={{
                 fontSize: 13, lineHeight: 1.6, color: 'var(--ink-2)', margin: 0
               }}>
-                Claude (Opus/Sonnet/Haiku) metin modelleri — hepsi <strong>tek API key</strong> ile. Bakiye yükle, kullandığın kadar öde.
+                {t('home.hero.leadPrefix')}<strong>{t('home.hero.leadStrong')}</strong>{t('home.hero.leadSuffix')}
               </p>
               <div style={{ display: 'flex', gap: 8, marginTop: 18, flexWrap: 'wrap' }}>
                 <button onClick={() => onTab('account')} style={{
@@ -1002,14 +1017,14 @@ const HomeTab = ({ ctx, onTab, onAction }) => {
                   display: 'flex', alignItems: 'center', gap: 7,
                   boxShadow: 'var(--sh-1)'
                 }}>
-                  <span>Kayıt Ol</span><I.Arrow size={13} stroke="#fff" />
+                  <span>{t('home.hero.signupCta')}</span><I.Arrow size={13} stroke="#fff" />
                 </button>
                 <button onClick={() => onTab('models')} style={{
                   background: 'var(--surface)', color: 'var(--ink)',
                   padding: '10px 18px', borderRadius: 9,
                   fontSize: 12.5, fontWeight: 500,
                   border: '1px solid var(--border-st)'
-                }}>Fiyat Listesi</button>
+                }}>{t('home.hero.pricingCta')}</button>
               </div>
             </div>
 
@@ -1022,10 +1037,10 @@ const HomeTab = ({ ctx, onTab, onAction }) => {
         {/* API Aktivitesi side card */}
         <Card pad={16} style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <Caption>API Aktivitesi</Caption>
+            <Caption>{t('home.activity.caption')}</Caption>
             <Chip tone="accent" style={{ fontSize: 9.5 }}>
               <PulseDot color="var(--accent)" size={5} withRing={false} />
-              {tweaks.streamRate === 'off' ? 'Duraklatıldı' : 'Canlı'}
+              {tweaks.streamRate === 'off' ? t('home.activity.paused') : t('home.activity.live')}
             </Chip>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1041,12 +1056,12 @@ const HomeTab = ({ ctx, onTab, onAction }) => {
 
       {/* ===== 3 FEATURE CARDS ===== */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-        <FeatureCard tone="teal" Ico={I.Layers} title="Claude Model Ailesi"
-        body="Claude Opus 4.8/4.7/4.6, Sonnet 4.6 ve Haiku 4.5 metin modelleri. Tek API key, tek bakiye, sıfır karmaşıklık." />
-        <FeatureCard tone="indigo" Ico={I.Wallet} title="Saydam Fiyatlama"
-        body="Katalogda görünen satış fiyatı kullanılır. Tüm ücretlendirme USD bazındadır — TL karşılığı yalnızca bilgi amaçlı gösterilir." />
-        <FeatureCard tone="purple" Ico={I.Zap} title="5 Dakikada Başla"
-        body="Kayıt ol → Bakiye yükle (IBAN / Shopier / Cryptomus) → API key oluştur → İlk isteği gönder. Kredi kartı zorunlu değil, minimum bakiye 2 USD." />
+        <FeatureCard tone="teal" Ico={I.Layers} title={t('home.feature.modelsTitle')}
+        body={t('home.feature.modelsBody')} />
+        <FeatureCard tone="indigo" Ico={I.Wallet} title={t('home.feature.pricingTitle')}
+        body={t('home.feature.pricingBody')} />
+        <FeatureCard tone="purple" Ico={I.Zap} title={t('home.feature.startTitle')}
+        body={t('home.feature.startBody')} />
       </div>
 
       {/* ===== HOW IT WORKS ===== */}

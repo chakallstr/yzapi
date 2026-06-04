@@ -8,6 +8,7 @@ import {
   mockUsers, mockUsageRecords, mockPayments, mockAnnouncements,
   mockAuditLogs, mockKurHistory, mockProviderStatus,
 } from './shared.jsx';
+import { useT } from './i18n/index.jsx';
 
 /* ============================================
    ModelsTab — metin model fiyat listesi
@@ -45,6 +46,7 @@ const ProviderBadge = ({ provider }) => {
 };
 
 const ModelRow = ({ m, tweaks, onToggleCompare, compareOn }) => {
+  const { t } = useT();
   const rate     = tweaks?.tlRate         ?? 34.5;
   const textMul  = tweaks?.textMultiplier ?? 3.0;
   const mediaMul = tweaks?.mediaMultiplier?? 2.3;
@@ -66,7 +68,7 @@ const ModelRow = ({ m, tweaks, onToggleCompare, compareOn }) => {
         background: compareOn ? 'var(--accent)' : 'var(--surface)',
         border: `1.5px solid ${compareOn ? 'var(--accent)' : 'var(--border-st)'}`,
         display: 'grid', placeItems: 'center', cursor: 'pointer',
-      }} title={compareOn ? 'Karşılaştırmadan çıkar' : 'Karşılaştırmaya ekle'}>
+      }} title={compareOn ? t('models.compare.remove_title') : t('models.compare.add_title')}>
         {compareOn && <I.Check size={12} stroke="#fff" />}
       </button>
       {/* Model name + id */}
@@ -102,6 +104,7 @@ const ModelRow = ({ m, tweaks, onToggleCompare, compareOn }) => {
 
 // === CompareTray — yan yana model karşılaştırma ====================
 const CompareTray = ({ ids, onRemove, onClear, tweaks }) => {
+  const { t } = useT();
   if (ids.length === 0) return null;
   const textMul = tweaks?.textMultiplier ?? 3.0;
   const mediaMul = tweaks?.mediaMultiplier ?? 2.3;
@@ -121,12 +124,12 @@ const CompareTray = ({ ids, onRemove, onClear, tweaks }) => {
                     background: 'var(--ink)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <I.Layers size={14} stroke="#fff" />
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>Karşılaştırma</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{t('models.compare.heading')}</span>
           <Chip tone="accent" style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
             {ids.length} / 3 model
           </Chip>
         </div>
-        <button onClick={onClear} style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-mono)' }}>tümünü temizle</button>
+        <button onClick={onClear} style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-mono)' }}>{t('models.compare.clear_all')}</button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${rows.length}, 1fr)` }}>
         {rows.map(({ id, m, catalogPrice, ourPrice }) => (
@@ -141,10 +144,10 @@ const CompareTray = ({ ids, onRemove, onClear, tweaks }) => {
             </div>
             <ProviderBadge provider={m.provider} />
             <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11.5 }}>
-              <CompareRow label="Katalog USD" value={fmt.usdPer(catalogPrice) + ' / 1M'} />
+              <CompareRow label={t('models.compare.row_catalog_usd')} value={fmt.usdPer(catalogPrice) + ' / 1M'} />
               <CompareRow label="YapayZekaLab" value={fmt.usdPer(ourPrice) + ' / 1M'} accent />
               <CompareRow label="Context" value={m.ctx || '—'} />
-              <CompareRow label="Tip" value={m.type} />
+              <CompareRow label={t('models.compare.row_type')} value={m.type} />
               <CompareRow label="Tier" value={m.tier || '—'} />
             </div>
           </div>
@@ -164,6 +167,7 @@ const CompareRow = ({ label, value, accent }) => (
 // === ModelsTab ====================================================
 const ModelsTab = ({ ctx }) => {
   const { tweaks } = ctx;
+  const { t } = useT();
   const [filter, setFilter] = useState('text');
   const [providerFilter, setProviderFilter] = useState('all');
   const [compareIds, setCompareIds] = useState([]);
@@ -232,14 +236,12 @@ const ModelsTab = ({ ctx }) => {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <Caption>Modeller</Caption>
+          <Caption>{t('models.heading_caption')}</Caption>
           <h2 style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.8, margin: '6px 0 6px' }}>
-            {catalogModels.length} metin modeli, <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: 'var(--ink-3)' }}>tek API geçidi</span>
+            {t('models.heading_count', { count: catalogModels.length })} <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: 'var(--ink-3)' }}>{t('models.heading_gateway')}</span>
           </h2>
-          <p style={{ fontSize: 12.5, color: 'var(--ink-2)', margin: 0, maxWidth: 640, lineHeight: 1.55 }}>
-            Tüm fiyatlar <strong>USD</strong> bazındadır. TL gösterimleri yalnızca bilgi amaçlıdır.
-            {' '}Bu geçişte aktif katalog yalnızca metin modelleridir.
-          </p>
+          <p style={{ fontSize: 12.5, color: 'var(--ink-2)', margin: 0, maxWidth: 640, lineHeight: 1.55 }}
+             dangerouslySetInnerHTML={{ __html: t('models.pricing_note') }} />
         </div>
 
         {/* Tip filter */}
@@ -263,10 +265,10 @@ const ModelsTab = ({ ctx }) => {
       <Card pad={20} style={{ background: 'var(--surface-2)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20 }}>
           {[
-            { label: 'Metin fiyatı',   value: 'katalog satış fiyatı',                                           mono: true },
-            { label: 'Aktif kapsam',   value: 'metin modelleri · görsel/video kapalı',                          mono: true },
-            { label: 'Para birimi',   value: 'USD birincil · TL bilgi',                                           mono: false, accent: true },
-            { label: 'Bilgi kuru',    value: '₺' + (tweaks.tlRate ?? 34.5).toFixed(2) + ' / USD',                  mono: false },
+            { label: t('models.info.text_price_label'),   value: t('models.info.text_price_value'),                                           mono: true },
+            { label: t('models.info.active_scope_label'), value: t('models.info.active_scope_value'),                                         mono: true },
+            { label: t('models.info.currency_label'),     value: t('models.info.currency_value'),                                             mono: false, accent: true },
+            { label: t('models.info.rate_label'),         value: '₺' + (tweaks.tlRate ?? 34.5).toFixed(2) + ' / USD',                        mono: false },
           ].map((row, i) => (
             <div key={i}>
               <Caption>{row.label}</Caption>
@@ -285,7 +287,7 @@ const ModelsTab = ({ ctx }) => {
       {/* Provider filter chips */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', letterSpacing: 0.6, marginRight: 4 }}>SAĞLAYICI</span>
+          <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', letterSpacing: 0.6, marginRight: 4 }}>{t('models.filter.provider_label')}</span>
           {providersFor.map(p => {
             const on = providerFilter === p;
             const meta = p === 'all' ? null : PROVIDERS[p];
@@ -298,7 +300,7 @@ const ModelsTab = ({ ctx }) => {
                 fontFamily: p === 'all' ? 'var(--font-sans)' : 'var(--font-mono)',
                 letterSpacing: p === 'all' ? 0 : 0.3,
               }}>
-                {p === 'all' ? 'Tümü' : meta.short}
+                {p === 'all' ? t('common.all') : meta.short}
               </button>
             );
           })}
@@ -309,7 +311,7 @@ const ModelsTab = ({ ctx }) => {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Model ara"
+            placeholder={t('models.search_placeholder')}
             type="text"
             style={{
               width: '100%',
@@ -340,13 +342,13 @@ const ModelsTab = ({ ctx }) => {
         }}>
           <Caption>≡</Caption>
           <Caption>Model</Caption>
-          <Caption>Sağlayıcı</Caption>
-          <Caption style={{ textAlign: 'right' }}>Katalog fiyatı</Caption>
-          <Caption style={{ textAlign: 'right' }}>YapayZekaLab fiyatı (USD)</Caption>
+          <Caption>{t('models.col.provider')}</Caption>
+          <Caption style={{ textAlign: 'right' }}>{t('models.col.catalog_price')}</Caption>
+          <Caption style={{ textAlign: 'right' }}>{t('models.col.yzl_price')}</Caption>
         </div>
         {filtered.length === 0 ? (
           <div style={{ padding: 28, textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>
-            Bu filtreyle eşleşen model yok.
+            {t('models.empty_state')}
           </div>
         ) : (
           filtered.map(m => <ModelRow key={m.id} m={m} tweaks={tweaks}
@@ -356,7 +358,7 @@ const ModelsTab = ({ ctx }) => {
       </Card>
 
       <div style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'center', padding: '8px 0', fontFamily: 'var(--font-mono)' }}>
-        * Ücretlendirme USD bazındadır. TL karşılığı günlük TCMB kurundan hesaplanıp yalnızca bilgi olarak gösterilir. Görsel/video endpointleri bu geçişte kapalıdır ve 501 JSON hata döndürür.
+        {t('models.footnote')}
       </div>
     </div>
   );

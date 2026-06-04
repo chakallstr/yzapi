@@ -4,6 +4,7 @@ import {
   PROVIDERS, MODELS_BY_ID, modelMeta, fmt, useCountUp,
 } from './shared.jsx';
 import { apiJson } from './auth-client.js';
+import { useT } from './i18n/index.jsx';
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
   CartesianGrid, XAxis, YAxis, Tooltip, Legend,
@@ -26,15 +27,17 @@ const StatSection = ({ title, sub, children }) => (
 
 // Saat/gün yoğunluk ısı haritası — usage-stats zaman serisi kovalarından.
 const StatHeatGrid = ({ rows }) => {
+  const { t } = useT();
   const max = Math.max(...rows.map((r) => r.requestCount || 0), 1);
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(74px, 1fr))', gap: 8 }}>
       {rows.map((row) => {
         const intensity = Math.max(0.1, (row.requestCount || 0) / max);
+        const tooltipKey = row.errorCount ? 'activity.heatgrid.tooltip.errors' : 'activity.heatgrid.tooltip';
         return (
           <div
             key={row.bucketStart}
-            title={`${row.label} · ${fmt.num(row.requestCount || 0)} istek${row.errorCount ? ` · ${fmt.num(row.errorCount)} hata` : ''}`}
+            title={t(tooltipKey, { label: row.label, requestCount: fmt.num(row.requestCount || 0), errorCount: fmt.num(row.errorCount) })}
             style={{
               borderRadius: 12, padding: '10px 9px', border: '1px solid var(--border)',
               background: `rgba(37,99,235,${Math.min(0.82, intensity)})`,
@@ -43,7 +46,7 @@ const StatHeatGrid = ({ rows }) => {
           >
             <div style={{ fontSize: 10, opacity: intensity > 0.5 ? 0.92 : 0.7 }}>{row.label}</div>
             <div className="tnum" style={{ fontSize: 16, fontWeight: 700, marginTop: 5 }}>{fmt.num(row.requestCount || 0)}</div>
-            {row.errorCount > 0 ? <div style={{ fontSize: 10, marginTop: 3 }}>hata {fmt.num(row.errorCount)}</div> : null}
+            {row.errorCount > 0 ? <div style={{ fontSize: 10, marginTop: 3 }}>{t('activity.heatgrid.cell.errors', { errorCount: fmt.num(row.errorCount) })}</div> : null}
           </div>
         );
       })}
@@ -195,6 +198,7 @@ const LatencyChart = ({ points, p50, accentColor = 'var(--accent)' }) => {
 };
 
 const ProviderDonut = ({ counts, total }) => {
+  const { t } = useT();
   const C = 2 * Math.PI * 64;
   let acc = 0;
   return (
@@ -224,7 +228,7 @@ const ProviderDonut = ({ counts, total }) => {
       <text x="80" y="78" textAnchor="middle" fontSize="26" fontWeight="600" fill="var(--ink)" fontFamily="var(--font-sans)" className="tnum">
         {fmt.num(total)}
       </text>
-      <text x="80" y="96" textAnchor="middle" fontSize="10" fill="var(--ink-3)" fontFamily="var(--font-mono)">istek</text>
+      <text x="80" y="96" textAnchor="middle" fontSize="10" fill="var(--ink-3)" fontFamily="var(--font-mono)">{t('activity.donut.requests')}</text>
     </svg>
   );
 };
@@ -257,6 +261,7 @@ const EmptyState = ({ children }) => (
 );
 
 const StatusBadge = ({ status }) => {
+  const { t } = useT();
   const ok = isOkStatus(status);
   return (
     <span style={{
@@ -266,7 +271,7 @@ const StatusBadge = ({ status }) => {
       color: ok ? '#047857' : '#c2410c',
     }}>
       {ok ? <I.Check size={11} stroke="#047857" /> : <I.Clock size={10} stroke="#c2410c" />}
-      {ok ? 'başarılı' : 'hata'}
+      {ok ? t('activity.status.ok') : t('activity.status.error')}
     </span>
   );
 };
@@ -285,7 +290,8 @@ const DetailRow = ({ label, value, mono = true, accent = false }) => (
 );
 
 const ExpandedDetail = ({ record, tlRate }) => {
-  const t = recordTokens(record);
+  const { t } = useT();
+  const tok = recordTokens(record);
   const usd = usdFor(record, tlRate);
   const tl = Number(record.costTL || 0);
   const keyLabel = record.apiKeyName || record.apiKeyMasked || '—';
@@ -296,24 +302,24 @@ const ExpandedDetail = ({ record, tlRate }) => {
       display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '4px 28px',
     }}>
       <div>
-        <Caption style={{ fontSize: 9 }}>Token kırılımı</Caption>
-        <DetailRow label="Bağlam girişi (taze)" value={fmt.num(t.base)} />
-        <DetailRow label="Cache okuma (önbellek)" value={fmt.num(t.cacheRead)} />
-        <DetailRow label="Cache yazma" value={fmt.num(t.cacheCreate)} />
-        <DetailRow label="Toplam giriş" value={fmt.num(t.inputUsage)} accent />
-        <DetailRow label="Çıkış" value={fmt.num(t.outputUsage)} accent />
-        <DetailRow label="Toplam token" value={fmt.num(t.total)} accent />
+        <Caption style={{ fontSize: 9 }}>{t('activity.detail.section.tokens')}</Caption>
+        <DetailRow label={t('activity.detail.base')} value={fmt.num(tok.base)} />
+        <DetailRow label={t('activity.detail.cacheRead')} value={fmt.num(tok.cacheRead)} />
+        <DetailRow label={t('activity.detail.cacheWrite')} value={fmt.num(tok.cacheCreate)} />
+        <DetailRow label={t('activity.detail.totalInput')} value={fmt.num(tok.inputUsage)} accent />
+        <DetailRow label={t('activity.detail.output')} value={fmt.num(tok.outputUsage)} accent />
+        <DetailRow label={t('activity.detail.totalTokens')} value={fmt.num(tok.total)} accent />
       </div>
       <div>
-        <Caption style={{ fontSize: 9 }}>Maliyet ve istek</Caption>
-        <DetailRow label="Maliyet (₺)" value={`₺${tl.toFixed(4)}`} accent />
-        <DetailRow label="Maliyet ($)" value={`$${usd.toFixed(6)}`} accent />
-        <DetailRow label="Kalan bakiye (₺)" value={record.remainingTL === null || record.remainingTL === undefined ? '—' : `₺${Number(record.remainingTL).toFixed(2)}`} />
-        <DetailRow label="Gecikme" value={record.responseMs ? `${fmt.num(record.responseMs)} ms` : '—'} />
-        <DetailRow label="API anahtarı" value={keyLabel} mono={false} />
-        <DetailRow label="İşlem tipi" value={record.type || 'text'} />
-        {record.errorCode ? <DetailRow label="Hata kodu" value={record.errorCode} /> : null}
-        <DetailRow label="İstek ID" value={record.requestId || record.id} />
+        <Caption style={{ fontSize: 9 }}>{t('activity.detail.section.cost')}</Caption>
+        <DetailRow label={t('activity.detail.costTL')} value={`₺${tl.toFixed(4)}`} accent />
+        <DetailRow label={t('activity.detail.costUSD')} value={`$${usd.toFixed(6)}`} accent />
+        <DetailRow label={t('activity.detail.remaining')} value={record.remainingTL === null || record.remainingTL === undefined ? '—' : `₺${Number(record.remainingTL).toFixed(2)}`} />
+        <DetailRow label={t('activity.detail.latency')} value={record.responseMs ? `${fmt.num(record.responseMs)} ms` : '—'} />
+        <DetailRow label={t('activity.detail.apiKey')} value={keyLabel} mono={false} />
+        <DetailRow label={t('activity.detail.type')} value={record.type || 'text'} />
+        {record.errorCode ? <DetailRow label={t('activity.detail.errorCode')} value={record.errorCode} /> : null}
+        <DetailRow label={t('activity.detail.requestId')} value={record.requestId || record.id} />
       </div>
     </div>
   );
@@ -322,6 +328,7 @@ const ExpandedDetail = ({ record, tlRate }) => {
 const HISTORY_GRID = '128px 1.3fr 1fr 110px 96px 130px 96px 30px';
 
 const UsageHistoryTable = ({ records, tlRate, loading }) => {
+  const { t } = useT();
   const [modelFilter, setModelFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [query, setQuery] = useState('');
@@ -363,31 +370,31 @@ const UsageHistoryTable = ({ records, tlRate, loading }) => {
     <Card pad={0} style={{ overflow: 'hidden' }}>
       <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>Detaylı kullanım geçmişi</div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>{t('activity.table.title')}</div>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
-            Her istek: tarih, model, bağlam/cache token kırılımı ve ₺ + $ maliyet. Satıra tıkla, tüm detayı gör.
+            {t('activity.table.subtitle')}
           </div>
         </div>
         <Chip tone="ok">
           <PulseDot color="#10b981" size={6} withRing={false} />
-          {fmt.num(filtered.length)} kayıt
+          {t('activity.table.recordCount', { count: fmt.num(filtered.length) })}
         </Chip>
       </div>
 
       <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', background: 'var(--surface-2)' }}>
         <select value={modelFilter} onChange={(e) => setModelFilter(e.target.value)} style={selectStyle}>
-          <option value="all">Tüm modeller</option>
+          <option value="all">{t('activity.table.filter.allModels')}</option>
           {modelOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
         </select>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
-          <option value="all">Tüm durumlar</option>
-          <option value="ok">Yalnız başarılı</option>
-          <option value="error">Yalnız hata</option>
+          <option value="all">{t('activity.table.filter.allStatuses')}</option>
+          <option value="ok">{t('activity.table.filter.onlyOk')}</option>
+          <option value="error">{t('activity.table.filter.onlyError')}</option>
         </select>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Model, istek ID, anahtar ara…"
+          placeholder={t('activity.table.filter.searchPlaceholder')}
           style={{ ...selectStyle, flex: 1, minWidth: 180 }}
         />
         {(modelFilter !== 'all' || statusFilter !== 'all' || query) && (
@@ -395,18 +402,18 @@ const UsageHistoryTable = ({ records, tlRate, loading }) => {
             onClick={() => { setModelFilter('all'); setStatusFilter('all'); setQuery(''); }}
             style={{ ...selectStyle, cursor: 'pointer' }}
           >
-            Temizle
+            {t('activity.table.filter.clear')}
           </button>
         )}
       </div>
 
       {records.length === 0 ? (
         <div style={{ padding: 18 }}>
-          <EmptyState>Henüz kullanım kaydı yok. İlk API çağrısından sonra burada görünür.</EmptyState>
+          <EmptyState>{t('activity.table.empty')}</EmptyState>
         </div>
       ) : filtered.length === 0 ? (
         <div style={{ padding: 18 }}>
-          <EmptyState>{loading ? 'Yükleniyor…' : 'Bu filtreyle eşleşen kayıt yok.'}</EmptyState>
+          <EmptyState>{loading ? t('common.loading') : t('activity.table.noMatch')}</EmptyState>
         </div>
       ) : (
         <>
@@ -416,7 +423,7 @@ const UsageHistoryTable = ({ records, tlRate, loading }) => {
                 display: 'grid', gridTemplateColumns: HISTORY_GRID, gap: 10,
                 padding: '10px 18px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)',
               }}>
-                {['Tarih · saat', 'Model', 'API anahtarı', 'Token (g+ç)', 'Gecikme', 'Maliyet ₺ / $', 'Durum', ''].map((h, i) => (
+                {[t('activity.table.col.datetime'), t('activity.table.col.model'), t('activity.table.col.apiKey'), t('activity.table.col.tokens'), t('activity.table.col.latency'), t('activity.table.col.cost'), t('activity.table.col.status'), ''].map((h, i) => (
                   <Caption key={i} style={{ fontSize: 9 }}>{h}</Caption>
                 ))}
               </div>
@@ -475,7 +482,7 @@ const UsageHistoryTable = ({ records, tlRate, loading }) => {
                 onClick={() => setVisible((v) => v + 25)}
                 style={{ padding: '9px 18px', borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
               >
-                Daha fazla göster ({fmt.num(filtered.length - visible)} kalan)
+                {t('activity.table.loadMore', { remaining: fmt.num(filtered.length - visible) })}
               </button>
             </div>
           )}
@@ -553,6 +560,7 @@ const buildLatencyPoints = (records, range) => {
 };
 
 const ActivityTab = ({ ctx }) => {
+  const { t } = useT();
   const { tweaks } = ctx;
   const tlRate = tweaks.tlRate || 0;
   const [range, setRange] = useState('day');
@@ -573,7 +581,7 @@ const ActivityTab = ({ ctx }) => {
       .catch((err) => {
         if (!cancelled) {
           setRecords(EMPTY_ACTIVITY);
-          setError(err?.message || 'Aktivite verisi alınamadı.');
+          setError(err?.message || t('activity.error.loadFailed'));
         }
       })
       .finally(() => {
@@ -656,7 +664,7 @@ const ActivityTab = ({ ctx }) => {
   const latencyPoints = useMemo(() => buildLatencyPoints(filtered, range), [filtered, range]);
   const latValues = filtered.map((record) => Number(record.responseMs || 0)).filter((value) => value > 0).sort((a, b) => a - b);
   const p50 = latValues.length ? latValues[Math.floor((latValues.length - 1) * 0.5)] : 0;
-  const rangeLabel = range === 'hour' ? 'son 1 saat' : range === 'week' ? 'son 7 gün' : range === 'month' ? 'son 30 gün' : 'son 24 saat';
+  const rangeLabel = t(`activity.rangeLabel.${range}`);
   const totalTokensInRange = tokenTotals.input + tokenTotals.output;
 
   // — Tam-geçmiş agregatları (usage-stats); yoksa 200-cap'li records'a düş —
@@ -683,16 +691,16 @@ const ActivityTab = ({ ctx }) => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <Caption>Aktivite</Caption>
+          <Caption>{t('activity.header.caption')}</Caption>
           <h2 style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.8, margin: '6px 0 6px' }}>
-            API çağrıları, <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: 'var(--ink-3)' }}>gerçek</span>
+            {t('activity.header.title')} <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400, color: 'var(--ink-3)' }}>{t('activity.header.titleAccent')}</span>
           </h2>
           <p style={{ fontSize: 12.5, color: 'var(--ink-2)', margin: 0 }}>
-            Yeni hesaplarda bu ekran sıfırdan başlar. Kullanım oldukça doğal olarak dolar.
+            {t('activity.header.subtitle')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 2, padding: 3, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
-          {[['hour', 'Saat'], ['day', 'Gün'], ['week', 'Hafta'], ['month', 'Ay']].map(([key, label]) => (
+          {[['hour', t('activity.range.hour')], ['day', t('activity.range.day')], ['week', t('activity.range.week')], ['month', t('activity.range.month')]].map(([key, label]) => (
             <button
               key={key}
               onClick={() => setRange(key)}
@@ -716,23 +724,23 @@ const ActivityTab = ({ ctx }) => {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-        <ActKPI label="Toplam istek" value={kpiRequests} delta={(loading || statsLoading) ? 'yükleniyor…' : `${rangeLabel} · cap yok`} />
-        <ActKPI label="Toplam token" value={kpiTokens} delta={kpiCache > 0 ? `cache ${fmt.num(kpiCache)} · ${rangeLabel}` : `g ${fmt.num(kpiInput)} · ç ${fmt.num(kpiOutput)}`} />
-        <ActKPI label="Avg gecikme" value={avgLatency} unit="ms" delta={total ? `${total} kayıt ölçüldü` : 'ölçüm yok'} />
-        <ActKPI label="Bu ay harcama" value={monthUsd} unit="$" delta={`≈ ₺${Number(monthTl).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} decimals={2} />
+        <ActKPI label={t('activity.kpi.requests.label')} value={kpiRequests} delta={(loading || statsLoading) ? t('activity.kpi.requests.loading') : t('activity.kpi.requests.delta', { rangeLabel })} />
+        <ActKPI label={t('activity.kpi.tokens.label')} value={kpiTokens} delta={kpiCache > 0 ? t('activity.kpi.tokens.deltaCache', { cache: fmt.num(kpiCache), rangeLabel }) : t('activity.kpi.tokens.deltaNoCache', { input: fmt.num(kpiInput), output: fmt.num(kpiOutput) })} />
+        <ActKPI label={t('activity.kpi.latency.label')} value={avgLatency} unit="ms" delta={total ? t('activity.kpi.latency.measured', { total }) : t('activity.kpi.latency.none')} />
+        <ActKPI label={t('activity.kpi.spend.label')} value={monthUsd} unit="$" delta={`≈ ₺${Number(monthTl).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} decimals={2} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 18 }}>
         <Card pad={20}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Gecikme eğrisi</div>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>İstek başına milisaniye · {rangeLabel}</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{t('activity.chart.latency.title')}</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{t('activity.chart.latency.subtitle', { rangeLabel })}</div>
             </div>
             <div style={{ display: 'flex', gap: 14, fontSize: 11, color: 'var(--ink-2)' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                 <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--accent)' }} />
-                Gecikme
+                {t('activity.chart.latency.legend')}
               </span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                 <span style={{ width: 8, height: 2, background: 'var(--warn)' }} />
@@ -741,22 +749,22 @@ const ActivityTab = ({ ctx }) => {
             </div>
           </div>
           {total === 0 && !loading ? (
-            <EmptyState>Henüz çağrı yapılmadı. İlk istekten sonra gecikme eğrisi burada oluşur.</EmptyState>
+            <EmptyState>{t('activity.chart.latency.empty')}</EmptyState>
           ) : (
             <LatencyChart points={latencyPoints} p50={p50} />
           )}
         </Card>
 
         <Card pad={20}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>Sağlayıcı dağılımı</div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>{t('activity.card.provider.title')}</div>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, marginBottom: 16 }}>
-            Gerçek kullanım kayıtları
+            {t('activity.card.provider.subtitle')}
           </div>
           <div style={{ display: 'grid', placeItems: 'center', marginBottom: 16 }}>
             <ProviderDonut counts={byProvider} total={total} />
           </div>
           {total === 0 ? (
-            <EmptyState>Henüz kullanım olmadığı için dağılım görünmüyor.</EmptyState>
+            <EmptyState>{t('activity.card.provider.empty')}</EmptyState>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, maxHeight: 200, overflow: 'auto' }}>
               {byProvider.slice(0, 6).map(({ provider, count }) => (
@@ -770,7 +778,7 @@ const ActivityTab = ({ ctx }) => {
       {hasStatsData ? (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 18 }}>
-            <StatSection title="Maliyet zaman serisi" sub={`₺ ve $ tüketim akışı · ${rangeLabel}`}>
+            <StatSection title={t('activity.chart.cost.title')} sub={t('activity.chart.cost.subtitle', { rangeLabel })}>
               {hasSeries ? (
                 <div style={{ width: '100%', height: 260 }}>
                   <ResponsiveContainer>
@@ -781,15 +789,15 @@ const ActivityTab = ({ ctx }) => {
                       <YAxis yAxisId="usd" orientation="right" tick={{ fontSize: 10 }} width={50} />
                       <Tooltip />
                       <Legend />
-                      <Line yAxisId="tl" type="monotone" dataKey="costTL" stroke="#7c3aed" strokeWidth={2} name="Maliyet ₺" dot={false} />
-                      <Line yAxisId="usd" type="monotone" dataKey="costUsd" stroke="#10a37f" strokeWidth={1.8} name="Maliyet $" dot={false} />
+                      <Line yAxisId="tl" type="monotone" dataKey="costTL" stroke="#7c3aed" strokeWidth={2} name={t('activity.chart.cost.lineTL')} dot={false} />
+                      <Line yAxisId="usd" type="monotone" dataKey="costUsd" stroke="#10a37f" strokeWidth={1.8} name={t('activity.chart.cost.lineUSD')} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
-              ) : <EmptyState>Maliyet akışı yok.</EmptyState>}
+              ) : <EmptyState>{t('activity.chart.cost.empty')}</EmptyState>}
             </StatSection>
 
-            <StatSection title="Token tüketimi" sub={`Giriş · çıkış · önbellek (cache) · ${rangeLabel}`}>
+            <StatSection title={t('activity.chart.tokens.title')} sub={t('activity.chart.tokens.subtitle', { rangeLabel })}>
               {hasSeries ? (
                 <div style={{ width: '100%', height: 260 }}>
                   <ResponsiveContainer>
@@ -799,18 +807,18 @@ const ActivityTab = ({ ctx }) => {
                       <YAxis tick={{ fontSize: 10 }} width={50} />
                       <Tooltip />
                       <Legend />
-                      <Line type="monotone" dataKey="inputTokens" stroke="#2563eb" strokeWidth={2} name="Giriş" dot={false} />
-                      <Line type="monotone" dataKey="outputTokens" stroke="#f59e0b" strokeWidth={2} name="Çıkış" dot={false} />
-                      <Line type="monotone" dataKey="cacheTokens" stroke="#0ea5e9" strokeWidth={1.6} name="Cache" dot={false} />
+                      <Line type="monotone" dataKey="inputTokens" stroke="#2563eb" strokeWidth={2} name={t('activity.chart.tokens.input')} dot={false} />
+                      <Line type="monotone" dataKey="outputTokens" stroke="#f59e0b" strokeWidth={2} name={t('activity.chart.tokens.output')} dot={false} />
+                      <Line type="monotone" dataKey="cacheTokens" stroke="#0ea5e9" strokeWidth={1.6} name={t('activity.chart.tokens.cache')} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
-              ) : <EmptyState>Token akışı yok.</EmptyState>}
+              ) : <EmptyState>{t('activity.chart.tokens.empty')}</EmptyState>}
             </StatSection>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 18 }}>
-            <StatSection title="Başarı / hata dağılımı" sub={`Her kovadaki sonuç oranı · ${rangeLabel}`}>
+            <StatSection title={t('activity.chart.successError.title')} sub={t('activity.chart.successError.subtitle', { rangeLabel })}>
               {hasSeries ? (
                 <div style={{ width: '100%', height: 260 }}>
                   <ResponsiveContainer>
@@ -820,15 +828,15 @@ const ActivityTab = ({ ctx }) => {
                       <YAxis tick={{ fontSize: 10 }} width={40} allowDecimals={false} />
                       <Tooltip />
                       <Legend />
-                      <Bar dataKey="successCount" stackId="a" fill="#10a37f" name="Başarılı" />
-                      <Bar dataKey="errorCount" stackId="a" fill="#ef4444" name="Hata" />
+                      <Bar dataKey="successCount" stackId="a" fill="#10a37f" name={t('activity.chart.successError.success')} />
+                      <Bar dataKey="errorCount" stackId="a" fill="#ef4444" name={t('activity.chart.successError.error')} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-              ) : <EmptyState>Sonuç verisi yok.</EmptyState>}
+              ) : <EmptyState>{t('activity.chart.successError.empty')}</EmptyState>}
             </StatSection>
 
-            <StatSection title="En çok kullandığın modeller" sub="İstek sayısına göre ilk 8">
+            <StatSection title={t('activity.chart.topModels.title')} sub={t('activity.chart.topModels.sub')}>
               {modelBar.length ? (
                 <div style={{ width: '100%', height: 260 }}>
                   <ResponsiveContainer>
@@ -837,27 +845,27 @@ const ActivityTab = ({ ctx }) => {
                       <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
                       <YAxis type="category" dataKey="shortName" width={130} tick={{ fontSize: 10 }} />
                       <Tooltip />
-                      <Bar dataKey="requestCount" fill="#2563eb" name="İstek" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="requestCount" fill="#2563eb" name={t('activity.chart.topModels.bar')} radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-              ) : <EmptyState>Model verisi yok.</EmptyState>}
+              ) : <EmptyState>{t('activity.chart.topModels.empty')}</EmptyState>}
             </StatSection>
           </div>
 
-          <StatSection title="Saat / gün yoğunluğu" sub={`Hangi zaman diliminde ne kadar istek attın · ${rangeLabel}`}>
-            {hasSeries ? <StatHeatGrid rows={stats.timeseries} /> : <EmptyState>Yoğunluk verisi yok.</EmptyState>}
+          <StatSection title={t('activity.section.heatgrid.title')} sub={t('activity.section.heatgrid.subtitle', { rangeLabel })}>
+            {hasSeries ? <StatHeatGrid rows={stats.timeseries} /> : <EmptyState>{t('activity.section.heatgrid.empty')}</EmptyState>}
           </StatSection>
 
           <Card pad={0} style={{ overflow: 'hidden' }}>
             <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Model bazında kullanım & maliyet</div>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>Kendi en çok kullandığın / en pahalı modellerin · {rangeLabel}</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{t('activity.modelTable.title')}</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>{t('activity.modelTable.subtitle', { rangeLabel })}</div>
             </div>
             {stats.models && stats.models.length ? (
               <div style={{ overflowX: 'auto' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) 66px 62px 84px 92px 92px 70px', gap: 10, padding: '10px 16px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
-                  <Caption>Model</Caption><Caption>İstek</Caption><Caption>Pay %</Caption><Caption>Token</Caption><Caption>Maliyet ₺</Caption><Caption>Maliyet $</Caption><Caption>Mlyt %</Caption>
+                  <Caption>{t('activity.modelTable.col.model')}</Caption><Caption>{t('activity.modelTable.col.requests')}</Caption><Caption>{t('activity.modelTable.col.share')}</Caption><Caption>{t('activity.modelTable.col.tokens')}</Caption><Caption>{t('activity.modelTable.col.costTL')}</Caption><Caption>{t('activity.modelTable.col.costUSD')}</Caption><Caption>{t('activity.modelTable.col.costShare')}</Caption>
                 </div>
                 {stats.models.slice(0, 20).map((m) => (
                   <div key={m.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) 66px 62px 84px 92px 92px 70px', gap: 10, padding: '0 16px' }}>
@@ -874,7 +882,7 @@ const ActivityTab = ({ ctx }) => {
                   </div>
                 ))}
               </div>
-            ) : <div style={{ padding: 16 }}><EmptyState>Bu aralıkta model kullanımı yok.</EmptyState></div>}
+            ) : <div style={{ padding: 16 }}><EmptyState>{t('activity.modelTable.empty')}</EmptyState></div>}
           </Card>
         </>
       ) : null}
