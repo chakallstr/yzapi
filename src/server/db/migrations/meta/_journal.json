@@ -162,6 +162,13 @@
       "when": 1781212800000,
       "tag": "0022_github_oauth_account_delivery",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1781299200000,
+      "tag": "0023_user_lang",
+      "breakpoints": true
     }
   ]
 }

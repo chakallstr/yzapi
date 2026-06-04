@@ -115,6 +115,11 @@ const withAuthHeaders = (headers = {}) => {
   const next = { ...headers };
   const token = getAccessToken();
   if (token) next.Authorization = `Bearer ${token}`;
+  // i18n: forward the chosen UI language so API error messages match the toggle.
+  try {
+    const lang = storage()?.getItem('yz_lang');
+    if ((lang === 'tr' || lang === 'en') && next['X-Lang'] === undefined) next['X-Lang'] = lang;
+  } catch { /* ignore */ }
   return next;
 };
 

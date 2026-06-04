@@ -192,18 +192,42 @@ router.get("/me", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// PATCH /api/user/me
+// PATCH /api/user/me — update display name and/or language preference (both optional)
 router.patch("/me", async (req, res, next) => {
   try {
-    const adSoyad = String(req.body?.adSoyad || "").trim();
-    if (!adSoyad || adSoyad.length < 2) {
-      res.status(400).json({ error: "Ad soyad en az 2 karakter olmalı." });
+    const updates: { adSoyad?: string; lang?: string; updatedAt?: Date } = {};
+    const auditParts: string[] = [];
+
+    if (req.body?.adSoyad !== undefined) {
+      const adSoyad = String(req.body.adSoyad || "").trim();
+      if (!adSoyad || adSoyad.length < 2) {
+        res.status(400).json({ error: "Ad soyad en az 2 karakter olmalı." });
+        return;
+      }
+      updates.adSoyad = adSoyad;
+      auditParts.push(`ad: ${adSoyad}`);
+    }
+
+    if (req.body?.lang !== undefined) {
+      const lang = String(req.body.lang);
+      if (lang !== "tr" && lang !== "en") {
+        res.status(400).json({ error: "Geçersiz dil tercihi (tr veya en)." });
+        return;
+      }
+      updates.lang = lang;
+      auditParts.push(`dil: ${lang}`);
+    }
+
+    if (auditParts.length === 0) {
+      res.status(400).json({ error: "Güncellenecek alan yok." });
       return;
     }
 
+    updates.updatedAt = new Date();
+
     const updatedRows = await db
       .update(users)
-      .set({ adSoyad, updatedAt: new Date() })
+      .set(updates)
       .where(eq(users.id, req.user!.id))
       .returning();
 
@@ -212,7 +236,7 @@ router.patch("/me", async (req, res, next) => {
       return;
     }
 
-    await writeAudit("user_profile_update", req.user!.id, `Kullanıcı profil adını güncelledi: ${adSoyad}`, req.user!.id);
+    await writeAudit("user_profile_update", req.user!.id, `Kullanıcı profilini güncelledi (${auditParts.join(", ")})`, req.user!.id);
 
     const { passwordHash, ...safe } = updatedRows[0];
     void passwordHash;

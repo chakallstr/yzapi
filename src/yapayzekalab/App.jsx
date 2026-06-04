@@ -1020,7 +1020,7 @@ const SiteFooter = () => {
   );
 };
 const App = ({ initialTab = 'home' }) => {
-  const { t: tr } = useT();
+  const { t: tr, lang, setLang } = useT();
   const initialAuth = hasStoredAuth();
   const initialWhatsappPending = getWhatsappPendingToken();
   const initialTabRequiresAuth = PROTECTED_TABS.has(initialTab);
@@ -1034,6 +1034,27 @@ const App = ({ initialTab = 'home' }) => {
   const [profile, setProfile] = useState(null);
   const skeleton = false;
   const isAdmin = String(profile?.email || '').trim().toLowerCase() === ADMIN_EMAIL;
+
+  // i18n: seed the UI language from the saved profile preference once it loads
+  // (profile wins over a stale localStorage choice). Depends only on profile.lang
+  // so it does NOT fight the live toggle (which doesn't change profile.lang).
+  useEffect(() => {
+    const pl = profile?.lang;
+    if ((pl === 'tr' || pl === 'en') && pl !== lang) setLang(pl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.lang]);
+
+  // i18n: when the user toggles language while signed in, persist the preference
+  // to the profile (best-effort) so server-side emails follow the same language.
+  useEffect(() => {
+    const onLangChange = (e) => {
+      const next = e?.detail;
+      if (!isAuthenticated || (next !== 'tr' && next !== 'en')) return;
+      void apiJson('/api/user/me', { method: 'PATCH', body: { lang: next } }).catch(() => {});
+    };
+    window.addEventListener('yz:lang-change', onLangChange);
+    return () => window.removeEventListener('yz:lang-change', onLangChange);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
