@@ -5,6 +5,12 @@ import { logger } from "../lib/logger.js";
 import { canonicalizeModelId } from "../../master-models.js";
 import { getRuntimeApiConfig } from "./api-settings-service.js";
 import type { ProviderContext } from "./provider-config-service.js";
+import {
+  ResponsesStreamTranslator,
+  formatResponsesSse,
+  usageFromTokens,
+  type ResponsesStreamMeta,
+} from "./responses-translation.js";
 
 export interface ChatUsage {
   promptTokens: number;
@@ -440,6 +446,140 @@ export async function forwardChatStream(
     });
 
     // Abort upstream if client disconnects
+    res.req?.on("close", () => {
+      nodeStream.destroy();
+      finalize();
+    });
+  });
+}
+
+// ── Responses API streaming köprüsü ──────────────────────────────────────────
+// Codex (>=0.99) yalnız Responses API konuşur ama upstream yalnız /chat/completions
+// sunar. Bu fonksiyon upstream'i CHAT olarak (stream) sürer, gelen chat SSE delta'larını
+// Responses event'lerine (response.output_text.delta vb.) çevirip res'e yazar.
+// forwardChatStream'in İKİZİDİR (aynı upstream okuma/usage mantığı) ama res'e Responses
+// formatı yazar — chat hot-path'i (forwardChatStream) byte-byte DOKUNULMADAN bırakılır.
+// Dönüş ChatUsage: billing settle forwardChatStream ile AYNI çalışır (para yolu değişmez).
+export async function forwardChatStreamAsResponses(
+  body: ChatRequest,
+  res: Response,
+  ctx: ProviderContext,
+  meta: ResponsesStreamMeta,
+): Promise<ChatUsage> {
+  const baseUrl = ctx.baseUrl;
+  const url = `${baseUrl}/chat/completions`;
+  const providerBody = applyProfileModelMap(
+    mapRequestBodyForProvider(
+      { ...body, stream: true, stream_options: { include_usage: true } },
+      baseUrl,
+    ),
+    ctx.modelMap,
+  );
+  const runtimeConfig = await getRuntimeApiConfig();
+
+  const upstream = await fetchWithRuntimeTimeout(url, {
+    method: "POST",
+    headers: { ...baseHeaders(ctx.apiKey), Accept: "text/event-stream" },
+    body: JSON.stringify(providerBody),
+  }, runtimeConfig.defaultStreamTimeoutMs);
+
+  if (!upstream.ok) {
+    // Header'lar HENÜZ gönderilmedi → proxy normal JSON hata gövdesi döndürebilir.
+    const errBody = await upstream.json().catch(() => ({}));
+    const err = new Error(`AI provider ${upstream.status}`) as Error & { status: number; body: unknown };
+    err.status = upstream.status;
+    err.body = errBody;
+    throw err;
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+
+  const translator = new ResponsesStreamTranslator(meta);
+  const writeEvents = (events: Record<string, unknown>[]) => {
+    for (const e of events) res.write(formatResponsesSse(e));
+  };
+  writeEvents(translator.start());
+
+  return new Promise<ChatUsage>((resolve, reject) => {
+    if (!upstream.body) {
+      reject(new Error("No response body from AI provider"));
+      return;
+    }
+
+    const usage: ChatUsage = { promptTokens: 0, completionTokens: 0 };
+    let assistantText = "";
+    let settled = false;
+    const nodeStream = Readable.fromWeb(upstream.body as import("stream/web").ReadableStream);
+    let buffer = "";
+
+    const finalize = () => {
+      if (settled) return;
+      settled = true;
+      clearIdle();
+      if (usage.promptTokens <= 0) usage.promptTokens = estimateTextTokens(providerBody.messages ?? "");
+      if (usage.completionTokens <= 0) usage.completionTokens = estimateTextTokens(assistantText);
+      try {
+        writeEvents(translator.finish(usageFromTokens(usage.promptTokens, usage.completionTokens)));
+      } catch { /* res kapalı olabilir */ }
+      try { res.end(); } catch { /* zaten kapalı */ }
+      resolve(usage);
+    };
+
+    const idleMs = runtimeConfig.defaultStreamTimeoutMs ?? 120_000;
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    function clearIdle() { if (idleTimer) clearTimeout(idleTimer); }
+    function resetIdle() {
+      clearIdle();
+      idleTimer = setTimeout(() => {
+        logger.error({ url, idleMs }, "responses stream idle timeout — upstream veri göndermedi");
+        nodeStream.destroy();
+        finalize();
+      }, idleMs);
+    }
+    resetIdle();
+
+    nodeStream.on("data", (chunk: Buffer) => {
+      resetIdle();
+      buffer += chunk.toString();
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6).trim();
+        if (payload === "[DONE]") continue;
+        try {
+          const parsed = JSON.parse(payload) as Record<string, unknown>;
+          if (parsed.usage) {
+            const n = normalizeProviderUsage(parsed.usage);
+            if (n.promptTokens > 0) usage.promptTokens = n.promptTokens;
+            if (n.completionTokens > 0) usage.completionTokens = n.completionTokens;
+            usage.providerRaw = parsed.usage;
+          }
+          const choice = (parsed.choices as Array<Record<string, unknown>> | undefined)?.[0];
+          const delta = choice?.delta as Record<string, unknown> | undefined;
+          assistantText += String(delta?.content ?? "");
+          writeEvents(translator.pushChatChunk(parsed));
+        } catch {
+          // non-JSON chunk — ignore
+        }
+      }
+    });
+
+    nodeStream.on("end", () => {
+      finalize();
+    });
+
+    nodeStream.on("error", (err: Error) => {
+      logger.error({ err }, "responses stream error");
+      try { writeEvents(translator.fail(String(err?.message ?? "stream error"))); } catch { /* */ }
+      finalize();
+    });
+
     res.req?.on("close", () => {
       nodeStream.destroy();
       finalize();

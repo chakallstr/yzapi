@@ -165,7 +165,7 @@ claude`,
           "İşletim sistemini seç (Windows / macOS / Linux), bloğun tamamını kopyala, terminale yapıştır, Enter'a bas. Codex kurulu değilse blok `npm install -g @openai/codex` ile kurar.",
           "Blok senin için `~/.codex/config.toml` dosyasına YapayZekaLab sağlayıcısını yazar ve anahtarını ayarlar (varsa eski config'i `.bak` olarak yedekler).",
           "Yalnızca `yzk_live_YOUR_KEY` yazan yeri kendi anahtarınla değiştir.",
-          "Blok bitince `codex` başlar. Not: Codex bir OpenAI aracıdır; Claude modellerinde ufak uyumluluk uyarısı verebilir — en sorunsuz deneyim için yukarıdaki Claude Code kartını tercih et.",
+          "Blok bitince `codex` başlar. Varsayılan model `gpt-5.5` (Codex'in en güçlü kodlama modeli). YapayZekaLab artık Codex'in kullandığı Responses API'sini doğrudan destekler — başka bir ayar veya istemci gerekmez. İstersen `~/.codex/config.toml` içindeki `model` satırını başka bir modelle (ör. `gpt-5.4`) değiştirebilirsin.",
         ],
         osVariants: {
           windows: `# PowerShell — tum blogu yapistir, Enter tusuna bas. Hicbir sey kurulu degilse bile calisir.
@@ -186,7 +186,7 @@ $cfgDir = "$env:USERPROFILE\\.codex"
 New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
 if (Test-Path "$cfgDir\\config.toml") { Copy-Item "$cfgDir\\config.toml" "$cfgDir\\config.toml.bak" -Force }
 @'
-model = "claude-opus-4-8"
+model = "gpt-5.5"
 model_provider = "yapayzekalab"
 
 [model_providers.yapayzekalab]
@@ -217,7 +217,7 @@ fi
 mkdir -p ~/.codex
 [ -f ~/.codex/config.toml ] && cp ~/.codex/config.toml ~/.codex/config.toml.bak
 cat > ~/.codex/config.toml <<'TOML'
-model = "claude-opus-4-8"
+model = "gpt-5.5"
 model_provider = "yapayzekalab"
 
 [model_providers.yapayzekalab]
@@ -247,7 +247,7 @@ fi
 mkdir -p ~/.codex
 [ -f ~/.codex/config.toml ] && cp ~/.codex/config.toml ~/.codex/config.toml.bak
 cat > ~/.codex/config.toml <<'TOML'
-model = "claude-opus-4-8"
+model = "gpt-5.5"
 model_provider = "yapayzekalab"
 
 [model_providers.yapayzekalab]

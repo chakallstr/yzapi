@@ -115,7 +115,7 @@ export OPENAI_API_KEY="yzk_live_SENIN_ANAHTARIN"
 **Yol B — Config dosyası** (`~/.codex/config.toml`):
 
 ```toml
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_provider = "yapayzekalab"
 
 [model_providers.yapayzekalab]

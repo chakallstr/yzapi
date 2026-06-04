@@ -21,6 +21,7 @@ import {
   type WebSearchMode,
 } from "../services/web-search-augment.js";
 import { chargeWebSearch } from "../services/web-search-billing-service.js";
+import { responsesRequestToChat, chatCompletionToResponses } from "../services/responses-translation.js";
 import {
   getApiKeyPolicy,
   getModelRuntimePolicy,
@@ -603,9 +604,165 @@ router.get("/balance", async (req: Request, res: Response, next: NextFunction) =
   }
 });
 
+// ── /v1/responses — OpenAI Responses API (Codex CLI) ─────────────────────────
+// Codex CLI (>=0.99) yalnız Responses API konuşur; upstream sağlayıcılar yalnız
+// /chat/completions sunar (/responses → 404). Bu handler gelen Responses isteğini
+// chat/completions'a çevirir, AYNI billing/guard/routing yolundan geçirir (endpoint
+// "chat" olarak çözülür → "model does not support responses" 400'ü ortadan kalkar),
+// chat yanıtını (stream veya non-stream) Codex'in beklediği Responses formatına çevirir.
+// Para yolu (reserve/settle/resolveBilledPromptTokens) chat handler ile BİREBİR aynıdır.
+async function handleResponsesEndpoint(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const isStream = (req.body as { stream?: boolean }).stream === true;
+  const userId = req.user!.id;
+  const apiKeyId = req.apiKey!.id;
+  const requestId = (req as any).id as string;
+  const start = Date.now();
+  const createdAt = Math.floor(start / 1000);
+
+  let masterModel: MasterModel | undefined;
+  let guard: RequestGuardResult | undefined;
+  let runtimeConfig: RuntimeApiConfig | undefined;
+
+  try {
+    // 1) Responses isteğini chat/completions şemasına çevir (model slug alias dahil).
+    const chatBody = responsesRequestToChat(req.body as Record<string, unknown>);
+
+    // 2) Guard/billing pipeline'ı endpoint "chat" ile çalıştır (model çözümlemesi chat
+    //    uçlarını kullanır; allowResponsesEndpoint toggle'ı buildRequestGuard'a verilir).
+    const enforcement = await enforceRequestGuards({
+      userId,
+      apiKeyId,
+      ipAddress: req.ip,
+      modelId: chatBody.model as string | undefined,
+      endpoint: "chat",
+      body: chatBody as Record<string, unknown>,
+    });
+    masterModel = enforcement.masterModel;
+    runtimeConfig = enforcement.runtimeConfig;
+    if (runtimeConfig.maintenanceModeForApi) {
+      throw new AppError(503, runtimeConfig.maintenanceMessage);
+    }
+
+    const effectiveMaxOutputTokens = computeEffectiveMaxOutputTokens(
+      enforcement.masterModel,
+      enforcement.runtimeConfig,
+      enforcement.apiKeyPolicy,
+      enforcement.runtimePolicy,
+    );
+    guard = buildRequestGuard({
+      endpoint: "chat",
+      model: {
+        maxOutputTokens: effectiveMaxOutputTokens,
+        supportsStreaming: true,
+      },
+      body: chatBody as Record<string, unknown>,
+      // allowResponsesEndpoint admin toggle'ı burada uygulanır (kapalıysa guard reddeder).
+      endpointEnabled: endpointEnabledFor(enforcement.runtimeConfig, "responses"),
+      contextLimitTokens: computeEffectiveContextLimit(
+        enforcement.masterModel,
+        enforcement.runtimeConfig,
+        enforcement.apiKeyPolicy,
+        enforcement.runtimePolicy,
+      ),
+      outputReserveTokens: computeEffectiveOutputReserve(enforcement.runtimeConfig, effectiveMaxOutputTokens),
+      maxTokensPerRequest: effectiveMaxOutputTokens,
+      allowStreaming: enforcement.runtimeConfig.allowStreaming && (enforcement.apiKeyPolicy?.allowStreaming ?? true) !== false && (enforcement.runtimePolicy?.allowStreaming ?? true) !== false,
+      temperatureMin: enforcement.runtimeConfig.defaultTemperatureMin,
+      temperatureMax: enforcement.runtimeConfig.defaultTemperatureMax,
+      topPMin: enforcement.runtimeConfig.defaultTopPMin,
+      topPMax: enforcement.runtimeConfig.defaultTopPMax,
+    });
+
+    await reserveUsageBudget({
+      userId,
+      apiKeyId,
+      model: masterModel,
+      usage: { promptTokens: guard.contextTokens, completionTokens: guard.reservedCompletionTokens },
+      requestId,
+    });
+
+    const providerBody = {
+      ...guard.guardedBody,
+      model: runtimeConfig.strictCanonicalModelIds ? masterModel.id : String(chatBody.model || masterModel.id),
+    };
+    const providerCtx = await resolveProviderForModel(masterModel.id);
+    const activeProviderAdapter = await getActiveProviderAdapter();
+
+    if (isStream) {
+      res.setHeader("X-YZ-Request-Id", requestId);
+      const usage = await activeProviderAdapter.forwardResponsesStream(
+        providerBody as any,
+        res,
+        providerCtx,
+        { id: requestId, model: masterModel.id, createdAt },
+      );
+      const responseMs = Date.now() - start;
+
+      const hasUsage = usage.promptTokens > 0 || usage.completionTokens > 0;
+      const streamStatus = hasUsage
+        ? "success"
+        : (runtimeConfig?.streamMissingUsageFallbackEnabled === false ? "error" : "stream_missing_usage");
+      const billedPromptTokens = resolveBilledPromptTokens(usage.promptTokens, guard.contextTokens);
+      await settleReservedUsage({
+        userId,
+        apiKeyId,
+        model: masterModel,
+        usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens },
+        requestId,
+        rawUsageJson: usage,
+        errorCode: streamStatus === "stream_missing_usage" ? "stream_missing_usage" : undefined,
+        responseMs,
+        status: streamStatus,
+      });
+    } else {
+      const { raw, usage } = await activeProviderAdapter.forwardChat(providerBody as any, providerCtx);
+      const responseMs = Date.now() - start;
+
+      const billedPromptTokens = resolveBilledPromptTokens(usage.promptTokens, guard.contextTokens);
+      const { costTL, remainingTL } = await settleReservedUsage({
+        userId,
+        apiKeyId,
+        model: masterModel,
+        usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens },
+        requestId,
+        rawUsageJson: usage,
+        responseMs,
+        status: "success",
+      });
+
+      const { remainingUSD } = await getUserBalanceSnapshot(userId);
+      setExtendedBillingHeaders(res, costTL, remainingTL, remainingUSD, requestId);
+      res.json(chatCompletionToResponses(raw, { id: requestId, model: masterModel.id, createdAt }));
+    }
+  } catch (err) {
+    if (err instanceof InsufficientBalanceError || err instanceof RateLimitError || err instanceof ModelNotFoundError || err instanceof ModelDisabledError || err instanceof BadRequestError) {
+      return next(err);
+    }
+    if (masterModel && guard) {
+      const responseMs = Date.now() - start;
+      settleReservedUsage({
+        userId,
+        apiKeyId,
+        model: masterModel,
+        usage: { promptTokens: guard.contextTokens, completionTokens: 0 },
+        requestId,
+        rawUsageJson: { promptTokens: guard.contextTokens, completionTokens: 0 },
+        errorCode: upstreamErrorCode(err),
+        responseMs,
+        status: "error",
+      })
+        .catch((e2) => logger.error({ err: e2 }, "error usage record failed (responses)"));
+    }
+    // Stream başladıysa header'lar gönderilmiştir; forwardUpstreamError yalnız header
+    // gönderilmemişse JSON yazabilir (aksi halde stream zaten kapanır).
+    if (runtimeConfig && !res.headersSent && forwardUpstreamError(err, res, runtimeConfig)) return;
+    return next(err);
+  }
+}
+
 // POST /v1/responses
 router.post("/responses", requireProxy, (req: Request, res: Response, next: NextFunction) => {
-  void handleTextJsonEndpoint(req, res, next, "responses");
+  void handleResponsesEndpoint(req, res, next);
 });
 
 // POST /v1/messages

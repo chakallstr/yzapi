@@ -5,6 +5,7 @@ import {
   TextRequest,
   forwardChat,
   forwardChatStream,
+  forwardChatStreamAsResponses,
   forwardImage,
   forwardTextEndpoint,
   getVideoTask,
@@ -12,11 +13,14 @@ import {
 } from "./closerouter-service.js";
 import { getRuntimeApiConfig } from "./api-settings-service.js";
 import type { ProviderContext } from "./provider-config-service.js";
+import type { ResponsesStreamMeta } from "./responses-translation.js";
 
 export interface ProviderAdapter {
   readonly id: "closerouter" | "ninerouter";
   forwardChat(body: ChatRequest, ctx: ProviderContext): Promise<{ raw: unknown; usage: ChatUsage }>;
   forwardChatStream(body: ChatRequest, res: Response, ctx: ProviderContext): Promise<ChatUsage>;
+  // Responses API streaming köprüsü: upstream'i chat olarak sürer, res'e Responses event'leri yazar.
+  forwardResponsesStream(body: ChatRequest, res: Response, ctx: ProviderContext, meta: ResponsesStreamMeta): Promise<ChatUsage>;
   forwardResponses(body: TextRequest, ctx: ProviderContext): Promise<{ raw: unknown; usage: ChatUsage }>;
   forwardMessages(body: TextRequest, ctx: ProviderContext): Promise<{ raw: unknown; usage: ChatUsage }>;
   forwardImage(
@@ -37,6 +41,10 @@ export class CloseRouterAdapter implements ProviderAdapter {
 
   forwardChatStream(body: ChatRequest, res: Response, ctx: ProviderContext): Promise<ChatUsage> {
     return forwardChatStream(body, res, ctx);
+  }
+
+  forwardResponsesStream(body: ChatRequest, res: Response, ctx: ProviderContext, meta: ResponsesStreamMeta): Promise<ChatUsage> {
+    return forwardChatStreamAsResponses(body, res, ctx, meta);
   }
 
   forwardResponses(body: TextRequest, ctx: ProviderContext): Promise<{ raw: unknown; usage: ChatUsage }> {
