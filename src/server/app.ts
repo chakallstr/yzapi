@@ -5,6 +5,7 @@ import { execSync } from "child_process";
 import { aiProviderApiKey, aiProviderBaseUrl } from "./lib/env.js";
 import { httpLogger } from "./lib/logger.js";
 import { requestId } from "./middleware/request-id.js";
+import { requestLang } from "./middleware/request-lang.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { adminAuth } from "./middleware/admin-auth.js";
 import { userAuth } from "./middleware/user-auth.js";
@@ -62,6 +63,7 @@ export function createApp(): express.Express {
     },
   }));
   app.use(requestId);
+  app.use(requestLang); // resolve req.lang (X-Lang | Accept-Language | tr) for localized API errors
   app.use(httpLogger);
 
   // Gözcü: hafif in-memory istek sayacı (DB yazımı YOK). api_5xx_rate paydası +

@@ -555,10 +555,12 @@ describe("unsupported model under per-model routing", () => {
     const res = await request(app)
       .post("/v1/chat/completions")
       .set("Authorization", `Bearer ${BILLING_KEY}`)
+      .set("X-Lang", "en") // i18n: request English error message; model id is preserved
       .send({ model: UNSUPPORTED_MODEL, messages: [{ role: "user", content: "hi" }] });
 
     expect(res.status).toBe(404);
     expect(String(res.body.error)).toContain("Model not found");
+    expect(String(res.body.error)).toContain(UNSUPPORTED_MODEL);
 
     // Nothing was billed: no reservation, no usage record, balance unchanged.
     const after = await getBalance(BILLING_USER_ID);

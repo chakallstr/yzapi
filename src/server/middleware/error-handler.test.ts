@@ -31,10 +31,25 @@ describe("errorHandler", () => {
     errorHandler(new InsufficientBalanceError("Insufficient balance"), req, res, vi.fn());
 
     expect(res.status).toHaveBeenCalledWith(402);
+    // localized: req has no lang → default tr
     expect(res.json).toHaveBeenCalledWith({
-      error: "Insufficient balance",
+      error: "Yetersiz bakiye. Lütfen bakiye yükleyin.",
       code: 402,
       requestId: "req-402",
+    });
+  });
+
+  it("localizes insufficient balance to English when req.lang is en", () => {
+    const req = { id: "req-402-en", lang: "en" } as unknown as Request;
+    const res = makeRes();
+
+    errorHandler(new InsufficientBalanceError("Insufficient balance"), req, res, vi.fn());
+
+    expect(res.status).toHaveBeenCalledWith(402);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "Insufficient balance. Please top up.",
+      code: 402,
+      requestId: "req-402-en",
     });
   });
 
@@ -45,8 +60,9 @@ describe("errorHandler", () => {
     errorHandler(new ModelDisabledError("gpt-5.4"), req, res, vi.fn());
 
     expect(res.status).toHaveBeenCalledWith(403);
+    // localized (tr default) with the model id preserved
     expect(res.json).toHaveBeenCalledWith({
-      error: "Model disabled: gpt-5.4",
+      error: "Model şu an kapalı: gpt-5.4",
       code: 403,
       requestId: "req-403",
     });
@@ -60,8 +76,9 @@ describe("errorHandler", () => {
 
     expect(res.setHeader).toHaveBeenCalledWith("Retry-After", "30");
     expect(res.status).toHaveBeenCalledWith(429);
+    // localized (tr default); retryAfter + Retry-After header unchanged
     expect(res.json).toHaveBeenCalledWith({
-      error: "Rate limit exceeded",
+      error: "Çok fazla istek gönderildi. Lütfen biraz sonra tekrar deneyin.",
       code: 429,
       requestId: "req-429",
       retryAfter: 30,
@@ -79,8 +96,9 @@ describe("errorHandler", () => {
     errorHandler(err, req, res, vi.fn());
 
     expect(res.status).toHaveBeenCalledWith(400);
+    // localized (tr default); still no stack/details leaked
     expect(res.json).toHaveBeenCalledWith({
-      error: "Invalid JSON body",
+      error: "Geçersiz JSON gövdesi.",
       code: 400,
       requestId: "req-json",
     });
