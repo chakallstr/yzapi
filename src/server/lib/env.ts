@@ -38,6 +38,11 @@ const schema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().default("http://localhost:4567/api/auth/google/callback"),
 
+  // GitHub OAuth (optional — graceful degrade if missing)
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
+  GITHUB_REDIRECT_URI: z.string().default("http://localhost:4567/api/auth/github/callback"),
+
   // WhatsApp OTP after Google auth. Disabled by default until OpenWA is configured.
   WHATSAPP_OTP_ENABLED: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   WHATSAPP_OTP_PROVIDER: z.enum(["openwa", "meta", "dry_run"]).default("dry_run"),

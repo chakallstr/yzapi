@@ -8,6 +8,12 @@ import {
   isGoogleConfigured,
 } from "../services/google-oauth-service.js";
 import {
+  buildGithubAuthUrl,
+  exchangeGithubCode,
+  fetchGithubProfile,
+  isGithubConfigured,
+} from "../services/github-oauth-service.js";
+import {
   rotateRefreshToken,
   revokeRefreshToken,
   signAccessToken,
@@ -47,6 +53,84 @@ function readPendingToken(req: { headers: Record<string, unknown>; body?: unknow
   const body = req.body as { pendingToken?: unknown } | undefined;
   return typeof body?.pendingToken === "string" ? body.pendingToken : null;
 }
+
+// GET /api/auth/github
+router.get("/github", (req, res) => {
+  if (!isGithubConfigured()) {
+    res.status(503).json({ error: "github oauth not configured" });
+    return;
+  }
+  res.redirect(buildGithubAuthUrl(createOAuthState()));
+});
+
+// GET /api/auth/github/callback
+router.get("/github/callback", async (req, res, next) => {
+  try {
+    const { code, state } = req.query as { code?: string; state?: string };
+    if (!code || !state) {
+      res.status(400).json({ error: "Missing code or state" });
+      return;
+    }
+    if (!verifyOAuthState(state)) {
+      res.status(400).json({ error: "Invalid or expired state" });
+      return;
+    }
+
+    const accessToken = await exchangeGithubCode(code);
+    const profile = await fetchGithubProfile(accessToken);
+
+    const existing = await db.select().from(users).where(eq(users.email, profile.email)).limit(1);
+    let userId: string;
+    let isNew = false;
+    if (existing.length) {
+      userId = existing[0].id;
+      if (!existing[0].githubId) {
+        await db.update(users).set({ githubId: profile.id, updatedAt: new Date() }).where(eq(users.id, userId));
+      }
+    } else {
+      const inserted = await db.insert(users).values({
+        email: profile.email,
+        adSoyad: profile.name || profile.email,
+        githubId: profile.id,
+        bakiyeTL: "0",
+        plan: "ucretsiz",
+      }).returning();
+      userId = inserted[0].id;
+      isNew = true;
+      welcomeEmail({ email: profile.email, adSoyad: profile.name || profile.email }).catch((e) =>
+        logger.error({ err: e }, "[auth] welcome email failed"),
+      );
+      notifyAdmin({ kind: "yeni_uye", title: "Yeni üye kaydı", userEmail: profile.email }).catch((e) =>
+        logger.error({ err: e }, "[auth] admin notify (signup) failed"),
+      );
+    }
+
+    await db.insert(auditLogs).values({
+      action: isNew ? "user_signup" : "user_login",
+      hedef: userId,
+      ozet: `GitHub OAuth: ${profile.email}`,
+      actorId: userId,
+    });
+
+    if (isWhatsappOtpEnabled() && !(await hasActiveVerifiedWhatsappForUser(userId))) {
+      const pendingToken = signWhatsappPendingToken({ sub: userId, email: profile.email, isNew });
+      res.redirect(buildFrontendReturnUrl({ wv: "required", wpt: pendingToken }));
+      return;
+    }
+
+    if (isNew && !isWhatsappOtpEnabled()) {
+      await grantSignupBonusIfEligible(userId, { ip: req.ip }).catch((e) =>
+        logger.error({ err: e, userId }, "[auth] signup bonus failed"),
+      );
+    }
+
+    const accessTokenJwt = signAccessToken({ sub: userId, role: "user" });
+    const refreshToken = await signRefreshToken(userId);
+    res.redirect(buildFrontendReturnUrl({ at: accessTokenJwt, rt: refreshToken }));
+  } catch (e) {
+    next(e);
+  }
+});
 
 // GET /api/auth/google
 router.get("/google", (req, res) => {
