@@ -102,3 +102,11 @@ export async function deletePackage(id: string) {
   // güvenli: disable (entitlement FK'ları korunur)
   await setPackageEnabled(id, false);
 }
+
+/** Feature flag: paket özelliği tümden açık mı? (system_config.packages_enabled, default true) */
+export async function packagesFeatureEnabled(): Promise<boolean> {
+  const rows = await dbSql<{ packages_enabled: boolean }[]>`
+    SELECT packages_enabled FROM system_config WHERE id = 1 LIMIT 1
+  `;
+  return rows.length ? rows[0].packages_enabled !== false : true;
+}

@@ -15,6 +15,7 @@ import { extractUsageBreakdown } from "../services/usage-breakdown.js";
 import { getUserUsageStats, type UsageStatsWindow } from "../services/user-usage-stats-service.js";
 import { listUserEntitlements } from "../services/entitlement-service.js";
 import { purchasePackageWithBalance } from "../services/package-purchase-service.js";
+import { packagesFeatureEnabled } from "../services/package-service.js";
 
 const router = Router();
 
@@ -33,6 +34,10 @@ router.get("/entitlements", async (req, res, next) => {
 
 router.post("/packages/:id/purchase", async (req, res, next) => {
   try {
+    if (!(await packagesFeatureEnabled())) {
+      res.status(404).json({ error: "Paket özelliği kapalı" });
+      return;
+    }
     const result = await purchasePackageWithBalance(req.user!.id, req.params.id);
     res.status(201).json(result);
   } catch (e) {
