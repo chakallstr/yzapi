@@ -10,6 +10,9 @@ export function PackagesTab() {
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState('');
   const keysRef = useRef({});
+  const [code, setCode] = useState('');
+  const [redeeming, setRedeeming] = useState(false);
+  const [redeemMsg, setRedeemMsg] = useState('');
 
   const load = async () => {
     setLoading(true); setError('');
@@ -49,10 +52,32 @@ export function PackagesTab() {
     } finally { setBusyId(''); }
   };
 
+  const redeem = async () => {
+    if (!code.trim()) return;
+    setRedeeming(true); setRedeemMsg(''); setError('');
+    try {
+      const r = await apiJson('/api/user/redeem', { method: 'POST', body: { code: code.trim() } });
+      setRedeemMsg(r.tip === 'balance' ? `Bakiye eklendi: ₺${r.amountTL}` : 'Paket hesabınıza tanımlandı.');
+      setCode('');
+      await load();
+    } catch (e) {
+      setRedeemMsg(e.status === 401 ? 'Kod kullanmak için giriş yapın.' : (e.message || 'Kod kullanılamadı.'));
+    } finally { setRedeeming(false); }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Caption>Paketler</Caption>
       {error && <div style={{ color: 'var(--danger, #e5484d)' }}>{error}</div>}
+
+      <Card pad={16}>
+        <Caption>Hediye / Geçiş Kodu</Caption>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <input placeholder="Kodu girin" value={code} onChange={(e) => setCode(e.target.value)} style={{ flex: 1, minWidth: 180 }} />
+          <button disabled={redeeming} onClick={redeem}>{redeeming ? 'Kullanılıyor…' : 'Kullan'}</button>
+        </div>
+        {redeemMsg && <div style={{ marginTop: 6, color: 'var(--ink-2)' }}>{redeemMsg}</div>}
+      </Card>
 
       {ents.length > 0 && (
         <Card pad={16}>

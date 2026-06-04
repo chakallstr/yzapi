@@ -20,6 +20,7 @@ const ADMIN_SECTIONS = [
   { id: 'users', label: 'Kullanıcılar', Ico: I.Users },
   { id: 'overrides', label: 'Modeller', Ico: I.Layers },
   { id: 'packages', label: 'Paketler', Ico: I.Wallet },
+  { id: 'codes', label: 'Kodlar', Ico: I.Key },
   { id: 'announce', label: 'Duyurular', Ico: I.Megaphone },
   { id: 'providers', label: 'Sağlayıcı', Ico: I.Server },
   { id: 'kur', label: 'Kur', Ico: I.Coins },
@@ -719,6 +720,87 @@ const AdminOverrides = ({ overrides, token, refresh }) => {
         })}
       </Card>
     </div>
+  );
+};
+
+const AdminRedeemCodes = ({ token }) => {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [form, setForm] = useState({ tip: 'balance', amountTL: '', packageId: '', count: '1', prefix: '', maxUses: '1', expiresAt: '', aciklama: '' });
+  const [saving, setSaving] = useState(false);
+  const [generated, setGenerated] = useState([]);
+
+  const load = async () => {
+    setLoading(true); setError('');
+    try { const list = await adminRequest('/api/admin/redeem-codes', token); setRows(Array.isArray(list) ? list : []); }
+    catch (e) { setError(e.message || 'Kodlar alınamadı.'); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); }, [token]);
+
+  const create = async () => {
+    setSaving(true); setError(''); setGenerated([]);
+    try {
+      const res = await adminRequest('/api/admin/redeem-codes', token, { method: 'POST', body: {
+        tip: form.tip,
+        amountTL: form.tip === 'balance' ? Number(form.amountTL) : undefined,
+        packageId: form.tip === 'package' ? form.packageId.trim() : undefined,
+        count: Number(form.count || 1), prefix: form.prefix, maxUses: Number(form.maxUses || 1),
+        expiresAt: form.expiresAt || null, aciklama: form.aciklama,
+      } });
+      setGenerated(res.codes || []);
+      await load();
+    } catch (e) { setError(e.message || 'Kod üretilemedi.'); }
+    finally { setSaving(false); }
+  };
+
+  const toggle = async (row) => {
+    try { await adminRequest(`/api/admin/redeem-codes/${row.id}/toggle`, token, { method: 'POST', body: { enabled: !row.enabled } }); await load(); }
+    catch (e) { setError(e.message || 'Durum değiştirilemedi.'); }
+  };
+
+  return (
+    <Card pad={18}>
+      <Caption>Hediye / Geçiş Kodları</Caption>
+      {error && <div style={{ color: 'var(--danger, #e5484d)', marginTop: 6 }}>{error}</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 8, margin: '12px 0' }}>
+        <select value={form.tip} onChange={(e) => setForm({ ...form, tip: e.target.value })}>
+          <option value="balance">Bakiye (TL)</option>
+          <option value="package">Paket</option>
+        </select>
+        {form.tip === 'balance'
+          ? <input placeholder="tutar ₺" value={form.amountTL} onChange={(e) => setForm({ ...form, amountTL: e.target.value })} />
+          : <input placeholder="paket id" value={form.packageId} onChange={(e) => setForm({ ...form, packageId: e.target.value })} />}
+        <input placeholder="adet" value={form.count} onChange={(e) => setForm({ ...form, count: e.target.value })} />
+        <input placeholder="prefix (ops)" value={form.prefix} onChange={(e) => setForm({ ...form, prefix: e.target.value })} />
+        <input placeholder="max kullanım" value={form.maxUses} onChange={(e) => setForm({ ...form, maxUses: e.target.value })} />
+        <input placeholder="bitiş (ISO, ops)" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} />
+      </div>
+      <button disabled={saving} onClick={create}>{saving ? 'Üretiliyor…' : 'Kod Üret'}</button>
+      {generated.length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <Caption>Üretilen kodlar</Caption>
+          <textarea readOnly rows={Math.min(generated.length, 8)} style={{ width: '100%' }} value={generated.join('\n')} />
+        </div>
+      )}
+      {loading ? <div style={{ marginTop: 12 }}>Yükleniyor…</div> : (
+        <table style={{ width: '100%', marginTop: 12, fontSize: 13 }}>
+          <thead><tr style={{ textAlign: 'left' }}><th>kod</th><th>tip</th><th>değer</th><th>kullanım</th><th>durum</th><th></th></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id}>
+                <td>{r.code}</td><td>{r.tip}</td>
+                <td>{r.tip === 'balance' ? `₺${Number(r.amount_tl)}` : r.package_id}</td>
+                <td>{r.used_count}/{r.max_uses}</td>
+                <td>{r.enabled ? 'Açık' : 'Kapalı'}</td>
+                <td><button onClick={() => toggle(r)}>{r.enabled ? 'Kapat' : 'Aç'}</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Card>
   );
 };
 
@@ -2590,6 +2672,7 @@ const AdminTab = ({ ctx = {} }) => {
         {section === 'kur' && <AdminKur config={data.config} kurHistory={data.kurHistory || []} token={token} refresh={refresh} />}
         {section === 'payments' && <AdminPaymentSettings config={data.config} token={token} refresh={refresh} />}
         {section === 'packages' && <AdminPackages token={token} />}
+        {section === 'codes' && <AdminRedeemCodes token={token} />}
         {section === 'telegram' && <AdminTelegram token={token} />}
         {section === 'apikeys' && <AdminApiKeys apiKeys={data.apiKeys || []} users={data.users || []} token={token} refresh={refresh} filterUserId={trafficApiKeyJump.userId} filterApiKeyId={trafficApiKeyJump.apiKeyId} filterNonce={trafficApiKeyJump.nonce} />}
         {section === 'logs' && <AdminLogs reconciliation={data.reconciliation} auditLogs={data.auditLogs || []} token={token} />}
