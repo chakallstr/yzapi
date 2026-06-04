@@ -53,16 +53,17 @@ export async function fetchGithubProfile(accessToken: string): Promise<GitHubPro
   };
   const userRes = await fetch("https://api.github.com/user", { headers });
   if (!userRes.ok) throw new Error(`GitHub userinfo failed: ${userRes.status}`);
-  const u = (await userRes.json()) as { id: number; login: string; name?: string; email?: string };
+  const u = (await userRes.json()) as { id: number; login: string; name?: string };
 
-  let email = u.email;
-  if (!email) {
-    const emailsRes = await fetch("https://api.github.com/user/emails", { headers });
-    if (emailsRes.ok) {
-      const emails = (await emailsRes.json()) as Array<{ email: string; primary: boolean; verified: boolean }>;
-      const primary = emails.find((e) => e.primary && e.verified) || emails.find((e) => e.verified);
-      email = primary?.email;
-    }
+  // GÜVENLİK: GET /user'ın `email` alanı doğrulanma bilgisi taşımaz (sahte/doğrulanmamış
+  // e-posta hesap-ele-geçirmeye açar). Bu yüzden HER ZAMAN /user/emails'ten yalnız
+  // `verified` primary'yi çözeriz (Google'ın açık `email_verified` gate'inin eşi).
+  let email: string | undefined;
+  const emailsRes = await fetch("https://api.github.com/user/emails", { headers });
+  if (emailsRes.ok) {
+    const emails = (await emailsRes.json()) as Array<{ email: string; primary: boolean; verified: boolean }>;
+    const primary = emails.find((e) => e.primary && e.verified) || emails.find((e) => e.verified);
+    email = primary?.email;
   }
   if (!email) throw new Error("GitHub doğrulanmış e-posta bulunamadı");
   return { id: String(u.id), email, name: u.name || u.login };
