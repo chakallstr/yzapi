@@ -63,6 +63,7 @@ export const users = pgTable(
     gunlukLimitTL: numeric("gunluk_limit_tl", { precision: 14, scale: 4 }),
     passwordHash: text("password_hash"),
     googleId: text("google_id"),
+    githubId: text("github_id"),
     lastLowBalanceAlert: timestamp("last_low_balance_alert", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
@@ -669,4 +670,27 @@ export const redeemCodeUses = pgTable(
     entitlementId: uuid("entitlement_id").references(() => userPackageEntitlements.id),
   },
   (t) => [uniqueIndex("redeem_code_uses_code_user_idx").on(t.codeId, t.userId)]
+);
+
+// ── account delivery orders (Faz 6 — hesap-teslim paketleri, manuel fulfillment) ──
+export const accountDeliveryOrders = pgTable(
+  "account_delivery_orders",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    packageId: text("package_id").notNull().references(() => packages.id),
+    amountTL: numeric("amount_tl", { precision: 14, scale: 4 }).notNull(),
+    contact: text("contact").notNull().default(""),
+    durum: text("durum").notNull().default("bekliyor"), // bekliyor | teslim_edildi | iptal
+    teslimPayload: text("teslim_payload"),
+    purchaseTransactionId: uuid("purchase_transaction_id").references(() => transactions.id),
+    onaylayan: text("onaylayan"),
+    olusturma: timestamp("olusturma", { withTimezone: true }).notNull().default(sql`now()`),
+    teslim: timestamp("teslim", { withTimezone: true }),
+    not: text("not"),
+  },
+  (t) => [
+    index("ado_user_idx").on(t.userId),
+    index("ado_durum_idx").on(t.durum, t.olusturma),
+  ]
 );

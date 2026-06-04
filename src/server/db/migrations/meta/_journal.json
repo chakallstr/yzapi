@@ -155,6 +155,13 @@
       "when": 1781126400000,
       "tag": "0021_added_model_image",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1781212800000,
+      "tag": "0022_github_oauth_account_delivery",
+      "breakpoints": true
     }
   ]
 }
