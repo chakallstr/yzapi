@@ -5,11 +5,17 @@ import { env } from "./lib/env.js";
 import { logger } from "./lib/logger.js";
 import { startKurRefresh } from "./services/kur-service.js";
 import { startAllJobs } from "./jobs/index.js";
+import { installUpstreamDispatcher } from "./lib/upstream-dispatcher.js";
 import { createApp } from "./app.js";
 
 const app = createApp();
 
 async function startServer() {
+  // Upstream connect-timeout 500'lerine karşı: keep-alive havuzu + 30sn connect timeout
+  // (ham fetch'in undici-default 10sn connect tavanını kaldırır). closerouter-service
+  // ayrıca connect hatalarında retry eder (ikinci savunma katmanı).
+  installUpstreamDispatcher();
+
   await startKurRefresh();
   startAllJobs();
 

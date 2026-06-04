@@ -225,18 +225,72 @@ function baseHeaders(apiKey: string | undefined): Record<string, string> {
   };
 }
 
-async function fetchWithRuntimeTimeout(
+// Yalnız BAĞLANTI-FAZI (istek upstream'e HİÇ ulaşmadan) hataları. Bağlantı
+// kurulmadıysa istek gönderilmedi → tekrar denemek çift-işlem/çift-tahsil YARATMAZ.
+// ECONNRESET kasten DIŞARIDA: akış ortasında da olabilir (istek gönderilmiş olabilir).
+const RETRYABLE_CONNECT_CODES = new Set([
+  "UND_ERR_CONNECT_TIMEOUT",
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+]);
+
+function isRetryableConnectError(e: unknown): boolean {
+  const err = e as { name?: string; message?: string; cause?: { code?: string; message?: string } };
+  if (err?.name === "AbortError") return false; // bizim kasıtlı timeout'umuz — retry etme
+  const code = err?.cause?.code;
+  if (code && RETRYABLE_CONNECT_CODES.has(code)) return true;
+  const msg = `${err?.cause?.message ?? ""} ${err?.message ?? ""}`.toLowerCase();
+  return msg.includes("connect timeout") || msg.includes("connecttimeout");
+}
+
+// Upstream'e fetch — kasıtlı timeout + BAĞLANTI-FAZI hatalarında güvenli retry.
+// Canlı olay (2026-06-04): Popusk yeni TLS bağlantısını undici'nin 10s connectTimeout'u
+// içinde kabul edemeyince ham 500 dönüyordu. Connect hatası = istek hiç gönderilmedi →
+// retry money-safe. Tükenirse retry-edilebilir 503'e çevrilir (ham 500 yerine).
+export async function fetchWithRuntimeTimeout(
   url: string,
   init: RequestInit,
   timeoutMs: number,
+  maxAttempts = 3,
+  backoffMs = 300,
 ): Promise<globalThis.Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...init, signal: controller.signal });
+    } catch (e) {
+      lastErr = e;
+      if (attempt < maxAttempts && isRetryableConnectError(e)) {
+        logger.warn(
+          { url, attempt, maxAttempts, err: (e as Error)?.message },
+          "upstream connect hatası — yeniden deneniyor",
+        );
+        await new Promise((r) => setTimeout(r, backoffMs * attempt));
+        continue;
+      }
+      // Retry'lar tükendi: ham 500 yerine RETRY-EDİLEBİLİR 503 ver. (OpenAI/Roo SDK
+      // 5xx'i otomatik tekrar dener; Gözcü upstream_503 olarak doğru sınıflar.)
+      // billing K1: forward ÖNCESİ patladığı için reserve serbest bırakılır (0 tahsil).
+      if (isRetryableConnectError(e)) {
+        const tagged = e as Error & { status?: number; body?: unknown };
+        tagged.status = 503;
+        tagged.body = {
+          error: {
+            message: "Sağlayıcıya geçici olarak ulaşılamadı, lütfen tekrar deneyin.",
+            type: "upstream_unavailable",
+          },
+        };
+        throw tagged;
+      }
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  throw lastErr;
 }
 
 export async function forwardChat(
