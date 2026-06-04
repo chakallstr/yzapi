@@ -4,7 +4,7 @@ import { AppError } from "../lib/errors.js";
 export async function listUserDeliveryOrders(userId: string) {
   const rows = await dbSql<any[]>`
     SELECT o.id, o.package_id, p.ad AS paket_adi, o.amount_tl, o.durum, o.contact,
-           o.olusturma, o.teslim, o.teslim_payload, o.not
+           o.olusturma, o.teslim, o.teslim_payload, o."not"
     FROM account_delivery_orders o
     LEFT JOIN packages p ON p.id = o.package_id
     WHERE o.user_id = ${userId}::uuid
@@ -28,7 +28,7 @@ export async function listUserDeliveryOrders(userId: string) {
 export async function listAllDeliveryOrders() {
   const rows = await dbSql<any[]>`
     SELECT o.id, o.user_id, u.email AS user_email, o.package_id, p.ad AS paket_adi,
-           o.amount_tl, o.durum, o.contact, o.olusturma, o.teslim, o.onaylayan, o.not
+           o.amount_tl, o.durum, o.contact, o.olusturma, o.teslim, o.onaylayan, o."not"
     FROM account_delivery_orders o
     LEFT JOIN users u ON u.id = o.user_id
     LEFT JOIN packages p ON p.id = o.package_id
@@ -59,7 +59,7 @@ export async function markDeliveryDelivered(id: string, adminId: string, teslimP
   await dbSql`
     UPDATE account_delivery_orders
     SET durum = 'teslim_edildi', teslim_payload = ${teslimPayload ?? ""}, teslim = now(),
-        onaylayan = ${adminId}, not = ${note ?? null}
+        onaylayan = ${adminId}, "not" = ${note ?? null}
     WHERE id = ${id}::uuid AND durum = 'bekliyor'
   `;
 }
@@ -91,7 +91,7 @@ export async function cancelDeliveryWithRefund(id: string, adminId: string, note
          ${"Hesap-teslim iptal iadesi"}, 'bakiye', ${"delivery_refund_" + id})
     `;
     await txSql`
-      UPDATE account_delivery_orders SET durum = 'iptal', onaylayan = ${adminId}, teslim = now(), not = ${note ?? null}
+      UPDATE account_delivery_orders SET durum = 'iptal', onaylayan = ${adminId}, teslim = now(), "not" = ${note ?? null}
       WHERE id = ${id}::uuid AND durum = 'bekliyor'
     `;
     return { refundedTL: amountTL, newBalanceTL: newBalance };
