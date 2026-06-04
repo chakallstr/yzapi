@@ -14,6 +14,8 @@ import { ModelsTab } from './tab-models.jsx';
 import { PackagesTab } from './tab-packages.jsx';
 import { AiChatTab } from './tab-ai-chat.jsx';
 import { StudioTab } from './tab-studio.jsx';
+import { StatusTab } from './tab-status.jsx';
+import { SupportTab } from './tab-support.jsx';
 import { LEGAL_DOCS } from './legal-docs.js';
 import {
   apiJson,
@@ -656,6 +658,8 @@ const TopBar = ({ active, onTab, balanceUSD, tlRate, onUserAction, isAuthenticat
     { id: 'ai-chat',  label: 'AI Chat',    Ico: I.Sparkle },
     { id: 'studio',   label: 'Studio',     Ico: I.Layers },
     { id: 'documents',label: 'Documents',  Ico: I.File },
+    { id: 'status',   label: 'Durum',      Ico: I.Activity },
+    { id: 'support',  label: 'Destek',     Ico: I.Bell },
     { id: 'activity', label: 'Aktivite',   Ico: I.Activity },
     { id: 'account',  label: 'Hesap',      Ico: I.Wallet },
     ...(isAdmin ? [{ id: 'admin', label: 'Admin', Ico: I.Shield }] : []),
@@ -1277,6 +1281,8 @@ const App = ({ initialTab = 'home' }) => {
         {tab === 'studio' && <StudioTab />}
         {tab === 'activity' && <ActivityTab ctx={ctx} />}
         {tab === 'documents' && <DocumentsTab />}
+        {tab === 'status' && <StatusTab />}
+        {tab === 'support' && <SupportTab />}
         {tab === 'account'  && <AccountTab  ctx={ctx} />}
         {tab === 'admin' && isAdmin && <AdminTab ctx={ctx} />}
       </main>

@@ -96,6 +96,12 @@ const schema = z.object({
   DODO_API_BASE: z.string().optional(),
   DODO_RETURN_URL: z.string().optional(),
 
+  // Destek/iletişim kanalları (opsiyonel — yalnız tanımlıysa gösterilir)
+  SUPPORT_WHATSAPP_URL: z.string().optional(),
+  SUPPORT_TELEGRAM_URL: z.string().optional(),
+  SUPPORT_DISCORD_URL: z.string().optional(),
+  SUPPORT_EMAIL: z.string().optional(),
+
   // Telegram + Crypto Pay bot channel (optional — endpoints return 503 when unset)
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_BOT_USERNAME: z.string().optional(),
