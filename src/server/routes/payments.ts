@@ -107,12 +107,23 @@ function buildPaymentNotification(opts: {
   };
 }
 
+const MIN_TOPUP_USD = 2;
+
 async function buildQuoteFromRequest(body: Record<string, unknown>) {
   const kur = await getPaymentKur();
   const rawAmountUsd = body.amountUsd ?? (body.miktarTL !== undefined ? Number(body.miktarTL) / kur : undefined);
   const amountUsd = Number(rawAmountUsd);
+  // Min ödeme USD-tabanlı ($2) — frontend (MIN_USD=2) ile hizalı. Üst sınır config'ten (maxBakiyeTL).
+  // (Eski ₺250 TL-floor yerine; geçersiz/küçük tutarda buildUsdTopupQuote throw etmeden 400 döner.)
+  if (!Number.isFinite(amountUsd) || amountUsd < MIN_TOPUP_USD) {
+    return {
+      quote: { amountUsd: Number.isFinite(amountUsd) ? amountUsd : 0, kur, payableTL: 0, creditTL: 0, roundingTL: 0 },
+      amountValidation: { ok: false as const, status: 400 as const, error: `Minimum yükleme tutarı ${MIN_TOPUP_USD} USD.` },
+    };
+  }
   const quote = buildUsdTopupQuote(amountUsd, kur);
-  const amountValidation = validatePaymentAmount(quote.payableTL, await getPaymentLimits());
+  const limits = await getPaymentLimits();
+  const amountValidation = validatePaymentAmount(quote.payableTL, { minBakiyeTL: 0, maxBakiyeTL: limits.maxBakiyeTL });
   return { quote, amountValidation };
 }
 
