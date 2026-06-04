@@ -16,6 +16,7 @@ import { getUserUsageStats, type UsageStatsWindow } from "../services/user-usage
 import { listUserEntitlements } from "../services/entitlement-service.js";
 import { purchasePackageWithBalance } from "../services/package-purchase-service.js";
 import { packagesFeatureEnabled } from "../services/package-service.js";
+import { redeemCode } from "../services/redeem-code-service.js";
 
 const router = Router();
 
@@ -24,6 +25,20 @@ const router = Router();
 export { extractUsageBreakdown } from "../services/usage-breakdown.js";
 
 // ── Paketler (Faz 1) ─────────────────────────────────────────────────────────
+router.post("/redeem", async (req, res, next) => {
+  try {
+    const { code } = req.body as { code?: string };
+    if (!code?.trim()) {
+      res.status(400).json({ error: "Kod gerekli" });
+      return;
+    }
+    const result = await redeemCode(req.user!.id, code);
+    res.json(result);
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.get("/entitlements", async (req, res, next) => {
   try {
     res.json(await listUserEntitlements(req.user!.id));

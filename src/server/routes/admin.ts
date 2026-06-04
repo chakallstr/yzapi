@@ -40,6 +40,7 @@ import {
   setPackageEnabled,
   deletePackage,
 } from "../services/package-service.js";
+import { generateRedeemCodes, listRedeemCodes, setRedeemCodeEnabled } from "../services/redeem-code-service.js";
 import {
   getProviderConfigAdminView,
   saveProviderConfig,
@@ -1258,6 +1259,48 @@ router.delete("/packages/:id", async (req, res, next) => {
   try {
     await deletePackage(req.params.id);
     await writeAudit("admin_package_delete", req.params.id, `Paket kapatıldı (silme): ${req.params.id}`, req.user!.id);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ── Hediye/Geçiş Kodları (Faz 2) ─────────────────────────────────────────────
+router.get("/redeem-codes", async (_req, res, next) => {
+  try {
+    res.json(await listRedeemCodes());
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/redeem-codes", async (req, res, next) => {
+  try {
+    const b = req.body as Record<string, unknown>;
+    const tip = b.tip === "package" ? "package" : "balance";
+    const result = await generateRedeemCodes({
+      tip,
+      amountTL: b.amountTL != null ? Number(b.amountTL) : undefined,
+      packageId: b.packageId != null ? String(b.packageId) : undefined,
+      count: Number(b.count ?? 1),
+      prefix: b.prefix != null ? String(b.prefix) : undefined,
+      maxUses: b.maxUses != null ? Number(b.maxUses) : undefined,
+      perUserOnce: b.perUserOnce !== false,
+      expiresAt: b.expiresAt != null ? String(b.expiresAt) : null,
+      aciklama: b.aciklama != null ? String(b.aciklama) : undefined,
+    });
+    await writeAudit("admin_redeem_codes_create", "redeem", `${result.codes.length} kod üretildi (${tip})`, req.user!.id);
+    res.status(201).json(result);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/redeem-codes/:id/toggle", async (req, res, next) => {
+  try {
+    const enabled = (req.body as Record<string, unknown>)?.enabled === true;
+    await setRedeemCodeEnabled(req.params.id, enabled);
+    await writeAudit("admin_redeem_code_toggle", req.params.id, `Kod ${enabled ? "açıldı" : "kapatıldı"}`, req.user!.id);
     res.json({ ok: true });
   } catch (e) {
     next(e);
