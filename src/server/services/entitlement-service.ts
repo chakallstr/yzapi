@@ -83,7 +83,7 @@ export async function recordPackageUsage(opts: {
     status: opts.status,
     billedVia: "package",
     entitlementId: opts.entitlementId,
-  });
+  }).onConflictDoNothing({ target: usageRecords.requestId });
 }
 
 export interface ActiveEntitlement {

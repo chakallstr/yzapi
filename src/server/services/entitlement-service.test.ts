@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockDbSql = vi.fn();
-const mockInsertValues = vi.fn();
+const mockOnConflict = vi.fn();
+const mockInsertValues = vi.fn(() => ({ onConflictDoNothing: mockOnConflict }));
 
 vi.mock("../db/client.js", () => ({
   db: { insert: () => ({ values: mockInsertValues }) },
@@ -32,7 +33,7 @@ describe("entitlement-service", () => {
   });
 
   it("recordPackageUsage writes a usage row with costTL=0 and billed_via=package", async () => {
-    mockInsertValues.mockResolvedValue([]);
+    mockOnConflict.mockResolvedValue([]);
     const { recordPackageUsage } = await import("./entitlement-service.js");
     await recordPackageUsage({
       userId: "u", apiKeyId: "k", modelId: "claude-opus-4.8", entitlementId: "e",

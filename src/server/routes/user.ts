@@ -38,7 +38,8 @@ router.post("/packages/:id/purchase", async (req, res, next) => {
       res.status(404).json({ error: "Paket özelliği kapalı" });
       return;
     }
-    const result = await purchasePackageWithBalance(req.user!.id, req.params.id);
+    const idempotencyKey = req.header("Idempotency-Key") || undefined;
+    const result = await purchasePackageWithBalance(req.user!.id, req.params.id, idempotencyKey);
     res.status(201).json(result);
   } catch (e) {
     next(e);
