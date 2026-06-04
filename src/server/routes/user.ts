@@ -71,6 +71,39 @@ router.post("/ai-chat", async (req, res, next) => {
   }
 });
 
+// ── Studio (Faz 4a) — görsel üretim panel proxy (key server-side, ai-chat ile aynı) ──
+router.post("/studio", async (req, res, next) => {
+  try {
+    const keyRows = await db
+      .select({ fullKeyCipher: apiKeys.fullKeyCipher })
+      .from(apiKeys)
+      .where(and(eq(apiKeys.userId, req.user!.id), eq(apiKeys.aktif, true)))
+      .limit(1);
+    if (!keyRows.length || !keyRows[0].fullKeyCipher) {
+      res.status(400).json({ error: "Aktif API anahtarı yok. Önce bir API anahtarı oluşturun." });
+      return;
+    }
+    const fullKey = decryptApiKey(keyRows[0].fullKeyCipher);
+    const raw = (req.body ?? {}) as Record<string, unknown>;
+    const endpoint = raw.endpoint === "edits" ? "edits" : "generations";
+    const { endpoint: _omit, ...imageBody } = raw;
+    void _omit;
+
+    const upstream = await fetch(`http://127.0.0.1:${env.PORT}/v1/images/${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${fullKey}` },
+      body: JSON.stringify(imageBody),
+    });
+    res.status(upstream.status);
+    const ct = upstream.headers.get("content-type");
+    if (ct) res.setHeader("Content-Type", ct);
+    const text = await upstream.text();
+    res.send(text);
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.post("/redeem", async (req, res, next) => {
   try {
     const { code } = req.body as { code?: string };

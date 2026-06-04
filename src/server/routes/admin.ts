@@ -392,6 +392,8 @@ router.post("/added-models", async (req, res, next) => {
       providerLabel: String(body.providerLabel ?? ""),
       inputUsd: Number(body.inputUsd ?? 0),
       outputUsd: Number(body.outputUsd ?? 0),
+      type: body.type === "Görsel" ? "Görsel" : "Metin",
+      imagePriceUsd: body.imagePriceUsd != null ? Number(body.imagePriceUsd) : 0,
       enabled: body.enabled,
     });
     await writeAudit("added_model_create", created.modelId, `name: ${created.name}`);

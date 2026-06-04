@@ -895,7 +895,7 @@ const AdminAddedModels = ({ token }) => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [form, setForm] = useState({ modelId: '', name: '', providerLabel: '', inputUsd: '', outputUsd: '' });
+  const [form, setForm] = useState({ modelId: '', name: '', providerLabel: '', inputUsd: '', outputUsd: '', type: 'Metin', imagePriceUsd: '' });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState('');
 
@@ -930,9 +930,11 @@ const AdminAddedModels = ({ token }) => {
       setSaved('');
       return;
     }
-    const inputUsd = Number(normalizeDecimalInput(form.inputUsd));
-    const outputUsd = Number(normalizeDecimalInput(form.outputUsd));
-    if (!Number.isFinite(inputUsd) || !Number.isFinite(outputUsd)) {
+    const isImage = form.type === 'Görsel';
+    const inputUsd = Number(normalizeDecimalInput(form.inputUsd || '0'));
+    const outputUsd = Number(normalizeDecimalInput(form.outputUsd || '0'));
+    const imagePriceUsd = Number(normalizeDecimalInput(form.imagePriceUsd || '0'));
+    if (isImage ? !Number.isFinite(imagePriceUsd) : (!Number.isFinite(inputUsd) || !Number.isFinite(outputUsd))) {
       setError('Fiyat alanlarına geçerli sayı gir.');
       setSaved('');
       return;
@@ -943,9 +945,9 @@ const AdminAddedModels = ({ token }) => {
     try {
       await adminRequest('/api/admin/added-models', token, {
         method: 'POST',
-        body: { modelId, name, providerLabel, inputUsd, outputUsd },
+        body: { modelId, name, providerLabel, inputUsd, outputUsd, type: form.type, imagePriceUsd },
       });
-      setForm({ modelId: '', name: '', providerLabel: '', inputUsd: '', outputUsd: '' });
+      setForm({ modelId: '', name: '', providerLabel: '', inputUsd: '', outputUsd: '', type: 'Metin', imagePriceUsd: '' });
       setSaved('Ek model eklendi.');
       await load();
     } catch (createError) {
@@ -975,12 +977,22 @@ const AdminAddedModels = ({ token }) => {
         <div style={{ fontSize: 11.5, color: 'var(--ink-2)', marginTop: 4, marginBottom: 12 }}>
           Master kataloğa dokunmadan eklenen modeller. Yinelenen veya master id reddedilir.
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1.2fr) minmax(160px, 1fr) minmax(140px, 1fr) minmax(110px, 0.7fr) minmax(110px, 0.7fr) 130px', gap: 10, alignItems: 'end' }}>
-          <input value={form.modelId} onChange={(e) => setField('modelId', e.target.value)} placeholder="model id" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
-          <input value={form.name} onChange={(e) => setField('name', e.target.value)} placeholder="ad" style={inputStyle} />
-          <input value={form.providerLabel} onChange={(e) => setField('providerLabel', e.target.value)} placeholder="sağlayıcı" style={inputStyle} />
-          <input value={form.inputUsd} onChange={(e) => setField('inputUsd', e.target.value)} placeholder="input $/M" type="text" inputMode="decimal" style={inputStyle} />
-          <input value={form.outputUsd} onChange={(e) => setField('outputUsd', e.target.value)} placeholder="output $/M" type="text" inputMode="decimal" style={inputStyle} />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'end' }}>
+          <input value={form.modelId} onChange={(e) => setField('modelId', e.target.value)} placeholder="model id" style={{ ...inputStyle, fontFamily: 'var(--font-mono)', flex: '1 1 160px' }} />
+          <input value={form.name} onChange={(e) => setField('name', e.target.value)} placeholder="ad" style={{ ...inputStyle, flex: '1 1 140px' }} />
+          <input value={form.providerLabel} onChange={(e) => setField('providerLabel', e.target.value)} placeholder="sağlayıcı" style={{ ...inputStyle, flex: '1 1 120px' }} />
+          <select value={form.type} onChange={(e) => setField('type', e.target.value)} style={{ ...inputStyle, flex: '0 0 110px' }}>
+            <option value="Metin">Metin</option>
+            <option value="Görsel">Görsel</option>
+          </select>
+          {form.type === 'Görsel' ? (
+            <input value={form.imagePriceUsd} onChange={(e) => setField('imagePriceUsd', e.target.value)} placeholder="görsel $/adet" type="text" inputMode="decimal" style={{ ...inputStyle, flex: '0 0 120px' }} />
+          ) : (
+            <>
+              <input value={form.inputUsd} onChange={(e) => setField('inputUsd', e.target.value)} placeholder="input $/M" type="text" inputMode="decimal" style={{ ...inputStyle, flex: '0 0 110px' }} />
+              <input value={form.outputUsd} onChange={(e) => setField('outputUsd', e.target.value)} placeholder="output $/M" type="text" inputMode="decimal" style={{ ...inputStyle, flex: '0 0 110px' }} />
+            </>
+          )}
           <button onClick={create} disabled={saving} style={{ padding: '10px 12px', borderRadius: 9, background: 'var(--ink)', color: '#fff', fontWeight: 600, opacity: saving ? 0.7 : 1 }}>{saving ? 'Ekleniyor…' : 'Ekle'}</button>
         </div>
         {saved && <div style={{ marginTop: 10 }}><Chip tone="ok">{saved}</Chip></div>}

@@ -13,6 +13,7 @@ import { HomeTab } from './tab-home.jsx';
 import { ModelsTab } from './tab-models.jsx';
 import { PackagesTab } from './tab-packages.jsx';
 import { AiChatTab } from './tab-ai-chat.jsx';
+import { StudioTab } from './tab-studio.jsx';
 import { LEGAL_DOCS } from './legal-docs.js';
 import {
   apiJson,
@@ -81,7 +82,7 @@ const ACCENT_MAP = {
 
 const ADMIN_EMAIL = 'cix.crazy666@gmail.com';
 const FALLBACK_USD_TRY = 47.084289;
-const PROTECTED_TABS = new Set(['activity', 'account', 'admin', 'ai-chat']);
+const PROTECTED_TABS = new Set(['activity', 'account', 'admin', 'ai-chat', 'studio']);
 const SUPPORT_WHATSAPP_NUMBER = '905319310781';
 const SUPPORT_WHATSAPP_URL = `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}`;
 const FALLBACK_TELEGRAM_BOT_URL = 'https://t.me/YapayZekaLabAPIBot';
@@ -653,6 +654,7 @@ const TopBar = ({ active, onTab, balanceUSD, tlRate, onUserAction, isAuthenticat
     { id: 'models',   label: 'Modeller',   Ico: I.Layers },
     { id: 'packages', label: 'Paketler',   Ico: I.Wallet },
     { id: 'ai-chat',  label: 'AI Chat',    Ico: I.Sparkle },
+    { id: 'studio',   label: 'Studio',     Ico: I.Layers },
     { id: 'documents',label: 'Documents',  Ico: I.File },
     { id: 'activity', label: 'Aktivite',   Ico: I.Activity },
     { id: 'account',  label: 'Hesap',      Ico: I.Wallet },
@@ -1272,6 +1274,7 @@ const App = ({ initialTab = 'home' }) => {
         {tab === 'models'   && <ModelsTab   ctx={ctx} />}
         {tab === 'packages' && <PackagesTab />}
         {tab === 'ai-chat' && <AiChatTab />}
+        {tab === 'studio' && <StudioTab />}
         {tab === 'activity' && <ActivityTab ctx={ctx} />}
         {tab === 'documents' && <DocumentsTab />}
         {tab === 'account'  && <AccountTab  ctx={ctx} />}
