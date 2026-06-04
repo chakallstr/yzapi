@@ -13,12 +13,32 @@ import {
 } from "../services/report-service.js";
 import { extractUsageBreakdown } from "../services/usage-breakdown.js";
 import { getUserUsageStats, type UsageStatsWindow } from "../services/user-usage-stats-service.js";
+import { listUserEntitlements } from "../services/entitlement-service.js";
+import { purchasePackageWithBalance } from "../services/package-purchase-service.js";
 
 const router = Router();
 
 // extractUsageBreakdown taşındı → services/usage-breakdown.ts. Test ve dış
 // kullanım uyumluluğu için buradan re-export ediliyor (DOKUNULMAZ: upstream no-leak).
 export { extractUsageBreakdown } from "../services/usage-breakdown.js";
+
+// ── Paketler (Faz 1) ─────────────────────────────────────────────────────────
+router.get("/entitlements", async (req, res, next) => {
+  try {
+    res.json(await listUserEntitlements(req.user!.id));
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/packages/:id/purchase", async (req, res, next) => {
+  try {
+    const result = await purchasePackageWithBalance(req.user!.id, req.params.id);
+    res.status(201).json(result);
+  } catch (e) {
+    next(e);
+  }
+});
 
 async function buildUserMePayload(userId: string, safe: Record<string, unknown>) {
   const configRows = await db

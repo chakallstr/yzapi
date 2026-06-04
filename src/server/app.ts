@@ -15,6 +15,7 @@ import authRouter from "./routes/auth.js";
 import userRouter from "./routes/user.js";
 import modelsRouter from "./routes/models.js";
 import settingsRouter from "./routes/settings.js";
+import packagesRouter from "./routes/packages.js";
 import proxyRouter from "./routes/proxy.js";
 import paymentsRouter from "./routes/payments.js";
 import telegramRouter from "./routes/telegram.js";
@@ -140,6 +141,7 @@ export function createApp(): express.Express {
 
   app.use("/api", modelsRouter);
   app.use("/api", settingsRouter);
+  app.use("/api", packagesRouter);
 
   app.use("/api/payments", paymentsRouter);
   app.use("/api/telegram", telegramRouter);

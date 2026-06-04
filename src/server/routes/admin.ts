@@ -34,6 +34,13 @@ import {
 } from "../services/api-settings-service.js";
 import { listImplementedProviderIds } from "../services/provider-adapter.js";
 import {
+  listAllPackages,
+  createPackage,
+  updatePackage,
+  setPackageEnabled,
+  deletePackage,
+} from "../services/package-service.js";
+import {
   getProviderConfigAdminView,
   saveProviderConfig,
   testProviderConnection,
@@ -1180,6 +1187,81 @@ router.post("/gozcu/findings/:id/heal", async (req, res, next) => {
     const result = await executeHealForCheck(rows[0].check_name, who);
     res.status(result.ok ? 200 : 409).json(result);
   } catch (e) { next(e); }
+});
+
+// ── Paketler (Faz 1) ─────────────────────────────────────────────────────────
+router.get("/packages", async (_req, res, next) => {
+  try {
+    res.json(await listAllPackages());
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/packages", async (req, res, next) => {
+  try {
+    const b = req.body as Record<string, unknown>;
+    if (!String(b?.id ?? "").trim() || !String(b?.ad ?? "").trim() || !String(b?.kategori ?? "").trim()) {
+      res.status(400).json({ error: "id, ad, kategori zorunlu" });
+      return;
+    }
+    if (!(Number(b.gunlukIstekLimiti) > 0) || !(Number(b.sureGun) > 0) || !(Number(b.fiyatTL) >= 0)) {
+      res.status(400).json({ error: "gunlukIstekLimiti, sureGun, fiyatTL geçersiz" });
+      return;
+    }
+    const created = await createPackage({
+      id: String(b.id).trim(),
+      ad: String(b.ad).trim(),
+      kategori: String(b.kategori).trim(),
+      aciklama: b.aciklama != null ? String(b.aciklama) : "",
+      gunlukIstekLimiti: Number(b.gunlukIstekLimiti),
+      sureGun: Number(b.sureGun),
+      allowedModels: Array.isArray(b.allowedModels) ? (b.allowedModels as string[]) : [],
+      fiyatTL: Number(b.fiyatTL),
+      fiyatUsd: b.fiyatUsd != null ? Number(b.fiyatUsd) : null,
+      enabled: b.enabled !== false,
+      displayOrder: Number(b.displayOrder ?? 0),
+    });
+    await writeAudit("admin_package_create", created.id, `Paket oluşturuldu: ${created.id}`, req.user!.id);
+    res.status(201).json(created);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.patch("/packages/:id", async (req, res, next) => {
+  try {
+    const updated = await updatePackage(req.params.id, req.body as Record<string, unknown>);
+    if (!updated) {
+      res.status(404).json({ error: "Paket bulunamadı" });
+      return;
+    }
+    await writeAudit("admin_package_update", req.params.id, `Paket güncellendi: ${req.params.id}`, req.user!.id);
+    res.json(updated);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/packages/:id/toggle", async (req, res, next) => {
+  try {
+    const enabled = (req.body as Record<string, unknown>)?.enabled === true;
+    await setPackageEnabled(req.params.id, enabled);
+    await writeAudit("admin_package_toggle", req.params.id, `Paket ${enabled ? "açıldı" : "kapatıldı"}: ${req.params.id}`, req.user!.id);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.delete("/packages/:id", async (req, res, next) => {
+  try {
+    await deletePackage(req.params.id);
+    await writeAudit("admin_package_delete", req.params.id, `Paket kapatıldı (silme): ${req.params.id}`, req.user!.id);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
 });
 
 export default router;
