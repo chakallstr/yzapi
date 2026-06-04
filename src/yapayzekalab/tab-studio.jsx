@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Card, Caption } from './shared.jsx';
 import { apiJson } from './auth-client.js';
+import { useT } from './i18n/index.jsx';
 
 export function StudioTab() {
+  const { t } = useT();
   const [models, setModels] = useState([]);
   const [model, setModel] = useState('');
   const [prompt, setPrompt] = useState('');
@@ -39,13 +41,13 @@ export function StudioTab() {
       const urls = data
         .map((d) => d.url || (d.b64_json ? `data:image/png;base64,${d.b64_json}` : null))
         .filter(Boolean);
-      if (!urls.length) setError('Sonuç alınamadı.');
+      if (!urls.length) setError(t('studio.err_no_result'));
       setImages(urls);
     } catch (e) {
-      if (e.status === 400) setError(e.message || 'Aktif API anahtarı yok ya da geçersiz istek.');
-      else if (e.status === 402) setError('Yetersiz bakiye.');
-      else if (e.status === 501 || e.status === 503) setError('Görsel üretim sağlayıcısı şu an kapalı.');
-      else setError(e.message || 'Üretim hatası.');
+      if (e.status === 400) setError(e.message || t('studio.err_bad_request'));
+      else if (e.status === 402) setError(t('studio.err_low_balance'));
+      else if (e.status === 501 || e.status === 503) setError(t('studio.err_provider_down'));
+      else setError(e.message || t('studio.err_generic'));
     } finally {
       setBusy(false);
     }
@@ -53,11 +55,11 @@ export function StudioTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <Caption>Studio — Görsel Üretim</Caption>
+      <Caption>{t('studio.title')}</Caption>
       {error && <div style={{ color: 'var(--danger, #e5484d)' }}>{error}</div>}
       <Card pad={14}>
         {models.length === 0 && (
-          <div style={{ color: 'var(--ink-2)', marginBottom: 8 }}>Henüz görsel modeli tanımlı değil (admin "Modeller"den ekler).</div>
+          <div style={{ color: 'var(--ink-2)', marginBottom: 8 }}>{t('studio.no_models')}</div>
         )}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
           <select value={model} onChange={(e) => setModel(e.target.value)}>
@@ -67,18 +69,18 @@ export function StudioTab() {
           <select value={size} onChange={(e) => setSize(e.target.value)}>
             {['1024x1024', '1024x1536', '1536x1024', '512x512'].map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-          <label style={{ fontSize: 13 }}>Adet <input type="number" min="1" max="4" value={n} onChange={(e) => setN(e.target.value)} style={{ width: 56 }} /></label>
+          <label style={{ fontSize: 13 }}>{t('studio.count_label')} <input type="number" min="1" max="4" value={n} onChange={(e) => setN(e.target.value)} style={{ width: 56 }} /></label>
         </div>
-        <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Görsel açıklaması (prompt)…" rows={3} style={{ width: '100%' }} />
+        <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={t('studio.prompt_placeholder')} rows={3} style={{ width: '100%' }} />
         <div style={{ marginTop: 8 }}>
-          <button disabled={busy || !model} onClick={generate}>{busy ? 'Üretiliyor…' : 'Üret'}</button>
+          <button disabled={busy || !model} onClick={generate}>{busy ? t('studio.generating') : t('studio.generate')}</button>
         </div>
       </Card>
       {images.length > 0 && (
         <Card pad={14}>
-          <Caption>Sonuç</Caption>
+          <Caption>{t('studio.result')}</Caption>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 10, marginTop: 8 }}>
-            {images.map((u, i) => <img key={i} src={u} alt={`görsel ${i + 1}`} style={{ width: '100%', borderRadius: 8 }} />)}
+            {images.map((u, i) => <img key={i} src={u} alt={t('studio.image_alt', { n: i + 1 })} style={{ width: '100%', borderRadius: 8 }} />)}
           </div>
         </Card>
       )}

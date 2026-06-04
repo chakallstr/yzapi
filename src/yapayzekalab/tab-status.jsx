@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Card, Chip, Caption } from './shared.jsx';
+import { useT } from './i18n/index.jsx';
 
-const STATUS_LABEL = { ok: 'Çalışıyor', degraded: 'Kısmi sorun', down: 'Çalışmıyor' };
 const STATUS_TONE = { ok: 'ok', degraded: 'warn', down: 'danger' };
-const CHECK_LABEL = { api: 'API', db: 'Veritabanı', aiProvider: 'AI Sağlayıcı' };
 
 function tone(v) { return STATUS_TONE[v] || 'neutral'; }
-function label(v) { return STATUS_LABEL[v] || String(v ?? '—'); }
 function fmtUptime(s) {
   const sec = Number(s) || 0;
   const d = Math.floor(sec / 86400);
@@ -16,6 +14,7 @@ function fmtUptime(s) {
 }
 
 export function StatusTab() {
+  const { t } = useT();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [updatedAt, setUpdatedAt] = useState(null);
@@ -24,7 +23,7 @@ export function StatusTab() {
     fetch('/status')
       .then((r) => r.json())
       .then((d) => { setData(d); setUpdatedAt(new Date()); setError(''); })
-      .catch(() => setError('Durum alınamadı.'));
+      .catch(() => setError(t('status.fetchError')));
   };
 
   useEffect(() => {
@@ -37,32 +36,32 @@ export function StatusTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <Caption>Sistem Durumu</Caption>
+      <Caption>{t('status.title')}</Caption>
       {error && <div style={{ color: 'var(--danger, #e5484d)' }}>{error}</div>}
 
       <Card pad={16}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <Chip tone={tone(data?.status)} style={{ fontSize: 14 }}>{label(data?.status)}</Chip>
+          <Chip tone={tone(data?.status)} style={{ fontSize: 14 }}>{data?.status ? t(`status.statusLabel_${data.status}`) || String(data.status) : '—'}</Chip>
           <span style={{ color: 'var(--ink-2)', fontSize: 13 }}>
-            {data ? `Çalışma süresi ${fmtUptime(data.uptimeSeconds)} · ${data.modelCount ?? '—'} model · v${data.version ?? '—'}` : 'Yükleniyor…'}
+            {data ? t('status.uptimeSummary', { uptime: fmtUptime(data.uptimeSeconds), modelCount: data.modelCount ?? '—', version: data.version ?? '—' }) : t('status.loading')}
           </span>
-          {updatedAt && <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ink-3)' }}>Son kontrol: {updatedAt.toLocaleTimeString('tr-TR')}</span>}
+          {updatedAt && <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ink-3)' }}>{t('status.lastChecked', { time: updatedAt.toLocaleTimeString('tr-TR') })}</span>}
         </div>
       </Card>
 
       <Card pad={0} style={{ overflow: 'hidden' }}>
-        {Object.keys(checks).length === 0 && <div style={{ padding: 16, color: 'var(--ink-3)' }}>Kontrol verisi yok.</div>}
+        {Object.keys(checks).length === 0 && <div style={{ padding: 16, color: 'var(--ink-3)' }}>{t('status.noCheckData')}</div>}
         {Object.entries(checks).map(([k, v], i, arr) => (
           <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
-            <span style={{ fontWeight: 600, fontSize: 13 }}>{CHECK_LABEL[k] || k}</span>
-            <Chip tone={tone(v)}>{label(v)}</Chip>
+            <span style={{ fontWeight: 600, fontSize: 13 }}>{t(`status.checkLabel_${k}`) || k}</span>
+            <Chip tone={tone(v)}>{t(`status.statusLabel_${v}`) || String(v ?? '—')}</Chip>
           </div>
         ))}
       </Card>
 
       {data?.lastKurRefresh && (
         <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-          Son kur güncelleme: {new Date(data.lastKurRefresh).toLocaleString('tr-TR')}
+          {t('status.lastKurRefresh', { datetime: new Date(data.lastKurRefresh).toLocaleString('tr-TR') })}
         </div>
       )}
     </div>

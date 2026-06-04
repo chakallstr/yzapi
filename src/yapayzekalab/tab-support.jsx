@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Card, Caption } from './shared.jsx';
+import { useT } from './i18n/index.jsx';
 
 export function SupportTab() {
+  const { t } = useT();
   const [channels, setChannels] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -14,14 +16,13 @@ export function SupportTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <Caption>Destek</Caption>
+      <Caption>{t('support.heading')}</Caption>
       <Card pad={16}>
         <p style={{ color: 'var(--ink-2)', marginTop: 0 }}>
-          Hesap, ödeme, paket teslimatı ve teknik destek için aşağıdaki kanallardan bize ulaşın.
-          Ekibimiz mesajınızı inceleyip en kısa sürede dönüş yapar.
+          {t('support.description')}
         </p>
         {loaded && channels.length === 0 && (
-          <div style={{ color: 'var(--ink-3)' }}>Destek kanalı henüz tanımlı değil.</div>
+          <div style={{ color: 'var(--ink-3)' }}>{t('support.emptyState')}</div>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
           {channels.map((c) => (

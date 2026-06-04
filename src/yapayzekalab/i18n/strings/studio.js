@@ -1,2 +1,33 @@
 /* tab-studio.jsx strings. { tr: {...}, en: {...} } with parity. */
-export default { tr: {}, en: {} };
+export default {
+  tr: {
+    'studio.title':            'Studio — Görsel Üretim',
+    'studio.no_models':        'Henüz görsel modeli tanımlı değil (admin "Modeller"den ekler).',
+    'studio.count_label':      'Adet',
+    'studio.prompt_placeholder': 'Görsel açıklaması (prompt)…',
+    'studio.generate':         'Üret',
+    'studio.generating':       'Üretiliyor…',
+    'studio.result':           'Sonuç',
+    'studio.image_alt':        'görsel {n}',
+    'studio.err_no_result':    'Sonuç alınamadı.',
+    'studio.err_bad_request':  'Aktif API anahtarı yok ya da geçersiz istek.',
+    'studio.err_low_balance':  'Yetersiz bakiye.',
+    'studio.err_provider_down': 'Görsel üretim sağlayıcısı şu an kapalı.',
+    'studio.err_generic':      'Üretim hatası.',
+  },
+  en: {
+    'studio.title':            'Studio — Image Generation',
+    'studio.no_models':        'No image models configured yet (admin adds them under "Models").',
+    'studio.count_label':      'Count',
+    'studio.prompt_placeholder': 'Image description (prompt)…',
+    'studio.generate':         'Generate',
+    'studio.generating':       'Generating…',
+    'studio.result':           'Result',
+    'studio.image_alt':        'image {n}',
+    'studio.err_no_result':    'No result returned.',
+    'studio.err_bad_request':  'No active API key or invalid request.',
+    'studio.err_low_balance':  'Insufficient balance.',
+    'studio.err_provider_down': 'Image generation provider is currently unavailable.',
+    'studio.err_generic':      'Generation error.',
+  },
+};

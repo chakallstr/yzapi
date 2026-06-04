@@ -5,6 +5,7 @@ import {
   fmt, OPUS48_LABEL, usdToOpusTokens,
   mockLogs, mockProviderStatus, useLogStream,
 } from './shared.jsx';
+import { useT, LangToggle } from './i18n/index.jsx';
 import { AccountTab } from './tab-account.jsx';
 import { ActivityTab } from './tab-activity.jsx';
 import { AdminTab } from './tab-admin.jsx';
@@ -108,24 +109,24 @@ const ANNOUNCEMENT_DOT = {
   basari: 'var(--ok)',
 };
 
-const formatNotifTime = (value) => {
+const formatNotifTime = (value, t) => {
   const date = new Date(value || '');
-  if (Number.isNaN(date.getTime())) return 'yeni';
+  if (Number.isNaN(date.getTime())) return t('appShell.notif.timeNew');
   const diffMs = Date.now() - date.getTime();
   const diffMin = Math.max(0, Math.round(diffMs / 60000));
-  if (diffMin < 1) return 'az önce';
-  if (diffMin < 60) return `${diffMin} dk önce`;
+  if (diffMin < 1) return t('appShell.notif.timeJustNow');
+  if (diffMin < 60) return t('appShell.notif.timeMinAgo', { n: diffMin });
   const diffHour = Math.round(diffMin / 60);
-  if (diffHour < 24) return `${diffHour} sa önce`;
+  if (diffHour < 24) return t('appShell.notif.timeHourAgo', { n: diffHour });
   const diffDay = Math.round(diffHour / 24);
-  return `${diffDay} gün önce`;
+  return t('appShell.notif.timeDayAgo', { n: diffDay });
 };
 
-const formatNotifSub = (item) => {
+const formatNotifSub = (item, t) => {
   const tip = String(item?.tip || 'bilgi').toUpperCase();
   const end = item?.bitis ? new Date(item.bitis) : null;
-  if (!end || Number.isNaN(end.getTime())) return `Sistem duyurusu · ${tip}`;
-  return `Sistem duyurusu · ${tip} · ${end.toLocaleString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} kadar`;
+  if (!end || Number.isNaN(end.getTime())) return t('appShell.notif.subAnnouncement', { tip });
+  return t('appShell.notif.subAnnouncementUntil', { tip, end: end.toLocaleString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) });
 };
 
 const TELEGRAM_LOGIN_FIELDS = ['id', 'first_name', 'last_name', 'username', 'photo_url', 'auth_date', 'hash'];
@@ -142,6 +143,7 @@ const readTelegramLinkPayloadFromQuery = (query) => {
 
 // === Notifications dropdown =========================================
 const NotificationsButton = () => {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -154,17 +156,17 @@ const NotificationsButton = () => {
     try {
       const response = await fetch('/api/announcements/active');
       const body = await response.json().catch(() => []);
-      if (!response.ok) throw new Error(body?.message || `Bildirimler alınamadı (${response.status})`);
+      if (!response.ok) throw new Error(body?.message || t('appShell.notif.fetchError', { status: response.status }));
       const rows = Array.isArray(body) ? body : [];
       rows.sort((a, b) => new Date(b.baslangic || 0).getTime() - new Date(a.baslangic || 0).getTime());
       setItems(rows);
     } catch (err) {
       setItems([]);
-      setError(err?.message || 'Bildirimler alınamadı.');
+      setError(err?.message || t('appShell.notif.fetchErrorGeneric'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -208,12 +210,12 @@ const NotificationsButton = () => {
             padding: '12px 14px', borderBottom: '1px solid var(--border)',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           }}>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>Bildirimler</span>
-            <Chip tone="accent" style={{ fontSize: 10 }}>{activeCount} aktif</Chip>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>{t('appShell.notif.title')}</span>
+            <Chip tone="accent" style={{ fontSize: 10 }}>{t('appShell.notif.activeCount', { n: activeCount })}</Chip>
           </div>
           {loading && (
             <div style={{ padding: '16px 14px', fontSize: 11.5, color: 'var(--ink-3)' }}>
-              Bildirimler yükleniyor…
+              {t('appShell.notif.loading')}
             </div>
           )}
           {!loading && error && (
@@ -223,7 +225,7 @@ const NotificationsButton = () => {
           )}
           {!loading && !error && activeCount === 0 && (
             <div style={{ padding: '16px 14px', fontSize: 11.5, color: 'var(--ink-3)' }}>
-              Aktif admin duyurusu yok.
+              {t('appShell.notif.empty')}
             </div>
           )}
           {!loading && !error && items.map((n) => (
@@ -234,8 +236,8 @@ const NotificationsButton = () => {
               <Dot color={ANNOUNCEMENT_DOT[n.tip] || 'var(--accent)'} size={7} style={{ marginTop: 5 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink)' }}>{n.mesaj}</div>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>{formatNotifSub(n)}</div>
-                <div style={{ fontSize: 10.5, color: 'var(--ink-4)', marginTop: 4 }}>{formatNotifTime(n.baslangic)}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>{formatNotifSub(n, t)}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--ink-4)', marginTop: 4 }}>{formatNotifTime(n.baslangic, t)}</div>
               </div>
             </div>
           ))}
@@ -243,7 +245,7 @@ const NotificationsButton = () => {
             width: '100%', padding: '10px',
             fontSize: 11.5, fontWeight: 500, color: 'var(--accent-ink)',
             background: 'transparent', textAlign: 'center',
-          }}>Admin duyuruları anlık yayınlanır</div>
+          }}>{t('appShell.notif.footer')}</div>
         </div>
       )}
     </div>
@@ -270,6 +272,7 @@ const Logo = () => (
 
 // === LoginScreen — çıkış yapıldığında gösterilir ===================
 const LoginScreen = () => {
+  const { t } = useT();
   const [legalOpen, setLegalOpen] = useState('');
   const startGoogleAuth = () => {
     window.location.assign('/api/auth/google');
@@ -287,16 +290,19 @@ const LoginScreen = () => {
       <div style={{
         background: 'var(--surface)', borderRadius: 20, padding: 36,
         width: '100%', maxWidth: 420, boxShadow: 'var(--sh-3)',
-        border: '1px solid var(--border)',
+        border: '1px solid var(--border)', position: 'relative',
       }} className="yz-login-card">
+        <div style={{ position: 'absolute', top: 16, right: 16 }}>
+          <LangToggle compact />
+        </div>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
           <Logo />
         </div>
         <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.6, textAlign: 'center', margin: '0 0 6px' }}>
-          Google ile devam et
+          {t('appShell.login.title')}
         </h2>
         <p style={{ fontSize: 12, color: 'var(--ink-3)', textAlign: 'center', margin: '0 0 24px' }}>
-          YapayZekaLab hesabın Google oturumu ile açılır; ayrı şifre tutulmaz.
+          {t('appShell.login.subtitle')}
         </p>
 
         {/* Google button */}
@@ -313,7 +319,7 @@ const LoginScreen = () => {
             <path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.3C29.4 35.1 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.5 16.2 44 24 44z"/>
             <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4.1 5.6l6.3 5.3C42 35.1 44 30 44 24c0-1.2-.1-2.4-.4-3.5z"/>
           </svg>
-          Google ile giriş yap
+          {t('appShell.login.googleBtn')}
         </button>
 
         {/* GitHub button */}
@@ -327,11 +333,11 @@ const LoginScreen = () => {
           <svg width="16" height="16" viewBox="0 0 16 16" fill="#fff" aria-hidden="true">
             <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
           </svg>
-          GitHub ile giriş yap
+          {t('appShell.login.githubBtn')}
         </button>
 
         <div style={{ textAlign: 'center', marginTop: 18, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.55 }}>
-          Hesap oluşturma ve giriş aynı Google akışıyla tamamlanır.
+          {t('appShell.login.hint')}
         </div>
         <div style={{
           marginTop: 16,
@@ -342,13 +348,13 @@ const LoginScreen = () => {
           textAlign: 'center',
         }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.55 }}>
-            Giriş yaparak KVKK Aydınlatma Metni, Gizlilik Politikası, Kullanıcı Sözleşmesi ve Mesafeli Satış koşullarını kabul etmiş sayılırsınız.
+            {t('appShell.login.consent')}
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 10, marginTop: 10, fontSize: 11.5 }}>
             <button type="button" onClick={() => setLegalOpen('kvkk')} style={{ color: 'var(--accent-ink)', textDecoration: 'underline' }}>KVKK</button>
-            <button type="button" onClick={() => setLegalOpen('gizlilik')} style={{ color: 'var(--accent-ink)', textDecoration: 'underline' }}>Gizlilik</button>
-            <button type="button" onClick={() => setLegalOpen('sozlesme')} style={{ color: 'var(--accent-ink)', textDecoration: 'underline' }}>Kullanıcı Sözleşmesi</button>
-            <button type="button" onClick={() => setLegalOpen('mesafeli')} style={{ color: 'var(--accent-ink)', textDecoration: 'underline' }}>Mesafeli Satış</button>
+            <button type="button" onClick={() => setLegalOpen('gizlilik')} style={{ color: 'var(--accent-ink)', textDecoration: 'underline' }}>{t('appShell.login.legalPrivacy')}</button>
+            <button type="button" onClick={() => setLegalOpen('sozlesme')} style={{ color: 'var(--accent-ink)', textDecoration: 'underline' }}>{t('appShell.login.legalAgreement')}</button>
+            <button type="button" onClick={() => setLegalOpen('mesafeli')} style={{ color: 'var(--accent-ink)', textDecoration: 'underline' }}>{t('appShell.login.legalDistanceSale')}</button>
           </div>
         </div>
         {legalOpen && <LegalModal docKey={legalOpen} onClose={() => setLegalOpen('')} />}
@@ -359,6 +365,7 @@ const LoginScreen = () => {
 
 // === WhatsAppOtpScreen — Google sonrası telefon doğrulama ===========
 const WhatsAppOtpScreen = ({ pendingToken, onVerified, onCancel }) => {
+  const { t } = useT();
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [verificationId, setVerificationId] = useState('');
@@ -382,12 +389,12 @@ const WhatsAppOtpScreen = ({ pendingToken, onVerified, onCancel }) => {
         body: JSON.stringify(mode === 'resend' ? { verificationId } : { phone, marketingConsent }),
       });
       const body = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(body?.error || 'Kod gönderilemedi.');
+      if (!response.ok) throw new Error(body?.error || t('appShell.otp.sendError'));
       setVerificationId(body.verificationId);
       setPhoneMasked(body.phoneMasked || '');
-      setMessage('WhatsApp doğrulama kodu gönderildi.');
+      setMessage(t('appShell.otp.sent'));
     } catch (err) {
-      setError(err?.message || 'Kod gönderilemedi.');
+      setError(err?.message || t('appShell.otp.sendError'));
     } finally {
       setSubmitting(false);
     }
@@ -407,10 +414,10 @@ const WhatsAppOtpScreen = ({ pendingToken, onVerified, onCancel }) => {
         body: JSON.stringify({ verificationId, code, marketingConsent }),
       });
       const body = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(body?.error || 'Kod doğrulanamadı.');
+      if (!response.ok) throw new Error(body?.error || t('appShell.otp.verifyError'));
       onVerified(body);
     } catch (err) {
-      setError(err?.message || 'Kod doğrulanamadı.');
+      setError(err?.message || t('appShell.otp.verifyError'));
     } finally {
       setSubmitting(false);
     }
@@ -431,10 +438,10 @@ const WhatsAppOtpScreen = ({ pendingToken, onVerified, onCancel }) => {
           <Logo />
         </div>
         <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.6, textAlign: 'center', margin: '0 0 6px' }}>
-          WhatsApp doğrulaması
+          {t('appShell.otp.title')}
         </h2>
         <p style={{ fontSize: 12, color: 'var(--ink-3)', textAlign: 'center', margin: '0 0 24px', lineHeight: 1.55 }}>
-          Google hesabın doğrulandı. Paneli açmadan önce WhatsApp numaranı tek seferlik kodla doğrula.
+          {t('appShell.otp.subtitle')}
         </p>
 
         {!verificationId ? (
@@ -442,7 +449,7 @@ const WhatsAppOtpScreen = ({ pendingToken, onVerified, onCancel }) => {
             <input
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="05xx xxx xx xx"
+              placeholder={t('appShell.otp.phonePlaceholder')}
               inputMode="tel"
               style={{
                 width: '100%', padding: '11px 14px', borderRadius: 10,
@@ -457,25 +464,25 @@ const WhatsAppOtpScreen = ({ pendingToken, onVerified, onCancel }) => {
                 onChange={(e) => setMarketingConsent(e.target.checked)}
                 style={{ marginTop: 2 }}
               />
-              Kampanya ve duyuru mesajlarını WhatsApp üzerinden almak istiyorum. Bu izin OTP için zorunlu değildir.
+              {t('appShell.otp.marketingConsent')}
             </label>
             <button type="button" disabled={submitting} onClick={() => requestOtp('start')} style={{
               width: '100%', padding: '11px 14px', borderRadius: 10,
               background: 'var(--ink)', color: '#fff',
               fontSize: 13, fontWeight: 600,
             }}>
-              {submitting ? 'Gönderiliyor…' : 'WhatsApp kodu gönder'}
+              {submitting ? t('common.sending') : t('appShell.otp.sendBtn')}
             </button>
           </>
         ) : (
           <>
             <div style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: 10, textAlign: 'center' }}>
-              Kod gönderilen numara: <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>{phoneMasked}</span>
+              {t('appShell.otp.sentTo')} <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>{phoneMasked}</span>
             </div>
             <input
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
-              placeholder="6 haneli kod"
+              placeholder={t('appShell.otp.codePlaceholder')}
               inputMode="numeric"
               style={{
                 width: '100%', padding: '11px 14px', borderRadius: 10,
@@ -490,14 +497,14 @@ const WhatsAppOtpScreen = ({ pendingToken, onVerified, onCancel }) => {
               fontSize: 13, fontWeight: 600,
               marginBottom: 10,
             }}>
-              {submitting ? 'Doğrulanıyor…' : 'Kodu doğrula'}
+              {submitting ? t('appShell.otp.verifying') : t('appShell.otp.verifyBtn')}
             </button>
             <button type="button" disabled={submitting} onClick={() => requestOtp('resend')} style={{
               width: '100%', padding: '10px 14px', borderRadius: 10,
               background: 'var(--surface)', border: '1px solid var(--border-st)',
               fontSize: 12, fontWeight: 500, color: 'var(--ink-2)',
             }}>
-              Kodu tekrar gönder
+              {t('appShell.otp.resendBtn')}
             </button>
           </>
         )}
@@ -509,7 +516,7 @@ const WhatsAppOtpScreen = ({ pendingToken, onVerified, onCancel }) => {
           display: 'block', margin: '18px auto 0',
           fontSize: 12, color: 'var(--ink-3)', background: 'transparent',
         }}>
-          Girişe geri dön
+          {t('appShell.otp.backToLogin')}
         </button>
       </div>
     </div>
@@ -517,7 +524,9 @@ const WhatsAppOtpScreen = ({ pendingToken, onVerified, onCancel }) => {
 };
 
 // === LogoutConfirm — küçük modal ===================================
-const LogoutConfirm = ({ onClose, onConfirm }) => (
+const LogoutConfirm = ({ onClose, onConfirm }) => {
+  const { t } = useT();
+  return (
   <div onClick={onClose} className="fade-in" style={{
     position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(6px)',
     zIndex: 100, display: 'grid', placeItems: 'center', padding: 24,
@@ -526,20 +535,22 @@ const LogoutConfirm = ({ onClose, onConfirm }) => (
       background: 'var(--surface)', borderRadius: 16, padding: 24,
       width: '100%', maxWidth: 380, boxShadow: 'var(--sh-3)',
     }}>
-      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Çıkış yapılsın mı?</div>
+      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>{t('appShell.logout.title')}</div>
       <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.55, marginBottom: 20 }}>
-        Aktif oturumun sonlandırılacak. Bakiyen ve API anahtarların korunur — tekrar giriş yaptığında her şey aynı kalır.
+        {t('appShell.logout.body')}
       </div>
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-        <button onClick={onClose} style={{ padding: '9px 16px', borderRadius: 8, fontSize: 12, color: 'var(--ink-2)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>İptal</button>
-        <button onClick={onConfirm} style={{ padding: '9px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', background: '#b91c1c' }}>Çıkış yap</button>
+        <button onClick={onClose} style={{ padding: '9px 16px', borderRadius: 8, fontSize: 12, color: 'var(--ink-2)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>{t('common.cancel')}</button>
+        <button onClick={onConfirm} style={{ padding: '9px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#fff', background: '#b91c1c' }}>{t('appShell.logout.confirm')}</button>
       </div>
     </div>
   </div>
-);
+  );
+};
 
 // === UserMenu — sağ üst kullanıcı dropdown'u =======================
 const UserMenu = ({ onAction, profile, balanceUSD }) => {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const ref = useRef(null);
@@ -548,18 +559,18 @@ const UserMenu = ({ onAction, profile, balanceUSD }) => {
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
   }, []);
-  const displayName = profile?.adSoyad || profile?.email?.split('@')[0] || 'Hesabım';
-  const email = profile?.email || 'oturum aktif';
+  const displayName = profile?.adSoyad || profile?.email?.split('@')[0] || t('appShell.user.fallbackName');
+  const email = profile?.email || t('appShell.user.fallbackEmail');
   const status = profile?.durum || 'aktif';
-  const plan = profile?.planAd || profile?.plan || 'hesap';
+  const plan = profile?.planAd || profile?.plan || t('appShell.user.fallbackPlan');
   const userCode = profile?.userCode || (profile?.id ? `u-${String(profile.id).replace(/-/g, '').slice(0, 8)}` : 'profil');
   const balanceHint = `$${Number(balanceUSD ?? profile?.bakiyeUsd ?? 0).toFixed(2)}`;
 
   const items = [
-    { Ico: I.Wallet,   label: 'Hesabım & bakiye',     hint: balanceHint,          section: 'account-balance' },
-    { Ico: I.Key,      label: 'API anahtarları',       hint: 'gerçek liste',       section: 'account-keys' },
-    { Ico: I.Activity, label: 'Kullanım geçmişi',      hint: 'son istekler',       section: 'account-usage' },
-    { Ico: I.Settings, label: 'Hesap ayarları',        hint: 'profil, email',     section: 'account-settings' },
+    { Ico: I.Wallet,   label: t('appShell.user.itemAccountBalance'),     hint: balanceHint,          section: 'account-balance' },
+    { Ico: I.Key,      label: t('appShell.user.itemKeys'),       hint: t('appShell.user.hintRealList'),       section: 'account-keys' },
+    { Ico: I.Activity, label: t('appShell.user.itemUsage'),      hint: t('appShell.user.hintRecent'),       section: 'account-usage' },
+    { Ico: I.Settings, label: t('appShell.user.itemSettings'),        hint: t('appShell.user.hintProfileEmail'),     section: 'account-settings' },
   ];
 
   return (
@@ -579,7 +590,7 @@ const UserMenu = ({ onAction, profile, balanceUSD }) => {
         }}>{initialsFor(displayName)}</div>
         <div style={{ lineHeight: 1.15, marginRight: 2, textAlign: 'left' }}>
           <div style={{ fontSize: 12, fontWeight: 500, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</div>
-          <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>{profile?.email ? plan : 'hesap'}</div>
+          <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>{profile?.email ? plan : t('appShell.user.fallbackPlan')}</div>
         </div>
         <I.Chevron size={12} stroke="var(--ink-3)" style={{
           transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0)',
@@ -652,7 +663,7 @@ const UserMenu = ({ onAction, profile, balanceUSD }) => {
           onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
           onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
             <I.Close size={13} stroke="#b91c1c" />
-            <span>Çıkış yap</span>
+            <span>{t('appShell.user.logout')}</span>
           </button>
         </div>
       )}
@@ -668,18 +679,19 @@ const UserMenu = ({ onAction, profile, balanceUSD }) => {
 
 // === TopBar =========================================================
 const TopBar = ({ active, onTab, balanceUSD, tlRate, onUserAction, isAuthenticated, onLoginClick, profile, isAdmin }) => {
+  const { t } = useT();
   const tabs = [
-    { id: 'home',     label: 'Ana Sayfa',  Ico: I.Home },
-    { id: 'models',   label: 'Modeller',   Ico: I.Layers },
-    { id: 'packages', label: 'Paketler',   Ico: I.Wallet },
-    { id: 'ai-chat',  label: 'AI Chat',    Ico: I.Sparkle },
-    { id: 'studio',   label: 'Studio',     Ico: I.Layers },
-    { id: 'documents',label: 'Documents',  Ico: I.File },
-    { id: 'status',   label: 'Durum',      Ico: I.Activity },
-    { id: 'support',  label: 'Destek',     Ico: I.Bell },
-    { id: 'activity', label: 'Aktivite',   Ico: I.Activity },
-    { id: 'account',  label: 'Hesap',      Ico: I.Wallet },
-    ...(isAdmin ? [{ id: 'admin', label: 'Admin', Ico: I.Shield }] : []),
+    { id: 'home',     label: t('nav.home'),  Ico: I.Home },
+    { id: 'models',   label: t('nav.models'),   Ico: I.Layers },
+    { id: 'packages', label: t('nav.packages'),   Ico: I.Wallet },
+    { id: 'ai-chat',  label: t('nav.aiChat'),    Ico: I.Sparkle },
+    { id: 'studio',   label: t('nav.studio'),     Ico: I.Layers },
+    { id: 'documents',label: t('nav.documents'),  Ico: I.File },
+    { id: 'status',   label: t('nav.status'),      Ico: I.Activity },
+    { id: 'support',  label: t('nav.support'),     Ico: I.Bell },
+    { id: 'activity', label: t('nav.activity'),   Ico: I.Activity },
+    { id: 'account',  label: t('nav.account'),      Ico: I.Wallet },
+    ...(isAdmin ? [{ id: 'admin', label: t('nav.admin'), Ico: I.Shield }] : []),
   ];
 
   return (
@@ -716,11 +728,12 @@ const TopBar = ({ active, onTab, balanceUSD, tlRate, onUserAction, isAuthenticat
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }} className="yz-topbar-actions">
+        <LangToggle compact />
         {isAuthenticated ? (
           <>
             {/* Balance pill — USD birincil, TL bilgi, token tooltip */}
             <button onClick={() => onTab('account')}
-              title={`Ortalama ~${fmt.tokens(usdToOpusTokens(balanceUSD ?? 0))} ${OPUS48_LABEL} tokeni eder`}
+              title={t('appShell.topbar.balanceTooltip', { tokens: fmt.tokens(usdToOpusTokens(balanceUSD ?? 0)), model: OPUS48_LABEL })}
               style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '6px 12px', borderRadius: 999,
@@ -743,7 +756,7 @@ const TopBar = ({ active, onTab, balanceUSD, tlRate, onUserAction, isAuthenticat
               width: 200,
             }}>
               <I.Search size={13} stroke="var(--ink-3)" />
-              <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>Model ara…</span>
+              <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{t('appShell.topbar.searchPlaceholder')}</span>
               <span style={{
                 marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10,
                 color: 'var(--ink-3)', padding: '1px 5px',
@@ -762,14 +775,14 @@ const TopBar = ({ active, onTab, balanceUSD, tlRate, onUserAction, isAuthenticat
               background: 'var(--surface)', border: '1px solid var(--border-st)',
               color: 'var(--ink-2)', fontSize: 12.5, fontWeight: 600,
             }}>
-              Giriş yap
+              {t('appShell.topbar.login')}
             </button>
             <button onClick={onLoginClick} style={{
               padding: '8px 14px', borderRadius: 999,
               background: 'var(--ink)', color: '#fff',
               fontSize: 12.5, fontWeight: 700,
             }}>
-              Kayıt ol
+              {t('appShell.topbar.register')}
             </button>
           </>
         )}
@@ -780,6 +793,7 @@ const TopBar = ({ active, onTab, balanceUSD, tlRate, onUserAction, isAuthenticat
 
 // === PublicStatus — açık erişim sistem durumu modali ================
 const PublicStatusModal = ({ onClose }) => {
+  const { t } = useT();
   const items = mockProviderStatus;
   const total = items.length;
   const ok = items.filter(x => x.durum === 'aktif').length;
@@ -799,9 +813,9 @@ const PublicStatusModal = ({ onClose }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <PulseDot color={allOk ? '#10b981' : '#a16207'} size={9} />
             <div>
-              <Caption style={{ color: allOk ? '#047857' : '#92400e' }}>Sistem durumu · public</Caption>
+              <Caption style={{ color: allOk ? '#047857' : '#92400e' }}>{t('appShell.status.caption')}</Caption>
               <div style={{ fontSize: 16, fontWeight: 600, marginTop: 4, color: allOk ? '#047857' : '#92400e' }}>
-                {allOk ? 'Tüm servisler çevrimiçi' : `${ok} / ${total} sağlayıcı aktif`}
+                {allOk ? t('appShell.status.allOnline') : t('appShell.status.partial', { ok, total })}
               </div>
             </div>
           </div>
@@ -813,9 +827,9 @@ const PublicStatusModal = ({ onClose }) => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {items.map(s => {
               const p = PROVIDERS[s.provider] || { label: s.provider, color: 'var(--ink-3)' };
-              const tone = s.durum === 'aktif' ? { bg: 'var(--ok-bg)', fg: '#047857', label: 'aktif' }
-                          : s.durum === 'yavaş' ? { bg: '#fffbeb', fg: '#a16207', label: 'yavaş' }
-                          : { bg: '#fef2f2', fg: '#b91c1c', label: 'kapalı' };
+              const tone = s.durum === 'aktif' ? { bg: 'var(--ok-bg)', fg: '#047857', label: t('appShell.status.toneActive') }
+                          : s.durum === 'yavaş' ? { bg: '#fffbeb', fg: '#a16207', label: t('appShell.status.toneSlow') }
+                          : { bg: '#fef2f2', fg: '#b91c1c', label: t('appShell.status.toneDown') };
               return (
                 <div key={s.provider} style={{ display: 'flex', alignItems: 'center', gap: 10,
                   padding: '10px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
@@ -832,7 +846,7 @@ const PublicStatusModal = ({ onClose }) => {
             })}
           </div>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 16, textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
-            Otomatik kontrol her 30 saniyede · status.yapayzekalab.org
+            {t('appShell.status.autoCheck')}
           </div>
         </div>
       </div>
@@ -841,6 +855,7 @@ const PublicStatusModal = ({ onClose }) => {
 };
 
 const LegalModal = ({ docKey, onClose }) => {
+  const { t } = useT();
   const doc = LEGAL_DOCS[docKey];
   if (!doc) return null;
   return (
@@ -857,7 +872,7 @@ const LegalModal = ({ docKey, onClose }) => {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
-            <Caption>Yasal metin</Caption>
+            <Caption>{t('appShell.legal.caption')}</Caption>
             <div style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>{doc.title}</div>
           </div>
           <button onClick={onClose} style={{ color: 'var(--ink-3)', padding: 6 }}>
@@ -876,12 +891,14 @@ const LegalModal = ({ docKey, onClose }) => {
   );
 };
 
-const WhatsAppFloat = () => (
+const WhatsAppFloat = () => {
+  const { t } = useT();
+  return (
   <a
     href={SUPPORT_WHATSAPP_URL}
     target="_blank"
     rel="noreferrer"
-    aria-label="WhatsApp ile destek al"
+    aria-label={t('appShell.float.whatsappAria')}
     style={{
       position: 'fixed',
       right: 20,
@@ -911,14 +928,17 @@ const WhatsAppFloat = () => (
     }} />
     WhatsApp
   </a>
-);
+  );
+};
 
-const TelegramFloat = ({ href = FALLBACK_TELEGRAM_BOT_URL }) => (
+const TelegramFloat = ({ href = FALLBACK_TELEGRAM_BOT_URL }) => {
+  const { t } = useT();
+  return (
   <a
     href={href || FALLBACK_TELEGRAM_BOT_URL}
     target="_blank"
     rel="noreferrer"
-    aria-label="Telegram botunu aç"
+    aria-label={t('appShell.float.telegramAria')}
     style={{
       position: 'fixed',
       left: 20,
@@ -957,10 +977,12 @@ const TelegramFloat = ({ href = FALLBACK_TELEGRAM_BOT_URL }) => (
     </span>
     Telegram
   </a>
-);
+  );
+};
 
 // === Footer with public status link =================================
 const SiteFooter = () => {
+  const { t } = useT();
   const [statusOpen, setStatusOpen] = useState(false);
   const [legalOpen, setLegalOpen] = useState('');
   const okCount = mockProviderStatus.filter(x => x.durum === 'aktif').length;
@@ -981,15 +1003,15 @@ const SiteFooter = () => {
             color: allOk ? '#047857' : '#a16207', fontWeight: 500,
           }}>
             <PulseDot color={allOk ? '#10b981' : '#f59e0b'} size={6} withRing={false} />
-            {allOk ? 'Tüm servisler çevrimiçi' : `${okCount}/${mockProviderStatus.length} sağlayıcı`}
+            {allOk ? t('appShell.footer.allOnline') : t('appShell.footer.partial', { ok: okCount, total: mockProviderStatus.length })}
           </button>
           <span style={{ color: 'var(--ink-4)' }}>·</span>
           <a href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>WhatsApp</a>
           <span style={{ color: 'var(--ink-4)' }}>·</span>
           <button onClick={() => setLegalOpen('kvkk')} style={{ color: 'inherit', textDecoration: 'none' }}>KVKK</button>
-          <button onClick={() => setLegalOpen('sozlesme')} style={{ color: 'inherit', textDecoration: 'none' }}>Kullanıcı Sözleşmesi</button>
-          <button onClick={() => setLegalOpen('gizlilik')} style={{ color: 'inherit', textDecoration: 'none' }}>Gizlilik</button>
-          <button onClick={() => setLegalOpen('mesafeli')} style={{ color: 'inherit', textDecoration: 'none' }}>Mesafeli Satış</button>
+          <button onClick={() => setLegalOpen('sozlesme')} style={{ color: 'inherit', textDecoration: 'none' }}>{t('appShell.login.legalAgreement')}</button>
+          <button onClick={() => setLegalOpen('gizlilik')} style={{ color: 'inherit', textDecoration: 'none' }}>{t('appShell.login.legalPrivacy')}</button>
+          <button onClick={() => setLegalOpen('mesafeli')} style={{ color: 'inherit', textDecoration: 'none' }}>{t('appShell.login.legalDistanceSale')}</button>
         </div>
       </footer>
       {statusOpen && <PublicStatusModal onClose={() => setStatusOpen(false)} />}
@@ -998,6 +1020,7 @@ const SiteFooter = () => {
   );
 };
 const App = ({ initialTab = 'home' }) => {
+  const { t: tr } = useT();
   const initialAuth = hasStoredAuth();
   const initialWhatsappPending = getWhatsappPendingToken();
   const initialTabRequiresAuth = PROTECTED_TABS.has(initialTab);
@@ -1120,12 +1143,12 @@ const App = ({ initialTab = 'home' }) => {
         clearTelegramLinkPayload();
         if (cancelled) return;
         window.dispatchEvent(new CustomEvent('yz:telegram-link-error', {
-          detail: error?.message || 'Telegram bağlantısı tamamlanamadı.',
+          detail: error?.message || tr('appShell.telegram.linkError'),
         }));
       });
 
     return () => { cancelled = true; };
-  }, [isAuthenticated, setTweak]);
+  }, [isAuthenticated, setTweak, tr]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = t.theme;
@@ -1269,11 +1292,11 @@ const App = ({ initialTab = 'home' }) => {
             <div style={{ fontSize: 12.5, color: emptyBalance ? '#991b1b' : '#92400e' }}>
               {emptyBalance ? (
                 <>
-                  <strong>Bakiyen bitti.</strong> Yeni API çağrıları <span style={{ fontFamily: 'var(--font-mono)' }}>402 Payment Required</span> dönüyor.
+                  <strong>{tr('appShell.banner.emptyTitle')}</strong> {tr('appShell.banner.emptyBody')} <span style={{ fontFamily: 'var(--font-mono)' }}>402 Payment Required</span>{tr('appShell.banner.emptyReturning')}
                 </>
               ) : (
                 <>
-                  <strong>Bakiyen düşük:</strong> ${balance.toFixed(2)} kaldı — ortalama ~{fmt.tokens(usdToOpusTokens(balance))} {OPUS48_LABEL} tokeni eder.
+                  <strong>{tr('appShell.banner.lowTitle')}</strong> {tr('appShell.banner.lowBody', { balance: balance.toFixed(2), tokens: fmt.tokens(usdToOpusTokens(balance)), model: OPUS48_LABEL })}
                 </>
               )}
             </div>
@@ -1285,7 +1308,7 @@ const App = ({ initialTab = 'home' }) => {
             display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
           }}>
             <I.Wallet size={12} stroke="#fff" />
-            Bakiye yükle
+            {tr('appShell.banner.topUp')}
           </button>
         </div>
       )}

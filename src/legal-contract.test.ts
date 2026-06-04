@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 
 const appSource = readFileSync("src/yapayzekalab/App.jsx", "utf8");
 const legalSource = readFileSync("src/yapayzekalab/legal-docs.js", "utf8");
-const combined = `${appSource}\n${legalSource}`;
+// i18n: login consent text moved to the app-shell dictionary fragment.
+const shell = readFileSync("src/yapayzekalab/i18n/strings/app-shell.js", "utf8");
+const combined = `${appSource}\n${legalSource}\n${shell}`;
 
 describe("legal content contract", () => {
   it("contains footer legal documents and modal labels", () => {
@@ -20,6 +22,8 @@ describe("legal content contract", () => {
   });
 
   it("shows login acceptance notice", () => {
-    expect(appSource).toContain("Giriş yaparak KVKK Aydınlatma Metni, Gizlilik Politikası, Kullanıcı Sözleşmesi ve Mesafeli Satış koşullarını kabul etmiş sayılırsınız.");
+    // wiring intact (consent rendered via i18n key) + TR string still shipped in the dict.
+    expect(appSource).toContain("appShell.login.consent");
+    expect(shell).toContain("Giriş yaparak KVKK Aydınlatma Metni, Gizlilik Politikası, Kullanıcı Sözleşmesi ve Mesafeli Satış koşullarını kabul etmiş sayılırsınız.");
   });
 });

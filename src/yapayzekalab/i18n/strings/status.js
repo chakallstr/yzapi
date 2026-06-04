@@ -1,2 +1,33 @@
 /* tab-status.jsx strings. { tr: {...}, en: {...} } with parity. */
-export default { tr: {}, en: {} };
+export default {
+  tr: {
+    'status.title': 'Sistem Durumu',
+    'status.fetchError': 'Durum alınamadı.',
+    'status.loading': 'Yükleniyor…',
+    'status.uptimeSummary': 'Çalışma süresi {uptime} · {modelCount} model · v{version}',
+    'status.lastChecked': 'Son kontrol: {time}',
+    'status.noCheckData': 'Kontrol verisi yok.',
+    'status.lastKurRefresh': 'Son kur güncelleme: {datetime}',
+    'status.checkLabel_api': 'API',
+    'status.checkLabel_db': 'Veritabanı',
+    'status.checkLabel_aiProvider': 'AI Sağlayıcı',
+    'status.statusLabel_ok': 'Çalışıyor',
+    'status.statusLabel_degraded': 'Kısmi sorun',
+    'status.statusLabel_down': 'Çalışmıyor',
+  },
+  en: {
+    'status.title': 'System Status',
+    'status.fetchError': 'Could not fetch status.',
+    'status.loading': 'Loading…',
+    'status.uptimeSummary': 'Uptime {uptime} · {modelCount} models · v{version}',
+    'status.lastChecked': 'Last checked: {time}',
+    'status.noCheckData': 'No check data.',
+    'status.lastKurRefresh': 'Last rate update: {datetime}',
+    'status.checkLabel_api': 'API',
+    'status.checkLabel_db': 'Database',
+    'status.checkLabel_aiProvider': 'AI Provider',
+    'status.statusLabel_ok': 'Operational',
+    'status.statusLabel_degraded': 'Partial outage',
+    'status.statusLabel_down': 'Down',
+  },
+};
