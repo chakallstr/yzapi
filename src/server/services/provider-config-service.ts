@@ -89,6 +89,7 @@ export interface ProviderProfileAdminView {
   enabled: boolean;
   supportedModelIds: string[];
   modelMap: Record<string, string>;
+  fallbackProviderId: string | null;    // failover target profile id, or null
   isActive: boolean;                    // id === system_api_config.activeProviderId
 }
 
@@ -578,6 +579,7 @@ function toProviderProfileAdminView(
     enabled: row.enabled === true,
     supportedModelIds: parseStringArray(row.supportedModelIds),
     modelMap: parseStringRecord(row.modelMap),
+    fallbackProviderId: isNonEmptyString(row.fallbackProviderId) ? row.fallbackProviderId : null,
     isActive: activeProviderId !== null && row.id === activeProviderId,
   };
 }
@@ -608,6 +610,7 @@ export async function upsertProviderProfile(input: {
   enabled?: boolean;
   supportedModelIds?: string[];
   modelMap?: Record<string, string>;
+  fallbackProviderId?: string | null;  // failover target; "" / null clears it
 }): Promise<ProviderProfileAdminView> {
   const id = typeof input.id === "string" ? input.id.trim() : "";
   if (!id) {
@@ -629,6 +632,23 @@ export async function upsertProviderProfile(input: {
     throw new BadRequestError("Sağlayıcı API anahtarı boş olamaz.");
   }
 
+  // Failover target validation: must not be self; when set, the target must exist and
+  // be enabled. Explicit "" / null clears it. undefined → leave unchanged.
+  let normalizedFallback: string | null | undefined;
+  if (input.fallbackProviderId !== undefined) {
+    const fb = typeof input.fallbackProviderId === "string" ? input.fallbackProviderId.trim() : "";
+    if (!fb) {
+      normalizedFallback = null;
+    } else {
+      if (fb === id) throw new BadRequestError("Fallback sağlayıcı profilin kendisi olamaz.");
+      const targetRows = await db.select().from(providerProfiles).where(eq(providerProfiles.id, fb)).limit(1);
+      const target = targetRows[0] ?? null;
+      if (!target) throw new BadRequestError("Fallback sağlayıcı profili bulunamadı.");
+      if (target.enabled !== true) throw new BadRequestError("Pasif sağlayıcı fallback olarak atanamaz.");
+      normalizedFallback = fb;
+    }
+  }
+
   const existingRows = await db
     .select()
     .from(providerProfiles)
@@ -644,6 +664,7 @@ export async function upsertProviderProfile(input: {
     if (input.enabled !== undefined) patch.enabled = input.enabled;
     if (input.supportedModelIds !== undefined) patch.supportedModelIds = input.supportedModelIds;
     if (input.modelMap !== undefined) patch.modelMap = input.modelMap;
+    if (normalizedFallback !== undefined) patch.fallbackProviderId = normalizedFallback;
     if (isNonEmptyString(input.apiKey)) patch.apiKeyCipher = encryptApiKey(input.apiKey);
 
     await db.update(providerProfiles).set(patch).where(eq(providerProfiles.id, id));
@@ -656,6 +677,7 @@ export async function upsertProviderProfile(input: {
       enabled: input.enabled ?? true,
       supportedModelIds: input.supportedModelIds ?? [],
       modelMap: input.modelMap ?? {},
+      fallbackProviderId: normalizedFallback ?? null,
     };
     if (isNonEmptyString(input.apiKey)) values.apiKeyCipher = encryptApiKey(input.apiKey);
 
