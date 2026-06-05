@@ -76,7 +76,7 @@ export async function forwardWithFailover<T>(
     return { result, servedBy: primary.profileId, failedOver: false };
   } catch (err) {
     const eligible = isFailoverEligible(err);
-    // Post-commit guard: if the stream already started writing to the client we cannot
+    // Post-commit guard: once the stream has started writing to the client we cannot
     // fail over (headers/bytes are out). For non-streaming, headersSent is false here.
     const committed = opts.res?.headersSent === true;
     if (eligible && !committed) {
@@ -85,11 +85,22 @@ export async function forwardWithFailover<T>(
         { from: primary.profileId, to: fallback.profileId, reason: (err as Error)?.message },
         "provider failover",
       );
-      const result = await runForward(fallback, undefined);
-      return { result, servedBy: fallback.profileId, failedOver: true };
+      try {
+        const result = await runForward(fallback, undefined);
+        return { result, servedBy: fallback.profileId, failedOver: true };
+      } catch (fbErr) {
+        logger.warn(
+          { from: primary.profileId, to: fallback.profileId, reason: (fbErr as Error)?.message },
+          "provider failover: fallback also failed",
+        );
+        throw fbErr;
+      }
     }
-    // Non-eligible error = primary responded (4xx/app) → it is reachable → close breaker.
-    if (!eligible) recordReachable(key);
+    // Otherwise the primary is reachable: either a non-eligible app error (it responded),
+    // or an eligible error AFTER commit (it already streamed headers → it connected). Both
+    // reset the breaker, which ALSO releases the half-open probe flag — so halfOpenInFlight
+    // is never stranded into a permanent half-open wedge (spec §3.4 QA3, defense-in-depth).
+    recordReachable(key);
     throw err;
   }
 }
