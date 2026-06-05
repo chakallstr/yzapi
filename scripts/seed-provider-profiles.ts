@@ -3,19 +3,21 @@
 // One-shot operator script: seeds the provider profiles for PER-MODEL routing and
 // (re-)applies the fallback active provider. Each enabled profile's
 // supported_model_ids is a DISJOINT partition; the request's model picks the
-// upstream (resolveProviderForModel). PROBE-VERIFIED topology (2026-06-03):
+// upstream (resolveProviderForModel). PROBE-VERIFIED topology (updated 2026-06-05):
 //
 //   wellflow    — Claude family upstream (base https://api.wellflow.dev/v1). OWN
 //                 reseller key (wf_-prefixed) from env WELLFLOW_API_KEY (conditional,
-//                 empty env keeps stored cipher). Serves opus-4-7/4-6, sonnet-4-6,
-//                 haiku-4-5 (model_map → DOT wire names). It does NOT serve
-//                 opus-4.8 / Gemini / o-series / the broader GPT family.
+//                 empty env keeps stored cipher). Serves opus-4.8 (DOT wire) + opus-4-7/4-6,
+//                 sonnet-4-6, haiku-4-5 (model_map → DOT wire names). Re-probe 2026-06-05:
+//                 wellflow serves claude-opus-4.8 (GET /v1/models lists it; chat+messages 200).
+//                 fallback_provider_id = closerouter → infra (502/503/504/timeout) failover.
 //   closerouter — "Popusk" multi-model upstream (base https://api.claude-popusk.shop/v1).
 //                 OWN reseller key from env POPUSK_API_KEY (conditional). Serves the
-//                 GPT-5 family + o-series + Gemini (the 3 it exposes) + claude-opus-4.8.
-//                 Wire names are verbatim (dash) EXCEPT opus-4.8: our canonical id is
-//                 the DOT form claude-opus-4.8, popusk serves it as claude-opus-4-8
-//                 (model_map dot→dash). Active fallback provider.
+//                 GPT-5 family + o-series + Gemini (the 3 it exposes). Wire names are
+//                 verbatim (dash). Active fallback provider. NOTE: opus-4.8 was moved to
+//                 wellflow-PRIMARY 2026-06-05 (Popusk was 503-storming opus-4.8 with no
+//                 fallback); the POPUSK_MODEL_MAP opus-4.8→opus-4-8 entry is KEPT so the
+//                 wellflow→closerouter failover leg still maps to the dash wire.
 //   metro       — DELETED. The old api.stepanovikov.uno profile is removed: GPT/Gemini
 //                 moved to popusk, Claude to wellflow (operator decision 2026-06-03).
 //
@@ -49,7 +51,7 @@ import { addedModels, providerProfiles } from "../src/server/db/schema.js";
 // (NOT imported from db/seed.ts, whose top-level main() would run as an import
 // side-effect). Idempotent via onConflictDoNothing — never overwrites an existing
 // row's price/label. Prices from the approved locked table (USD/1M).
-// claude-opus-4.8 is served by popusk; gemini-3.5-flash is kept for catalog parity
+// claude-opus-4.8 is served by wellflow (primary, since 2026-06-05); gemini-3.5-flash is kept for catalog parity
 // but NO enabled profile serves it now (popusk doesn't expose it) → it stays hidden
 // from the UNION catalog until a provider lists it.
 const ADDED_MODELS = [
@@ -81,6 +83,7 @@ async function seedAddedModelsInline() {
 const WELLFLOW_BASE_URL = process.env.WELLFLOW_BASE_URL || "https://api.wellflow.dev/v1";
 
 const WELLFLOW_SUPPORTED_MODEL_IDS = [
+  "claude-opus-4.8", // moved here 2026-06-05 (wellflow PRIMARY); DOT wire = canonical → no map entry needed
   "claude-opus-4-7",
   "claude-opus-4-6",
   "claude-sonnet-4-6",
@@ -125,12 +128,15 @@ const POPUSK_SUPPORTED_MODEL_IDS = [
   "o3-mini", "o3-mini-2025-01-31",
   // Gemini (3 — exactly what popusk exposes)
   "gemini-3.1-pro-preview", "gemini-3.1-pro-preview-customtools", "gemini-3-flash-preview",
-  // Claude added (1) — opus-4.8 lives here (wellflow can't serve it)
-  "claude-opus-4.8",
+  // NOTE: claude-opus-4.8 was moved to wellflow-PRIMARY (2026-06-05) — it is NO LONGER in
+  // popusk's supportedModelIds (else, by id sort order, closerouter would hijack primary
+  // routing). popusk now only serves opus-4.8 as the FAILOVER target (see POPUSK_MODEL_MAP).
 ];
 
 // canonical id → popusk wire id. opus-4.8's canonical id is dot-form but popusk
-// serves it as the dash form; everything else forwards verbatim.
+// serves it as the dash form. KEPT even though opus-4.8 is no longer in popusk's
+// supportedModelIds: the wellflow→closerouter failover leg routes opus-4.8 here and
+// needs this dot→dash rewrite (fallback uses the fallback profile's own modelMap).
 const POPUSK_MODEL_MAP: Record<string, string> = {
   "claude-opus-4.8": "claude-opus-4-8",
 };
@@ -149,7 +155,7 @@ async function main() {
 
   // ── added_models ────────────────────────────────────────────────────────────
   await seedAddedModelsInline();
-  console.log("  added_models seeded (claude-opus-4.8 [popusk], gemini-3.5-flash [hidden — no provider])");
+  console.log("  added_models seeded (claude-opus-4.8 [wellflow primary → popusk fallback], gemini-3.5-flash [hidden — no provider])");
 
   // ── wellflow (Claude family) ─────────────────────────────────────────────────
   // OWN reseller key (wf_-prefixed) from env WELLFLOW_API_KEY, conditional so an
@@ -164,6 +170,10 @@ async function main() {
     enabled: true,
     supportedModelIds: WELLFLOW_SUPPORTED_MODEL_IDS,
     modelMap: WELLFLOW_MODEL_MAP,
+    // Infra-failover target (2026-06-05): wellflow Claude (incl. opus-4.8) falls over
+    // to closerouter/Popusk on 502/503/504/connect-timeout. Baked into the seed so a
+    // re-seed restores the edge (was previously set manually via set-provider-fallback).
+    fallbackProviderId: "closerouter",
   });
   console.log(`  wellflow upserted (base=${WELLFLOW_BASE_URL}, ${WELLFLOW_SUPPORTED_MODEL_IDS.length} models, ${Object.keys(WELLFLOW_MODEL_MAP).length} mapped, key=${process.env.WELLFLOW_API_KEY ? "WELLFLOW_API_KEY" : "(unchanged)"})`);
 
