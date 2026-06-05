@@ -1,5 +1,6 @@
 import { Response } from "express";
 import {
+  AttemptOptions,
   ChatRequest,
   ChatUsage,
   TextRequest,
@@ -17,12 +18,12 @@ import type { ResponsesStreamMeta } from "./responses-translation.js";
 
 export interface ProviderAdapter {
   readonly id: "closerouter" | "ninerouter";
-  forwardChat(body: ChatRequest, ctx: ProviderContext): Promise<{ raw: unknown; usage: ChatUsage }>;
-  forwardChatStream(body: ChatRequest, res: Response, ctx: ProviderContext): Promise<ChatUsage>;
+  forwardChat(body: ChatRequest, ctx: ProviderContext, attempt?: AttemptOptions): Promise<{ raw: unknown; usage: ChatUsage }>;
+  forwardChatStream(body: ChatRequest, res: Response, ctx: ProviderContext, attempt?: AttemptOptions): Promise<ChatUsage>;
   // Responses API streaming köprüsü: upstream'i chat olarak sürer, res'e Responses event'leri yazar.
-  forwardResponsesStream(body: ChatRequest, res: Response, ctx: ProviderContext, meta: ResponsesStreamMeta): Promise<ChatUsage>;
-  forwardResponses(body: TextRequest, ctx: ProviderContext): Promise<{ raw: unknown; usage: ChatUsage }>;
-  forwardMessages(body: TextRequest, ctx: ProviderContext): Promise<{ raw: unknown; usage: ChatUsage }>;
+  forwardResponsesStream(body: ChatRequest, res: Response, ctx: ProviderContext, meta: ResponsesStreamMeta, attempt?: AttemptOptions): Promise<ChatUsage>;
+  forwardResponses(body: TextRequest, ctx: ProviderContext, attempt?: AttemptOptions): Promise<{ raw: unknown; usage: ChatUsage }>;
+  forwardMessages(body: TextRequest, ctx: ProviderContext, attempt?: AttemptOptions): Promise<{ raw: unknown; usage: ChatUsage }>;
   forwardImage(
     endpoint: "generations" | "edits",
     body: Record<string, unknown>,
@@ -35,24 +36,24 @@ export interface ProviderAdapter {
 export class CloseRouterAdapter implements ProviderAdapter {
   readonly id = "closerouter" as const;
 
-  forwardChat(body: ChatRequest, ctx: ProviderContext): Promise<{ raw: unknown; usage: ChatUsage }> {
-    return forwardChat(body, ctx);
+  forwardChat(body: ChatRequest, ctx: ProviderContext, attempt?: AttemptOptions): Promise<{ raw: unknown; usage: ChatUsage }> {
+    return forwardChat(body, ctx, attempt);
   }
 
-  forwardChatStream(body: ChatRequest, res: Response, ctx: ProviderContext): Promise<ChatUsage> {
-    return forwardChatStream(body, res, ctx);
+  forwardChatStream(body: ChatRequest, res: Response, ctx: ProviderContext, attempt?: AttemptOptions): Promise<ChatUsage> {
+    return forwardChatStream(body, res, ctx, attempt);
   }
 
-  forwardResponsesStream(body: ChatRequest, res: Response, ctx: ProviderContext, meta: ResponsesStreamMeta): Promise<ChatUsage> {
-    return forwardChatStreamAsResponses(body, res, ctx, meta);
+  forwardResponsesStream(body: ChatRequest, res: Response, ctx: ProviderContext, meta: ResponsesStreamMeta, attempt?: AttemptOptions): Promise<ChatUsage> {
+    return forwardChatStreamAsResponses(body, res, ctx, meta, attempt);
   }
 
-  forwardResponses(body: TextRequest, ctx: ProviderContext): Promise<{ raw: unknown; usage: ChatUsage }> {
-    return forwardTextEndpoint("responses", body, ctx);
+  forwardResponses(body: TextRequest, ctx: ProviderContext, attempt?: AttemptOptions): Promise<{ raw: unknown; usage: ChatUsage }> {
+    return forwardTextEndpoint("responses", body, ctx, attempt);
   }
 
-  forwardMessages(body: TextRequest, ctx: ProviderContext): Promise<{ raw: unknown; usage: ChatUsage }> {
-    return forwardTextEndpoint("messages", body, ctx);
+  forwardMessages(body: TextRequest, ctx: ProviderContext, attempt?: AttemptOptions): Promise<{ raw: unknown; usage: ChatUsage }> {
+    return forwardTextEndpoint("messages", body, ctx, attempt);
   }
 
   forwardImage(

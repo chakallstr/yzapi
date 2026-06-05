@@ -40,6 +40,14 @@ export interface TextRequest {
   [key: string]: unknown;
 }
 
+// Optional per-call override for the upstream attempt budget. Used by the failover
+// wrapper to make the PRIMARY attempt single-shot with a short time-to-headers budget
+// (provider-failover.ts). undefined → today's behavior (default timeout + 3 connect-retries).
+export interface AttemptOptions {
+  timeoutMs?: number;
+  maxAttempts?: number;
+}
+
 const OMNIROUTE_MODEL_MAP: Record<string, string> = {
   "gpt-5.4-mini": "cx/gpt-5.4-mini",
   "openai/gpt-5.4-mini": "cx/gpt-5.4-mini",
@@ -295,7 +303,8 @@ export async function fetchWithRuntimeTimeout(
 
 export async function forwardChat(
   body: ChatRequest,
-  ctx: ProviderContext
+  ctx: ProviderContext,
+  attempt?: AttemptOptions,
 ): Promise<{ raw: unknown; usage: ChatUsage }> {
   const start = Date.now();
   const baseUrl = ctx.baseUrl;
@@ -310,7 +319,7 @@ export async function forwardChat(
     method: "POST",
     headers: baseHeaders(ctx.apiKey),
     body: JSON.stringify(providerBody),
-  }, runtimeConfig.defaultRequestTimeoutMs);
+  }, attempt?.timeoutMs ?? runtimeConfig.defaultRequestTimeoutMs, attempt?.maxAttempts ?? 3);
 
   const responseMs = Date.now() - start;
   const json = await readProviderJson(res);
@@ -333,7 +342,8 @@ export async function forwardChat(
 export async function forwardTextEndpoint(
   endpoint: "responses" | "messages",
   body: TextRequest,
-  ctx: ProviderContext
+  ctx: ProviderContext,
+  attempt?: AttemptOptions,
 ): Promise<{ raw: unknown; usage: ChatUsage }> {
   const start = Date.now();
   const baseUrl = ctx.baseUrl;
@@ -348,7 +358,7 @@ export async function forwardTextEndpoint(
     method: "POST",
     headers: baseHeaders(ctx.apiKey),
     body: JSON.stringify(providerBody),
-  }, runtimeConfig.defaultRequestTimeoutMs);
+  }, attempt?.timeoutMs ?? runtimeConfig.defaultRequestTimeoutMs, attempt?.maxAttempts ?? 3);
 
   const responseMs = Date.now() - start;
   const json = await readProviderJson(res);
@@ -368,7 +378,8 @@ export async function forwardTextEndpoint(
 export async function forwardChatStream(
   body: ChatRequest,
   res: Response,
-  ctx: ProviderContext
+  ctx: ProviderContext,
+  attempt?: AttemptOptions,
 ): Promise<ChatUsage> {
   const baseUrl = ctx.baseUrl;
   const url = `${baseUrl}/chat/completions`;
@@ -390,7 +401,7 @@ export async function forwardChatStream(
     method: "POST",
     headers: { ...baseHeaders(ctx.apiKey), Accept: "text/event-stream" },
     body: JSON.stringify(providerBody),
-  }, runtimeConfig.defaultStreamTimeoutMs);
+  }, attempt?.timeoutMs ?? runtimeConfig.defaultStreamTimeoutMs, attempt?.maxAttempts ?? 3);
 
   if (!upstream.ok) {
     const errBody = await upstream.json().catch(() => ({}));
@@ -519,6 +530,7 @@ export async function forwardChatStreamAsResponses(
   res: Response,
   ctx: ProviderContext,
   meta: ResponsesStreamMeta,
+  attempt?: AttemptOptions,
 ): Promise<ChatUsage> {
   const baseUrl = ctx.baseUrl;
   const url = `${baseUrl}/chat/completions`;
@@ -535,7 +547,7 @@ export async function forwardChatStreamAsResponses(
     method: "POST",
     headers: { ...baseHeaders(ctx.apiKey), Accept: "text/event-stream" },
     body: JSON.stringify(providerBody),
-  }, runtimeConfig.defaultStreamTimeoutMs);
+  }, attempt?.timeoutMs ?? runtimeConfig.defaultStreamTimeoutMs, attempt?.maxAttempts ?? 3);
 
   if (!upstream.ok) {
     // Header'lar HENÜZ gönderilmedi → proxy normal JSON hata gövdesi döndürebilir.

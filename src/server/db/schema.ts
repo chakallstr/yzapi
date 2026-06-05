@@ -207,6 +207,7 @@ export const providerProfiles = pgTable("provider_profiles", {
   enabled: boolean("enabled").notNull().default(true),
   supportedModelIds: jsonb("supported_model_ids").notNull().default(sql`'[]'::jsonb`),
   modelMap: jsonb("model_map").notNull().default(sql`'{}'::jsonb`), // catalog id -> upstream id
+  fallbackProviderId: text("fallback_provider_id"), // soft ref: failover target profile id, nullable
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });

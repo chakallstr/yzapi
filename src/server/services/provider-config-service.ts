@@ -118,6 +118,7 @@ interface ParsedProfile {
   apiKey: string | undefined;
   supportedModelIds: string[];
   modelMap: Record<string, string>;
+  fallbackProviderId: string | null;
 }
 
 // All-enabled-profiles cache (per-model routing + UNION catalog). Shares the
@@ -246,6 +247,7 @@ async function readAllEnabledProfiles(): Promise<ParsedProfile[]> {
       apiKey: isNonEmptyString(r.apiKeyCipher) ? (decryptApiKey(r.apiKeyCipher) ?? undefined) : undefined,
       supportedModelIds: parseStringArray(r.supportedModelIds),
       modelMap: parseStringRecord(r.modelMap),
+      fallbackProviderId: isNonEmptyString(r.fallbackProviderId) ? r.fallbackProviderId : null,
     }))
     .sort((a, b) => a.id.localeCompare(b.id));
   profilesCache = { profiles, at: Date.now() };
@@ -375,32 +377,70 @@ export async function resolveSupportedModelIds(): Promise<string[] | null> {
 // The canonicalModelId MUST be the same id used in supportedModelIds (i.e.
 // masterModel.id — dash form for masters, dot form for added models like
 // claude-opus-4.8); proxy.ts already sends that id upstream.
-export async function resolveProviderForModel(canonicalModelId: string): Promise<ProviderContext> {
+export interface ProviderChain {
+  primary: ProviderContext;
+  fallback: ProviderContext | null;
+}
+
+// Resolves the primary provider for a model AND its optional failover target.
+// The primary is exactly the legacy resolveProviderForModel result. The fallback is
+// the matched PINNED profile's fallback_provider_id resolved to a ProviderContext —
+// only when that target is enabled AND has a decryptable key (mirrors the primary's
+// `&& apiKey` guard); else null. The fallback does NOT require the model to be in the
+// fallback profile's supportedModelIds (pin bypass — adding it there would, by sort
+// order, hijack PRIMARY routing). Single-hop: the fallback's own fallback is ignored.
+// The unpinned (active/system_api_config/env) path never carries a fallback.
+// See docs/superpowers/specs/2026-06-05-provider-failover-design.md §3.2.
+export async function resolveProviderChainForModel(canonicalModelId: string): Promise<ProviderChain> {
   const profiles = await readAllEnabledProfiles();
   const match = profiles.find((p) => p.supportedModelIds.includes(canonicalModelId));
+
   if (match && match.apiKey) {
-    return {
+    const primary: ProviderContext = {
       profileId: match.id,
       baseUrl: match.baseUrl,
       apiKey: match.apiKey,
       modelMap: match.modelMap,
       source: { baseUrl: "model_profile", apiKey: "model_profile" },
     };
+    let fallback: ProviderContext | null = null;
+    if (match.fallbackProviderId) {
+      const fb = profiles.find((p) => p.id === match.fallbackProviderId);
+      if (fb && fb.apiKey) {
+        fallback = {
+          profileId: fb.id,
+          baseUrl: fb.baseUrl,
+          apiKey: fb.apiKey,
+          modelMap: fb.modelMap,
+          source: { baseUrl: "model_profile", apiKey: "model_profile" },
+        };
+      }
+    }
+    return { primary, fallback };
   }
 
-  // Fallback: active profile → system_api_config → env (unchanged single-active).
+  // No pinning profile → existing active profile → system_api_config → env. No failover.
   const eff = await resolveEffectiveProviderConfig();
   const activeMap = await resolveActiveModelMap();
   return {
-    profileId: null,
-    baseUrl: eff.baseUrl,
-    apiKey: eff.apiKey,
-    modelMap: activeMap,
-    source: {
-      baseUrl: eff.source.baseUrl === "profile" ? "active_profile" : eff.source.baseUrl,
-      apiKey: eff.source.apiKey === "profile" ? "active_profile" : eff.source.apiKey,
+    primary: {
+      profileId: null,
+      baseUrl: eff.baseUrl,
+      apiKey: eff.apiKey,
+      modelMap: activeMap,
+      source: {
+        baseUrl: eff.source.baseUrl === "profile" ? "active_profile" : eff.source.baseUrl,
+        apiKey: eff.source.apiKey === "profile" ? "active_profile" : eff.source.apiKey,
+      },
     },
+    fallback: null,
   };
+}
+
+// Per-model upstream routing (backward-compatible single result). Delegates to
+// resolveProviderChainForModel().primary so all existing callers/tests are unchanged.
+export async function resolveProviderForModel(canonicalModelId: string): Promise<ProviderContext> {
+  return (await resolveProviderChainForModel(canonicalModelId)).primary;
 }
 
 // DB-first resolution with env fallback. Reads system_api_config (id = 1).
