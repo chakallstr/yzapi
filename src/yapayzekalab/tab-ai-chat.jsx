@@ -109,43 +109,219 @@ export function AiChatTab() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <Caption>AI Chat</Caption>
-      {error && <div style={{ color: 'var(--danger, #e5484d)' }}>{error}</div>}
-      <Card pad={12}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* Başlık */}
+      <div>
+        <Caption>AI Chat</Caption>
+        <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.5, margin: '4px 0 0', color: 'var(--ink)' }}>
+          {t('aiChat.noMessages') ? 'Model ile sohbet et' : ''}
+        </h1>
+      </div>
+
+      {/* Hata */}
+      {error && (
+        <div className="fade-in" style={{
+          padding: '12px 16px', borderRadius: 10,
+          background: '#fff1f2', border: '1px solid #fecdd3',
+          fontSize: 13, color: '#be123c',
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <span>⚠️</span> {error}
+        </div>
+      )}
+
+      {/* Ayarlar */}
+      <Card pad={16}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <select value={model} onChange={(e) => setModel(e.target.value)}>
+          {/* Model seç */}
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            style={{
+              padding: '8px 12px', borderRadius: 9,
+              border: '1px solid var(--border-st)',
+              background: 'var(--surface-2)', color: 'var(--ink)',
+              fontSize: 13, fontFamily: 'var(--font-mono)',
+              outline: 'none', minWidth: 180,
+            }}
+          >
             {models.length === 0 && <option value="">{t('aiChat.modelPlaceholder')}</option>}
             {models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
           </select>
-          <label style={{ fontSize: 13 }}>Temp <input type="number" step="0.1" min="0" max="2" value={temperature} onChange={(e) => setTemperature(e.target.value)} style={{ width: 60 }} /></label>
-          <label style={{ fontSize: 13 }}>Max tokens <input type="number" value={maxTokens} onChange={(e) => setMaxTokens(e.target.value)} style={{ width: 84 }} /></label>
-          <label style={{ fontSize: 13 }}><input type="checkbox" checked={streaming} onChange={(e) => setStreaming(e.target.checked)} /> Streaming</label>
-          <button onClick={clear}>{t('aiChat.clearHistory')}</button>
-          <button onClick={exportChat} disabled={!messages.length}>{t('aiChat.exportChat')}</button>
+
+          {/* Temp */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+            Temp
+            <input
+              type="number" step="0.1" min="0" max="2" value={temperature}
+              onChange={(e) => setTemperature(e.target.value)}
+              style={{
+                width: 58, padding: '7px 8px', borderRadius: 8,
+                border: '1px solid var(--border-st)',
+                background: 'var(--surface-2)', color: 'var(--ink)',
+                fontSize: 12, fontFamily: 'var(--font-mono)', textAlign: 'center',
+              }}
+            />
+          </label>
+
+          {/* Max tokens */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+            Max tokens
+            <input
+              type="number" value={maxTokens}
+              onChange={(e) => setMaxTokens(e.target.value)}
+              style={{
+                width: 78, padding: '7px 8px', borderRadius: 8,
+                border: '1px solid var(--border-st)',
+                background: 'var(--surface-2)', color: 'var(--ink)',
+                fontSize: 12, fontFamily: 'var(--font-mono)', textAlign: 'center',
+              }}
+            />
+          </label>
+
+          {/* Streaming toggle */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink-2)', cursor: 'pointer', userSelect: 'none' }}>
+            <div
+              onClick={() => setStreaming((s) => !s)}
+              style={{
+                width: 36, height: 20, borderRadius: 999, cursor: 'pointer',
+                background: streaming ? 'var(--accent)' : 'var(--border)',
+                position: 'relative', transition: 'background 0.2s',
+              }}
+            >
+              <div style={{
+                position: 'absolute', top: 3, left: streaming ? 19 : 3,
+                width: 14, height: 14, borderRadius: 999,
+                background: '#fff', transition: 'left 0.2s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              }} />
+            </div>
+            Streaming
+          </label>
+
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+            <button
+              onClick={clear}
+              style={{
+                padding: '7px 14px', borderRadius: 8, border: '1px solid var(--border-st)',
+                background: 'var(--surface)', color: 'var(--ink-2)',
+                fontSize: 12, fontWeight: 500, cursor: 'pointer',
+              }}
+            >
+              {t('aiChat.clearHistory')}
+            </button>
+            <button
+              onClick={exportChat}
+              disabled={!messages.length}
+              style={{
+                padding: '7px 14px', borderRadius: 8, border: '1px solid var(--border-st)',
+                background: 'var(--surface)', color: 'var(--ink-2)',
+                fontSize: 12, fontWeight: 500,
+                opacity: messages.length ? 1 : 0.4, cursor: messages.length ? 'pointer' : 'default',
+              }}
+            >
+              {t('aiChat.exportChat')}
+            </button>
+          </div>
         </div>
       </Card>
 
-      <Card pad={12}>
-        <div ref={scrollRef} style={{ maxHeight: 440, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {messages.length === 0 && <div style={{ color: 'var(--ink-2)' }}>{t('aiChat.noMessages')}</div>}
+      {/* Sohbet */}
+      <Card pad={0} style={{ overflow: 'hidden' }}>
+        {/* Mesajlar */}
+        <div
+          ref={scrollRef}
+          style={{
+            height: 420, overflowY: 'auto', padding: '20px 20px 16px',
+            display: 'flex', flexDirection: 'column', gap: 12,
+          }}
+        >
+          {messages.length === 0 && (
+            <div style={{
+              flex: 1, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 10,
+              color: 'var(--ink-3)',
+            }}>
+              <span style={{ fontSize: 32 }}>✦</span>
+              <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)' }}>{t('aiChat.noMessages')}</span>
+            </div>
+          )}
           {messages.map((m, i) => (
-            <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '82%', background: m.role === 'user' ? 'var(--accent-soft, #eef2ff)' : 'var(--surface-2, #f5f5f7)', padding: '8px 12px', borderRadius: 10, whiteSpace: 'pre-wrap' }}>
-              <Chip>{m.role === 'user' ? t('aiChat.youLabel') : 'AI'}</Chip>
-              <div style={{ marginTop: 4 }}>{m.content || (busy && i === messages.length - 1 ? '…' : '')}</div>
+            <div
+              key={i}
+              style={{
+                alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                maxWidth: '80%',
+                display: 'flex', flexDirection: 'column', gap: 4,
+              }}
+            >
+              <span style={{
+                fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
+                color: 'var(--ink-4)',
+                alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                letterSpacing: 0.5, textTransform: 'uppercase',
+              }}>
+                {m.role === 'user' ? t('aiChat.youLabel') : 'AI'}
+              </span>
+              <div style={{
+                padding: '10px 14px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                background: m.role === 'user' ? 'var(--accent)' : 'var(--surface-2)',
+                color: m.role === 'user' ? '#fff' : 'var(--ink)',
+                fontSize: 13.5, lineHeight: 1.6,
+                border: m.role === 'user' ? 'none' : '1px solid var(--border)',
+                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              }}>
+                {m.content || (busy && i === messages.length - 1
+                  ? <span style={{ opacity: 0.5 }} className="pulse-dot">●●●</span>
+                  : '')}
+              </div>
             </div>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+
+        {/* Girdi alanı */}
+        <div style={{
+          borderTop: '1px solid var(--border)',
+          padding: '12px 16px',
+          display: 'flex', gap: 10, alignItems: 'flex-end',
+          background: 'var(--surface)',
+        }}>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }}
             placeholder={t('aiChat.inputPlaceholder')}
             rows={2}
-            style={{ flex: 1 }}
+            style={{
+              flex: 1, padding: '10px 14px', borderRadius: 10,
+              border: '1px solid var(--border-st)',
+              background: 'var(--surface-2)', color: 'var(--ink)',
+              fontSize: 13.5, fontFamily: 'var(--font-sans)',
+              resize: 'none', outline: 'none', lineHeight: 1.5,
+            }}
           />
-          <button onClick={send} disabled={busy || !model}>{busy ? '…' : t('common.send')}</button>
+          <button
+            onClick={send}
+            disabled={busy || !model || !input.trim()}
+            style={{
+              padding: '10px 20px', borderRadius: 10, border: 0,
+              background: busy || !model || !input.trim() ? 'var(--border)' : 'var(--accent)',
+              color: busy || !model || !input.trim() ? 'var(--ink-3)' : '#fff',
+              fontSize: 13, fontWeight: 600,
+              display: 'flex', alignItems: 'center', gap: 6,
+              transition: 'background 0.15s, color 0.15s',
+              cursor: busy || !model || !input.trim() ? 'default' : 'pointer',
+              flexShrink: 0, alignSelf: 'flex-end',
+            }}
+          >
+            {busy ? (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="spin-slow">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+            ) : '↑'}
+            {busy ? '…' : t('common.send')}
+          </button>
         </div>
       </Card>
     </div>
