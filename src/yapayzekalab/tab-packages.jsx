@@ -7,6 +7,22 @@ import { useT } from './i18n/index.jsx';
    PackagesTab — Paket satın alma & kod kullan
    ============================================ */
 
+// === Kategori görsel kimlikleri ====================================
+// Her kategori = gradyan + line-icon (shared I). Gerçek görsel hosting
+// gerektirmeden "güzel görsel" sağlar (banner + ikon + dekoratif mesh).
+const CAT_META = {
+  'GPT/Codex':        { c1: '#10b981', c2: '#059669', icon: 'Terminal' },
+  'Claude':           { c1: '#f59e0b', c2: '#d97706', icon: 'Sparkle' },
+  'Gemini':           { c1: '#3b82f6', c2: '#2563eb', icon: 'Sparkle' },
+  'Grok':             { c1: '#64748b', c2: '#334155', icon: 'Bolt' },
+  'GLM':              { c1: '#14b8a6', c2: '#0d9488', icon: 'Cpu' },
+  'Görsel Oluşturma': { c1: '#a855f7', c2: '#7c3aed', icon: 'Beaker' },
+  'Hesaplar':         { c1: '#6366f1', c2: '#4f46e5', icon: 'Shield' },
+  'Deneme':           { c1: '#fbbf24', c2: '#ea580c', icon: 'Beaker' },
+};
+const DEFAULT_META = { c1: 'var(--accent)', c2: 'var(--t-teal)', icon: 'Layers' };
+const metaFor = (kategori) => CAT_META[kategori] || DEFAULT_META;
+
 // === Durum badge ===================================================
 const StatusBadge = ({ durum }) => {
   const cfg = {
@@ -25,29 +41,65 @@ const StatusBadge = ({ durum }) => {
 };
 
 // === Paket kartı ===================================================
-const PackageCard = ({ pkg, busy, onBuy, t }) => {
+const PackageCard = ({ pkg, busy, onBuy, onActivateCode, t }) => {
   const isBusy = busy === pkg.id;
   const isDelivery = pkg.tip === 'account_delivery';
+  const isTrial = pkg.kategori === 'Deneme';
+  // ₺0 = yalnız anahtar/kod ile verilir (doğrudan satın alınamaz, abuse engeli)
+  const isCodeOnly = Number(pkg.fiyatTL) <= 0;
+  const meta = metaFor(pkg.kategori);
+  const Ic = I[meta.icon] || I.Layers;
+  const priceLabel = pkg.fiyatUsd != null ? `$${Number(pkg.fiyatUsd).toFixed(2)}` : `₺${pkg.fiyatTL}`;
 
   return (
     <Card hoverable pad={0} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      {/* Üst renkli şerit */}
+      {/* Görsel banner: kategori gradyanı + büyük ikon + dekoratif mesh */}
       <div style={{
-        height: 3,
-        background: isDelivery
-          ? 'linear-gradient(90deg, var(--t-purple), var(--t-indigo))'
-          : 'linear-gradient(90deg, var(--accent), var(--t-teal))',
-      }} />
+        position: 'relative', height: 88,
+        background: `linear-gradient(135deg, ${meta.c1}, ${meta.c2})`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+      }}>
+        {/* yumuşak ışık lekeleri */}
+        <div style={{
+          position: 'absolute', inset: 0, opacity: 0.22, pointerEvents: 'none',
+          backgroundImage:
+            'radial-gradient(circle at 18% 28%, #fff 0, transparent 36%), radial-gradient(circle at 86% 78%, #fff 0, transparent 30%)',
+        }} />
+        {/* köşede dev filigran ikon */}
+        <div style={{ position: 'absolute', right: -20, bottom: -26, opacity: 0.16, pointerEvents: 'none' }}>
+          <Ic size={128} stroke="#fff" strokeWidth={1.1} />
+        </div>
+        {/* ortadaki cam ikon rozeti */}
+        <div style={{
+          position: 'relative', width: 48, height: 48, borderRadius: 14,
+          background: 'rgba(255,255,255,0.20)', border: '1px solid rgba(255,255,255,0.35)',
+          display: 'grid', placeItems: 'center', boxShadow: '0 6px 18px rgba(0,0,0,0.18)',
+        }}>
+          <Ic size={25} stroke="#fff" strokeWidth={1.9} />
+        </div>
+        {/* deneme rozeti */}
+        {isTrial && (
+          <div style={{
+            position: 'absolute', top: 10, left: 10,
+            padding: '3px 9px', borderRadius: 999, background: 'rgba(255,255,255,0.95)',
+            fontSize: 9.5, fontWeight: 800, letterSpacing: 0.6, color: meta.c2,
+            fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: 4,
+          }}>🔑 {t('packages.trialBadge')}</div>
+        )}
+      </div>
 
-      <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ padding: '16px 20px', flex: 1, display: 'flex', flexDirection: 'column', gap: 11 }}>
         {/* Başlık + Kategori */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
           <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: -0.2, color: 'var(--ink)', lineHeight: 1.3 }}>
             {pkg.ad}
           </div>
-          <Chip tone={isDelivery ? 'indigo' : 'accent'} style={{ flexShrink: 0, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: 0.5 }}>
-            {pkg.kategori}
-          </Chip>
+          <span style={{
+            flexShrink: 0, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: 0.4,
+            padding: '3px 8px', borderRadius: 999, fontWeight: 600,
+            color: meta.c2, background: `color-mix(in srgb, ${meta.c1} 14%, transparent)`,
+            border: `1px solid color-mix(in srgb, ${meta.c1} 30%, transparent)`,
+          }}>{pkg.kategori}</span>
         </div>
 
         {/* Açıklama */}
@@ -58,7 +110,7 @@ const PackageCard = ({ pkg, busy, onBuy, t }) => {
         {/* Specs */}
         {(pkg.gunlukIstekLimiti || pkg.sureGun) && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {pkg.gunlukIstekLimiti && (
+            {pkg.gunlukIstekLimiti ? (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 5,
                 padding: '4px 10px', borderRadius: 7,
@@ -68,8 +120,8 @@ const PackageCard = ({ pkg, busy, onBuy, t }) => {
                 <span style={{ fontSize: 10 }}>⚡</span>
                 {pkg.gunlukIstekLimiti.toLocaleString('tr-TR')} {t('packages.perDay')}
               </div>
-            )}
-            {pkg.sureGun && (
+            ) : null}
+            {pkg.sureGun ? (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 5,
                 padding: '4px 10px', borderRadius: 7,
@@ -77,43 +129,50 @@ const PackageCard = ({ pkg, busy, onBuy, t }) => {
                 fontSize: 11.5, fontFamily: 'var(--font-mono)', color: 'var(--ink-2)',
               }}>
                 <span style={{ fontSize: 10 }}>📅</span>
-                {pkg.sureGun} {t('packages.days')}
+                {`${pkg.sureGun} ${t('packages.days')}`}
               </div>
-            )}
+            ) : null}
           </div>
         )}
 
-        {/* Fiyat */}
-        <div style={{
-          display: 'flex', alignItems: 'baseline', gap: 4,
-          marginTop: 'auto', paddingTop: 8,
-        }}>
-          <span style={{
-            fontSize: 32, fontWeight: 700, letterSpacing: -1.2, lineHeight: 1,
-            color: 'var(--ink)', fontFamily: 'var(--font-sans)',
-          }} className="tnum">
-            {pkg.fiyatUsd != null ? `$${Number(pkg.fiyatUsd).toFixed(2)}` : `₺${pkg.fiyatTL}`}
-          </span>
-          <span style={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
-            {t('packages.oneTime')}
-          </span>
-        </div>
+        {/* Fiyat / Anahtar ile */}
+        {isCodeOnly ? (
+          <div style={{ display: 'flex', alignItems: 'center', marginTop: 'auto', paddingTop: 8 }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '7px 12px', borderRadius: 9, fontWeight: 700, fontSize: 13.5,
+              color: meta.c2, background: `color-mix(in srgb, ${meta.c1} 14%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${meta.c1} 30%, transparent)`,
+            }}>🔑 {t('packages.keyOnly')}</span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 'auto', paddingTop: 8 }}>
+            <span style={{
+              fontSize: 32, fontWeight: 700, letterSpacing: -1.2, lineHeight: 1,
+              color: 'var(--ink)', fontFamily: 'var(--font-sans)',
+            }} className="tnum">
+              {priceLabel}
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+              {t('packages.oneTime')}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Satın Al butonu */}
+      {/* Satın Al / Kod ile etkinleştir butonu — kategori renginde */}
       <div style={{ padding: '0 20px 18px' }}>
         <button
           disabled={isBusy}
-          onClick={() => onBuy(pkg.id)}
+          onClick={() => (isCodeOnly ? onActivateCode?.() : onBuy(pkg.id))}
           style={{
             width: '100%', padding: '10px 16px', borderRadius: 9,
-            background: isBusy ? 'var(--border)' : 'var(--accent)',
+            background: isBusy ? 'var(--border)' : `linear-gradient(135deg, ${meta.c1}, ${meta.c2})`,
             color: isBusy ? 'var(--ink-3)' : '#fff',
             fontSize: 13, fontWeight: 600,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-            transition: 'opacity 0.15s, background 0.15s',
-            opacity: isBusy ? 0.7 : 1,
-            border: 0,
+            transition: 'opacity 0.15s, filter 0.15s', opacity: isBusy ? 0.7 : 1,
+            border: 0, cursor: isBusy ? 'default' : 'pointer',
           }}
         >
           {isBusy ? (
@@ -125,8 +184,8 @@ const PackageCard = ({ pkg, busy, onBuy, t }) => {
             </>
           ) : (
             <>
-              {isDelivery ? '📦' : '⚡'}
-              {t('packages.buyBtn')}
+              {isCodeOnly ? '🔑' : isDelivery ? '📦' : '⚡'}
+              {isCodeOnly ? t('packages.keyOnlyBtn') : t('packages.buyBtn')}
             </>
           )}
         </button>
@@ -295,6 +354,7 @@ export function PackagesTab() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <input
+            id="yz-redeem-input"
             placeholder={t('packages.codePlaceholder')}
             value={code}
             onChange={(e) => setCode(e.target.value)}
@@ -400,30 +460,42 @@ export function PackagesTab() {
         </Card>
       )}
 
-      {/* Kategori filtresi */}
+      {/* Kategori filtresi — kategori renkleriyle */}
       {categories.length > 1 && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          {categories.map(([c, n]) => (
-            <button
-              key={c}
-              onClick={() => setCat(c)}
-              style={{
-                padding: '6px 14px', borderRadius: 999, border: 0,
-                background: cat === c ? 'var(--accent)' : 'var(--surface)',
-                color: cat === c ? '#fff' : 'var(--ink-2)',
-                fontSize: 12.5, fontWeight: cat === c ? 600 : 500,
-                border: `1px solid ${cat === c ? 'transparent' : 'var(--border-st)'}`,
-                transition: 'all 0.15s', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 5,
-              }}
-            >
-              {c === 'Tümü' ? t('common.all') : c}
-              <span style={{
-                fontSize: 10, fontFamily: 'var(--font-mono)',
-                opacity: cat === c ? 0.8 : 0.5,
-              }}>{n}</span>
-            </button>
-          ))}
+          {categories.map(([c, n]) => {
+            const active = cat === c;
+            const m = c === 'Tümü' ? null : metaFor(c);
+            return (
+              <button
+                key={c}
+                onClick={() => setCat(c)}
+                style={{
+                  padding: '6px 13px', borderRadius: 999,
+                  background: active
+                    ? (m ? `linear-gradient(135deg, ${m.c1}, ${m.c2})` : 'var(--accent)')
+                    : 'var(--surface)',
+                  color: active ? '#fff' : 'var(--ink-2)',
+                  fontSize: 12.5, fontWeight: active ? 600 : 500,
+                  border: `1px solid ${active ? 'transparent' : 'var(--border-st)'}`,
+                  transition: 'all 0.15s', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                {m && (
+                  <span style={{
+                    width: 7, height: 7, borderRadius: 999, flexShrink: 0,
+                    background: active ? '#fff' : m.c1,
+                  }} />
+                )}
+                {c === 'Tümü' ? t('common.all') : c}
+                <span style={{
+                  fontSize: 10, fontFamily: 'var(--font-mono)',
+                  opacity: active ? 0.85 : 0.5,
+                }}>{n}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -449,7 +521,18 @@ export function PackagesTab() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
           {visible.map((p) => (
-            <PackageCard key={p.id} pkg={p} busy={busyId} onBuy={buy} t={t} />
+            <PackageCard
+              key={p.id}
+              pkg={p}
+              busy={busyId}
+              onBuy={buy}
+              onActivateCode={() => {
+                const el = document.getElementById('yz-redeem-input');
+                el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el?.focus();
+              }}
+              t={t}
+            />
           ))}
         </div>
       )}
