@@ -60,6 +60,11 @@ export async function purchasePackageWithBalance(
   if (pkg.tip !== "request_limit" && pkg.tip !== "account_delivery") {
     throw new AppError(400, "Bu paket tipi henüz desteklenmiyor");
   }
+  // ₺0 paketler (deneme/anahtar) DOĞRUDAN satın alınamaz — yalnız redeem kodu ile
+  // verilir (grantPackageEntitlement). Bu, ücretsiz-açık-satış abuse'ünü engeller.
+  if (Number(pkg.fiyat_tl) <= 0) {
+    throw new AppError(400, "Bu paket yalnızca kod/anahtar ile verilir");
+  }
 
   const fiyatTL = Number(pkg.fiyat_tl);
 
