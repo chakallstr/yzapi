@@ -3,6 +3,9 @@ import { Card, Chip, Caption } from './shared.jsx';
 import { authFetch, apiJson } from './auth-client.js';
 import { useT } from './i18n/index.jsx';
 
+// AI-chat playground'da yalnız aile-flagship modelleri göster (her aileden 1 üst model).
+const AI_CHAT_ALLOWED = ['gpt-5.5', 'claude-opus-4.8', 'gemini-3.1-pro-preview', 'o3'];
+
 export function AiChatTab() {
   const { t } = useT();
   const [models, setModels] = useState([]);
@@ -23,7 +26,8 @@ export function AiChatTab() {
         const raw = d?.MODELS || d?.models || (Array.isArray(d) ? d : []);
         const list = raw
           .map((m) => ({ id: m.id || m.modelId, label: m.label || m.name || m.id || m.modelId }))
-          .filter((m) => m.id);
+          .filter((m) => m.id && AI_CHAT_ALLOWED.includes(m.id))
+          .sort((a, b) => AI_CHAT_ALLOWED.indexOf(a.id) - AI_CHAT_ALLOWED.indexOf(b.id));
         setModels(list);
         setModel((prev) => prev || (list[0]?.id ?? ''));
       })
