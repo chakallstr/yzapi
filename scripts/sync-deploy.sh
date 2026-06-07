@@ -36,6 +36,8 @@ RSYNC_EXCLUDES=(
   --exclude='dist' --exclude='.deploy' --exclude='.backups' --exclude='_backups'
   --exclude='test-results' --exclude='playwright-report' --exclude='*.dump'
   --exclude='*.tar.gz' --exclude='tmp-account-deploy' --exclude='migration-audit'
+  --exclude='.pgdata' --exclude='.DS_Store' --exclude='.claude' --exclude='*.rvf'
+  --exclude='*.rvf.lock' --exclude='ruvector.db' --exclude='agentdb.rvf'
 )
 
 echo "==> 1/8 rsync source -> ${SSH_HOST}:${REMOTE_APP} (--delete YOK)"
