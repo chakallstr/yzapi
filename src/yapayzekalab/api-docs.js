@@ -333,6 +333,85 @@ grep -q 'OPENAI_API_KEY' ~/.bashrc 2>/dev/null || echo 'export OPENAI_API_KEY="y
 codex --version
 codex`,
         },
+        desktopSteps: [
+          "Codex CLI kurulu değilse terminale `npm install -g @openai/codex` yaz, Enter'a bas.",
+          "İşletim sistemini seç — aşağıdaki sekme. Bloğun TAMAMINI kopyala, terminale yapıştır, Enter'a bas.",
+          "Blokta yalnızca `yzk_live_YOUR_KEY` yazan yeri kendi anahtarınla değiştir.",
+          "Blok bittikten sonra yeni bir terminal aç ve `codex` yaz — Codex başlamalı.",
+          "Başarı işareti: Codex arayüzü açılıyorsa config doğru okundu.",
+        ],
+        desktopCode: {
+          windows: String.raw`# PowerShell — tum blogu yapistir, Enter tusuna bas.
+
+# ① Klasoru olustur
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.codex" | Out-Null
+
+# ② config.toml yaz — yzk_live_YOUR_KEY yerine kendi anahtarini koy
+@'
+model = "gpt-5.5"
+model_provider = "yapayzekalab"
+
+[model_providers.yapayzekalab]
+name = "YapayZekaLab"
+base_url = "https://yapayzekalab.org/v1"
+env_key = "OPENAI_API_KEY"
+'@ | Set-Content -Encoding UTF8 "$env:USERPROFILE\.codex\config.toml"
+
+# ③ API anahtarini kalici yaz
+$env:OPENAI_API_KEY = "yzk_live_YOUR_KEY"
+setx OPENAI_API_KEY "yzk_live_YOUR_KEY" | Out-Null
+
+Write-Host "✓ config.toml yazildi: $env:USERPROFILE\.codex\config.toml"
+Write-Host "✓ OPENAI_API_KEY kalici olarak ayarlandi"
+Write-Host "Simdi yeni bir terminal ac ve 'codex' yaz."`,
+          macos: `# bash/zsh — tum blogu yapistir, Enter tusuna bas.
+
+# ① Klasoru olustur
+mkdir -p ~/.codex
+
+# ② config.toml yaz — yzk_live_YOUR_KEY yerine kendi anahtarini koy
+cat > ~/.codex/config.toml << 'EOF'
+model = "gpt-5.5"
+model_provider = "yapayzekalab"
+
+[model_providers.yapayzekalab]
+name = "YapayZekaLab"
+base_url = "https://yapayzekalab.org/v1"
+env_key = "OPENAI_API_KEY"
+EOF
+
+# ③ API anahtarini kalici yaz (~/.zshrc)
+grep -q 'OPENAI_API_KEY' ~/.zshrc 2>/dev/null || echo 'export OPENAI_API_KEY="yzk_live_YOUR_KEY"' >> ~/.zshrc
+export OPENAI_API_KEY="yzk_live_YOUR_KEY"
+
+echo "✓ ~/.codex/config.toml yazildi"
+echo "✓ OPENAI_API_KEY ~/.zshrc'ye eklendi"
+echo "Simdi yeni bir terminal ac ve 'codex' yaz."`,
+          linux: `# bash/zsh — tum blogu yapistir, Enter tusuna bas.
+
+# ① Klasoru olustur
+mkdir -p ~/.codex
+
+# ② config.toml yaz — yzk_live_YOUR_KEY yerine kendi anahtarini koy
+cat > ~/.codex/config.toml << 'EOF'
+model = "gpt-5.5"
+model_provider = "yapayzekalab"
+
+[model_providers.yapayzekalab]
+name = "YapayZekaLab"
+base_url = "https://yapayzekalab.org/v1"
+env_key = "OPENAI_API_KEY"
+EOF
+
+# ③ API anahtarini kalici yaz (~/.bashrc)
+grep -q 'OPENAI_API_KEY' ~/.bashrc 2>/dev/null || echo 'export OPENAI_API_KEY="yzk_live_YOUR_KEY"' >> ~/.bashrc
+export OPENAI_API_KEY="yzk_live_YOUR_KEY"
+
+echo "✓ ~/.codex/config.toml yazildi"
+echo "✓ OPENAI_API_KEY ~/.bashrc'ye eklendi"
+echo "Simdi yeni bir terminal ac ve 'codex' yaz."`,
+        },
+        desktopNote: "config.toml kalıcıdır — her terminalde tekrar ayarlamana gerek kalmaz. Codex her başlatıldığında bu dosyayı ve ortam değişkenini okur.",
       },
       {
         name: "OpenCode",
