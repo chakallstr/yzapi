@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   I, Card, Chip, Caption, PulseDot, Dot,
-  isModelUnderMaintenance,
   PROVIDERS, MODELS, MODELS_BY_ID, MODEL_KEYS, modelMeta,
   modelsByType, modelsByProvider, ctxFor,
   computeOurUsd, usdToTL, computeTLPrice, fmt,
@@ -46,26 +45,11 @@ const ProviderBadge = ({ provider }) => {
   );
 };
 
-// Bakım / çalışıyor rozeti (yalnızca bakım modunda gösterilir)
-const MaintBadge = ({ down }) => {
-  const { t } = useT();
-  return (
-    <span style={{
-      fontSize: 9.5, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: 0.3,
-      padding: '2px 7px', borderRadius: 999, whiteSpace: 'nowrap',
-      background: down ? '#fff7ed' : 'var(--ok-bg)',
-      color: down ? '#9a3412' : '#047857',
-      border: `1px solid ${down ? '#fed7aa' : '#a7f3d0'}`,
-    }}>{down ? t('models.maint.badge_down') : t('models.maint.badge_active')}</span>
-  );
-};
-
-const ModelRow = ({ m, tweaks, onToggleCompare, compareOn, maintActive }) => {
+const ModelRow = ({ m, tweaks, onToggleCompare, compareOn }) => {
   const { t } = useT();
   const rate     = tweaks?.tlRate         ?? 34.5;
   const textMul  = tweaks?.textMultiplier ?? 3.0;
   const mediaMul = tweaks?.mediaMultiplier?? 2.3;
-  const maint    = isModelUnderMaintenance(m.provider, maintActive);
 
   // USD birincil. TL sadece bilgi amaçlı.
   const inputUsd  = m.type === 'text'  ? computeOurUsd(m.input, 'text', { textMul, mediaMul }) : null;
@@ -77,7 +61,6 @@ const ModelRow = ({ m, tweaks, onToggleCompare, compareOn, maintActive }) => {
       padding: '14px 18px',
       borderBottom: '1px solid var(--border)',
       alignItems: 'center', fontSize: 12,
-      opacity: maint ? 0.6 : 1,
     }} className="card-hover">
       {/* Compare checkbox */}
       <button onClick={() => onToggleCompare?.(m.id)} style={{
@@ -90,10 +73,7 @@ const ModelRow = ({ m, tweaks, onToggleCompare, compareOn, maintActive }) => {
       </button>
       {/* Model name + id */}
       <div style={{ minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: -0.15, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.label}</span>
-          {maintActive && <MaintBadge down={maint} />}
-        </div>
+        <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: -0.15, color: 'var(--ink)' }}>{m.label}</div>
         <div style={{ fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {m.id}{m.ctx ? <span style={{ marginLeft: 8, color: 'var(--ink-4)' }}>· {m.ctx} ctx</span> : null}
         </div>
@@ -187,7 +167,6 @@ const CompareRow = ({ label, value, accent }) => (
 // === ModelsTab ====================================================
 const ModelsTab = ({ ctx }) => {
   const { tweaks } = ctx;
-  const maintActive = Boolean(ctx?.modelsMaintenance);
   const { t } = useT();
   const [filter, setFilter] = useState('text');
   const [providerFilter, setProviderFilter] = useState('all');
@@ -254,18 +233,6 @@ const ModelsTab = ({ ctx }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-      {/* Bakım notu — admin "model bakımı" anahtarı açıkken */}
-      {maintActive && (
-        <div style={{
-          padding: '12px 16px', borderRadius: 10,
-          background: '#fff7ed', border: '1px solid #fed7aa',
-          fontSize: 12.5, color: '#9a3412', display: 'flex', alignItems: 'center', gap: 10, lineHeight: 1.5,
-        }}>
-          <PulseDot color="#ea580c" size={7} />
-          <span>{t('models.maint.note')}</span>
-        </div>
-      )}
-
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
         <div>
@@ -386,8 +353,7 @@ const ModelsTab = ({ ctx }) => {
         ) : (
           filtered.map(m => <ModelRow key={m.id} m={m} tweaks={tweaks}
                                        onToggleCompare={toggleCompare}
-                                       compareOn={compareIds.includes(m.id)}
-                                       maintActive={maintActive} />)
+                                       compareOn={compareIds.includes(m.id)} />)
         )}
       </Card>
 

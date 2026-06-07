@@ -96,18 +96,6 @@ export function StatusTab() {
         </h1>
       </div>
 
-      {/* Bakım notu — admin "model bakımı" anahtarı açıkken (/status flag'i) */}
-      {data?.modelsMaintenanceActive && (
-        <div className="fade-in" style={{
-          padding: '12px 16px', borderRadius: 10,
-          background: '#fff7ed', border: '1px solid #fed7aa',
-          fontSize: 13, color: '#9a3412', display: 'flex', alignItems: 'center', gap: 10,
-        }}>
-          <PulseDot color="#ea580c" size={7} />
-          <span>{t('status.maintNote')}</span>
-        </div>
-      )}
-
       {/* Hata */}
       {error && (
         <div className="fade-in" style={{

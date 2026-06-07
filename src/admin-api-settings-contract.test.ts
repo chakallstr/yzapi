@@ -4,8 +4,6 @@ import { describe, expect, it } from "vitest";
 const adminRouteSource = readFileSync("src/server/routes/admin.ts", "utf8");
 const proxySource = readFileSync("src/server/routes/proxy.ts", "utf8");
 const adminUiSource = readFileSync("src/yapayzekalab/tab-admin.jsx", "utf8");
-const apiSettingsSource = readFileSync("src/server/services/api-settings-service.ts", "utf8");
-const statusServiceSource = readFileSync("src/server/services/status-service.ts", "utf8");
 
 describe("admin api settings contract", () => {
   it("exposes dedicated admin endpoints for system, model, provider and api key policies", () => {
@@ -33,15 +31,5 @@ describe("admin api settings contract", () => {
     expect(proxySource).toContain("endpointEnabledFor");
     expect(proxySource).toContain("getActiveProviderAdapter");
     expect(proxySource).toContain("upstream402PassThroughEnabled");
-  });
-
-  it("exposes the cosmetic models-maintenance toggle end-to-end", () => {
-    // admin UI checkbox + KPI bound to the config field
-    expect(adminUiSource).toContain("modelsMaintenanceActive");
-    expect(adminUiSource).toContain("Model bakımı bildirimi");
-    // runtime config carries it (type + default + serialize + snapshot + upsert)
-    expect(apiSettingsSource).toContain("modelsMaintenanceActive");
-    // publicly readable via /status (logged-out banner relies on this)
-    expect(statusServiceSource).toContain("modelsMaintenanceActive");
   });
 });

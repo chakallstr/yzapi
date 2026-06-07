@@ -1131,7 +1131,6 @@ describe("GAP-02: status-service – DB down path", () => {
       modelCount: 0,
       checks: { api: "ok", db: "fail", aiProvider: "unknown" },
       lastKurRefresh: null,
-      modelsMaintenanceActive: false,
       deploy: {
         id: null,
         commit: null,

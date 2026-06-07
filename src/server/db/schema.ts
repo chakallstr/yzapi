@@ -172,10 +172,6 @@ export const systemApiConfig = pgTable("system_api_config", {
   upstream402PassThroughEnabled: boolean("upstream_402_pass_through_enabled").notNull().default(true),
   maintenanceModeForApi: boolean("maintenance_mode_for_api").notNull().default(false),
   maintenanceMessage: text("maintenance_message").notNull().default("API geçici olarak bakım modunda."),
-  // Cosmetic-only: shows the "only Claude works, others under maintenance" notice
-  // on the panel (banner + model badges + status note). Does NOT block the API
-  // (that is maintenanceModeForApi). Toggled from the admin API-settings screen.
-  modelsMaintenanceActive: boolean("models_maintenance_active").notNull().default(false),
   strictCanonicalModelIds: boolean("strict_canonical_model_ids").notNull().default(true),
   providerBaseUrl: text("provider_base_url"),
   providerApiKeyCipher: text("provider_api_key_cipher"),

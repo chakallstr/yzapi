@@ -101,10 +101,6 @@ export default {
 
     // Telegram link error
     'appShell.telegram.linkError': 'Telegram bağlantısı tamamlanamadı.',
-
-    // Maintenance banner (geçici — yalnızca Claude çalışıyor)
-    'appShell.maint.title': 'Bakım çalışması',
-    'appShell.maint.body': 'Şu anda yalnızca Claude modelleri çalışıyor. Diğer modeller (GPT, Gemini, o-serisi) geçici olarak bakımdadır.',
   },
   en: {
     // Notifications
@@ -204,9 +200,5 @@ export default {
 
     // Telegram link error
     'appShell.telegram.linkError': 'Could not complete Telegram connection.',
-
-    // Maintenance banner (temporary — only Claude is working)
-    'appShell.maint.title': 'Maintenance',
-    'appShell.maint.body': 'Currently only Claude models are working. Other models (GPT, Gemini, o-series) are temporarily under maintenance.',
   },
 };
