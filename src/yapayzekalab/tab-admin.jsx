@@ -138,14 +138,14 @@ const ErrorBox = ({ children }) => (
   </div>
 );
 
-const SubNav = ({ section, onSection }) => (
+const SubNav = ({ section, onSection, sections }) => (
   <div style={{
     display: 'flex', gap: 4, padding: 5,
     background: 'var(--surface)', border: '1px solid var(--border)',
     borderRadius: 'var(--r-lg)', boxShadow: 'var(--sh-1)',
     overflowX: 'auto', maxWidth: '100%',
   }}>
-    {ADMIN_SECTIONS.map((s) => {
+    {sections.map((s) => {
       const on = section === s.id;
       return (
         <button key={s.id} onClick={() => onSection(s.id)} style={{
@@ -266,7 +266,7 @@ const AdminDashboard = ({ dashboard, config, auditLogs, providers }) => {
   );
 };
 
-const AdminUsers = ({ users, token, refresh, focusUserId = '', focusNonce = '' }) => {
+const AdminUsers = ({ users, token, refresh, meRole = '', focusUserId = '', focusNonce = '' }) => {
   const [q, setQ] = useState('');
   const [openUserId, setOpenUserId] = useState('');
   const [detailById, setDetailById] = useState({});
@@ -401,7 +401,12 @@ const AdminUsers = ({ users, token, refresh, focusUserId = '', focusNonce = '' }
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                 <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--accent-bg)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600 }}>{initials(u.adSoyad || u.email)}</div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.adSoyad || u.email}</div>
+                  <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.adSoyad || u.email}</span>
+                    {u.role === 'partner' && (
+                      <Chip tone="neutral" style={{ background: 'var(--t-purple-bg)', color: 'var(--t-purple)', fontSize: 9, flexShrink: 0 }}>ORTAK</Chip>
+                    )}
+                  </div>
                   <div style={{ fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</div>
                 </div>
               </div>
@@ -415,6 +420,29 @@ const AdminUsers = ({ users, token, refresh, focusUserId = '', focusNonce = '' }
                 <button onClick={() => updateUser(u, { plan: u.plan === 'pro' ? 'kurumsal' : 'pro' })} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11 }}>Plan</button>
                 <button onClick={() => updateBalance(u, 'add')} style={{ padding: '6px 9px', borderRadius: 8, background: 'var(--ink)', color: '#fff', fontSize: 11 }}>Bakiye +</button>
                 <button onClick={() => updateBalance(u, 'remove')} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid #fecaca', background: '#fff1f2', color: '#b91c1c', fontSize: 11 }}>Bakiye -</button>
+                {meRole === 'owner' && u.email !== LAUNCH_ADMIN_EMAIL && (
+                  <button
+                    onClick={async () => {
+                      const nextRole = u.role === 'partner' ? 'user' : 'partner';
+                      const confirmMsg = nextRole === 'partner'
+                        ? `${u.email} ORTAK yapılsın mı? (sınırlı admin paneline erişir)`
+                        : `${u.email} ortaklıktan çıkarılsın mı?`;
+                      if (!window.confirm(confirmMsg)) return;
+                      try {
+                        await adminRequest(`/api/admin/users/${u.id}/role`, token, {
+                          method: 'POST',
+                          body: { role: nextRole },
+                        });
+                        await refresh();
+                      } catch (e) {
+                        window.alert(e.message || 'Rol değiştirilemedi');
+                      }
+                    }}
+                    style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11.5 }}
+                  >
+                    {u.role === 'partner' ? 'Ortaklıktan çıkar' : 'Ortak yap'}
+                  </button>
+                )}
               </div>
               {openUserId === u.id && (
                 <div style={{ gridColumn: '1 / -1', paddingTop: 10 }}>
@@ -2698,6 +2726,15 @@ const AdminTab = ({ ctx = {} }) => {
     setSection('apikeys');
   };
 
+  const allowedTabs = data.me?.allowedTabs || ADMIN_SECTIONS.map((s) => s.id);
+  const visibleSections = ADMIN_SECTIONS.filter((s) => allowedTabs.includes(s.id));
+
+  useEffect(() => {
+    if (visibleSections.length && !visibleSections.some((s) => s.id === section)) {
+      setSection(visibleSections[0].id);
+    }
+  }, [data.me]); // me geldiğinde owner-only sekmedeyse ilk izinliye düş
+
   if (!token) {
     return <AdminAccessNotice />;
   }
@@ -2716,14 +2753,14 @@ const AdminTab = ({ ctx = {} }) => {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <Chip tone="accent" style={{ background: 'var(--ink)', color: 'var(--surface)', fontFamily: 'var(--font-mono)', fontSize: 10.5 }}>
-            <I.Shield size={11} stroke="var(--surface)" /> ADMIN
+            <I.Shield size={11} stroke="var(--surface)" /> {data.me?.role === 'partner' ? 'ORTAK' : 'ADMIN'}
           </Chip>
           <button onClick={() => refresh()} style={{ padding: '8px 11px', borderRadius: 9, border: '1px solid var(--border)', fontSize: 12 }}>Yenile</button>
           <button onClick={logout} style={{ padding: '8px 11px', borderRadius: 9, color: '#b91c1c', border: '1px solid #fecaca', fontSize: 12 }}>Çıkış</button>
         </div>
       </div>
 
-      <SubNav section={section} onSection={setSection} />
+      <SubNav section={section} onSection={setSection} sections={visibleSections} />
       {loading && <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Admin verisi yükleniyor…</div>}
       {error && <ErrorBox>{error}</ErrorBox>}
 
@@ -2733,7 +2770,7 @@ const AdminTab = ({ ctx = {} }) => {
         {section === 'mali-izleme' && <AdminMaliIzleme token={token} />}
         {section === 'gozcu' && <AdminGozcu token={token} />}
         {section === 'api' && <AdminApiSettings token={token} apiKeys={data.apiKeys || []} />}
-        {section === 'users' && <AdminUsers users={data.users || []} token={token} refresh={refresh} focusUserId={trafficUserJump.userId} focusNonce={trafficUserJump.nonce} />}
+        {section === 'users' && <AdminUsers users={data.users || []} token={token} refresh={refresh} meRole={data.me?.role} focusUserId={trafficUserJump.userId} focusNonce={trafficUserJump.nonce} />}
         {section === 'overrides' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <AdminOverrides overrides={data.overrides || []} token={token} refresh={refresh} />
