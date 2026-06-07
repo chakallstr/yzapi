@@ -318,15 +318,204 @@ export function PackagesTab() {
     } finally { setRedeeming(false); }
   };
 
+  // Statik fiyat tanımları (görselden)
+  const STATIC_PKGS = [
+    { istek: 50,  ad: 'Başlangıç Paketi',    tl: 50,  usd: '0.90', icon: 'Bolt',     c1: '#10b981', c2: '#059669' },
+    { istek: 100, ad: 'Esnek Paket',          tl: 100, usd: '1.80', icon: 'Activity', c1: '#3b82f6', c2: '#2563eb' },
+    { istek: 150, ad: 'Avantajlı Paket',      tl: 150, usd: '2.70', icon: 'Shield',   c1: '#f59e0b', c2: '#d97706' },
+    { istek: 200, ad: 'Ölçeklenebilir Paket', tl: 200, usd: '3.60', icon: 'Sparkle',  c1: '#a855f7', c2: '#7c3aed' },
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-      {/* Başlık */}
+      {/* ── HERO: Kullandığın Kadar Öde ── */}
+      <div style={{
+        borderRadius: 16, overflow: 'hidden',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        padding: '28px 24px 22px',
+        position: 'relative',
+      }}>
+        {/* dekoratif ışık */}
+        <div style={{
+          position: 'absolute', top: -60, right: -60, width: 220, height: 220, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(99,102,241,0.25) 0%, transparent 70%)',
+          pointerEvents: 'none',
+        }} />
+        <div style={{ position: 'relative' }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '4px 12px', borderRadius: 999,
+            background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)',
+            fontSize: 11, fontWeight: 600, color: '#a5b4fc',
+            fontFamily: 'var(--font-mono)', letterSpacing: 0.5, marginBottom: 12,
+          }}>
+            ⚡ YapayZekaLab API
+          </div>
+          <h1 style={{
+            fontSize: 26, fontWeight: 800, letterSpacing: -0.8, lineHeight: 1.2,
+            color: '#f8fafc', margin: '0 0 10px',
+          }}>
+            Kullandığın Kadar Öde
+          </h1>
+          <p style={{ fontSize: 13.5, color: '#94a3b8', lineHeight: 1.6, margin: '0 0 18px', maxWidth: 400 }}>
+            Kullanmadığın API erişimi için sabit ücret ödeme.<br />
+            İhtiyacın kadar yükle, ihtiyacın kadar kullan.
+          </p>
+          {/* 3 özellik chip */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {[
+              { ico: '📅', text: 'İstekler günlük paketlerdir' },
+              { ico: '🕐', text: '1 günden 30 güne kadar alınabilir' },
+              { ico: '🔄', text: 'Kullanılmayan istekler gün sonunda sıfırlanır' },
+            ].map((f) => (
+              <div key={f.text} style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '5px 12px', borderRadius: 8,
+                background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+                fontSize: 11.5, color: '#cbd5e1',
+              }}>
+                <span>{f.ico}</span> {f.text}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── STATİK FİYAT SHOWCASE ── */}
       <div>
-        <Caption>{t('packages.title')}</Caption>
-        <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.5, margin: '4px 0 0', color: 'var(--ink)' }}>
-          {t('packages.subtitle')}
-        </h1>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14,
+        }}>
+          <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+          <span style={{
+            fontSize: 14, fontWeight: 700, color: 'var(--ink)',
+            letterSpacing: -0.3, whiteSpace: 'nowrap',
+          }}>50 İstek ve Katları</span>
+          <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+        </div>
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))',
+          gap: 10,
+        }}>
+          {STATIC_PKGS.map((p) => {
+            const Ic = I[p.icon] || I.Bolt;
+            return (
+              <div key={p.istek} style={{
+                borderRadius: 12, overflow: 'hidden',
+                border: '1px solid var(--border)',
+                background: 'var(--surface)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                textAlign: 'center', padding: '16px 12px 14px',
+                gap: 4,
+              }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10, marginBottom: 4,
+                  background: `linear-gradient(135deg, ${p.c1}, ${p.c2})`,
+                  display: 'grid', placeItems: 'center',
+                }}>
+                  <Ic size={20} stroke="#fff" strokeWidth={2} />
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>
+                  {p.istek} istek / gün
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 6 }}>{p.ad}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: p.c1, letterSpacing: -0.5, lineHeight: 1 }}>
+                  {p.tl} TL
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                  ${p.usd}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Codex & GPT notu */}
+        <div style={{
+          marginTop: 10, padding: '10px 16px', borderRadius: 9,
+          background: 'var(--surface-2)', border: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+          fontSize: 12.5, color: 'var(--ink-2)',
+        }}>
+          <span style={{ fontSize: 16 }}>{'</>'}</span>
+          Codex &amp; GPT paketleri ihtiyacın kadar alınabilir
+          <span style={{ fontSize: 16 }}>🧠</span>
+        </div>
+      </div>
+
+      {/* ── CTA BUTONLARI ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+        {/* Yorum bırak */}
+        <div style={{
+          borderRadius: 12, padding: '14px 16px',
+          background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)',
+          display: 'flex', alignItems: 'center', gap: 10,
+          cursor: 'pointer',
+        }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+            background: '#f97316', display: 'grid', placeItems: 'center', fontSize: 18,
+          }}>💬</div>
+          <div>
+            <div style={{ fontSize: 10.5, color: '#94a3b8', marginBottom: 2 }}>Deneme bakiyesi için</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>yorum bırak</div>
+          </div>
+        </div>
+        {/* Telefon */}
+        <a href="tel:+905319310781" style={{
+          borderRadius: 12, padding: '14px 16px',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', gap: 10,
+          textDecoration: 'none',
+        }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+            background: '#1d4ed8', display: 'grid', placeItems: 'center', fontSize: 18,
+          }}>📞</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', fontFamily: 'var(--font-mono)' }}>
+            +90 531 931 0781
+          </div>
+        </a>
+        {/* Min yükleme */}
+        <div style={{
+          borderRadius: 12, padding: '14px 16px',
+          background: '#f97316', border: '1px solid #ea580c',
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+            background: 'rgba(255,255,255,0.2)', display: 'grid', placeItems: 'center', fontSize: 18,
+          }}>👛</div>
+          <div>
+            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.8)', marginBottom: 2 }}>Siteye minimum yükleme</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>2$</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 3 ROZET ── */}
+      <div style={{
+        display: 'flex', gap: 0, borderRadius: 12, overflow: 'hidden',
+        border: '1px solid var(--border)', background: 'var(--surface)',
+      }}>
+        {[
+          { ico: '🛡️', label: 'Şeffaf Fiyatlandırma' },
+          { ico: '🔒', label: 'Güvenli Altyapı' },
+          { ico: '⚡', label: 'Hızlı Yanıt' },
+        ].map((b, i) => (
+          <div key={b.label} style={{
+            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+            padding: '12px 8px', gap: 5, textAlign: 'center',
+            borderRight: i < 2 ? '1px solid var(--border)' : 'none',
+          }}>
+            <span style={{ fontSize: 20 }}>{b.ico}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-2)' }}>{b.label}</span>
+          </div>
+        ))}
       </div>
 
       {/* Hata banner */}
