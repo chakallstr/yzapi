@@ -1031,7 +1031,7 @@ const App = ({ initialTab = 'home' }) => {
   const [goto, setGoto] = useState(null);
   const [profile, setProfile] = useState(null);
   const skeleton = false;
-  const isAdmin = String(profile?.email || '').trim().toLowerCase() === ADMIN_EMAIL;
+  const isAdmin = String(profile?.email || '').trim().toLowerCase() === ADMIN_EMAIL || profile?.role === 'partner';
 
   // i18n: seed the UI language from the saved profile preference once it loads
   // (profile wins over a stale localStorage choice). Depends only on profile.lang
