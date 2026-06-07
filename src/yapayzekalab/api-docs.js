@@ -970,6 +970,135 @@ X-YZ-Request-Id: req_123456789`,
       "Sorun yaşarsan `X-YZ-Request-Id` değerini destek ekibine iletmek hata ayıklamayı hızlandırır.",
     ],
   },
+  {
+    key: "codex-api",
+    label: "Codex API (ChatGPT)",
+    title: "Codex API (ChatGPT) paketi — gpt-5.5 & gpt-5.4",
+    intro:
+      "**Codex API (ChatGPT) paketine sahipsen** bu adımları izle. Paket, OpenAI Responses API formatını destekler — `gpt-5.5` ve `gpt-5.4` modelleri doğrudan YapayZekaLab uç noktası üzerinden kullanılabilir. Başka bir anahtar veya endpoint kurmanı gerekmez; mevcut `yzk_live_` anahtarın bu paket kapsamındaki istekleri otomatik tanır.",
+    referenceRows: [
+      { key: "Base URL", value: "https://yapayzekalab.org" },
+      { key: "Endpoint", value: "POST /v1/responses" },
+      { key: "API Key", value: "yzk_live_YOUR_KEY" },
+      { key: "Desteklenen modeller", value: "gpt-5.5 · gpt-5.4" },
+      { key: "İstek formatı", value: "OpenAI Responses API (input alanı)" },
+    ],
+    codeBlocks: [
+      {
+        title: "cURL — basit istek",
+        lang: "bash",
+        code: `curl https://yapayzekalab.org/v1/responses \\
+  -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "gpt-5.5",
+    "input": "Merhaba, bana kısa bir tanıtım metni yaz."
+  }'`,
+      },
+      {
+        title: "cURL — streaming (-N ile anlık akış)",
+        lang: "bash",
+        code: `curl -N https://yapayzekalab.org/v1/responses \\
+  -H "Authorization: Bearer yzk_live_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "gpt-5.5",
+    "input": "Türkiye için 5 maddelik kısa bir gezi planı yaz.",
+    "stream": true
+  }'`,
+      },
+      {
+        title: "Node.js — streaming (fetch)",
+        lang: "javascript",
+        code: `const response = await fetch("https://yapayzekalab.org/v1/responses", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer yzk_live_YOUR_KEY",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    model: "gpt-5.5",
+    input: "Kısa ve net şekilde streaming nasıl çalışır anlat.",
+    stream: true,
+  }),
+});
+
+if (!response.ok) {
+  const err = await response.json().catch(() => null);
+  throw new Error(err?.error?.message || \`HTTP \${response.status}\`);
+}
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+let buffer = "";
+
+while (true) {
+  const { value, done } = await reader.read();
+  if (done) break;
+
+  buffer += decoder.decode(value, { stream: true });
+  const events = buffer.split("\\n\\n");
+  buffer = events.pop() || "";
+
+  for (const event of events) {
+    const dataLine = event.split("\\n").find((l) => l.startsWith("data: "));
+    if (!dataLine) continue;
+
+    const data = dataLine.slice("data: ".length);
+    if (data === "[DONE]") continue;
+
+    const payload = JSON.parse(data);
+    if (payload.type === "response.output_text.delta") {
+      process.stdout.write(payload.delta);
+    }
+    if (payload.type === "error") {
+      throw new Error(payload.error?.message || "Stream error");
+    }
+  }
+}`,
+      },
+      {
+        title: "Python — streaming (httpx)",
+        lang: "python",
+        code: `import httpx, json
+
+url = "https://yapayzekalab.org/v1/responses"
+headers = {
+    "Authorization": "Bearer yzk_live_YOUR_KEY",
+    "Content-Type": "application/json",
+}
+body = {
+    "model": "gpt-5.5",
+    "input": "Yapay zeka nedir? Kısa açıkla.",
+    "stream": True,
+}
+
+with httpx.stream("POST", url, headers=headers, json=body, timeout=60) as r:
+    r.raise_for_status()
+    buffer = ""
+    for chunk in r.iter_text():
+        buffer += chunk
+        while "\\n\\n" in buffer:
+            event, buffer = buffer.split("\\n\\n", 1)
+            for line in event.splitlines():
+                if not line.startswith("data: "):
+                    continue
+                data = line[len("data: "):]
+                if data == "[DONE]":
+                    break
+                payload = json.loads(data)
+                if payload.get("type") == "response.output_text.delta":
+                    print(payload["delta"], end="", flush=True)`,
+      },
+    ],
+    bullets: [
+      "Paket günlük istek limitine sahiptir — limitin dolup dolmadığını `/v1/balance` ucu döner.",
+      "Hata kodu `daily_token_limit_exceeded` aldıysan limit dolmuştur; gün başında sıfırlanır.",
+      "Modeli `gpt-5.4` ile değiştirerek daha ekonomik kullanım sağlayabilirsin.",
+      "Yanıtın `output` dizisinde `type: \"output_text\"` elemanının `text` alanında cevap metni bulunur.",
+      "Her istekte `X-YZ-Request-Id` başlığı döner; destek için bu değeri not al.",
+    ],
+  },
 ];
 
 export const OS_LABELS = { windows: "Windows (PowerShell)", macos: "macOS", linux: "Linux" };

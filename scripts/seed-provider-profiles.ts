@@ -3,7 +3,7 @@
 // One-shot operator script: seeds the provider profiles for PER-MODEL routing and
 // (re-)applies the fallback active provider. Each enabled profile's
 // supported_model_ids is a DISJOINT partition; the request's model picks the
-// upstream (resolveProviderForModel). PROBE-VERIFIED topology (updated 2026-06-05):
+// upstream (resolveProviderForModel). PROBE-VERIFIED topology (updated 2026-06-07):
 //
 //   wellflow    — Claude family upstream (base https://api.wellflow.dev/v1). OWN
 //                 reseller key (wf_-prefixed) from env WELLFLOW_API_KEY (conditional,
@@ -13,15 +13,16 @@
 //                 fallback_provider_id = closerouter → infra (502/503/504/timeout) failover.
 //   closerouter — "Popusk" multi-model upstream (base https://api.claude-popusk.shop/v1).
 //                 OWN reseller key from env POPUSK_API_KEY (conditional). Serves the
-//                 GPT-5 family + o-series + Gemini (the 3 it exposes). Wire names are
-//                 verbatim (dash). Active fallback provider. NOTE: opus-4.8 was moved to
-//                 wellflow-PRIMARY 2026-06-05 (Popusk was 503-storming opus-4.8 with no
-//                 fallback); the POPUSK_MODEL_MAP opus-4.8→opus-4-8 entry is KEPT so the
-//                 wellflow→closerouter failover leg still maps to the dash wire.
+//                 GPT-5 LOWER family (gpt-5.4-mini and below) + o-series + Gemini.
+//                 NOTE: gpt-5.5 and gpt-5.4 (top-tier) moved to rika 2026-06-07.
+//                 NOTE: opus-4.8 was moved to wellflow-PRIMARY 2026-06-05.
+//   rika        — Reseller GPT-5 top-tier upstream. OWN reseller key from env RIKA_API_KEY.
+//                 Serves gpt-5.5 and gpt-5.4 (the two confirmed models from the Rika catalog).
+//                 Wire names verbatim. No fallback configured.
 //   metro       — DELETED. The old api.stepanovikov.uno profile is removed: GPT/Gemini
 //                 moved to popusk, Claude to wellflow (operator decision 2026-06-03).
 //
-// Provider keys are read from env (WELLFLOW_API_KEY, POPUSK_API_KEY) — never
+// Provider keys are read from env (WELLFLOW_API_KEY, POPUSK_API_KEY, RIKA_API_KEY) — never
 // hard-coded / committed. The fallback active provider defaults to "closerouter"
 // (popusk) since it serves the bulk of the catalog; override with ACTIVE_PROVIDER.
 // Under per-model routing the active provider only serves models pinned to no
@@ -29,7 +30,7 @@
 //
 // Run on the server (reads .env.production for DATABASE_URL + secrets):
 //   ENV_FILE_PATH=.env.production NODE_ENV=production \
-//     WELLFLOW_API_KEY='wf_***' POPUSK_API_KEY='***' \
+//     WELLFLOW_API_KEY='wf_***' POPUSK_API_KEY='***' RIKA_API_KEY='***' \
 //     ACTIVE_PROVIDER=closerouter npx tsx scripts/seed-provider-profiles.ts
 //
 // Idempotent: re-running upserts the rows in place, deletes any metro row, and
@@ -102,17 +103,29 @@ const WELLFLOW_MODEL_MAP: Record<string, string> = {
   "claude-haiku-4-5-20251001": "claude-haiku-4.5",
 };
 
+// ── rika — GPT-5 top-tier (gpt-5.5, gpt-5.4) ────────────────────────────────────
+// Reseller upstream. Key from env RIKA_API_KEY (conditional; empty env keeps cipher).
+// Only the two models confirmed by the Rika catalog are listed here.
+// Wire names verbatim (no model_map needed).
+const RIKA_BASE_URL = process.env.RIKA_BASE_URL || "https://ai.rika.wtf/v1";
+
+const RIKA_SUPPORTED_MODEL_IDS = [
+  "gpt-5.5", "gpt-5.5-2026-04-23",
+  "gpt-5.4", "gpt-5.4-2026-03-05",
+];
+
+const RIKA_MODEL_MAP: Record<string, string> = {};
+
 // ── closerouter ("Popusk") — GPT + o-series + Gemini + opus-4.8 ─────────────────
 // PROBE-VERIFIED 2026-06-03 (GET https://api.claude-popusk.shop/v1/models): popusk
 // is a full multi-model router. The ids below are exactly those popusk exposes AND
 // that exist in our MASTER_MODELS (verified), plus the added claude-opus-4.8. Wire
 // names are verbatim (dash) — only opus-4.8 needs a dot→dash rewrite (see map).
+// NOTE: gpt-5.5 and gpt-5.4 (+ dated variants) moved to rika 2026-06-07.
 const POPUSK_BASE_URL = process.env.POPUSK_BASE_URL || "https://api.claude-popusk.shop/v1";
 
 const POPUSK_SUPPORTED_MODEL_IDS = [
-  // GPT-5 family (24)
-  "gpt-5.5", "gpt-5.5-2026-04-23",
-  "gpt-5.4", "gpt-5.4-2026-03-05",
+  // GPT-5 lower family (gpt-5.5 / gpt-5.4 moved to rika)
   "gpt-5.4-mini", "gpt-5.4-mini-2026-03-17",
   "gpt-5.4-nano", "gpt-5.4-nano-2026-03-17",
   "gpt-5.3-chat-latest",
@@ -156,6 +169,18 @@ async function main() {
   // ── added_models ────────────────────────────────────────────────────────────
   await seedAddedModelsInline();
   console.log("  added_models seeded (claude-opus-4.8 [wellflow primary → popusk fallback], gemini-3.5-flash [hidden — no provider])");
+
+  // ── rika (GPT-5 top-tier: gpt-5.5, gpt-5.4) ────────────────────────────────────
+  await upsertProviderProfile({
+    id: "rika",
+    label: "Rika",
+    baseUrl: RIKA_BASE_URL,
+    ...(process.env.RIKA_API_KEY ? { apiKey: process.env.RIKA_API_KEY } : {}),
+    enabled: true,
+    supportedModelIds: RIKA_SUPPORTED_MODEL_IDS,
+    modelMap: RIKA_MODEL_MAP,
+  });
+  console.log(`  rika upserted (base=${RIKA_BASE_URL}, ${RIKA_SUPPORTED_MODEL_IDS.length} models, key=${process.env.RIKA_API_KEY ? "RIKA_API_KEY" : "(unchanged)"})`);
 
   // ── wellflow (Claude family) ─────────────────────────────────────────────────
   // OWN reseller key (wf_-prefixed) from env WELLFLOW_API_KEY, conditional so an
