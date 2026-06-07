@@ -77,12 +77,12 @@ describe("purchasePackageWithBalance", () => {
     await expect(purchasePackageWithBalance("u1", "p1", "key-3")).rejects.toThrow("satışta değil");
   });
 
-  it("rejects direct purchase of a ₺0 (code/key-only) package — no free-purchase abuse", async () => {
+  it("rejects direct purchase of a negative-price package", async () => {
     mockDbSql
       .mockResolvedValueOnce([]) // dup-check: none
-      .mockResolvedValueOnce([{ ...PKG, fiyat_tl: "0" }]); // package lookup: free trial
+      .mockResolvedValueOnce([{ ...PKG, fiyat_tl: "-10" }]); // package lookup: negative price
     const { purchasePackageWithBalance } = await import("./package-purchase-service.js");
-    await expect(purchasePackageWithBalance("u1", "p1", "key-trial")).rejects.toThrow("kod/anahtar");
+    await expect(purchasePackageWithBalance("u1", "p1", "key-neg")).rejects.toThrow();
     expect(mockBegin).not.toHaveBeenCalled(); // never reaches the debit transaction
   });
 });

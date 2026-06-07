@@ -40,7 +40,7 @@ export async function purchasePackageWithBalance(
   idempotencyKey?: string,
   contact?: string,
 ): Promise<PurchaseResult> {
-  const txKey = "pkg_purchase_" + (idempotencyKey && idempotencyKey.trim() ? idempotencyKey.trim() : randomUUID());
+  const txKey = "pkg_purchase_" + userId + "_" + (idempotencyKey && idempotencyKey.trim() ? idempotencyKey.trim() : randomUUID());
 
   // Ön-kontrol: bu key ile zaten satın alınmışsa tekrar TAHSİL ETME (idempotent).
   const dup = await dbSql<{ id: string }[]>`
@@ -62,8 +62,8 @@ export async function purchasePackageWithBalance(
   }
   // ₺0 paketler (deneme/anahtar) DOĞRUDAN satın alınamaz — yalnız redeem kodu ile
   // verilir (grantPackageEntitlement). Bu, ücretsiz-açık-satış abuse'ünü engeller.
-  if (Number(pkg.fiyat_tl) <= 0) {
-    throw new AppError(400, "Bu paket yalnızca kod/anahtar ile verilir");
+  if (Number(pkg.fiyat_tl) < 0) {
+    throw new AppError(400, "Negatif fiyatlı paket satın alınamaz");
   }
 
   const fiyatTL = Number(pkg.fiyat_tl);

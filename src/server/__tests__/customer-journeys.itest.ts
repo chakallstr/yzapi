@@ -171,7 +171,7 @@ describe("J2-REDEEM-BALANCE-THEN-BUY-004: redeem 60TL code → purchase 60TL pac
     const txRows = await dbSql<{ tip: string; miktar_tl: string; sonraki_bakiye: string }[]>`
       SELECT tip, miktar_tl, sonraki_bakiye FROM transactions
       WHERE user_id = ${UID_J2}::uuid
-      ORDER BY id ASC
+      ORDER BY timestamp ASC
     `;
     expect(txRows.length).toBe(2);
     // First: hediye_kod credit of +60

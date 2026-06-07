@@ -21,7 +21,7 @@ import { MASTER_MODELS } from "../../master-models.js";
 const UPSTREAM = process.env.CLOSEROUTER_BASE_URL || "https://api.closerouter.dev/v1";
 const UPSTREAM_ORIGIN = new URL(UPSTREAM).origin;
 
-const TEST_USER_ID = "re111111-1111-1111-1111-111111111111";
+const TEST_USER_ID = "ee111111-1111-1111-1111-111111111111";
 const FULL_KEY = "yzk_live_rrrrrrrrrrrrrrrrrrrrrrrr";
 const PREFIX = `yzk_live_${FULL_KEY.slice("yzk_live_".length, "yzk_live_".length + 3)}`;
 

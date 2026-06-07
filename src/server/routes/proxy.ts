@@ -727,6 +727,11 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
   let billedViaPackage = false;
   let entitlementId: string | undefined;
 
+  if (!(req.body as Record<string, unknown>).model) {
+    res.status(400).json({ error: { message: "model field is required", type: "invalid_request_error" } });
+    return;
+  }
+
   try {
     // 1) Responses isteğini chat/completions şemasına çevir (model slug alias dahil).
     const chatBody = responsesRequestToChat(req.body as Record<string, unknown>);
