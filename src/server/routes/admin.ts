@@ -81,6 +81,7 @@ function serializeUser(u: typeof users.$inferSelect) {
     apiKeyCount: u.apiKeyCount,
     not: u.not,
     gunlukLimitTL: u.gunlukLimitTL !== null ? Number(u.gunlukLimitTL) : null,
+    role: u.role,
   };
 }
 
@@ -656,6 +657,13 @@ router.patch("/users/:id", async (req, res, next) => {
     const existingUser = existingRows[0];
 
     if (
+      req.adminRole === "partner" &&
+      String(existingUser.email || "").trim().toLowerCase() === SINGLE_ADMIN_EMAIL
+    ) {
+      return res.status(403).json({ error: "Ortak, sahip hesabını değiştiremez." });
+    }
+
+    if (
       body.durum !== undefined &&
       String(existingUser.email || "").trim().toLowerCase() === SINGLE_ADMIN_EMAIL &&
       body.durum !== "aktif"
@@ -708,6 +716,34 @@ router.post("/users/:id/bakiye", async (req, res, next) => {
 
     const updatedUser = await db.select().from(users).where(eq(users.id, id)).limit(1);
     res.json({ user: serializeUser(updatedUser[0]), hareket: serializeTransaction(tx[0]) });
+  } catch (e) { next(e); }
+});
+
+router.post("/users/:id/role", async (req, res, next) => {
+  try {
+    // Defense-in-depth: izin haritası partner'ı zaten engeller; burada ikinci kontrol.
+    if (req.adminRole !== "owner") {
+      return res.status(403).json({ error: "Yalnız sahip rol değiştirebilir." });
+    }
+    const { id } = req.params;
+    const role = String((req.body as { role?: string }).role ?? "");
+    if (role !== "partner" && role !== "user") {
+      return res.status(400).json({ error: "Geçersiz rol. 'partner' veya 'user' olmalı." });
+    }
+
+    const userRows = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    if (!userRows.length) return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+    const target = userRows[0];
+
+    if (String(target.email || "").trim().toLowerCase() === SINGLE_ADMIN_EMAIL) {
+      return res.status(400).json({ error: "Sahip hesabının rolü değiştirilemez." });
+    }
+
+    await db.update(users).set({ role, updatedAt: new Date() }).where(eq(users.id, id));
+    await writeAudit("user_role_change", id, `rol → ${role}`, req.user!.id);
+
+    const updated = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    res.json({ user: serializeUser(updated[0]) });
   } catch (e) { next(e); }
 });
 

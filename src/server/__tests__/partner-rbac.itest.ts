@@ -56,3 +56,55 @@ describe("GET /api/admin/me — rol + allowedTabs", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("POST /api/admin/users/:id/role — yalnız owner", () => {
+  it("owner bir kullanıcıyı partner yapıp geri alabilir", async () => {
+    const promote = await request(app)
+      .post(`/api/admin/users/${NORMAL_ID}/role`)
+      .set("Authorization", `Bearer ${ownerToken()}`)
+      .send({ role: "partner" });
+    expect(promote.status).toBe(200);
+    expect(promote.body.user.role).toBe("partner");
+
+    const demote = await request(app)
+      .post(`/api/admin/users/${NORMAL_ID}/role`)
+      .set("Authorization", `Bearer ${ownerToken()}`)
+      .send({ role: "user" });
+    expect(demote.status).toBe(200);
+    expect(demote.body.user.role).toBe("user");
+  });
+
+  it("partner rol değiştiremez (privilege escalation) → 403", async () => {
+    const res = await request(app)
+      .post(`/api/admin/users/${NORMAL_ID}/role`)
+      .set("Authorization", `Bearer ${partnerToken()}`)
+      .send({ role: "partner" });
+    expect(res.status).toBe(403);
+  });
+
+  it("owner hesabının rolü değiştirilemez", async () => {
+    const res = await request(app)
+      .post(`/api/admin/users/${OWNER_ID}/role`)
+      .set("Authorization", `Bearer ${ownerToken()}`)
+      .send({ role: "partner" });
+    expect(res.status).toBe(400);
+  });
+
+  it("geçersiz rol → 400", async () => {
+    const res = await request(app)
+      .post(`/api/admin/users/${NORMAL_ID}/role`)
+      .set("Authorization", `Bearer ${ownerToken()}`)
+      .send({ role: "superadmin" });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("PATCH /api/admin/users/:id — partner owner'ı değiştiremez", () => {
+  it("partner owner satırını PATCH edemez → 403", async () => {
+    const res = await request(app)
+      .patch(`/api/admin/users/${OWNER_ID}`)
+      .set("Authorization", `Bearer ${partnerToken()}`)
+      .send({ not: "deneme" });
+    expect(res.status).toBe(403);
+  });
+});
