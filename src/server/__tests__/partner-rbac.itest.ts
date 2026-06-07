@@ -108,3 +108,54 @@ describe("PATCH /api/admin/users/:id — partner owner'ı değiştiremez", () =>
     expect(res.status).toBe(403);
   });
 });
+
+describe("Erişim matrisi — partner HTTP zorlaması (3 mount noktası)", () => {
+  it.each([
+    ["GET", "/api/admin/dashboard"],
+    ["GET", "/api/admin/users"],
+    ["GET", "/api/admin/audit-logs"],
+    ["GET", "/api/admin/config"],          // paylaşımlı okuma
+    ["GET", "/api/admin/provider-durumu"], // paylaşımlı okuma
+    ["GET", "/api/admin/model-overrides"], // paylaşımlı okuma
+    ["GET", "/api/payments/admin/pending-iban"],
+    ["GET", "/api/telegram/admin/accounts"],
+  ])("partner izinli: %s %s → 403 DEĞİL", async (method, path) => {
+    const res = await request(app)[method.toLowerCase() as "get"](path)
+      .set("Authorization", `Bearer ${partnerToken()}`);
+    expect(res.status).not.toBe(403);
+  });
+
+  it.each([
+    ["GET", "/api/admin/provider-profiles"],
+    ["GET", "/api/admin/api-settings"],
+    ["GET", "/api/admin/packages"],
+    ["GET", "/api/admin/redeem-codes"],
+    ["GET", "/api/admin/delivery-orders"],
+    ["POST", "/api/admin/refresh-kur"],
+  ])("partner owner-only: %s %s → 403", async (method, path) => {
+    const res = await request(app)[method.toLowerCase() as "get" | "post"](path)
+      .set("Authorization", `Bearer ${partnerToken()}`)
+      .send({});
+    expect(res.status).toBe(403);
+  });
+
+  it("owner aynı owner-only uçlara erişebilir (403 değil)", async () => {
+    const res = await request(app).get("/api/admin/provider-profiles")
+      .set("Authorization", `Bearer ${ownerToken()}`);
+    expect(res.status).not.toBe(403);
+  });
+
+  it("rol DB'den her istek okunur → demote anında etki eder", async () => {
+    // PARTNER_ID'yi user'a çek, sonra partner-only uca dene → 403
+    await db.update(users).set({ role: "user" }).where(eq(users.id, PARTNER_ID));
+    const denied = await request(app).get("/api/admin/users")
+      .set("Authorization", `Bearer ${partnerToken()}`);
+    expect(denied.status).toBe(403); // artık admin değil
+
+    // geri partner yap → tekrar erişir
+    await db.update(users).set({ role: "partner" }).where(eq(users.id, PARTNER_ID));
+    const allowed = await request(app).get("/api/admin/users")
+      .set("Authorization", `Bearer ${partnerToken()}`);
+    expect(allowed.status).not.toBe(403);
+  });
+});
