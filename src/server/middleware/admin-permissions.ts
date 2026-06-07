@@ -12,6 +12,7 @@ export const ALL_TABS = [
   "telegram", "apikeys", "logs", "animations",
 ] as const;
 
+// partner'a açık sekme id'leri (ALL_TABS'ın alt kümesi; sıra önemli değil — panel ADMIN_SECTIONS sırasını kullanır).
 export const PARTNER_TABS = [
   "dashboard", "traffic", "mali-izleme", "gozcu", "announce",
   "payments", "telegram", "apikeys", "logs", "animations", "users",

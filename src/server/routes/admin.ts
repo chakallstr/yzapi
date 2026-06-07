@@ -683,7 +683,7 @@ router.patch("/users/:id", async (req, res, next) => {
     updates.updatedAt = new Date();
 
     const updated = await db.update(users).set(updates).where(eq(users.id, id)).returning();
-    await writeAudit("user_update", id, `Güncellendi: ${Object.keys(body).join(", ")}`);
+    await writeAudit("user_update", id, `Güncellendi: ${Object.keys(body).join(", ")}`, req.user!.id);
     res.json(serializeUser(updated[0]));
   } catch (e) { next(e); }
 });
@@ -719,7 +719,7 @@ router.post("/users/:id/bakiye", async (req, res, next) => {
       aciklama: aciklama || (miktar >= 0 ? "Manuel yükleme" : "Manuel düşüm"),
     }).returning();
 
-    await writeAudit("bakiye_update", id, `${miktar >= 0 ? "+" : ""}${miktar} TL, ${once} → ${sonraki}`);
+    await writeAudit("bakiye_update", id, `${miktar >= 0 ? "+" : ""}${miktar} TL, ${once} → ${sonraki}`, req.user!.id);
 
     const updatedUser = await db.select().from(users).where(eq(users.id, id)).limit(1);
     res.json({ user: serializeUser(updatedUser[0]), hareket: serializeTransaction(tx[0]) });

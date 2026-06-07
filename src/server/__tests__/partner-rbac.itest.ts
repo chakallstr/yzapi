@@ -2,9 +2,10 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import { createApp } from "../app.js";
 import { db, dbSql } from "../db/client.js";
-import { users } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { users, auditLogs } from "../db/schema.js";
+import { eq, and, desc } from "drizzle-orm";
 import { signAccessToken } from "../services/auth-service.js";
+import { ALL_TABS } from "../middleware/admin-permissions.js";
 
 const app = createApp();
 
@@ -37,7 +38,7 @@ describe("GET /api/admin/me — rol + allowedTabs", () => {
     expect(res.body.role).toBe("owner");
     expect(res.body.allowedTabs).toContain("providers");
     expect(res.body.allowedTabs).toContain("packages");
-    expect(res.body.allowedTabs.length).toBe(18);
+    expect(res.body.allowedTabs.length).toBe(ALL_TABS.length);
   });
 
   it("partner: role=partner ve yalnız izinli sekmeler (owner-only YOK)", async () => {
@@ -167,5 +168,23 @@ describe("Erişim matrisi — partner HTTP zorlaması (3 mount noktası)", () =>
     const allowed = await request(app).get("/api/admin/users")
       .set("Authorization", `Bearer ${partnerToken()}`);
     expect(allowed.status).not.toBe(403);
+  });
+});
+
+describe("Audit attribution — partner aksiyonları ortağa atfedilir", () => {
+  it("partner normal kullanıcıya bakiye ekler → 200 + audit actorId=partner", async () => {
+    const res = await request(app)
+      .post(`/api/admin/users/${NORMAL_ID}/bakiye`)
+      .set("Authorization", `Bearer ${partnerToken()}`)
+      .send({ miktar: 5, aciklama: "rbac-audit-test" });
+    expect(res.status).toBe(200);
+
+    const logs = await db
+      .select()
+      .from(auditLogs)
+      .where(and(eq(auditLogs.action, "bakiye_update"), eq(auditLogs.hedef, NORMAL_ID)))
+      .orderBy(desc(auditLogs.timestamp))
+      .limit(1);
+    expect(logs[0]?.actorId).toBe(PARTNER_ID);
   });
 });
