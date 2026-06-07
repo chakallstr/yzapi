@@ -14,6 +14,7 @@ export default {
     'status.statusLabel_ok': 'Çalışıyor',
     'status.statusLabel_degraded': 'Kısmi sorun',
     'status.statusLabel_down': 'Çalışmıyor',
+    'status.maintNote': 'Yalnızca Claude modelleri aktif — diğer modeller (GPT, Gemini, o-serisi) geçici olarak bakımdadır.',
   },
   en: {
     'status.title': 'System Status',
@@ -29,5 +30,6 @@ export default {
     'status.statusLabel_ok': 'Operational',
     'status.statusLabel_degraded': 'Partial outage',
     'status.statusLabel_down': 'Down',
+    'status.maintNote': 'Only Claude models are active — other models (GPT, Gemini, o-series) are temporarily under maintenance.',
   },
 };

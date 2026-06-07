@@ -176,6 +176,13 @@
       "when": 1781385600000,
       "tag": "0024_provider_fallback",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1781472000000,
+      "tag": "0025_models_maintenance_notice",
+      "breakpoints": true
     }
   ]
 }

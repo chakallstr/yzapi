@@ -1447,6 +1447,7 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
           <TopCard label="Context limiti" value={`${fmt.num(Number(configForm.defaultContextLimitTokens || 0))}`} sub="1M varsayılan sınır" />
           <TopCard label="Key / dk" value={fmt.num(Number(configForm.defaultPerKeyPerMinute || 0))} sub="dakika başına anahtar limiti" />
           <TopCard label="Bakım modu" value={configForm.maintenanceModeForApi ? 'Açık' : 'Kapalı'} sub={configForm.maintenanceModeForApi ? (configForm.maintenanceMessage || 'Bakım mesajı var') : 'canlı trafik açık'} />
+          <TopCard label="Model bakımı" value={configForm.modelsMaintenanceActive ? 'Açık' : 'Kapalı'} sub={configForm.modelsMaintenanceActive ? 'yalnızca Claude bildirimi açık' : 'normal gösterim'} />
         </div>
       </Card>
 
@@ -1505,6 +1506,12 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
           <div style={{ marginTop: 12 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}><input type="checkbox" checked={Boolean(configForm.maintenanceModeForApi)} onChange={(e) => setConfigField('maintenanceModeForApi', e.target.checked)} />Bakım modu</label>
             <textarea value={configForm.maintenanceMessage || ''} onChange={(e) => setConfigField('maintenanceMessage', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical', minHeight: 76 }} />
+          </div>
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={Boolean(configForm.modelsMaintenanceActive)} onChange={(e) => setConfigField('modelsMaintenanceActive', e.target.checked)} />Model bakımı bildirimi (yalnızca Claude çalışıyor)</label>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>
+              Açıkken sitede "yalnızca Claude modelleri çalışıyor, diğerleri bakımda" uyarısı gösterilir (üst şerit + modeller rozeti + durum notu). API'yi DURDURMAZ — bu yalnızca görsel bildirimdir.
+            </div>
           </div>
         </Card>
       )}

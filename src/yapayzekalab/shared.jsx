@@ -63,6 +63,18 @@ const PROVIDERS = {
   google:     { label: 'Google',     short: 'Google',     color: '#4285f4', bg: '#eff6ff', ink: '#1d4ed8' },
 };
 
+// === Bakım durumu (admin panelinden açılır/kapanır) =================
+// "Yalnızca Claude çalışıyor, diğer modeller bakımda" bildirimi. Aç/kapa
+// anahtarı DB'de: system_api_config.models_maintenance_active → public
+// /status.modelsMaintenanceActive üzerinden okunur (giriş gerektirmez).
+// Burada yalnızca HANGİ sağlayıcının "çalışıyor" sayıldığı tanımlı; geri
+// kalan her sağlayıcı (OpenAI/Gemini/o-serisi) bakımda kabul edilir.
+const MAINTENANCE_WORKING_PROVIDERS = ['anthropic'];
+function isModelUnderMaintenance(providerSlug, active) {
+  if (!active) return false;
+  return !MAINTENANCE_WORKING_PROVIDERS.includes(String(providerSlug || '').toLowerCase());
+}
+
 // --- Models catalog -----------------------------------------------
 // USD prices: per 1M tokens (input/output). Video: per second (480p/720p/1080p).
 // ctx: human-readable context window.
@@ -477,6 +489,7 @@ const mockProviderStatus = [
 
 export {
   Icon, I, Chip, PulseDot, Dot, Caption, Card,
+  MAINTENANCE_WORKING_PROVIDERS, isModelUnderMaintenance,
   PROVIDERS, MODELS, MODELS_BY_ID, MODEL_KEYS, modelMeta,
   modelsByType, modelsByProvider, ctxFor,
   computeOurUsd, usdToTL, computeTLPrice, fmt,

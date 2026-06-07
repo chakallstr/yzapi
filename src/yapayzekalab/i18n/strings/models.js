@@ -25,6 +25,10 @@ export default {
     'models.compare.remove_title': 'Karşılaştırmadan çıkar',
     'models.compare.row_catalog_usd': 'Katalog USD',
     'models.compare.row_type': 'Tip',
+    // Bakım (geçici — yalnızca Claude aktif)
+    'models.maint.note': 'Şu anda yalnızca Claude modelleri aktiftir. Diğer modeller (GPT, Gemini, o-serisi) geçici olarak bakımda olduğu için kullanılamıyor.',
+    'models.maint.badge_down': 'Bakımda',
+    'models.maint.badge_active': 'Çalışıyor',
   },
   en: {
     'models.heading_caption': 'Models',
@@ -51,5 +55,9 @@ export default {
     'models.compare.remove_title': 'Remove from compare',
     'models.compare.row_catalog_usd': 'Catalog USD',
     'models.compare.row_type': 'Type',
+    // Maintenance (temporary — only Claude active)
+    'models.maint.note': 'Only Claude models are currently active. Other models (GPT, Gemini, o-series) are temporarily unavailable while under maintenance.',
+    'models.maint.badge_down': 'Maintenance',
+    'models.maint.badge_active': 'Active',
   },
 };

@@ -4,6 +4,7 @@ import { db, dbSql } from "../db/client.js";
 import { systemConfig } from "../db/schema.js";
 import { aiProviderApiKey, aiProviderBaseUrl } from "../lib/env.js";
 import { MASTER_MODELS } from "../../master-models.js";
+import { getRuntimeApiConfig } from "./api-settings-service.js";
 
 export interface StatusSnapshot {
   status: "ok" | "degraded";
@@ -18,6 +19,8 @@ export interface StatusSnapshot {
     aiProvider: "ok" | "fail" | "unknown";
   };
   lastKurRefresh: string | null;
+  // Cosmetic notice flag (admin-toggleable): only Claude works, others maintenance.
+  modelsMaintenanceActive: boolean;
   deploy: {
     id: string | null;
     commit: string | null;
@@ -139,11 +142,12 @@ export async function getStatusSnapshot(opts: {
   startedAt: number;
   version: string;
 }): Promise<StatusSnapshot> {
-  const [dbStatus, aiProvider, lastKurRefresh, deploy] = await Promise.all([
+  const [dbStatus, aiProvider, lastKurRefresh, deploy, runtimeConfig] = await Promise.all([
     checkDb(),
     checkAiProvider(),
     readLastKurRefresh(),
     readLatestDeployRecord(),
+    getRuntimeApiConfig(),
   ]);
 
   const checks = { api: "ok" as const, db: dbStatus, aiProvider };
@@ -157,6 +161,7 @@ export async function getStatusSnapshot(opts: {
     modelCount: MASTER_MODELS.length,
     checks,
     lastKurRefresh,
+    modelsMaintenanceActive: runtimeConfig.modelsMaintenanceActive,
     deploy,
   };
 }

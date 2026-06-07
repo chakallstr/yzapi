@@ -41,6 +41,7 @@ export type RuntimeApiConfig = {
   upstream402PassThroughEnabled: boolean;
   maintenanceModeForApi: boolean;
   maintenanceMessage: string;
+  modelsMaintenanceActive: boolean;
   strictCanonicalModelIds: boolean;
   updatedAt: string | null;
 };
@@ -69,6 +70,7 @@ export const DEFAULT_API_SETTINGS: Omit<RuntimeApiConfig, "updatedAt"> = {
   upstream402PassThroughEnabled: true,
   maintenanceModeForApi: false,
   maintenanceMessage: "API geçici olarak bakım modunda.",
+  modelsMaintenanceActive: false,
   strictCanonicalModelIds: true,
 };
 
@@ -143,6 +145,7 @@ function serializeRuntimeConfig(row?: typeof systemApiConfig.$inferSelect | null
     upstream402PassThroughEnabled: row?.upstream402PassThroughEnabled ?? DEFAULT_API_SETTINGS.upstream402PassThroughEnabled,
     maintenanceModeForApi: row?.maintenanceModeForApi ?? DEFAULT_API_SETTINGS.maintenanceModeForApi,
     maintenanceMessage: row?.maintenanceMessage || DEFAULT_API_SETTINGS.maintenanceMessage,
+    modelsMaintenanceActive: row?.modelsMaintenanceActive ?? DEFAULT_API_SETTINGS.modelsMaintenanceActive,
     strictCanonicalModelIds: row?.strictCanonicalModelIds ?? DEFAULT_API_SETTINGS.strictCanonicalModelIds,
     updatedAt: row?.updatedAt instanceof Date ? row.updatedAt.toISOString() : null,
   };
@@ -310,6 +313,7 @@ export async function getApiSettingsSnapshot() {
       defaultStreamTimeoutMs: runtimeConfig.defaultStreamTimeoutMs,
       maintenanceModeForApi: runtimeConfig.maintenanceModeForApi,
       maintenanceMessage: runtimeConfig.maintenanceMessage,
+      modelsMaintenanceActive: runtimeConfig.modelsMaintenanceActive,
       updatedAt: runtimeConfig.updatedAt,
     },
     limits: {
@@ -372,6 +376,7 @@ export async function upsertSystemApiConfig(input: Partial<RuntimeApiConfig>) {
     upstream402PassThroughEnabled: input.upstream402PassThroughEnabled ?? current.upstream402PassThroughEnabled,
     maintenanceModeForApi: input.maintenanceModeForApi ?? current.maintenanceModeForApi,
     maintenanceMessage: String(input.maintenanceMessage || current.maintenanceMessage),
+    modelsMaintenanceActive: input.modelsMaintenanceActive ?? current.modelsMaintenanceActive,
     strictCanonicalModelIds: input.strictCanonicalModelIds ?? current.strictCanonicalModelIds,
     updatedAt: new Date(),
   };

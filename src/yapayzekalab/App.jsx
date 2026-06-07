@@ -1197,7 +1197,23 @@ const App = ({ initialTab = 'home' }) => {
   // persistKey → akış localStorage'da tutulur; F5'te baştan sarmaz, "API Aktivitesi" sürekli akıyor görünür.
   const logs = useLogStream({ running: rate.running, intervalMs: 3000, speedMul: rate.mul, max: 80, persistKey: 'yz_activity_stream_v1' });
 
-  const ctx = { skeleton, logs, tweaks: t, setTweak, goto };
+  // "Yalnızca Claude çalışıyor" bildirimi — admin /status flag'inden okunur,
+  // 60sn'de bir tazelenir (panelden açılınca redeploy gerekmez).
+  const [modelsMaint, setModelsMaint] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const loadMaint = () => {
+      fetch('/status')
+        .then((r) => r.json())
+        .then((d) => { if (!cancelled) setModelsMaint(Boolean(d?.modelsMaintenanceActive)); })
+        .catch(() => { /* sessizce yoksay — bildirim kapalı kalır */ });
+    };
+    loadMaint();
+    const timer = setInterval(loadMaint, 60000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, []);
+
+  const ctx = { skeleton, logs, tweaks: t, setTweak, goto, modelsMaintenance: modelsMaint };
 
   useEffect(() => {
     let cancelled = false;
@@ -1300,6 +1316,22 @@ const App = ({ initialTab = 'home' }) => {
           setShowLogin(true);
         }}
       />
+
+      {modelsMaint && (
+        <div role="status" style={{
+          background: '#fff7ed',
+          borderBottom: '1px solid #fed7aa',
+          padding: '9px 24px',
+          display: 'flex', alignItems: 'center', gap: 10,
+          justifyContent: 'center', textAlign: 'center', flexWrap: 'wrap',
+        }}>
+          <PulseDot color="#ea580c" size={7} />
+          <span style={{ fontSize: 12.5, color: '#9a3412', lineHeight: 1.5 }}>
+            <strong style={{ fontWeight: 700 }}>{tr('appShell.maint.title')}:</strong>{' '}
+            {tr('appShell.maint.body')}
+          </span>
+        </div>
+      )}
 
       {(lowBalanceWarn || emptyBalance) && (
         <div className="fade-in" style={{
