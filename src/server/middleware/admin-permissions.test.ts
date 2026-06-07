@@ -85,3 +85,21 @@ describe("sekme setleri", () => {
     expect(allowedTabsForRole("partner")).toEqual([...PARTNER_TABS]);
   });
 });
+
+describe("requiredRoleFor — path traversal + sıkı traffic", () => {
+  it.each([
+    ["GET", "/api/admin/traffic/../provider-profiles"],
+    ["POST", "/api/admin/users/../x/role"],
+    ["GET", "/api/admin/users/../detail"],
+  ])("'..' içeren yol owner'a düşer: %s %s", (m, p) => {
+    expect(requiredRoleFor(m, p)).toBe("owner");
+  });
+  it("bilinen traffic alt-yolları partner", () => {
+    for (const sub of ["", "/overview", "/timeseries", "/models", "/providers", "/users", "/api-keys", "/errors"]) {
+      expect(requiredRoleFor("GET", `/api/admin/traffic${sub}`)).toBe("partner");
+    }
+  });
+  it("bilinmeyen traffic alt-yolu owner (sıkı regex)", () => {
+    expect(requiredRoleFor("GET", "/api/admin/traffic/secret-export")).toBe("owner");
+  });
+});

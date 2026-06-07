@@ -109,6 +109,16 @@ describe("PATCH /api/admin/users/:id — partner owner'ı değiştiremez", () =>
   });
 });
 
+describe("Owner bakiyesi partner tarafından korunur", () => {
+  it("partner owner'ın bakiyesini değiştiremez → 403", async () => {
+    const res = await request(app)
+      .post(`/api/admin/users/${OWNER_ID}/bakiye`)
+      .set("Authorization", `Bearer ${partnerToken()}`)
+      .send({ miktar: 100, aciklama: "test" });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("Erişim matrisi — partner HTTP zorlaması (3 mount noktası)", () => {
   it.each([
     ["GET", "/api/admin/dashboard"],

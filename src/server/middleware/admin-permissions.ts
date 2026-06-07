@@ -30,7 +30,7 @@ const PARTNER_RULES: Rule[] = [
   // dashboard
   { methods: ["GET"], re: /^\/api\/admin\/dashboard$/ },
   // traffic
-  { methods: ["GET"], re: /^\/api\/admin\/traffic(\/.*)?$/ },
+  { methods: ["GET"], re: /^\/api\/admin\/traffic(\/(overview|timeseries|models|providers|users|api-keys|errors))?$/ },
   // mali-izleme + reconciliation
   { methods: ["GET"], re: /^\/api\/admin\/mali-izleme\/(son|canli-akis|gecmis)$/ },
   { methods: ["POST"], re: /^\/api\/admin\/mali-izleme\/tara$/ },
@@ -71,6 +71,8 @@ const PARTNER_RULES: Rule[] = [
 export function requiredRoleFor(method: string, fullPath: string): AdminRole {
   const m = method.toUpperCase();
   const path = (fullPath.split("?")[0] || "").replace(/\/+$/, "") || "/";
+  // Path-traversal koruması: '..' segmenti içeren yolu partner'a kapat (fail-closed).
+  if (path.split("/").some((seg) => seg === "..")) return "owner";
   for (const rule of PARTNER_RULES) {
     if (rule.methods.includes(m) && rule.re.test(path)) return "partner";
   }

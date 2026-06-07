@@ -697,6 +697,13 @@ router.post("/users/:id/bakiye", async (req, res, next) => {
     if (!userRows.length) return res.status(404).json({ error: "Kullanıcı bulunamadı" });
     const user = userRows[0];
 
+    if (
+      req.adminRole === "partner" &&
+      String(user.email || "").trim().toLowerCase() === SINGLE_ADMIN_EMAIL
+    ) {
+      return res.status(403).json({ error: "Ortak, sahip hesabının bakiyesini değiştiremez." });
+    }
+
     const once = Number(user.bakiyeTL);
     const sonraki = Math.max(0, once + miktar);
 
