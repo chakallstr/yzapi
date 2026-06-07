@@ -399,6 +399,56 @@ const DocumentsTab = () => {
                       </div>
                       {card.values?.length ? renderValues(card) : null}
                       {card.osVariants || card.code ? renderCodeBlock(card) : null}
+                      {card.desktopCode ? (() => {
+                        const dKey = `${doc.key}-${card.name}-desktop`;
+                        const dCopied = copiedBlock === dKey;
+                        const dCode = card.desktopCode[osChoice] ?? card.desktopCode.macos ?? card.desktopCode.windows ?? '';
+                        return (
+                          <div style={{ marginTop: 16 }}>
+                            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: 'var(--accent-ink)', marginBottom: 8 }}>
+                              Kalıcı Kurulum — ~/.claude/settings.json
+                            </div>
+                            {card.desktopSteps?.length ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 12 }}>
+                                {card.desktopSteps.map((step, i) => (
+                                  <div key={i} style={{ display: 'flex', gap: 9, alignItems: 'flex-start', minWidth: 0 }}>
+                                    <span style={{
+                                      width: 18, height: 18, borderRadius: '50%', flexShrink: 0, marginTop: 1,
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      background: 'var(--accent)', color: '#fff', fontSize: 10, fontWeight: 700,
+                                      fontFamily: 'var(--font-mono)',
+                                    }}>{i + 1}</span>
+                                    <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.55, minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{renderInline(step)}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                            <OsTabs variants={card.desktopCode} selected={osChoice} onSelect={setOsChoice} />
+                            <div style={{ position: 'relative', minWidth: 0 }}>
+                              <button
+                                onClick={() => copyBlock(dKey, dCode)}
+                                style={{
+                                  position: 'absolute', top: 8, right: 8, zIndex: 1,
+                                  padding: '5px 9px', borderRadius: 8,
+                                  background: dCopied ? 'var(--ok-bg)' : 'rgba(226,232,240,0.12)',
+                                  color: dCopied ? '#047857' : '#e2e8f0',
+                                  fontSize: 10.5, fontWeight: 600,
+                                  display: 'flex', alignItems: 'center', gap: 5,
+                                }}
+                              >
+                                <I.Copy size={11} stroke={dCopied ? '#047857' : '#e2e8f0'} />
+                                {dCopied ? 'Kopyalandı' : 'Kopyala'}
+                              </button>
+                              <pre style={{ margin: 0, padding: '34px 12px 12px', borderRadius: 10, background: '#0f172a', color: '#e2e8f0', overflowX: 'auto', maxWidth: '100%', fontSize: 11, lineHeight: 1.55 }}>
+                                <code>{personalize(dCode)}</code>
+                              </pre>
+                            </div>
+                            {card.desktopNote ? (
+                              <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--ink-3)', fontStyle: 'italic', lineHeight: 1.5 }}>{card.desktopNote}</p>
+                            ) : null}
+                          </div>
+                        );
+                      })() : null}
                     </div>
                   );
 

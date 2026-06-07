@@ -46,4 +46,20 @@ describe("documents tab content contract", () => {
     expect(docsSource).toContain("window.history.replaceState");
     expect(docsSource).toContain("onClick={() => navigateToDoc(doc.key)}");
   });
+
+  it("Claude Code kart settings.json kalici kurulum blogunu iceriyor", () => {
+    expect(dataSource).toContain("desktopCode");
+    expect(dataSource).toContain("settings.json");
+    expect(dataSource).toContain("~/.claude/settings.json");
+    expect(dataSource).toContain("ANTHROPIC_AUTH_TOKEN");
+    expect(dataSource).toContain("yzk_live_YOUR_KEY");
+  });
+
+  it("tab-documents.jsx desktopCode blogu render ediyor", () => {
+    expect(docsSource).toContain("desktopCode");
+    expect(docsSource).toContain("Kalıcı Kurulum");
+    expect(docsSource).toContain("settings.json");
+    expect(docsSource).toContain("desktopSteps");
+    expect(docsSource).toContain("desktopNote");
+  });
 });

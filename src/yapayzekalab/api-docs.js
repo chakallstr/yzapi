@@ -156,6 +156,73 @@ export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
 which claude && claude --version
 claude`,
         },
+        desktopSteps: [
+          "npm install -g @anthropic-ai/claude-code komutunu terminalde çalıştır (kuruluysa atla).",
+          "İşletim sistemini seç — aşağıdaki sekme. Bloğun TAMAMINI kopyala, terminale yapıştır, Enter'a bas.",
+          "Blokta yalnızca `yzk_live_YOUR_KEY` yazan yeri kendi anahtarınla değiştir.",
+          "Blok bittikten sonra yeni bir terminal aç ve `claude` yaz — Claude Code başlamalı.",
+          "Başarı işareti: Ekranda `╔══` çerçevesi ve model adı görünüyorsa bağlantı kuruldu.",
+        ],
+        desktopCode: {
+          windows: String.raw`# PowerShell — tum blogu yapistir, Enter tusuna bas.
+
+# ① Klasoru olustur (varsa hata vermez)
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude" | Out-Null
+
+# ② settings.json yaz — yzk_live_YOUR_KEY yerine kendi anahtarini koy
+@"
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://yapayzekalab.org",
+    "ANTHROPIC_AUTH_TOKEN": "yzk_live_YOUR_KEY",
+    "ANTHROPIC_MODEL": "claude-opus-4-8",
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-sonnet-4-6"
+  }
+}
+"@ | Set-Content -Encoding UTF8 "$env:USERPROFILE\.claude\settings.json"
+
+Write-Host "✓ Ayarlar kaydedildi: $env:USERPROFILE\.claude\settings.json"
+Write-Host "Simdi yeni bir terminal ac ve 'claude' yaz."`,
+          macos: `# bash/zsh — tum blogu yapistir, Enter tusuna bas.
+
+# ① Klasoru olustur
+mkdir -p ~/.claude
+
+# ② settings.json yaz — yzk_live_YOUR_KEY yerine kendi anahtarini koy
+cat > ~/.claude/settings.json << 'EOF'
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://yapayzekalab.org",
+    "ANTHROPIC_AUTH_TOKEN": "yzk_live_YOUR_KEY",
+    "ANTHROPIC_MODEL": "claude-opus-4-8",
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-sonnet-4-6"
+  }
+}
+EOF
+
+echo "✓ Ayarlar kaydedildi: ~/.claude/settings.json"
+echo "Simdi yeni bir terminal ac ve 'claude' yaz."`,
+          linux: `# bash/zsh — tum blogu yapistir, Enter tusuna bas.
+
+# ① Klasoru olustur
+mkdir -p ~/.claude
+
+# ② settings.json yaz — yzk_live_YOUR_KEY yerine kendi anahtarini koy
+cat > ~/.claude/settings.json << 'EOF'
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://yapayzekalab.org",
+    "ANTHROPIC_AUTH_TOKEN": "yzk_live_YOUR_KEY",
+    "ANTHROPIC_MODEL": "claude-opus-4-8",
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-sonnet-4-6"
+  }
+}
+EOF
+
+echo "✓ Ayarlar kaydedildi: ~/.claude/settings.json"
+echo "Simdi yeni bir terminal ac ve 'claude' yaz."`,
+        },
+        desktopNote: "settings.json yöntemi kalıcıdır — her terminalde tekrar ayarlamana gerek kalmaz. Claude Code Desktop App, VS Code uzantısı ve tüm IDE entegrasyonları bu dosyayı okur.",
       },
       {
         name: "Codex CLI",
@@ -228,6 +295,8 @@ TOML
 
 # Anahtari ayarla (Codex bunu config'teki env_key ile okur)
 export OPENAI_API_KEY="yzk_live_YOUR_KEY"
+# Kalici yap — yeni terminallerde de gecerli olsun
+grep -q 'OPENAI_API_KEY' ~/.zshrc 2>/dev/null || echo 'export OPENAI_API_KEY="yzk_live_YOUR_KEY"' >> ~/.zshrc
 
 codex --version
 codex`,
@@ -258,6 +327,8 @@ TOML
 
 # Anahtari ayarla (Codex bunu config'teki env_key ile okur)
 export OPENAI_API_KEY="yzk_live_YOUR_KEY"
+# Kalici yap — yeni terminallerde de gecerli olsun
+grep -q 'OPENAI_API_KEY' ~/.bashrc 2>/dev/null || echo 'export OPENAI_API_KEY="yzk_live_YOUR_KEY"' >> ~/.bashrc
 
 codex --version
 codex`,
