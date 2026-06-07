@@ -518,6 +518,8 @@ describe("SEC-007: IDOR – body.userId paketi üzerindeki sahipliği değiştir
       "pkg-123",
       undefined,
       "test@email.com",
+      undefined,
+      undefined,
     );
     expect(purchasePackageWithBalance).not.toHaveBeenCalledWith(
       victimUserId,

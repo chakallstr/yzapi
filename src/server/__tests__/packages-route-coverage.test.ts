@@ -360,6 +360,8 @@ describe("GAP-PURCH-06: Idempotency-Key header forwarded to purchasePackageWithB
       "pkg-999",
       "client-idem-key-001",
       undefined,
+      undefined,
+      undefined,
     );
   });
 
@@ -381,6 +383,8 @@ describe("GAP-PURCH-06: Idempotency-Key header forwarded to purchasePackageWithB
     expect(mocks.purchasePackageWithBalance).toHaveBeenCalledWith(
       "user-ccc",
       "pkg-888",
+      undefined,
+      undefined,
       undefined,
       undefined,
     );

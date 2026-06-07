@@ -618,6 +618,12 @@ export const packages = pgTable("packages", {
   fiyatUsd: numeric("fiyat_usd", { precision: 14, scale: 4 }),
   enabled: boolean("enabled").notNull().default(true),
   displayOrder: integer("display_order").notNull().default(0),
+  isConfigurable: boolean("is_configurable").notNull().default(false),
+  minGunlukIstek: integer("min_gunluk_istek"),
+  maxGunlukIstek: integer("max_gunluk_istek"),
+  minSureGun: integer("min_sure_gun"),
+  maxSureGun: integer("max_sure_gun"),
+  birimFiyatUsdPer50: numeric("birim_fiyat_usd_per_50", { precision: 10, scale: 4 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });

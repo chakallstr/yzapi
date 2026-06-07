@@ -3,6 +3,47 @@ import { dbSql } from "../db/client.js";
 import { InsufficientBalanceError, AppError } from "../lib/errors.js";
 import { grantPackageEntitlement } from "./entitlement-service.js";
 
+/** Configurable paket için anlık fiyat hesabı (TL + USD). */
+export async function previewConfigurablePrice(
+  packageId: string,
+  customLimit: number,
+  customDays: number,
+): Promise<{ fiyatTL: number; fiyatUsd: number; birimFiyatUsd: number }> {
+  const [pkgRows, cfgRows] = await Promise.all([
+    dbSql<any[]>`
+      SELECT is_configurable, min_gunluk_istek, max_gunluk_istek,
+             min_sure_gun, max_sure_gun, birim_fiyat_usd_per_50, enabled
+      FROM packages WHERE id = ${packageId} LIMIT 1
+    `,
+    dbSql<{ live_kur: string; kur_buffer: string }[]>`
+      SELECT live_kur, kur_buffer FROM system_config WHERE id = 1 LIMIT 1
+    `,
+  ]);
+  if (!pkgRows.length) throw new AppError(404, "Paket bulunamadı");
+  const pkg = pkgRows[0];
+  if (!pkg.enabled) throw new AppError(400, "Paket satışta değil");
+  if (!pkg.is_configurable) throw new AppError(400, "Bu paket özelleştirilebilir değil");
+
+  const minLimit = Number(pkg.min_gunluk_istek ?? 50);
+  const maxLimit = Number(pkg.max_gunluk_istek ?? 5000);
+  const minDays = Number(pkg.min_sure_gun ?? 1);
+  const maxDays = Number(pkg.max_sure_gun ?? 30);
+  const birim = Number(pkg.birim_fiyat_usd_per_50 ?? 0.90);
+
+  if (customLimit < minLimit || customLimit > maxLimit)
+    throw new AppError(400, `Limit ${minLimit}–${maxLimit} arasında olmalı`);
+  if (customDays < minDays || customDays > maxDays)
+    throw new AppError(400, `Süre ${minDays}–${maxDays} gün arasında olmalı`);
+
+  const liveKur = Number(cfgRows[0]?.live_kur ?? 0);
+  const kurBuffer = Number(cfgRows[0]?.kur_buffer ?? 0.03);
+  const sellKur = liveKur * (1 + kurBuffer);
+
+  const fiyatUsd = Math.ceil(customLimit / 50) * birim * customDays;
+  const fiyatTL = Math.round(fiyatUsd * sellKur * 100) / 100;
+  return { fiyatTL, fiyatUsd: Math.round(fiyatUsd * 100) / 100, birimFiyatUsd: birim };
+}
+
 export interface PurchaseResult {
   entitlementId?: string;
   deliveryOrderId?: string;
@@ -39,6 +80,8 @@ export async function purchasePackageWithBalance(
   packageId: string,
   idempotencyKey?: string,
   contact?: string,
+  customLimit?: number,
+  customDays?: number,
 ): Promise<PurchaseResult> {
   const txKey = "pkg_purchase_" + userId + "_" + (idempotencyKey && idempotencyKey.trim() ? idempotencyKey.trim() : randomUUID());
 
@@ -51,7 +94,9 @@ export async function purchasePackageWithBalance(
   }
 
   const pkgRows = await dbSql<any[]>`
-    SELECT id, ad, fiyat_tl, sure_gun, gunluk_istek_limiti, allowed_models, enabled, tip
+    SELECT id, ad, fiyat_tl, sure_gun, gunluk_istek_limiti, allowed_models, enabled, tip,
+           is_configurable, min_gunluk_istek, max_gunluk_istek, min_sure_gun, max_sure_gun,
+           birim_fiyat_usd_per_50
     FROM packages WHERE id = ${packageId} LIMIT 1
   `;
   if (!pkgRows.length) throw new AppError(404, "Paket bulunamadı");
@@ -60,13 +105,25 @@ export async function purchasePackageWithBalance(
   if (pkg.tip !== "request_limit" && pkg.tip !== "account_delivery") {
     throw new AppError(400, "Bu paket tipi henüz desteklenmiyor");
   }
-  // ₺0 paketler (deneme/anahtar) DOĞRUDAN satın alınamaz — yalnız redeem kodu ile
-  // verilir (grantPackageEntitlement). Bu, ücretsiz-açık-satış abuse'ünü engeller.
   if (Number(pkg.fiyat_tl) < 0) {
     throw new AppError(400, "Negatif fiyatlı paket satın alınamaz");
   }
 
-  const fiyatTL = Number(pkg.fiyat_tl);
+  // Configurable paket: limit + süre body'den gelir, fiyat sunucuda hesaplanır.
+  let fiyatTL: number;
+  let effectiveLimit: number;
+  let effectiveDays: number;
+  if (pkg.is_configurable) {
+    if (!customLimit || !customDays) throw new AppError(400, "Configurable paket için limit ve süre gerekli");
+    const preview = await previewConfigurablePrice(packageId, customLimit, customDays);
+    fiyatTL = preview.fiyatTL;
+    effectiveLimit = customLimit;
+    effectiveDays = customDays;
+  } else {
+    fiyatTL = Number(pkg.fiyat_tl);
+    effectiveLimit = Number(pkg.gunluk_istek_limiti);
+    effectiveDays = Number(pkg.sure_gun);
+  }
 
   try {
     return await dbSql.begin(async (txSql) => {
@@ -107,8 +164,8 @@ export async function purchasePackageWithBalance(
       const entitlementId = await grantPackageEntitlement(txSql, {
         userId,
         packageId,
-        sureGun: pkg.sure_gun,
-        gunlukIstekLimiti: pkg.gunluk_istek_limiti,
+        sureGun: effectiveDays,
+        gunlukIstekLimiti: effectiveLimit,
         allowedModels: pkg.allowed_models ?? [],
         purchaseTransactionId: txId,
       });

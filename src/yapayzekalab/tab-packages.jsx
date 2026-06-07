@@ -40,6 +40,208 @@ const StatusBadge = ({ durum }) => {
   );
 };
 
+// === Configurable paket kartı (Codex API gibi) =====================
+const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
+  const isBusy = busy === pkg.id;
+  const meta = metaFor(pkg.kategori);
+  const Ic = I[meta.icon] || I.Terminal;
+
+  const STEP = 50;
+  const minLimit = pkg.minGunlukIstek ?? 50;
+  const maxLimit = pkg.maxGunlukIstek ?? 5000;
+  const minDays  = pkg.minSureGun ?? 1;
+  const maxDays  = pkg.maxSureGun ?? 30;
+
+  const [limit, setLimit] = useState(Math.min(500, maxLimit));
+  const [days,  setDays]  = useState(1);
+  const [preview, setPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const debounceRef = useRef(null);
+
+  const fetchPreview = (l, d) => {
+    setPreviewLoading(true);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/packages/${encodeURIComponent(pkg.id)}/price-preview?limit=${l}&days=${d}`);
+        const data = await r.json();
+        setPreview(data);
+      } catch { setPreview(null); }
+      finally { setPreviewLoading(false); }
+    }, 350);
+  };
+
+  useEffect(() => { fetchPreview(limit, days); }, [limit, days]);
+
+  const handleLimitChange = (v) => {
+    const clamped = Math.max(minLimit, Math.min(maxLimit, Math.round(v / STEP) * STEP));
+    setLimit(clamped);
+  };
+  const handleDaysChange = (v) => {
+    const clamped = Math.max(minDays, Math.min(maxDays, Math.round(v)));
+    setDays(clamped);
+  };
+
+  const priceUsd = preview?.fiyatUsd ?? 0;
+  const priceTL  = preview?.fiyatTL  ?? 0;
+
+  return (
+    <Card hoverable pad={0} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      {/* Banner */}
+      <div style={{
+        position: 'relative', height: 72,
+        background: `linear-gradient(135deg, ${meta.c1}, ${meta.c2})`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+      }}>
+        <div style={{ position: 'absolute', inset: 0, opacity: 0.18, pointerEvents: 'none',
+          backgroundImage: 'radial-gradient(circle at 18% 28%, #fff 0, transparent 36%), radial-gradient(circle at 86% 78%, #fff 0, transparent 30%)' }} />
+        <div style={{ position: 'absolute', right: -18, bottom: -22, opacity: 0.14, pointerEvents: 'none' }}>
+          <Ic size={110} stroke="#fff" strokeWidth={1.1} />
+        </div>
+        <div style={{ position: 'relative', width: 42, height: 42, borderRadius: 12,
+          background: 'rgba(255,255,255,0.20)', border: '1px solid rgba(255,255,255,0.35)',
+          display: 'grid', placeItems: 'center', boxShadow: '0 6px 18px rgba(0,0,0,0.18)' }}>
+          <Ic size={22} stroke="#fff" strokeWidth={2} />
+        </div>
+        <div style={{ position: 'absolute', top: 8, right: 10,
+          padding: '2px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.9)',
+          fontSize: 9, fontWeight: 800, letterSpacing: 0.5, color: meta.c2,
+          fontFamily: 'var(--font-mono)' }}>
+          ÖZELLEŞTİRİLEBİLİR
+        </div>
+      </div>
+
+      <div style={{ padding: '14px 18px', flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* Başlık */}
+        <div style={{ fontSize: 14.5, fontWeight: 700, letterSpacing: -0.2, color: 'var(--ink)', lineHeight: 1.3 }}>
+          {pkg.ad}
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5, margin: 0 }}>
+          {pkg.aciklama}
+        </p>
+
+        {/* Fiyat */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, paddingTop: 2 }}>
+          {previewLoading ? (
+            <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink-3)' }}>—</span>
+          ) : (
+            <>
+              <span style={{ fontSize: 26, fontWeight: 800, letterSpacing: -1, color: 'var(--ink)', lineHeight: 1 }} className="tnum">
+                ₺{priceTL.toFixed(2).replace('.', ',')}
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                ≈ ${priceUsd.toFixed(2)}
+              </span>
+            </>
+          )}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: -6 }}>
+          {days} gün erişim · {limit.toLocaleString('tr-TR')} istek / gün
+        </div>
+
+        {/* Seçili limit özeti */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '7px 10px', borderRadius: 8,
+          background: `color-mix(in srgb, ${meta.c1} 12%, transparent)`,
+          border: `1px solid color-mix(in srgb, ${meta.c1} 28%, transparent)`,
+          fontSize: 12, color: meta.c2, fontWeight: 600,
+        }}>
+          <span>✓</span>
+          {pkg.kategori} API: {limit.toLocaleString('tr-TR')} istek / günlük
+        </div>
+
+        {/* Özelleştir akordeonu */}
+        <div style={{ borderRadius: 9, border: '1px solid var(--border)', overflow: 'hidden' }}>
+          <button
+            onClick={() => setOpen((o) => !o)}
+            style={{
+              width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '9px 12px', background: 'var(--surface-2)', border: 0, cursor: 'pointer',
+              fontSize: 12.5, fontWeight: 600, color: 'var(--ink)',
+            }}
+          >
+            <span>Paketi özelleştir</span>
+            <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 400 }}>
+              {open ? 'Kapat' : 'Aç'}
+            </span>
+          </button>
+          {open && (
+            <div style={{ padding: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, borderTop: '1px solid var(--border)' }}>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 5 }}>
+                  Kullanım süresi
+                </div>
+                <input
+                  type="number"
+                  min={minDays} max={maxDays} step={1} value={days}
+                  onChange={(e) => handleDaysChange(Number(e.target.value))}
+                  style={{
+                    width: '100%', padding: '8px 10px', borderRadius: 7,
+                    border: '1px solid var(--border-st)', background: 'var(--surface-2)',
+                    color: 'var(--ink)', fontSize: 14, fontFamily: 'var(--font-mono)',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 3 }}>
+                  {minDays}–{maxDays} gün arası
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 5 }}>
+                  {pkg.kategori} API limiti
+                </div>
+                <input
+                  type="number"
+                  min={minLimit} max={maxLimit} step={STEP} value={limit}
+                  onChange={(e) => handleLimitChange(Number(e.target.value))}
+                  style={{
+                    width: '100%', padding: '8px 10px', borderRadius: 7,
+                    border: '1px solid var(--border-st)', background: 'var(--surface-2)',
+                    color: 'var(--ink)', fontSize: 14, fontFamily: 'var(--font-mono)',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 3 }}>
+                  {minLimit.toLocaleString('tr-TR')}–{maxLimit.toLocaleString('tr-TR')} istek ({STEP}'şer artış)
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Satın al butonu */}
+      <div style={{ padding: '0 18px 16px' }}>
+        <button
+          disabled={isBusy || previewLoading || priceTL <= 0}
+          onClick={() => onBuy(pkg.id, limit, days)}
+          style={{
+            width: '100%', padding: '10px 16px', borderRadius: 9, border: 0,
+            background: (isBusy || previewLoading || priceTL <= 0)
+              ? 'var(--border)'
+              : `linear-gradient(135deg, ${meta.c1}, ${meta.c2})`,
+            color: (isBusy || previewLoading || priceTL <= 0) ? 'var(--ink-3)' : '#fff',
+            fontSize: 13, fontWeight: 600,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+            cursor: (isBusy || previewLoading || priceTL <= 0) ? 'default' : 'pointer',
+            opacity: (isBusy || previewLoading) ? 0.7 : 1,
+            transition: 'opacity 0.15s',
+          }}
+        >
+          {isBusy ? (
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" className="spin-slow">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+          ) : '⚡'}
+          {isBusy ? t('packages.buying') : `Detayları gör →`}
+        </button>
+      </div>
+    </Card>
+  );
+};
+
 // === Paket kartı ===================================================
 const PackageCard = ({ pkg, busy, onBuy, onActivateCode, t }) => {
   const isBusy = busy === pkg.id;
@@ -274,7 +476,7 @@ export function PackagesTab() {
 
   const visible = cat === 'Tümü' ? packages : packages.filter((p) => p.kategori === cat);
 
-  const buy = async (id) => {
+  const buy = async (id, customLimit, customDays) => {
     const pkg = packages.find((p) => p.id === id);
     let contact;
     if (pkg?.tip === 'account_delivery') {
@@ -284,8 +486,13 @@ export function PackagesTab() {
     setBusyId(id); setError('');
     const key = keysRef.current[id] || (keysRef.current[id] = (window.crypto?.randomUUID?.() || `${id}-${Date.now()}`));
     try {
+      const bodyData = contact ? { contact } : {};
+      if (pkg?.isConfigurable && customLimit && customDays) {
+        bodyData.customLimit = customLimit;
+        bodyData.customDays = customDays;
+      }
       const r = await apiJson(`/api/user/packages/${encodeURIComponent(id)}/purchase`, {
-        method: 'POST', headers: { 'Idempotency-Key': key }, body: contact ? { contact } : undefined,
+        method: 'POST', headers: { 'Idempotency-Key': key }, body: bodyData,
       });
       delete keysRef.current[id];
       if (r?.tip === 'account_delivery') setRedeemMsg({ text: t('packages.orderPlaced'), ok: true });
@@ -520,7 +727,15 @@ export function PackagesTab() {
         </Card>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
-          {visible.map((p) => (
+          {visible.map((p) => p.isConfigurable ? (
+            <ConfigurablePackageCard
+              key={p.id}
+              pkg={p}
+              busy={busyId}
+              onBuy={buy}
+              t={t}
+            />
+          ) : (
             <PackageCard
               key={p.id}
               pkg={p}

@@ -10,25 +10,43 @@ function canonicalizeModels(models: string[]): string[] {
 
 /** Public katalog: yalnız enabled paketler, gizli alan yok. */
 export async function listPublicPackages() {
-  const rows = await dbSql<any[]>`
-    SELECT id, ad, kategori, aciklama, tip, gunluk_istek_limiti, sure_gun,
-           allowed_models, fiyat_tl, fiyat_usd, display_order
-    FROM packages WHERE enabled = true
-    ORDER BY display_order ASC, ad ASC
-  `;
-  return rows.map(publicShape);
+  const [rows, cfgRows] = await Promise.all([
+    dbSql<any[]>`
+      SELECT id, ad, kategori, aciklama, tip, gunluk_istek_limiti, sure_gun,
+             allowed_models, fiyat_tl, fiyat_usd, display_order,
+             is_configurable, min_gunluk_istek, max_gunluk_istek,
+             min_sure_gun, max_sure_gun, birim_fiyat_usd_per_50
+      FROM packages WHERE enabled = true
+      ORDER BY display_order ASC, ad ASC
+    `,
+    dbSql<{ live_kur: string; kur_buffer: string }[]>`
+      SELECT live_kur, kur_buffer FROM system_config WHERE id = 1 LIMIT 1
+    `,
+  ]);
+  const liveKur = Number(cfgRows[0]?.live_kur ?? 0);
+  const kurBuffer = Number(cfgRows[0]?.kur_buffer ?? 0.03);
+  return rows.map((r) => publicShape(r, liveKur, kurBuffer));
 }
 
 export async function getPublicPackage(id: string) {
-  const rows = await dbSql<any[]>`
-    SELECT id, ad, kategori, aciklama, tip, gunluk_istek_limiti, sure_gun,
-           allowed_models, fiyat_tl, fiyat_usd, display_order
-    FROM packages WHERE id = ${id} AND enabled = true LIMIT 1
-  `;
-  return rows.length ? publicShape(rows[0]) : null;
+  const [rows, cfgRows] = await Promise.all([
+    dbSql<any[]>`
+      SELECT id, ad, kategori, aciklama, tip, gunluk_istek_limiti, sure_gun,
+             allowed_models, fiyat_tl, fiyat_usd, display_order,
+             is_configurable, min_gunluk_istek, max_gunluk_istek,
+             min_sure_gun, max_sure_gun, birim_fiyat_usd_per_50
+      FROM packages WHERE id = ${id} AND enabled = true LIMIT 1
+    `,
+    dbSql<{ live_kur: string; kur_buffer: string }[]>`
+      SELECT live_kur, kur_buffer FROM system_config WHERE id = 1 LIMIT 1
+    `,
+  ]);
+  const liveKur = Number(cfgRows[0]?.live_kur ?? 0);
+  const kurBuffer = Number(cfgRows[0]?.kur_buffer ?? 0.03);
+  return rows.length ? publicShape(rows[0], liveKur, kurBuffer) : null;
 }
 
-function publicShape(r: any) {
+function publicShape(r: any, liveKur = 0, kurBuffer = 0.03) {
   return {
     id: r.id,
     ad: r.ad,
@@ -41,6 +59,14 @@ function publicShape(r: any) {
     fiyatTL: Number(r.fiyat_tl),
     fiyatUsd: r.fiyat_usd != null ? Number(r.fiyat_usd) : null,
     displayOrder: Number(r.display_order),
+    isConfigurable: r.is_configurable ?? false,
+    minGunlukIstek: r.min_gunluk_istek != null ? Number(r.min_gunluk_istek) : null,
+    maxGunlukIstek: r.max_gunluk_istek != null ? Number(r.max_gunluk_istek) : null,
+    minSureGun: r.min_sure_gun != null ? Number(r.min_sure_gun) : null,
+    maxSureGun: r.max_sure_gun != null ? Number(r.max_sure_gun) : null,
+    birimFiyatUsdPer50: r.birim_fiyat_usd_per_50 != null ? Number(r.birim_fiyat_usd_per_50) : null,
+    liveKur,
+    kurBuffer,
   };
 }
 

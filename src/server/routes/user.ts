@@ -142,8 +142,11 @@ router.post("/packages/:id/purchase", async (req, res, next) => {
       return;
     }
     const idempotencyKey = req.header("Idempotency-Key") || undefined;
-    const contact = (req.body as { contact?: string })?.contact;
-    const result = await purchasePackageWithBalance(req.user!.id, req.params.id, idempotencyKey, contact);
+    const body = req.body as { contact?: string; customLimit?: number; customDays?: number };
+    const contact = body?.contact;
+    const customLimit = body?.customLimit ? Number(body.customLimit) : undefined;
+    const customDays = body?.customDays ? Number(body.customDays) : undefined;
+    const result = await purchasePackageWithBalance(req.user!.id, req.params.id, idempotencyKey, contact, customLimit, customDays);
     res.status(201).json(result);
   } catch (e) {
     next(e);
