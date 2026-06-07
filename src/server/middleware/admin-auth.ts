@@ -4,6 +4,7 @@ import { db } from "../db/client.js";
 import { users } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { recordAuthFailure, hashIp } from "../services/gozcu/metrics-collector.js";
+import { requiredRoleFor, AdminRole } from "./admin-permissions.js";
 
 export const ADMIN_EMAIL = "cix.crazy666@gmail.com";
 
@@ -15,6 +16,7 @@ declare global {
   namespace Express {
     interface Request {
       admin?: TokenPayload;
+      adminRole?: AdminRole;
       user?: { id: string; email?: string };
       apiKey?: { id: string; userId: string };
     }
@@ -37,7 +39,7 @@ export async function adminAuth(req: Request, res: Response, next: NextFunction)
     }
 
     const rows = await db
-      .select({ id: users.id, email: users.email, durum: users.durum })
+      .select({ id: users.id, email: users.email, durum: users.durum, role: users.role })
       .from(users)
       .where(eq(users.id, payload.sub))
       .limit(1);
@@ -52,13 +54,30 @@ export async function adminAuth(req: Request, res: Response, next: NextFunction)
       res.status(403).json({ error: "User account is not active" });
       return;
     }
-    if (normalizeEmail(user.email) !== ADMIN_EMAIL) {
+
+    // Rol çözümleme: owner her zaman e-posta ile (DB'ye bağlı değil); partner DB rolünden.
+    let adminRole: AdminRole | null = null;
+    if (normalizeEmail(user.email) === ADMIN_EMAIL) adminRole = "owner";
+    else if (user.role === "partner") adminRole = "partner";
+
+    if (!adminRole) {
       res.status(403).json({ error: "Admin email required" });
       return;
     }
 
+    // Yetki (fail-closed): partner yalnız izinli uçlara; owner her şeye.
+    if (adminRole === "partner") {
+      const required = requiredRoleFor(req.method, req.baseUrl + req.path);
+      if (required !== "partner") {
+        recordAuthFailure(hashIp(req.ip));
+        res.status(403).json({ error: "Bu işlem için yetkiniz yok" });
+        return;
+      }
+    }
+
     req.user = { id: user.id, email: user.email };
     req.admin = { sub: user.id, role: "admin" };
+    req.adminRole = adminRole;
     next();
   } catch {
     recordAuthFailure(hashIp(req.ip));
