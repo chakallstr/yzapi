@@ -65,6 +65,7 @@ export const users = pgTable(
     googleId: text("google_id"),
     githubId: text("github_id"),
     lang: text("lang").notNull().default("tr"),
+    role: text("role").notNull().default("user"),
     lastLowBalanceAlert: timestamp("last_low_balance_alert", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
