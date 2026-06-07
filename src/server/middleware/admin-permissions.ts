@@ -25,6 +25,8 @@ type Rule = { methods: string[]; re: RegExp };
 
 // Partner'a AÇIK uçlar. Burada olmayan her şey owner-only (fail-closed).
 const PARTNER_RULES: Rule[] = [
+  // me (her admin rolü kendi bilgisini okuyabilir)
+  { methods: ["GET"], re: /^\/api\/admin\/me$/ },
   // dashboard
   { methods: ["GET"], re: /^\/api\/admin\/dashboard$/ },
   // traffic

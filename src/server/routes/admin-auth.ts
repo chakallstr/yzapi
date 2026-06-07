@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { adminAuth } from "../middleware/admin-auth.js";
+import { allowedTabsForRole } from "../middleware/admin-permissions.js";
 
 const router = Router();
 
@@ -17,7 +18,13 @@ router.post("/logout", (_req, res) => {
 
 // GET /api/admin/me
 router.get("/me", adminAuth, (req, res) => {
-  res.json({ role: "admin", sub: req.admin?.sub, email: req.user?.email });
+  const role = req.adminRole ?? "owner";
+  res.json({
+    role,
+    sub: req.admin?.sub,
+    email: req.user?.email,
+    allowedTabs: allowedTabsForRole(role),
+  });
 });
 
 export default router;
