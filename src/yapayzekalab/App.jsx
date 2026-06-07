@@ -684,7 +684,7 @@ const TopBar = ({ active, onTab, balanceUSD, tlRate, onUserAction, isAuthenticat
     { id: 'models',   label: t('nav.models'),   Ico: I.Layers },
     { id: 'packages', label: t('nav.packages'),   Ico: I.Wallet },
     { id: 'ai-chat',  label: t('nav.aiChat'),    Ico: I.Sparkle },
-    { id: 'studio',   label: t('nav.studio'),     Ico: I.Layers },
+    // { id: 'studio',   label: t('nav.studio'),     Ico: I.Layers },
     { id: 'documents',label: t('nav.documents'),  Ico: I.File },
     { id: 'status',   label: t('nav.status'),      Ico: I.Activity },
     { id: 'activity', label: t('nav.activity'),   Ico: I.Activity },
