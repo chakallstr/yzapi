@@ -139,56 +139,49 @@
       "idx": 19,
       "version": "7",
       "when": 1780953600000,
-      "tag": "0019_packages",
+      "tag": "0019_provider_fallback",
       "breakpoints": true
     },
     {
       "idx": 20,
       "version": "7",
       "when": 1781040000000,
-      "tag": "0020_redeem_codes",
+      "tag": "0020_packages",
       "breakpoints": true
     },
     {
       "idx": 21,
       "version": "7",
       "when": 1781126400000,
-      "tag": "0021_added_model_image",
+      "tag": "0021_redeem_codes",
       "breakpoints": true
     },
     {
       "idx": 22,
       "version": "7",
       "when": 1781212800000,
-      "tag": "0022_github_oauth_account_delivery",
+      "tag": "0022_added_model_image",
       "breakpoints": true
     },
     {
       "idx": 23,
       "version": "7",
       "when": 1781299200000,
-      "tag": "0023_user_lang",
+      "tag": "0023_github_oauth_account_delivery",
       "breakpoints": true
     },
     {
       "idx": 24,
       "version": "7",
       "when": 1781385600000,
-      "tag": "0024_provider_fallback",
+      "tag": "0024_user_lang",
       "breakpoints": true
     },
     {
       "idx": 25,
       "version": "7",
       "when": 1781472000000,
-      "tag": "0025_models_maintenance_notice",
-      "breakpoints": true
-    },
-    {
-      "idx": 26,
-      "version": "7",
-      "when": 1781558400000,
-      "tag": "0026_user_role",
+      "tag": "0025_user_role",
       "breakpoints": true
     }
   ]
