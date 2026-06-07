@@ -1,32 +1,11 @@
 /**
- * Codex API (ChatGPT) configurable paketini DB'ye ekler.
+ * Codex API (ChatGPT) configurable paketini DB'ye ekler (idempotent).
  * Çalıştır: ENV_FILE_PATH=.env.production npx tsx scripts/seed-codex-package.ts
  */
-import { loadEnv } from "src/server/lib/env.js";
-import { dbSql } from "src/server/db/client.js";
+import { config as loadEnv } from "dotenv";
+loadEnv({ path: process.env.ENV_FILE_PATH || ".env" });
 
-const pkg = {
-  id: "codex-api-chatgpt",
-  ad: "Codex API (ChatGPT)",
-  kategori: "GPT/Codex",
-  aciklama:
-    "Codex API (ChatGPT) ile gpt-5.5, gpt-5.4, gpt-5.3-codex ve gpt-5.2 " +
-    "Responses API modelleri kapsamında, seçtiğin istek limiti ve süreyle erişim.",
-  tip: "request_limit",
-  gunluk_istek_limiti: 500,
-  sure_gun: 1,
-  allowed_models: JSON.stringify(["gpt-5.5", "gpt-5.4", "gpt-5.3-codex", "gpt-5.2"]),
-  fiyat_tl: 0,
-  fiyat_usd: 0,
-  enabled: true,
-  display_order: 1,
-  is_configurable: true,
-  min_gunluk_istek: 50,
-  max_gunluk_istek: 5000,
-  min_sure_gun: 1,
-  max_sure_gun: 30,
-  birim_fiyat_usd_per_50: 0.90,
-};
+import { dbSql } from "../src/server/db/client.js";
 
 async function main() {
   await dbSql`
@@ -38,25 +17,28 @@ async function main() {
       min_sure_gun, max_sure_gun, birim_fiyat_usd_per_50
     )
     VALUES (
-      ${pkg.id}, ${pkg.ad}, ${pkg.kategori}, ${pkg.aciklama}, ${pkg.tip},
-      ${pkg.gunluk_istek_limiti}, ${pkg.sure_gun}, ${pkg.allowed_models}::jsonb,
-      ${pkg.fiyat_tl}, ${pkg.fiyat_usd}, ${pkg.enabled}, ${pkg.display_order},
-      ${pkg.is_configurable}, ${pkg.min_gunluk_istek}, ${pkg.max_gunluk_istek},
-      ${pkg.min_sure_gun}, ${pkg.max_sure_gun}, ${pkg.birim_fiyat_usd_per_50}
+      'codex-api-chatgpt',
+      'Codex API (ChatGPT)',
+      'GPT/Codex',
+      'Codex API (ChatGPT) ile gpt-5.5, gpt-5.4, gpt-5.3-codex ve gpt-5.2 Responses API modelleri kapsamında, seçtiğin istek limiti ve süreyle erişim.',
+      'request_limit',
+      500, 1, '["gpt-5.5","gpt-5.4","gpt-5.3-codex","gpt-5.2"]'::jsonb,
+      0, 0, true, 1,
+      true, 50, 5000, 1, 30, 0.90
     )
     ON CONFLICT (id) DO UPDATE SET
-      ad = EXCLUDED.ad,
-      aciklama = EXCLUDED.aciklama,
-      is_configurable = EXCLUDED.is_configurable,
-      min_gunluk_istek = EXCLUDED.min_gunluk_istek,
-      max_gunluk_istek = EXCLUDED.max_gunluk_istek,
-      min_sure_gun = EXCLUDED.min_sure_gun,
-      max_sure_gun = EXCLUDED.max_sure_gun,
+      ad                    = EXCLUDED.ad,
+      aciklama              = EXCLUDED.aciklama,
+      is_configurable       = EXCLUDED.is_configurable,
+      min_gunluk_istek      = EXCLUDED.min_gunluk_istek,
+      max_gunluk_istek      = EXCLUDED.max_gunluk_istek,
+      min_sure_gun          = EXCLUDED.min_sure_gun,
+      max_sure_gun          = EXCLUDED.max_sure_gun,
       birim_fiyat_usd_per_50 = EXCLUDED.birim_fiyat_usd_per_50,
-      updated_at = now()
+      updated_at            = now()
   `;
   console.log("✓ codex-api-chatgpt paketi eklendi/güncellendi.");
-  process.exit(0);
+  await dbSql.end();
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
