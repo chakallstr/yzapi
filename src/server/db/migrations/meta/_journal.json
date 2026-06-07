@@ -190,6 +190,13 @@
       "when": 1781558400000,
       "tag": "0026_configurable_packages",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1781644800000,
+      "tag": "0027_package_context_limit",
+      "breakpoints": true
     }
   ]
 }

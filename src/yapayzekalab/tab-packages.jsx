@@ -398,7 +398,8 @@ const PackageCard = ({ pkg, busy, onBuy, onActivateCode, t }) => {
 
 // === Aktif paket kartı =============================================
 const EntitlementCard = ({ ent, t }) => {
-  const pct = ent.gunlukLimit > 0 ? Math.round((ent.kalanBugun / ent.gunlukLimit) * 100) : 0;
+  const pct = ent.gunlukLimit > 0 ? Math.round((ent.kullanilanBugun / ent.gunlukLimit) * 100) : 0;
+  const exhausted = ent.gunlukLimit > 0 && ent.kalanBugun <= 0;
   return (
     <div style={{
       display: 'flex', gap: 14, padding: '14px 0',
@@ -406,31 +407,57 @@ const EntitlementCard = ({ ent, t }) => {
     }}>
       <div style={{
         width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-        background: 'var(--ok-bg)', display: 'grid', placeItems: 'center',
-        fontSize: 18,
-      }}>✓</div>
+        background: exhausted ? 'var(--warn-bg, #fef3c7)' : 'var(--ok-bg)',
+        display: 'grid', placeItems: 'center', fontSize: 18,
+      }}>{exhausted ? '⚠' : '✓'}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
           <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>{ent.paketAdi}</div>
           <Chip style={{ fontSize: 10, fontFamily: 'var(--font-mono)' }}>{ent.kategori}</Chip>
         </div>
+
+        {/* Günlük istek sayacı */}
         {ent.gunlukLimit > 0 && (
-          <div style={{ marginTop: 8 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginBottom: 5 }}>
-              <span>{t('packages.todayRemaining')}: {ent.kalanBugun?.toLocaleString('tr-TR')} / {ent.gunlukLimit?.toLocaleString('tr-TR')}</span>
-              <span>{pct}%</span>
+          <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: 'var(--surface-2, var(--card-bg))', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Bugünkü İstek Kullanımı
+              </span>
+              <span style={{
+                fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 700,
+                color: exhausted ? 'var(--warn, #d97706)' : pct >= 80 ? 'var(--warn, #d97706)' : 'var(--ok, #16a34a)',
+              }}>
+                {ent.kullanilanBugun?.toLocaleString('tr-TR')} / {ent.gunlukLimit?.toLocaleString('tr-TR')}
+              </span>
             </div>
-            <div style={{ height: 5, borderRadius: 999, background: 'var(--border)', overflow: 'hidden' }}>
+            <div style={{ height: 8, borderRadius: 999, background: 'var(--border)', overflow: 'hidden' }}>
               <div style={{
-                height: '100%', borderRadius: 999, width: `${pct}%`,
-                background: pct > 20 ? 'var(--ok)' : 'var(--warn)',
+                height: '100%', borderRadius: 999,
+                width: `${Math.min(pct, 100)}%`,
+                background: exhausted ? 'var(--warn, #d97706)' : pct >= 80 ? 'var(--warn, #d97706)' : 'var(--ok, #16a34a)',
                 transition: 'width 0.3s ease',
               }} />
             </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5, fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }}>
+              <span>{exhausted ? '⚠ Günlük limit doldu — gece yarısı sıfırlanır' : `${ent.kalanBugun?.toLocaleString('tr-TR')} istek kaldı`}</span>
+              <span>{pct}%</span>
+            </div>
           </div>
         )}
-        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
-          {t('packages.expiry')}: {new Date(ent.expiresAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+
+        {/* Context ve kural bilgisi */}
+        <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', background: 'var(--border)', borderRadius: 4, padding: '2px 6px' }}>
+            her istek = 1 sayılır
+          </span>
+          {ent.maxContextTokens && (
+            <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', background: 'var(--border)', borderRadius: 4, padding: '2px 6px' }}>
+              maks. {(ent.maxContextTokens / 1000).toLocaleString('tr-TR')}k token bağlam
+            </span>
+          )}
+          <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', background: 'var(--border)', borderRadius: 4, padding: '2px 6px' }}>
+            bitiş: {new Date(ent.expiresAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </span>
         </div>
       </div>
     </div>

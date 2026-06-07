@@ -4,6 +4,7 @@ import { usageRecords } from "../db/schema.js";
 export interface PackageCoverage {
   covered: boolean;
   entitlementId?: string;
+  maxContextTokens?: number; // null/undefined = limitsiz
 }
 
 /** Salt-okunur: bu modeli kapsayan, süresi geçmemiş, bugün kotası dolmamış aktif hak var mı? */
@@ -22,25 +23,34 @@ export async function checkPackageCoverage(userId: string, modelId: string): Pro
 
 /** Atomik: en erken biten kapsayan haktan bir günlük slot rezerve et. */
 export async function tryReservePackageSlot(userId: string, modelId: string): Promise<PackageCoverage> {
-  const rows = await dbSql<{ id: string }[]>`
+  const rows = await dbSql<{ id: string; max_context_tokens: number | null }[]>`
     UPDATE user_package_entitlements AS upe
     SET requests_today = CASE WHEN upe.last_reset_date < CURRENT_DATE THEN 1 ELSE upe.requests_today + 1 END,
         last_reset_date = CURRENT_DATE,
         updated_at = now()
-    WHERE upe.id = (
-      SELECT id FROM user_package_entitlements
-      WHERE user_id = ${userId}::uuid
-        AND status = 'active'
-        AND expires_at > now()
-        AND allowed_models_snapshot @> ${JSON.stringify([modelId])}::jsonb
-        AND (last_reset_date < CURRENT_DATE OR requests_today < daily_limit_snapshot)
-      ORDER BY expires_at ASC
-      LIMIT 1
-      FOR UPDATE SKIP LOCKED
-    )
-    RETURNING upe.id
+    FROM packages p
+    WHERE p.id = upe.package_id
+      AND upe.id = (
+        SELECT e.id FROM user_package_entitlements e
+        WHERE e.user_id = ${userId}::uuid
+          AND e.status = 'active'
+          AND e.expires_at > now()
+          AND e.allowed_models_snapshot @> ${JSON.stringify([modelId])}::jsonb
+          AND (e.last_reset_date < CURRENT_DATE OR e.requests_today < e.daily_limit_snapshot)
+        ORDER BY e.expires_at ASC
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
+      )
+    RETURNING upe.id, p.max_context_tokens
   `;
-  if (rows.length) return { covered: true, entitlementId: rows[0].id };
+  if (rows.length) {
+    const r = rows[0];
+    return {
+      covered: true,
+      entitlementId: r.id,
+      maxContextTokens: r.max_context_tokens ?? undefined,
+    };
+  }
   return { covered: false };
 }
 
@@ -143,8 +153,10 @@ export interface ActiveEntitlement {
   kategori: string;
   gunlukLimit: number;
   kalanBugun: number;
+  kullanilanBugun: number;
   expiresAt: string;
   allowedModels: string[];
+  maxContextTokens?: number;
 }
 
 export async function listUserEntitlements(userId: string): Promise<ActiveEntitlement[]> {
@@ -152,20 +164,26 @@ export async function listUserEntitlements(userId: string): Promise<ActiveEntitl
     SELECT e.id, e.package_id, p.ad AS paket_adi, p.kategori,
            e.daily_limit_snapshot,
            CASE WHEN e.last_reset_date < CURRENT_DATE THEN 0 ELSE e.requests_today END AS requests_today,
-           e.expires_at, e.allowed_models_snapshot
+           e.expires_at, e.allowed_models_snapshot, p.max_context_tokens
     FROM user_package_entitlements e
     JOIN packages p ON p.id = e.package_id
     WHERE e.user_id = ${userId}::uuid AND e.status = 'active' AND e.expires_at > now()
     ORDER BY e.expires_at ASC
   `;
-  return rows.map((r) => ({
-    id: r.id,
-    packageId: r.package_id,
-    paketAdi: r.paket_adi,
-    kategori: r.kategori,
-    gunlukLimit: Number(r.daily_limit_snapshot),
-    kalanBugun: Math.max(0, Number(r.daily_limit_snapshot) - Number(r.requests_today)),
-    expiresAt: r.expires_at,
-    allowedModels: r.allowed_models_snapshot ?? [],
-  }));
+  return rows.map((r) => {
+    const limit = Number(r.daily_limit_snapshot);
+    const used = Number(r.requests_today);
+    return {
+      id: r.id,
+      packageId: r.package_id,
+      paketAdi: r.paket_adi,
+      kategori: r.kategori,
+      gunlukLimit: limit,
+      kullanilanBugun: used,
+      kalanBugun: Math.max(0, limit - used),
+      expiresAt: r.expires_at,
+      allowedModels: r.allowed_models_snapshot ?? [],
+      maxContextTokens: r.max_context_tokens ?? undefined,
+    };
+  });
 }

@@ -388,6 +388,11 @@ async function handleTextJsonEndpoint(
     const pkgSlot = await tryReservePackageSlot(userId, masterModel.id);
     billedViaPackage = pkgSlot.covered;
     entitlementId = pkgSlot.entitlementId;
+    if (billedViaPackage && pkgSlot.maxContextTokens && guard.contextTokens > pkgSlot.maxContextTokens) {
+      await releasePackageSlot(pkgSlot.entitlementId!);
+      billedViaPackage = false; entitlementId = undefined;
+      throw new AppError(400, `Bağlam çok büyük (tahmini ${guard.contextTokens.toLocaleString("tr-TR")} token; bu paketin limiti ${pkgSlot.maxContextTokens.toLocaleString("tr-TR")} token). Lütfen bağlamınızı kısaltın.`);
+    }
     if (!billedViaPackage) {
       await reserveUsageBudget({
         userId,
@@ -553,6 +558,11 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
     const pkgSlot = await tryReservePackageSlot(userId, masterModel.id);
     billedViaPackage = pkgSlot.covered;
     entitlementId = pkgSlot.entitlementId;
+    if (billedViaPackage && pkgSlot.maxContextTokens && guard.contextTokens > pkgSlot.maxContextTokens) {
+      await releasePackageSlot(pkgSlot.entitlementId!);
+      billedViaPackage = false; entitlementId = undefined;
+      throw new AppError(400, `Bağlam çok büyük (tahmini ${guard.contextTokens.toLocaleString("tr-TR")} token; bu paketin limiti ${pkgSlot.maxContextTokens.toLocaleString("tr-TR")} token). Lütfen bağlamınızı kısaltın.`);
+    }
     if (!billedViaPackage) {
       await reserveUsageBudget({
         userId,
@@ -788,6 +798,11 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
     const pkgSlot = await tryReservePackageSlot(userId, masterModel.id);
     billedViaPackage = pkgSlot.covered;
     entitlementId = pkgSlot.entitlementId;
+    if (billedViaPackage && pkgSlot.maxContextTokens && guard.contextTokens > pkgSlot.maxContextTokens) {
+      await releasePackageSlot(pkgSlot.entitlementId!);
+      billedViaPackage = false; entitlementId = undefined;
+      throw new AppError(400, `Bağlam çok büyük (tahmini ${guard.contextTokens.toLocaleString("tr-TR")} token; bu paketin limiti ${pkgSlot.maxContextTokens.toLocaleString("tr-TR")} token). Lütfen bağlamınızı kısaltın.`);
+    }
     if (!billedViaPackage) {
       await reserveUsageBudget({
         userId,
