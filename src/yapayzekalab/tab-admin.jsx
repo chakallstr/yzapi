@@ -1210,6 +1210,12 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
   const [profileTestResult, setProfileTestResult] = useState({}); // id -> result
   const [profileNotice, setProfileNotice] = useState('');
 
+  // ── Rika GPT/Codex hızlı kontrol ──────────────────────────────────────────
+  const [rikaReseller, setRikaReseller] = useState(null);
+  const [rikaResellerLoading, setRikaResellerLoading] = useState(false);
+  const [rikaModelBusy, setRikaModelBusy] = useState(false);
+  const [rikaToggleBusy, setRikaToggleBusy] = useState(false);
+
   const selectedModel = useMemo(
     () => modelPolicies.find((row) => row.modelId === selectedModelId) || modelPolicies[0] || null,
     [modelPolicies, selectedModelId],
@@ -1409,6 +1415,46 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
     }
   };
 
+  // ── Rika hızlı kontrol yönetimi ──────────────────────────────────────────────
+  const loadRikaReseller = async () => {
+    setRikaResellerLoading(true);
+    try {
+      const data = await adminRequest('/api/admin/rika/reseller-status', token);
+      setRikaReseller(data);
+    } catch { /* yoksay — panel yüklenmeli */ }
+    finally { setRikaResellerLoading(false); }
+  };
+
+  const switchRikaModel = async (model) => {
+    setRikaModelBusy(true);
+    setProfilesError('');
+    try {
+      await adminRequest('/api/admin/provider-profiles', token, {
+        method: 'POST',
+        body: { id: 'rika', supportedModelIds: [model] },
+      });
+      await loadProfiles();
+      setProfileNotice(`Rika modeli → ${model}`);
+    } catch (e) {
+      setProfilesError(e.message || 'Model değiştirilemedi.');
+    } finally { setRikaModelBusy(false); }
+  };
+
+  const toggleRikaEnabled = async (enabled) => {
+    setRikaToggleBusy(true);
+    setProfilesError('');
+    try {
+      await adminRequest('/api/admin/provider-profiles', token, {
+        method: 'POST',
+        body: { id: 'rika', enabled },
+      });
+      await loadProfiles();
+      setProfileNotice(`Rika ${enabled ? 'etkinleştirildi' : 'devre dışı bırakıldı'}.`);
+    } catch (e) {
+      setProfilesError(e.message || 'Durum değiştirilemedi.');
+    } finally { setRikaToggleBusy(false); }
+  };
+
   // ── Aktif sağlayıcı (provider_profiles) yönetimi ─────────────────────────────
   const loadProfiles = async () => {
     setProfilesError('');
@@ -1416,6 +1462,7 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
       const list = await adminRequest('/api/admin/provider-profiles', token);
       const rows = Array.isArray(list) ? list : [];
       setProfiles(rows);
+      void loadRikaReseller();
       // Düzenleme taslaklarını yükle (anahtar asla geri gösterilmez → boş).
       setProfileDrafts((current) => {
         const next = { ...current };
@@ -1803,6 +1850,152 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
               </div>
             )}
           </Card>
+
+          {/* ── Rika GPT/Codex hızlı kontrol ─────────────────────────────── */}
+          {(() => {
+            const rikaProfile = profiles.find((p) => p.id === 'rika');
+            if (!rikaProfile) return null;
+            const activeModel = (rikaProfile.supportedModelIds || [])[0] || 'gpt-5.5';
+            return (
+              <Card pad={18}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                  <div>
+                    <Caption>Rika GPT/Codex</Caption>
+                    <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 4 }}>
+                      Codex paketleri için hızlı model geçişi ve aktiflik kontrolü.
+                    </div>
+                  </div>
+                  <Chip tone={rikaProfile.enabled ? 'ok' : 'neutral'}>
+                    {rikaProfile.enabled ? 'Etkin' : 'Kapalı'}
+                  </Chip>
+                </div>
+
+                {/* Model geçişi */}
+                <div style={{ marginTop: 14 }}>
+                  <Caption>Aktif model</Caption>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    {['gpt-5.5', 'gpt-5.4'].map((m) => (
+                      <button
+                        key={m}
+                        disabled={rikaModelBusy}
+                        onClick={() => switchRikaModel(m)}
+                        style={{
+                          padding: '8px 18px',
+                          borderRadius: 9,
+                          fontWeight: 600,
+                          fontSize: 13,
+                          background: activeModel === m ? 'var(--ink)' : 'var(--surface-2)',
+                          color: activeModel === m ? '#fff' : 'var(--ink)',
+                          border: activeModel === m ? 'none' : '1px solid var(--border)',
+                          opacity: rikaModelBusy ? 0.6 : 1,
+                          cursor: rikaModelBusy ? 'default' : 'pointer',
+                        }}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Aktif/Kapalı toggle */}
+                <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
+                  <button
+                    disabled={rikaToggleBusy || rikaProfile.enabled}
+                    onClick={() => toggleRikaEnabled(true)}
+                    style={{
+                      padding: '7px 16px', borderRadius: 9, fontSize: 12, fontWeight: 600,
+                      background: rikaProfile.enabled ? 'var(--ok-bg)' : 'var(--ink)',
+                      color: rikaProfile.enabled ? '#047857' : '#fff',
+                      border: rikaProfile.enabled ? '1px solid #a7f3d0' : 'none',
+                      opacity: (rikaToggleBusy || rikaProfile.enabled) ? 0.6 : 1,
+                    }}
+                  >
+                    {rikaProfile.enabled ? '✓ Etkin' : 'Etkinleştir'}
+                  </button>
+                  <button
+                    disabled={rikaToggleBusy || !rikaProfile.enabled}
+                    onClick={() => toggleRikaEnabled(false)}
+                    style={{
+                      padding: '7px 16px', borderRadius: 9, fontSize: 12,
+                      border: '1px solid var(--border)',
+                      opacity: (rikaToggleBusy || !rikaProfile.enabled) ? 0.5 : 1,
+                    }}
+                  >
+                    Kapat
+                  </button>
+                </div>
+
+                {/* Reseller kota bilgisi */}
+                <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Caption>Reseller kota</Caption>
+                    <button
+                      onClick={loadRikaReseller}
+                      disabled={rikaResellerLoading}
+                      style={{ fontSize: 11, padding: '3px 10px', borderRadius: 7, border: '1px solid var(--border)', opacity: rikaResellerLoading ? 0.5 : 1 }}
+                    >
+                      {rikaResellerLoading ? 'Yükleniyor…' : 'Yenile'}
+                    </button>
+                  </div>
+                  {!rikaReseller && !rikaResellerLoading && (
+                    <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
+                      RIKA_RESELLER_ID env ayarlanmamış veya yüklenmedi.
+                    </div>
+                  )}
+                  {rikaReseller && !rikaReseller.configured && (
+                    <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
+                      RIKA_RESELLER_ID ayarlanmamış — VPS .env.production'a ekle.
+                    </div>
+                  )}
+                  {rikaReseller?.error && (
+                    <div style={{ marginTop: 8, fontSize: 12, color: '#b91c1c' }}>{rikaReseller.error}</div>
+                  )}
+                  {rikaReseller?.summary && (
+                    <div style={{ marginTop: 10, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                      {[
+                        { label: 'Toplam key', value: rikaReseller.summary.keyCount },
+                        { label: 'Aktif key', value: rikaReseller.summary.activeKeyCount },
+                        { label: 'Canlı istek', value: rikaReseller.summary.liveKeyCount },
+                        { label: 'Toplam prompt', value: rikaReseller.summary.totalPromptCount?.toLocaleString() },
+                        { label: 'Toplam token', value: rikaReseller.summary.totalTokenTotal?.toLocaleString() },
+                      ].map(({ label, value }) => (
+                        <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{label}</span>
+                          <span style={{ fontSize: 15, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{value ?? '—'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {rikaReseller?.keys?.length > 0 && (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 6 }}>Key detayları</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {rikaReseller.keys.map((k) => (
+                          <div key={k.id} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', fontSize: 12 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontWeight: 600 }}>{k.label || k.id}</span>
+                              <Chip tone={k.status === 'Active' ? 'ok' : 'neutral'} style={{ fontSize: 10 }}>{k.status}</Chip>
+                            </div>
+                            <div style={{ display: 'flex', gap: 14, marginTop: 5, flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-2)' }}>
+                              <span>Kalan: {k.tokenUsage?.remaining?.toLocaleString() ?? '—'}</span>
+                              <span>Bugün: {k.tokenUsage?.today?.toLocaleString() ?? '—'}</span>
+                              <span>Toplam: {k.tokenUsage?.total?.toLocaleString() ?? '—'}</span>
+                              {k.expire && <span>Bitiş: {new Date(k.expire).toLocaleDateString('tr-TR')}</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {rikaReseller?.fetchedAt && (
+                    <div style={{ marginTop: 8, fontSize: 10.5, color: 'var(--ink-3)' }}>
+                      Son güncelleme: {new Date(rikaReseller.fetchedAt).toLocaleTimeString('tr-TR')}
+                    </div>
+                  )}
+                </div>
+              </Card>
+            );
+          })()}
 
           <Card pad={18}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>

@@ -42,6 +42,7 @@ import {
 } from "../services/package-service.js";
 import { generateRedeemCodes, listRedeemCodes, setRedeemCodeEnabled } from "../services/redeem-code-service.js";
 import { listAllDeliveryOrders, markDeliveryDelivered, cancelDeliveryWithRefund } from "../services/account-delivery-service.js";
+import { getRikaResellerStatus } from "../services/rika-reseller-service.js";
 import {
   getProviderConfigAdminView,
   saveProviderConfig,
@@ -1386,6 +1387,13 @@ router.post("/delivery-orders/:id/cancel", async (req, res, next) => {
   } catch (e) {
     next(e);
   }
+});
+
+// ── Rika Reseller API ─────────────────────────────────────────────────────────
+router.get("/rika/reseller-status", async (_req, res, next) => {
+  try {
+    res.json(await getRikaResellerStatus());
+  } catch (e) { next(e); }
 });
 
 export default router;
