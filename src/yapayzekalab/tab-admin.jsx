@@ -983,7 +983,7 @@ const AdminRedeemCodes = ({ token }) => {
                                 <tr key={u.id}>
                                   <td style={{ fontFamily: 'monospace' }}>{u.email}</td>
                                   <td>{u.ad_soyad || '—'}</td>
-                                  <td>{safeDate(u.used_at)}</td>
+                                  <td>{safeDate(u.redeemed_at)}</td>
                                 </tr>
                               ))
                             }
