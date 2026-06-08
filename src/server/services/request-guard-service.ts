@@ -46,7 +46,12 @@ const NON_CONTEXT_KEYS = new Set([
   "metadata",
   "user",
   "web_search",
+  "customerId",
 ]);
+
+// Reseller clients may include customerId in the request body for their own
+// tracking. The gateway consumes it internally but must never forward it upstream.
+const STRIP_BEFORE_UPSTREAM = new Set(["customerId"]);
 
 export function estimateTextTokens(value: unknown): number {
   if (value === null || value === undefined) return 0;
@@ -179,6 +184,7 @@ export function buildRequestGuard(opts: BuildRequestGuardOptions): RequestGuardR
     opts.maxTokensPerRequest,
   );
   const guardedBody = { ...opts.body };
+  for (const key of STRIP_BEFORE_UPSTREAM) delete guardedBody[key];
 
   if (opts.endpoint === "responses") {
     guardedBody.max_output_tokens = reservedCompletionTokens;

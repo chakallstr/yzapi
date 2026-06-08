@@ -128,6 +128,21 @@ describe("request guard service", () => {
     })).toThrow("Streaming bu endpoint veya model için kapalı.");
   });
 
+  it("strips customerId from guardedBody before upstream forwarding", () => {
+    const guard = buildRequestGuard({
+      endpoint: "chat",
+      model,
+      body: {
+        model: "gpt-5.5",
+        messages: [{ role: "user", content: "test" }],
+        customerId: "b653ee71-45a6-40cc-8d8d-374c1eae0d76",
+      },
+    });
+    expect(guard.guardedBody.customerId).toBeUndefined();
+    expect(guard.guardedBody.messages).toBeDefined();
+    expect(guard.guardedBody.model).toBe("gpt-5.5");
+  });
+
   it("blocks temperature and top_p values outside configured ranges", () => {
     expect(() => buildRequestGuard({
       endpoint: "chat",
