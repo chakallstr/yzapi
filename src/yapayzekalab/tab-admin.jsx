@@ -822,6 +822,21 @@ const AdminRedeemCodes = ({ token }) => {
   const [trialCount, setTrialCount] = useState('1');
   const [trialSaving, setTrialSaving] = useState(false);
   const [trialGenerated, setTrialGenerated] = useState([]);
+  const [expandedUses, setExpandedUses] = useState(null);
+  const [usesData, setUsesData] = useState({});
+  const [usesLoading, setUsesLoading] = useState(false);
+
+  const toggleUses = async (row) => {
+    if (expandedUses === row.id) { setExpandedUses(null); return; }
+    setExpandedUses(row.id);
+    if (usesData[row.id]) return;
+    setUsesLoading(true);
+    try {
+      const data = await adminRequest(`/api/admin/redeem-codes/${row.id}/uses`, token);
+      setUsesData((prev) => ({ ...prev, [row.id]: Array.isArray(data) ? data : [] }));
+    } catch { setUsesData((prev) => ({ ...prev, [row.id]: [] })); }
+    finally { setUsesLoading(false); }
+  };
 
   const load = async () => {
     setLoading(true); setError('');
@@ -938,17 +953,47 @@ const AdminRedeemCodes = ({ token }) => {
         )}
         {loading ? <div style={{ marginTop: 12 }}>Yükleniyor…</div> : (
           <table style={{ width: '100%', marginTop: 12, fontSize: 13 }}>
-            <thead><tr style={{ textAlign: 'left' }}><th>kod</th><th>tip</th><th>değer</th><th>kullanım</th><th>durum</th><th></th></tr></thead>
+            <thead><tr style={{ textAlign: 'left' }}><th>kod</th><th>tip</th><th>değer</th><th>kullanım</th><th>durum</th><th></th><th></th></tr></thead>
             <tbody>
-              {rows.map((r) => (
+              {rows.map((r) => [
                 <tr key={r.id}>
                   <td style={{ fontFamily: 'monospace' }}>{r.code}</td><td>{r.tip}</td>
                   <td>{r.tip === 'balance' ? `₺${Number(r.amount_tl)}` : pkgName(r.package_id)}</td>
                   <td>{r.used_count}/{r.max_uses}</td>
                   <td>{r.enabled ? 'Açık' : 'Kapalı'}</td>
                   <td><button onClick={() => toggle(r)}>{r.enabled ? 'Kapat' : 'Aç'}</button></td>
-                </tr>
-              ))}
+                  <td>
+                    {Number(r.used_count) > 0 && (
+                      <button onClick={() => toggleUses(r)} style={{ fontSize: 11, padding: '2px 8px' }}>
+                        {expandedUses === r.id ? '▲ gizle' : `▼ kim kullandı (${r.used_count})`}
+                      </button>
+                    )}
+                  </td>
+                </tr>,
+                expandedUses === r.id && (
+                  <tr key={`${r.id}-uses`}>
+                    <td colSpan={7} style={{ padding: '6px 0 10px 16px', background: 'var(--surface-2)' }}>
+                      {usesLoading && !usesData[r.id] ? <span style={{ fontSize: 12 }}>Yükleniyor…</span> : (
+                        <table style={{ fontSize: 12, width: '100%' }}>
+                          <thead><tr><th style={{ textAlign: 'left', fontWeight: 500 }}>e-posta</th><th style={{ textAlign: 'left', fontWeight: 500 }}>ad soyad</th><th style={{ textAlign: 'left', fontWeight: 500 }}>kullanım tarihi</th></tr></thead>
+                          <tbody>
+                            {(usesData[r.id] || []).length === 0
+                              ? <tr><td colSpan={3} style={{ color: 'var(--fg-muted)' }}>Henüz kullanılmamış.</td></tr>
+                              : (usesData[r.id] || []).map((u) => (
+                                <tr key={u.id}>
+                                  <td style={{ fontFamily: 'monospace' }}>{u.email}</td>
+                                  <td>{u.ad_soyad || '—'}</td>
+                                  <td>{safeDate(u.used_at)}</td>
+                                </tr>
+                              ))
+                            }
+                          </tbody>
+                        </table>
+                      )}
+                    </td>
+                  </tr>
+                ),
+              ])}
             </tbody>
           </table>
         )}

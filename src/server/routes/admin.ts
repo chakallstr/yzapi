@@ -1393,6 +1393,21 @@ router.post("/redeem-codes/:id/toggle", async (req, res, next) => {
   }
 });
 
+router.get("/redeem-codes/:id/uses", async (req, res, next) => {
+  try {
+    const rows = await dbSql<{ id: string; used_at: string; email: string; ad_soyad: string | null }[]>`
+      SELECT rcu.id, rcu.used_at, u.email, u.ad_soyad
+      FROM redeem_code_uses rcu
+      JOIN users u ON u.id = rcu.user_id
+      WHERE rcu.code_id = ${req.params.id}::uuid
+      ORDER BY rcu.used_at DESC
+    `;
+    res.json(rows);
+  } catch (e) {
+    next(e);
+  }
+});
+
 // ── Hesap-teslim siparişleri (Faz 6) ─────────────────────────────────────────
 router.get("/delivery-orders", async (_req, res, next) => {
   try {
