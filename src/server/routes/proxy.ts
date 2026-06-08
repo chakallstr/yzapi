@@ -405,6 +405,7 @@ async function handleTextJsonEndpoint(
     const providerBody = {
       ...guard.guardedBody,
       model: runtimeConfig.strictCanonicalModelIds ? masterModel.id : String(model || masterModel.id),
+      user: userId,
     };
     // Per-model upstream routing: the model decides which provider profile serves
     // it (Claude → wellflow, GPT/Gemini/o-series + opus-4.8 → popusk); falls back to
@@ -575,6 +576,7 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
     const providerBody = {
       ...guard.guardedBody,
       model: runtimeConfig.strictCanonicalModelIds ? masterModel.id : String(model || masterModel.id),
+      user: userId,
     };
     // Per-model upstream routing (see handleTextJsonEndpoint): model → provider + failover.
     const chain = await resolveProviderChainForModel(masterModel.id);
@@ -816,6 +818,7 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
     const providerBody = {
       ...guard.guardedBody,
       model: runtimeConfig.strictCanonicalModelIds ? masterModel.id : String(chatBody.model || masterModel.id),
+      user: userId,
     };
     const chain = await resolveProviderChainForModel(masterModel.id);
     const activeProviderAdapter = await getActiveProviderAdapter();

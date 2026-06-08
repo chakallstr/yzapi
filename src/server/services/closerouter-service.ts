@@ -324,7 +324,7 @@ export async function forwardChat(
   const responseMs = Date.now() - start;
   const json = await readProviderJson(res);
 
-  logger.debug({ model: body.model, status: res.status, responseMs }, "ai provider chat");
+  logger.info({ model: providerBody.model, user: (providerBody as ChatRequest).user, providerHost: new URL(url).hostname, status: res.status, responseMs }, "upstream request dispatched");
 
   if (!res.ok) {
     const err = new Error(`AI provider ${res.status}`) as Error & { status: number; body: unknown };
@@ -396,6 +396,8 @@ export async function forwardChatStream(
     ctx.modelMap,
   );
   const runtimeConfig = await getRuntimeApiConfig();
+
+  logger.info({ model: providerBody.model, user: (providerBody as ChatRequest).user, providerHost: new URL(url).hostname, stream: true }, "upstream request dispatched");
 
   const upstream = await fetchWithRuntimeTimeout(url, {
     method: "POST",
