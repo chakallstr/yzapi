@@ -626,6 +626,7 @@ export const packages = pgTable("packages", {
   maxSureGun: integer("max_sure_gun"),
   birimFiyatUsdPer50: numeric("birim_fiyat_usd_per_50", { precision: 10, scale: 4 }),
   maxContextTokens: integer("max_context_tokens"),
+  tpmLimit: integer("tpm_limit"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });

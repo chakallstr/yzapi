@@ -10,6 +10,7 @@ import {
   tryReservePackageSlot,
   releasePackageSlot,
   recordPackageUsage,
+  consumeTpmOrDeny,
 } from "../services/entitlement-service.js";
 import { chargeImage } from "../services/image-billing-service.js";
 import { withImageSlot } from "../services/image-queue.js";
@@ -395,6 +396,13 @@ async function handleTextJsonEndpoint(
       billedViaPackage = false; entitlementId = undefined;
       throw new AppError(400, `Bağlam çok büyük (tahmini ${guard.contextTokens.toLocaleString("tr-TR")} token; bu paketin limiti ${pkgSlot.maxContextTokens.toLocaleString("tr-TR")} token). Lütfen bağlamınızı kısaltın.`);
     }
+    if (billedViaPackage && pkgSlot.tpmLimit && pkgSlot.packageId) {
+      if (!consumeTpmOrDeny(userId, pkgSlot.packageId, guard.contextTokens, pkgSlot.tpmLimit)) {
+        await releasePackageSlot(pkgSlot.entitlementId!);
+        billedViaPackage = false; entitlementId = undefined;
+        throw new RateLimitError(`Token/dakika limiti aşıldı (${pkgSlot.tpmLimit.toLocaleString("tr-TR")} token/dk). Lütfen bir dakika bekleyin.`);
+      }
+    }
     if (!billedViaPackage) {
       await reserveUsageBudget({
         userId,
@@ -567,6 +575,13 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       await releasePackageSlot(pkgSlot.entitlementId!);
       billedViaPackage = false; entitlementId = undefined;
       throw new AppError(400, `Bağlam çok büyük (tahmini ${guard.contextTokens.toLocaleString("tr-TR")} token; bu paketin limiti ${pkgSlot.maxContextTokens.toLocaleString("tr-TR")} token). Lütfen bağlamınızı kısaltın.`);
+    }
+    if (billedViaPackage && pkgSlot.tpmLimit && pkgSlot.packageId) {
+      if (!consumeTpmOrDeny(userId, pkgSlot.packageId, guard.contextTokens, pkgSlot.tpmLimit)) {
+        await releasePackageSlot(pkgSlot.entitlementId!);
+        billedViaPackage = false; entitlementId = undefined;
+        throw new RateLimitError(`Token/dakika limiti aşıldı (${pkgSlot.tpmLimit.toLocaleString("tr-TR")} token/dk). Lütfen bir dakika bekleyin.`);
+      }
     }
     if (!billedViaPackage) {
       await reserveUsageBudget({
@@ -826,6 +841,13 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
       await releasePackageSlot(pkgSlot.entitlementId!);
       billedViaPackage = false; entitlementId = undefined;
       throw new AppError(400, `Bağlam çok büyük (tahmini ${guard.contextTokens.toLocaleString("tr-TR")} token; bu paketin limiti ${pkgSlot.maxContextTokens.toLocaleString("tr-TR")} token). Lütfen bağlamınızı kısaltın.`);
+    }
+    if (billedViaPackage && pkgSlot.tpmLimit && pkgSlot.packageId) {
+      if (!consumeTpmOrDeny(userId, pkgSlot.packageId, guard.contextTokens, pkgSlot.tpmLimit)) {
+        await releasePackageSlot(pkgSlot.entitlementId!);
+        billedViaPackage = false; entitlementId = undefined;
+        throw new RateLimitError(`Token/dakika limiti aşıldı (${pkgSlot.tpmLimit.toLocaleString("tr-TR")} token/dk). Lütfen bir dakika bekleyin.`);
+      }
     }
     if (!billedViaPackage) {
       await reserveUsageBudget({

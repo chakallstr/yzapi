@@ -4,7 +4,24 @@ import { usageRecords } from "../db/schema.js";
 export interface PackageCoverage {
   covered: boolean;
   entitlementId?: string;
-  maxContextTokens?: number; // null/undefined = limitsiz
+  maxContextTokens?: number;
+  tpmLimit?: number;
+  packageId?: string;
+}
+
+// In-memory fixed-window TPM tracker keyed by "userId:packageId"
+interface TpmWindow { minute: number; tokens: number }
+const tpmTracker = new Map<string, TpmWindow>();
+
+/** Returns false if the TPM limit would be exceeded; records tokens on success. */
+export function consumeTpmOrDeny(userId: string, packageId: string, tokens: number, limit: number): boolean {
+  const key = `${userId}:${packageId}`;
+  const minute = Math.floor(Date.now() / 60_000);
+  const w = tpmTracker.get(key);
+  const current = w?.minute === minute ? w.tokens : 0;
+  if (current + tokens > limit) return false;
+  tpmTracker.set(key, { minute, tokens: current + tokens });
+  return true;
 }
 
 /** Salt-okunur: bu modeli kapsayan, süresi geçmemiş, bugün kotası dolmamış aktif hak var mı? */
@@ -23,7 +40,7 @@ export async function checkPackageCoverage(userId: string, modelId: string): Pro
 
 /** Atomik: en erken biten kapsayan haktan bir günlük slot rezerve et. */
 export async function tryReservePackageSlot(userId: string, modelId: string): Promise<PackageCoverage> {
-  const rows = await dbSql<{ id: string; max_context_tokens: number | null }[]>`
+  const rows = await dbSql<{ id: string; max_context_tokens: number | null; tpm_limit: number | null; package_id: string }[]>`
     UPDATE user_package_entitlements AS upe
     SET requests_today = CASE WHEN upe.last_reset_date < CURRENT_DATE THEN 1 ELSE upe.requests_today + 1 END,
         last_reset_date = CURRENT_DATE,
@@ -41,14 +58,16 @@ export async function tryReservePackageSlot(userId: string, modelId: string): Pr
         LIMIT 1
         FOR UPDATE SKIP LOCKED
       )
-    RETURNING upe.id, p.max_context_tokens
+    RETURNING upe.id, upe.package_id, p.max_context_tokens, p.tpm_limit
   `;
   if (rows.length) {
     const r = rows[0];
     return {
       covered: true,
       entitlementId: r.id,
+      packageId: r.package_id,
       maxContextTokens: r.max_context_tokens ?? undefined,
+      tpmLimit: r.tpm_limit ?? undefined,
     };
   }
   return { covered: false };
