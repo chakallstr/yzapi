@@ -209,7 +209,7 @@ const fmt = {
   usdPer:(n) => '$' + n.toFixed(n < 0.01 ? 4 : 2),
   usd6:  (n) => '$' + n.toFixed(n < 0.001 ? 6 : 4),
   try:   (n) => '₺' + n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-  num:   (n) => n.toLocaleString('tr-TR'),
+  num:   (n) => (n == null ? '0' : Number(n).toLocaleString('tr-TR')),
   ms:    (n) => Math.round(n) + 'ms',
   cost:  (n) => '$' + n.toFixed(5),
   // İnsan-dostu token sayısı: "9,1 milyon" / "454 bin" / "812".

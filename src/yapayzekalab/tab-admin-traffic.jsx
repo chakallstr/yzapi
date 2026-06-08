@@ -15,6 +15,7 @@ import {
   Legend,
 } from 'recharts';
 import { I, Card, Chip, Caption, modelMeta, fmt, useCountUp } from './shared.jsx';
+import { authFetch } from './auth-client.js';
 
 const TRAFFIC_WINDOWS = [
   { id: '24h', label: '24 saat' },
@@ -23,7 +24,7 @@ const TRAFFIC_WINDOWS = [
 ];
 
 const adminRequest = async (path, token) => {
-  const response = await fetch(path, {
+  const response = await authFetch(path, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   const text = await response.text();
