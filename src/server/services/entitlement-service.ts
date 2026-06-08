@@ -24,6 +24,19 @@ export function consumeTpmOrDeny(userId: string, packageId: string, tokens: numb
   return true;
 }
 
+/** Salt-okunur: günlük kota bakılmaksızın aktif (süresi dolmamış) paket var mı? */
+export async function hasActivePackageForModel(userId: string, modelId: string): Promise<boolean> {
+  const rows = await dbSql<{ id: string }[]>`
+    SELECT e.id FROM user_package_entitlements e
+    WHERE e.user_id = ${userId}::uuid
+      AND e.status = 'active'
+      AND e.expires_at > now()
+      AND e.allowed_models_snapshot @> ${JSON.stringify([modelId])}::jsonb
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
 /** Salt-okunur: bu modeli kapsayan, süresi geçmemiş, bugün kotası dolmamış aktif hak var mı? */
 export async function checkPackageCoverage(userId: string, modelId: string): Promise<boolean> {
   const rows = await dbSql<{ id: string }[]>`

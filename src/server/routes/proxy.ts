@@ -11,6 +11,7 @@ import {
   releasePackageSlot,
   recordPackageUsage,
   consumeTpmOrDeny,
+  hasActivePackageForModel,
 } from "../services/entitlement-service.js";
 import { chargeImage } from "../services/image-billing-service.js";
 import { withImageSlot } from "../services/image-queue.js";
@@ -404,6 +405,9 @@ async function handleTextJsonEndpoint(
       }
     }
     if (!billedViaPackage) {
+      if (await hasActivePackageForModel(userId, masterModel.id)) {
+        throw new AppError(402, "Günlük istek limitiniz doldu. Yeni paket alın ya da kredinizden kullanın.");
+      }
       await reserveUsageBudget({
         userId,
         apiKeyId,
@@ -584,6 +588,9 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       }
     }
     if (!billedViaPackage) {
+      if (await hasActivePackageForModel(userId, masterModel.id)) {
+        throw new AppError(402, "Günlük istek limitiniz doldu. Yeni paket alın ya da kredinizden kullanın.");
+      }
       await reserveUsageBudget({
         userId,
         apiKeyId,
@@ -850,6 +857,9 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
       }
     }
     if (!billedViaPackage) {
+      if (await hasActivePackageForModel(userId, masterModel.id)) {
+        throw new AppError(402, "Günlük istek limitiniz doldu. Yeni paket alın ya da kredinizden kullanın.");
+      }
       await reserveUsageBudget({
         userId,
         apiKeyId,
