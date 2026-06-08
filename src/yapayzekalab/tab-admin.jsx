@@ -1215,6 +1215,7 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
   const [rikaResellerLoading, setRikaResellerLoading] = useState(false);
   const [rikaModelBusy, setRikaModelBusy] = useState(false);
   const [rikaToggleBusy, setRikaToggleBusy] = useState(false);
+  const [gptRouting, setGptRouting] = useState(null); // 'rika' | 'popusk' | null
 
   const selectedModel = useMemo(
     () => modelPolicies.find((row) => row.modelId === selectedModelId) || modelPolicies[0] || null,
@@ -1425,18 +1426,22 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
     finally { setRikaResellerLoading(false); }
   };
 
-  const switchRikaModel = async (model) => {
+  const loadGptRouting = async () => {
+    try {
+      const data = await adminRequest('/api/admin/gpt-routing', token);
+      setGptRouting(data?.target ?? null);
+    } catch { /* yoksay */ }
+  };
+
+  const routeGptTo = async (target) => {
     setRikaModelBusy(true);
     setProfilesError('');
     try {
-      await adminRequest('/api/admin/provider-profiles', token, {
-        method: 'POST',
-        body: { id: 'rika', supportedModelIds: [model] },
-      });
-      await loadProfiles();
-      setProfileNotice(`Rika modeli → ${model}`);
+      await adminRequest('/api/admin/gpt-routing', token, { method: 'POST', body: { target } });
+      await loadGptRouting();
+      setProfileNotice(`GPT-5.5/5.4 → ${target === 'popusk' ? 'Popusk' : 'Rika'}`);
     } catch (e) {
-      setProfilesError(e.message || 'Model değiştirilemedi.');
+      setProfilesError(e.message || 'Rota değiştirilemedi.');
     } finally { setRikaModelBusy(false); }
   };
 
@@ -1463,6 +1468,7 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
       const rows = Array.isArray(list) ? list : [];
       setProfiles(rows);
       void loadRikaReseller();
+      void loadGptRouting();
       // Düzenleme taslaklarını yükle (anahtar asla geri gösterilmez → boş).
       setProfileDrafts((current) => {
         const next = { ...current };
@@ -1855,7 +1861,7 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
           {(() => {
             const rikaProfile = profiles.find((p) => p.id === 'rika');
             if (!rikaProfile) return null;
-            const activeModel = (rikaProfile.supportedModelIds || [])[0] || 'gpt-5.5';
+            const gptRoutedToRika = gptRouting === 'rika';
             return (
               <Card pad={18}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -1870,30 +1876,33 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
                   </Chip>
                 </div>
 
-                {/* Model geçişi */}
+                {/* GPT-5.5/5.4 yönlendirme */}
                 <div style={{ marginTop: 14 }}>
-                  <Caption>Aktif model</Caption>
+                  <Caption>GPT-5.5 / GPT-5.4 rotası</Caption>
                   <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                    {['gpt-5.5', 'gpt-5.4'].map((m) => (
-                      <button
-                        key={m}
-                        disabled={rikaModelBusy}
-                        onClick={() => switchRikaModel(m)}
-                        style={{
-                          padding: '8px 18px',
-                          borderRadius: 9,
-                          fontWeight: 600,
-                          fontSize: 13,
-                          background: activeModel === m ? 'var(--ink)' : 'var(--surface-2)',
-                          color: activeModel === m ? '#fff' : 'var(--ink)',
-                          border: activeModel === m ? 'none' : '1px solid var(--border)',
-                          opacity: rikaModelBusy ? 0.6 : 1,
-                          cursor: rikaModelBusy ? 'default' : 'pointer',
-                        }}
-                      >
-                        {m}
-                      </button>
-                    ))}
+                    {[{ key: 'popusk', label: 'Popusk' }, { key: 'rika', label: 'Rika' }].map(({ key, label }) => {
+                      const isActive = key === 'rika' ? gptRoutedToRika : !gptRoutedToRika;
+                      return (
+                        <button
+                          key={key}
+                          disabled={rikaModelBusy || isActive}
+                          onClick={() => routeGptTo(key)}
+                          style={{
+                            padding: '8px 18px',
+                            borderRadius: 9,
+                            fontWeight: 600,
+                            fontSize: 13,
+                            background: isActive ? 'var(--ink)' : 'var(--surface-2)',
+                            color: isActive ? '#fff' : 'var(--ink)',
+                            border: isActive ? 'none' : '1px solid var(--border)',
+                            opacity: (rikaModelBusy || isActive) ? 0.7 : 1,
+                            cursor: (rikaModelBusy || isActive) ? 'default' : 'pointer',
+                          }}
+                        >
+                          {isActive ? `✓ ${label}` : label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
