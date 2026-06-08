@@ -107,6 +107,7 @@ describe("admin traffic analytics service", () => {
           timestamp: new Date("2026-05-29T08:00:00.000Z"),
           billedVia: "balance",
           entitlementId: null,
+          providerProfileId: null,
         },
         {
           id: "u2",
@@ -130,6 +131,7 @@ describe("admin traffic analytics service", () => {
           timestamp: new Date("2026-05-29T07:00:00.000Z"),
           billedVia: "balance",
           entitlementId: null,
+          providerProfileId: null,
         },
         {
           id: "u3",
@@ -153,6 +155,7 @@ describe("admin traffic analytics service", () => {
           timestamp: new Date("2026-05-28T18:00:00.000Z"),
           billedVia: "balance",
           entitlementId: null,
+          providerProfileId: null,
         },
       ],
       transactionRows: [

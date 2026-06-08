@@ -85,6 +85,34 @@ function modelInfo(modelId: string, metaMap: Map<string, ModelMetaEntry> = MODEL
   return metaMap.get(canonical) ?? { label: canonical, provider: "unknown", providerSlug: "unknown" };
 }
 
+// Provider profil ID'si doğrudan bilindiğinde model-tabanlı çıkarıma gerek kalmaz.
+const PROFILE_DISPLAY: Record<string, { name: string; slug: string }> = {
+  rika: { name: "Rika", slug: "rika" },
+};
+
+function effectiveProviderInfo(
+  modelId: string,
+  profileId: string | null | undefined,
+  metaMap: Map<string, ModelMetaEntry>,
+): { provider: string; providerSlug: string } {
+  if (profileId && PROFILE_DISPLAY[profileId]) {
+    const entry = PROFILE_DISPLAY[profileId];
+    return { provider: entry.name, providerSlug: entry.slug };
+  }
+  const info = modelInfo(modelId, metaMap);
+  return { provider: info.provider, providerSlug: info.providerSlug };
+}
+
+function extractCachedTokens(rawUsageJson: unknown): number {
+  if (!rawUsageJson || typeof rawUsageJson !== "object") return 0;
+  const providerRaw = (rawUsageJson as Record<string, unknown>).providerRaw as Record<string, unknown> | undefined;
+  if (!providerRaw) return 0;
+  const details = providerRaw.prompt_tokens_details as Record<string, unknown> | undefined;
+  if (!details) return 0;
+  const ct = details.cached_tokens;
+  return typeof ct === "number" ? ct : 0;
+}
+
 function buildTopModels(modelUsage: Map<string, number>, metaMap: Map<string, ModelMetaEntry>, limit = 3) {
   return [...modelUsage.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -198,7 +226,9 @@ export function computeAdminTrafficAnalytics(
     const success = row.status === "success";
     const modelId = canonicalizeModelId(row.modelId) ?? row.modelId;
     const info = modelInfo(modelId, metaMap);
-    const providerKey = info.providerSlug;
+    const providerInfoEff = effectiveProviderInfo(modelId, row.providerProfileId, metaMap);
+    const providerKey = providerInfoEff.providerSlug;
+    const cachedTokens = extractCachedTokens(row.rawUsageJson);
 
     overview.totalRequests += 1;
     overview.successfulRequests += success ? 1 : 0;
@@ -264,13 +294,14 @@ export function computeAdminTrafficAnalytics(
 
     const providerCurrent = providerAgg.get(providerKey) ?? {
       id: providerKey,
-      name: info.provider,
+      name: providerInfoEff.provider,
       requestCount: 0,
       successCount: 0,
       errorCount: 0,
       inputTokens: 0,
       outputTokens: 0,
       totalTokens: 0,
+      cachedTokens: 0,
       costTL: 0,
       costUsd: 0,
       responseMsTotal: 0,
@@ -286,6 +317,7 @@ export function computeAdminTrafficAnalytics(
     providerCurrent.inputTokens += inputTokens;
     providerCurrent.outputTokens += outputTokens;
     providerCurrent.totalTokens += totalTokens;
+    providerCurrent.cachedTokens += cachedTokens;
     providerCurrent.costTL += costTL;
     providerCurrent.costUsd += costUsd;
     providerCurrent.responseMsTotal += row.responseMs ?? 0;
@@ -412,6 +444,8 @@ export function computeAdminTrafficAnalytics(
       avgResponseMs: row.requestCount ? Math.round(row.responseMsTotal / row.requestCount) : 0,
       uniqueUsers: row.uniqueUsersSet.size,
       successRate: row.requestCount ? round2((row.successCount / row.requestCount) * 100) : 0,
+      costTL: round2(row.costTL),
+      costUsd: round2(row.costUsd),
     }))
     .sort((a, b) => b.requestCount - a.requestCount || b.costTL - a.costTL)
     .map(({ uniqueUsersSet, responseMsTotal, ...row }) => row);
@@ -469,6 +503,35 @@ export function computeAdminTrafficAnalytics(
       topProvider: buildTopProvider(row.providerUsage),
     }))
     .sort((a, b) => b.requestCount - a.requestCount || b.totalCostTL - a.totalCostTL);
+
+  const rikaRequests = usageRows
+    .filter((row) => row.providerProfileId === "rika")
+    .slice()
+    .sort((a, b) => (toDate(b.timestamp)?.getTime() ?? 0) - (toDate(a.timestamp)?.getTime() ?? 0))
+    .slice(0, 200)
+    .map((row) => {
+      const user = userMap.get(row.userId);
+      const key = row.apiKeyId ? apiKeyMap.get(row.apiKeyId) : null;
+      const modelId = canonicalizeModelId(row.modelId) ?? row.modelId;
+      const info = modelInfo(modelId, metaMap);
+      return {
+        id: row.id,
+        requestId: row.requestId,
+        userId: row.userId,
+        userCode: toUserCode(row.userId),
+        email: user?.email ?? "",
+        maskedKey: key?.maskedKey ?? "—",
+        modelId,
+        modelName: info.label,
+        inputTokens: row.inputUsage ?? 0,
+        outputTokens: row.outputUsage ?? 0,
+        cachedTokens: extractCachedTokens(row.rawUsageJson),
+        costTL: Number(row.costTL ?? 0),
+        status: row.status,
+        responseMs: row.responseMs,
+        timestamp: toIso(row.timestamp),
+      };
+    });
 
   const errorRows = usageRows
     .filter((row) => row.status !== "success")
@@ -542,6 +605,7 @@ export function computeAdminTrafficAnalytics(
     users: usersAgg,
     apiKeys: apiKeysAgg,
     errors,
+    rikaRequests,
   };
 }
 

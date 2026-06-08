@@ -263,6 +263,7 @@ async function settleBilling(opts: {
   responseMs: number;
   status: "success" | "error" | "stream_missing_usage";
   errorCode?: string;
+  profileId?: string;
 }): Promise<{ costTL: number; remainingTL: number }> {
   if (opts.billedViaPackage) {
     const isError = opts.status === "error";
@@ -298,6 +299,7 @@ async function settleBilling(opts: {
     responseMs: opts.responseMs,
     status: opts.status,
     errorCode: opts.errorCode,
+    profileId: opts.profileId,
   });
 }
 
@@ -411,6 +413,7 @@ async function handleTextJsonEndpoint(
     // it (Claude → wellflow, GPT/Gemini/o-series + opus-4.8 → popusk); falls back to
     // the active provider when the model is pinned to no enabled profile.
     const chain = await resolveProviderChainForModel(masterModel.id);
+    if (chain.primary.profileId === "rika") (providerBody as Record<string, unknown>).customerId = userId;
     const activeProviderAdapter = await getActiveProviderAdapter();
     const failover = await forwardWithFailover(chain, {}, (ctx, attempt) =>
       endpoint === "responses"
@@ -435,6 +438,7 @@ async function handleTextJsonEndpoint(
       rawUsageJson: usage,
       responseMs,
       status: "success",
+      profileId: failover.servedBy ?? undefined,
     });
 
     const { remainingUSD } = await getUserBalanceSnapshot(userId);
@@ -580,12 +584,13 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
     };
     // Per-model upstream routing (see handleTextJsonEndpoint): model → provider + failover.
     const chain = await resolveProviderChainForModel(masterModel.id);
+    if (chain.primary.profileId === "rika") (providerBody as Record<string, unknown>).customerId = userId;
     const activeProviderAdapter = await getActiveProviderAdapter();
 
     if (isStream) {
       res.setHeader("X-YZ-Request-Id", requestId);
-      const usage = (await forwardWithFailover(chain, { res }, (ctx, attempt) =>
-        activeProviderAdapter.forwardChatStream(providerBody as any, res, ctx, attempt))).result;
+      const { result: usage, servedBy: chatStreamProfileId } = await forwardWithFailover(chain, { res }, (ctx, attempt) =>
+        activeProviderAdapter.forwardChatStream(providerBody as any, res, ctx, attempt));
       const responseMs = Date.now() - start;
 
       const hasUsage = usage.promptTokens > 0 || usage.completionTokens > 0;
@@ -607,10 +612,11 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
         errorCode: streamStatus === "stream_missing_usage" ? "stream_missing_usage" : undefined,
         responseMs,
         status: streamStatus,
+        profileId: chatStreamProfileId ?? undefined,
       });
     } else {
-      const { raw, usage } = (await forwardWithFailover(chain, {}, (ctx, attempt) =>
-        activeProviderAdapter.forwardChat(providerBody as any, ctx, attempt))).result;
+      const { result: { raw, usage }, servedBy: chatProfileId } = await forwardWithFailover(chain, {}, (ctx, attempt) =>
+        activeProviderAdapter.forwardChat(providerBody as any, ctx, attempt));
       const responseMs = Date.now() - start;
 
       // Giriş token floor'u: yalnız sağlayıcı bozuk-düşük raporladığında (ör. cache alanı /
@@ -631,6 +637,7 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
         rawUsageJson: usage,
         responseMs,
         status: "success",
+        profileId: chatProfileId ?? undefined,
       });
 
       // Web-search auto-augment yapıldıysa: arama başına sabit $0.001 izole ücret
@@ -746,7 +753,22 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
 
   try {
     // 1) Responses isteğini chat/completions şemasına çevir (model slug alias dahil).
-    const chatBody = responsesRequestToChat(req.body as Record<string, unknown>);
+    const rawResponsesBody = req.body as Record<string, unknown>;
+    const customerId = typeof rawResponsesBody.customerId === "string" && rawResponsesBody.customerId.trim()
+      ? rawResponsesBody.customerId.trim()
+      : null;
+    const chatBody = responsesRequestToChat(rawResponsesBody);
+
+    // customerId varsa messages'ın başına (veya mevcut system mesajına) enjekte et.
+    if (customerId) {
+      const msgs = chatBody.messages as Array<Record<string, unknown>>;
+      const sysIdx = msgs.findIndex((m) => m.role === "system");
+      if (sysIdx >= 0) {
+        msgs[sysIdx] = { ...msgs[sysIdx], content: `Customer ID: ${customerId}\n\n${msgs[sysIdx].content ?? ""}` };
+      } else {
+        msgs.unshift({ role: "system", content: `Customer ID: ${customerId}` });
+      }
+    }
 
     // 2) Guard/billing pipeline'ı endpoint "chat" ile çalıştır (model çözümlemesi chat
     //    uçlarını kullanır; allowResponsesEndpoint toggle'ı buildRequestGuard'a verilir).
@@ -821,18 +843,19 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
       user: userId,
     };
     const chain = await resolveProviderChainForModel(masterModel.id);
+    if (chain.primary.profileId === "rika") (providerBody as Record<string, unknown>).customerId = userId;
     const activeProviderAdapter = await getActiveProviderAdapter();
 
     if (isStream) {
       res.setHeader("X-YZ-Request-Id", requestId);
-      const usage = (await forwardWithFailover(chain, { res }, (ctx, attempt) =>
+      const { result: usage, servedBy: responsesStreamProfileId } = await forwardWithFailover(chain, { res }, (ctx, attempt) =>
         activeProviderAdapter.forwardResponsesStream(
           providerBody as any,
           res,
           ctx,
           { id: requestId, model: masterModel!.id, createdAt },
           attempt,
-        ))).result;
+        ));
       const responseMs = Date.now() - start;
 
       const hasUsage = usage.promptTokens > 0 || usage.completionTokens > 0;
@@ -852,10 +875,11 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
         errorCode: streamStatus === "stream_missing_usage" ? "stream_missing_usage" : undefined,
         responseMs,
         status: streamStatus,
+        profileId: responsesStreamProfileId ?? undefined,
       });
     } else {
-      const { raw, usage } = (await forwardWithFailover(chain, {}, (ctx, attempt) =>
-        activeProviderAdapter.forwardChat(providerBody as any, ctx, attempt))).result;
+      const { result: { raw, usage }, servedBy: responsesProfileId } = await forwardWithFailover(chain, {}, (ctx, attempt) =>
+        activeProviderAdapter.forwardChat(providerBody as any, ctx, attempt));
       const responseMs = Date.now() - start;
 
       const billedPromptTokens = resolveBilledPromptTokens(usage.promptTokens, guard.contextTokens);
@@ -870,6 +894,7 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
         rawUsageJson: usage,
         responseMs,
         status: "success",
+        profileId: responsesProfileId ?? undefined,
       });
 
       const { remainingUSD } = await getUserBalanceSnapshot(userId);

@@ -342,6 +342,7 @@ export const usageRecords = pgTable(
     status: text("status").notNull().default("success"),
     billedVia: text("billed_via").notNull().default("balance"),
     entitlementId: uuid("entitlement_id"),
+    providerProfileId: text("provider_profile_id"),
     timestamp: timestamp("timestamp", { withTimezone: true }).notNull().default(sql`now()`),
   },
   (t) => [

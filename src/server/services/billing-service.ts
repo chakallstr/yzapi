@@ -220,6 +220,7 @@ export async function settleReservedUsage(opts: {
   upstreamRequestId?: string;
   rawUsageJson?: unknown;
   errorCode?: string;
+  profileId?: string;
 }): Promise<ChargeResult> {
   const existing = await findExistingCharge(opts.requestId);
   if (existing) return existing;
@@ -347,7 +348,8 @@ export async function settleReservedUsage(opts: {
         pricing_snapshot_json,
         error_code,
         response_ms,
-        status
+        status,
+        provider_profile_id
       ) VALUES (
         ${opts.userId}::uuid,
         ${opts.apiKeyId}::uuid,
@@ -365,7 +367,8 @@ export async function settleReservedUsage(opts: {
         ${JSON.stringify(meta.pricingSnapshot)}::jsonb,
         ${errorCode ?? null},
         ${opts.responseMs},
-        ${opts.status === "error" ? "error" : "success"}
+        ${opts.status === "error" ? "error" : "success"},
+        ${opts.profileId ?? null}
       )
     `;
 
@@ -391,8 +394,9 @@ export async function chargeUsage(opts: {
   upstreamRequestId?: string;
   rawUsageJson?: unknown;
   errorCode?: string;
+  profileId?: string;
 }): Promise<ChargeResult> {
-  const { userId, apiKeyId, model, usage, responseMs, status, requestId, upstreamRequestId, rawUsageJson, errorCode } = opts;
+  const { userId, apiKeyId, model, usage, responseMs, status, requestId, upstreamRequestId, rawUsageJson, errorCode, profileId } = opts;
 
   const existing = await findExistingCharge(requestId);
   if (existing) return existing;
@@ -427,6 +431,7 @@ export async function chargeUsage(opts: {
       errorCode: errorCode ?? (status === "stream_missing_usage" ? "stream_missing_usage" : undefined),
       responseMs,
       status,
+      providerProfileId: profileId,
     });
     return { costTL: 0, remainingTL };
   }
@@ -497,7 +502,8 @@ export async function chargeUsage(opts: {
         pricing_snapshot_json,
         error_code,
         response_ms,
-        status
+        status,
+        provider_profile_id
       ) VALUES (
         ${userId}::uuid,
         ${apiKeyId}::uuid,
@@ -515,7 +521,8 @@ export async function chargeUsage(opts: {
         ${JSON.stringify(pricingSnapshot)}::jsonb,
         ${errorCode ?? null},
         ${responseMs},
-        'success'
+        'success',
+        ${profileId ?? null}
       )
     `;
 
@@ -539,6 +546,7 @@ export async function chargeUsage(opts: {
       errorCode: "insufficient_balance",
       responseMs,
       status: "error",
+      providerProfileId: profileId,
     }).catch((e) => logger.error({ err: e }, "usageRecord insert failed (balance error)"));
 
     throw new InsufficientBalanceError("Insufficient balance to complete this request");

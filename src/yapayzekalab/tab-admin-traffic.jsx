@@ -166,6 +166,7 @@ const AdminTrafficAnalytics = ({ token, onOpenUser, onOpenApiKeys }) => {
     users: [],
     apiKeys: [],
     errors: null,
+    rikaRequests: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -474,6 +475,60 @@ const AdminTrafficAnalytics = ({ token, onOpenUser, onOpenApiKeys }) => {
                 <div key="5" style={trafficTableCell}><button onClick={() => onOpenUser?.(row)} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11 }}>Kullanıcı</button></div>,
               ]}
         />
+
+        {/* ─── Rika sağlayıcı bölümü (sadece admin) ─── */}
+        {(() => {
+          const rikaProvider = (data.providers || []).find((p) => p.id === 'rika');
+          const rikaRows = data.rikaRequests || [];
+          return (
+            <SectionCard
+              title={<span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>Rika <Chip tone="neutral" style={{ fontSize: 10 }}>sağlayıcı</Chip></span>}
+              sub="ai.rika.wtf — önbellek tokenları dahil tüm istekler"
+            >
+              {rikaProvider ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10, marginBottom: 16 }}>
+                  <MetricCard label="İstek" value={fmt.num(rikaProvider.requestCount)} />
+                  <MetricCard label="Hata" value={fmt.num(rikaProvider.errorCount)} />
+                  <MetricCard label="Input token" value={fmt.num(rikaProvider.totalInputTokens)} />
+                  <MetricCard label="Output token" value={fmt.num(rikaProvider.totalOutputTokens)} />
+                  <MetricCard label="Cache token" value={fmt.num(rikaProvider.cachedTokens || 0)} />
+                  <MetricCard label="Maliyet TL" value={`₺${Number(rikaProvider.costTL).toFixed(2)}`} />
+                </div>
+              ) : (
+                <div style={{ color: 'var(--ink-3)', fontSize: 13, marginBottom: 16 }}>Bu pencerede Rika isteği yok.</div>
+              )}
+
+              <TableCard
+                title="Rika İstekleri (son 200)"
+                sub="Kullanıcı bazında önbellek tokenları ve maliyet"
+                columns="minmax(160px, 1fr) 120px 90px 90px 90px 90px 80px 90px"
+                rows={rikaRows.slice(0, 200)}
+                empty="Rika isteği yok."
+                renderRow={(row) => row === 'header'
+                  ? [
+                      <Caption key="1">Kullanıcı</Caption>,
+                      <Caption key="2">Model</Caption>,
+                      <Caption key="3">Input</Caption>,
+                      <Caption key="4">Output</Caption>,
+                      <Caption key="5">Cache</Caption>,
+                      <Caption key="6">Maliyet TL</Caption>,
+                      <Caption key="7">Durum</Caption>,
+                      <Caption key="8">Zaman</Caption>,
+                    ]
+                  : [
+                      <div key="1" style={trafficTableCell}><div style={{ fontWeight: 600 }}>{row.email || row.userCode}</div><div style={{ fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{row.maskedKey}</div></div>,
+                      <div key="2" style={trafficTableCell}><div style={{ fontWeight: 500, fontSize: 11.5 }}>{row.modelName}</div><div style={{ fontSize: 10, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{row.modelId}</div></div>,
+                      <div key="3" className="tnum" style={trafficTableCell}>{fmt.num(row.inputTokens)}</div>,
+                      <div key="4" className="tnum" style={trafficTableCell}>{fmt.num(row.outputTokens)}</div>,
+                      <div key="5" className="tnum" style={{ ...trafficTableCell, color: row.cachedTokens > 0 ? 'var(--green)' : undefined }}>{fmt.num(row.cachedTokens)}</div>,
+                      <div key="6" className="tnum" style={trafficTableCell}>₺{Number(row.costTL).toFixed(4)}</div>,
+                      <div key="7" style={trafficTableCell}><Chip tone={row.status === 'success' ? 'green' : 'red'} style={{ fontSize: 10 }}>{row.status}</Chip></div>,
+                      <div key="8" style={{ ...trafficTableCell, fontSize: 10.5, color: 'var(--ink-3)' }}>{row.timestamp ? new Date(row.timestamp).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</div>,
+                    ]}
+              />
+            </SectionCard>
+          );
+        })()}
       </div>
     </div>
   );
