@@ -3,6 +3,7 @@ import {
   I, Card, Chip, Caption, PulseDot,
   PROVIDERS, MODELS, modelMeta, fmt, useCountUp,
 } from './shared.jsx';
+import { authFetch } from './auth-client.js';
 import { AdminTrafficAnalytics } from './tab-admin-traffic.jsx';
 import { AdminMaliIzleme } from './tab-admin-mali-izleme.jsx';
 import { AdminGozcu } from './tab-admin-gozcu.jsx';
@@ -87,7 +88,8 @@ const adminRequest = async (path, token, options = {}) => {
   if (token) headers.Authorization = `Bearer ${token}`;
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
 
-  const response = await fetch(path, {
+  // authFetch handles 401 → token refresh → retry automatically
+  const response = await authFetch(path, {
     ...options,
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
@@ -470,6 +472,8 @@ const AdminUsers = ({ users, token, refresh, meRole = '', focusUserId = '', focu
                           <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Input token</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{fmt.num(detail.summary?.totalInputTokens || 0)}</div></div>
                           <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Output token</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{fmt.num(detail.summary?.totalOutputTokens || 0)}</div></div>
                           <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Toplam harcama</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{money(detail.summary?.totalCostTL || 0)}</div></div>
+                          <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Paket isteği</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{fmt.num(detail.summary?.packageRequests || 0)}</div></div>
+                          <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Aktif paket</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{detail.summary?.activeEntitlements || 0}</div></div>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 16 }}>

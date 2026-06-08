@@ -582,7 +582,7 @@ router.get("/users/:id/detail", async (req, res, next) => {
     if (!userRows.length) return res.status(404).json({ error: "Kullanıcı bulunamadı" });
 
     const user = userRows[0];
-    const [keyRows, usageRows, txRows, usageAggRows] = await Promise.all([
+    const [keyRows, usageRows, txRows, usageAggRows, pkgAggRows] = await Promise.all([
       db.select().from(apiKeys).where(eq(apiKeys.userId, id)).orderBy(desc(apiKeys.olusturma)),
       db.select().from(usageRecords).where(eq(usageRecords.userId, id)).orderBy(desc(usageRecords.timestamp)).limit(50),
       db.select().from(transactions).where(eq(transactions.userId, id)).orderBy(desc(transactions.timestamp)).limit(50),
@@ -606,6 +606,11 @@ router.get("/users/:id/detail", async (req, res, next) => {
           COALESCE(SUM(cost_tl), 0) AS total_cost_tl
         FROM usage_records
         WHERE user_id = ${id}::uuid
+      `,
+      dbSql<{ package_requests: string; active_entitlements: string }[]>`
+        SELECT
+          (SELECT COUNT(*) FROM usage_records WHERE user_id = ${id}::uuid AND billed_via = 'package') AS package_requests,
+          (SELECT COUNT(*) FROM user_package_entitlements WHERE user_id = ${id}::uuid AND status = 'active' AND expires_at > now()) AS active_entitlements
       `,
     ]);
 
@@ -655,6 +660,7 @@ router.get("/users/:id/detail", async (req, res, next) => {
     const totalOutputTokens = Number(agg.total_output_tokens);
     const totalCostTL = Number(agg.total_cost_tl);
     const userCode = user.id ? `u-${String(user.id).replace(/-/g, "").slice(0, 8)}` : null;
+    const pkgAgg = pkgAggRows[0] ?? { package_requests: "0", active_entitlements: "0" };
 
     res.json({
       user: serializeUser(user),
@@ -669,6 +675,8 @@ router.get("/users/:id/detail", async (req, res, next) => {
         totalCostTL,
         activeApiKeyCount: keyRows.filter((row) => row.aktif).length,
         totalApiKeyCount: keyRows.length,
+        packageRequests: Number(pkgAgg.package_requests),
+        activeEntitlements: Number(pkgAgg.active_entitlements),
       },
       apiKeys: keyRows.map((row) => serializeApiKey(row, user.email)),
       usageRecords: usageRows.map(serializeUsageRecord),
