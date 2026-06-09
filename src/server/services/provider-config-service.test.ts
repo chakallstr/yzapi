@@ -20,7 +20,7 @@ vi.mock("../lib/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { systemApiConfig } from "../db/schema.js";
+import { providerProfiles, systemApiConfig } from "../db/schema.js";
 import { aiProviderBaseUrl, aiProviderApiKey } from "../lib/env.js";
 import { encryptApiKey, decryptApiKey } from "./api-key-service.js";
 import { BadRequestError } from "../lib/errors.js";
@@ -32,6 +32,8 @@ import {
   getProviderConfigAdminView,
   invalidateProviderConfigCache,
   isValidProviderBaseUrl,
+  resolveProviderChainForModel,
+  resolveSupportedModelIds,
 } from "./provider-config-service.js";
 import { resetFakeDb, seedTable, getTableRows } from "./__fakes__/fake-db.js";
 
@@ -81,6 +83,31 @@ describe("provider-config-service — properties", () => {
       }),
       { numRuns: 100 },
     );
+  });
+
+  it("matches dash provider support to dotted canonical added-model ids", async () => {
+    seedTable(providerProfiles, [
+      {
+        id: "wellflow",
+        label: "Wellflow",
+        baseUrl: "https://api.wellflow.test/v1",
+        apiKeyCipher: encryptApiKey("sk-profile-test"),
+        enabled: true,
+        supportedModelIds: ["claude-opus-4-8"],
+        modelMap: { "claude-opus-4.8": "claude-opus-4-8" },
+        fallbackProviderId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+
+    expect(await resolveSupportedModelIds()).toEqual(
+      expect.arrayContaining(["claude-opus-4-8", "claude-opus-4.8"]),
+    );
+
+    const chain = await resolveProviderChainForModel("claude-opus-4.8");
+
+    expect(chain.primary.profileId).toBe("wellflow");
   });
 
   // Feature: panel-provider-model-config, Property 3: For any persisted system_api_config state, resolveProviderBaseUrl returns the persisted provider_base_url when non-empty otherwise the env base URL; likewise resolveProviderApiKey returns the decrypted cipher when present otherwise the env key.

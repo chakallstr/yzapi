@@ -8,6 +8,8 @@ import {
   buildV1ModelsResponse,
   buildV1ProvidersResponse,
   createV1CatalogRouter,
+  filterV1ClientCatalogEntries,
+  V1_CLIENT_MODEL_IDS,
 } from "./v1-catalog.js";
 
 describe("public /v1 catalog contract", () => {
@@ -88,6 +90,51 @@ describe("public /v1 catalog contract", () => {
 
     const serialized = JSON.stringify(response);
     expect(serialized).not.toMatch(/api[_-]?key|secret|upstream|base_url|routing|weight/i);
+  });
+
+  it("curates /v1 model discovery for OpenAI-compatible editor clients", async () => {
+    const opus48 = {
+      ...MASTER_MODELS[0],
+      id: "claude-opus-4.8",
+      name: "Claude Opus 4.8",
+    };
+    const entries = [opus48, ...MASTER_MODELS].map((model) => ({
+      model,
+      enabled: true,
+    }));
+    const app = express();
+    app.use("/v1", createV1CatalogRouter(async () => entries));
+    const server = createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("test server address unavailable");
+    }
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+
+    try {
+      const models = await fetch(`${baseUrl}/v1/models`);
+      expect(models.status).toBe(200);
+      const payload = await models.json();
+      const ids = payload.data.map((model: { id: string }) => model.id);
+
+      expect(ids).toEqual(V1_CLIENT_MODEL_IDS);
+      expect(ids).toHaveLength(9);
+      expect(ids).toContain("claude-opus-4.8");
+      expect(ids).toContain("gpt-5.5");
+      expect(ids).toContain("gpt-5.4");
+      expect(ids).not.toContain("gpt-5.5-2026-04-23");
+      expect(ids).not.toContain("gpt-5.1");
+      expect(ids).not.toContain("gemini-3.1-pro-preview");
+
+      const count = await fetch(`${baseUrl}/v1/models/count`);
+      expect(await count.json()).toEqual({ count: V1_CLIENT_MODEL_IDS.length });
+      expect(filterV1ClientCatalogEntries(entries).map((entry) => entry.model.id)).toEqual(ids);
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve());
+      });
+    }
   });
 
   it("mounts catalog before authenticated proxy routes and keeps proxy auth after the allowlist", () => {

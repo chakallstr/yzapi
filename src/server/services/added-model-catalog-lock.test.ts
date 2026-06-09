@@ -15,15 +15,17 @@ vi.mock("../db/client.js", async () => {
 });
 
 import { MASTER_MODELS } from "../../master-models.js";
-import { addedModels } from "../db/schema.js";
+import { addedModels, providerProfiles } from "../db/schema.js";
 import {
   createAddedModel,
   deleteAddedModel,
+  getActiveCatalogModels,
   getMergedCatalogModels,
   isMasterModelId,
   type AddedModelInput,
 } from "./added-model-service.js";
-import { resetFakeDb } from "./__fakes__/fake-db.js";
+import { invalidateProviderConfigCache } from "./provider-config-service.js";
+import { resetFakeDb, seedTable } from "./__fakes__/fake-db.js";
 
 // Snapshot the canonical 42 ids and a deep price snapshot taken ONCE at module
 // load, so the property can prove MASTER_MODELS never drifts across operations.
@@ -59,6 +61,7 @@ const opArb = fc.oneof(
 
 beforeEach(() => {
   resetFakeDb();
+  invalidateProviderConfigCache();
 });
 
 describe("MASTER_MODELS 42-lock + additive-only — properties", () => {
@@ -110,5 +113,34 @@ describe("MASTER_MODELS 42-lock + additive-only — properties", () => {
       }),
       { numRuns: 100 },
     );
+  });
+
+  it("matches provider dash aliases to dotted added-model ids in the active catalog", async () => {
+    await createAddedModel({
+      modelId: "claude-opus-4.8",
+      name: "Claude Opus 4.8",
+      providerLabel: "Anthropic",
+      inputUsd: 1.4,
+      outputUsd: 7,
+      enabled: true,
+    });
+    seedTable(providerProfiles, [
+      {
+        id: "wellflow",
+        label: "Wellflow",
+        baseUrl: "https://api.wellflow.test/v1",
+        apiKeyCipher: null,
+        enabled: true,
+        supportedModelIds: ["claude-opus-4-8"],
+        modelMap: { "claude-opus-4.8": "claude-opus-4-8" },
+        fallbackProviderId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+
+    const active = await getActiveCatalogModels();
+
+    expect(active.map((model) => model.id)).toContain("claude-opus-4.8");
   });
 });

@@ -28,6 +28,26 @@ export interface V1CatalogEntry {
   enabled: boolean;
 }
 
+export const V1_CLIENT_MODEL_IDS = [
+  "claude-opus-4.8",
+  "claude-opus-4-7",
+  "claude-opus-4-6",
+  "claude-sonnet-4-6",
+  "gpt-5.5",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.4-nano",
+  "o4-mini",
+] as const;
+
+export function filterV1ClientCatalogEntries(entries: V1CatalogEntry[]): V1CatalogEntry[] {
+  const byId = new Map(entries.filter((entry) => entry.enabled).map((entry) => [entry.model.id, entry]));
+  return V1_CLIENT_MODEL_IDS.flatMap((modelId) => {
+    const entry = byId.get(modelId);
+    return entry ? [entry] : [];
+  });
+}
+
 function providerSlug(model: MasterModel): string {
   return model.providerSlug ?? model.provider.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
@@ -184,7 +204,7 @@ export function createV1CatalogRouter(loadEntries: () => Promise<V1CatalogEntry[
 
   router.get("/models", async (_req, res, next) => {
     try {
-      res.json(buildV1ModelsResponse(await loadEntries()));
+      res.json(buildV1ModelsResponse(filterV1ClientCatalogEntries(await loadEntries())));
     } catch (e) {
       next(e);
     }
@@ -192,7 +212,7 @@ export function createV1CatalogRouter(loadEntries: () => Promise<V1CatalogEntry[
 
   router.get("/models/count", async (_req, res, next) => {
     try {
-      res.json(buildV1ModelCountResponse(await loadEntries()));
+      res.json(buildV1ModelCountResponse(filterV1ClientCatalogEntries(await loadEntries())));
     } catch (e) {
       next(e);
     }
@@ -200,7 +220,7 @@ export function createV1CatalogRouter(loadEntries: () => Promise<V1CatalogEntry[
 
   router.get("/providers", async (_req, res, next) => {
     try {
-      res.json(buildV1ProvidersResponse(await loadEntries()));
+      res.json(buildV1ProvidersResponse(filterV1ClientCatalogEntries(await loadEntries())));
     } catch (e) {
       next(e);
     }

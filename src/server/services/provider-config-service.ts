@@ -10,6 +10,7 @@
 // Interfaces" §1 and §6.
 
 import { eq } from "drizzle-orm";
+import { canonicalizeModelId } from "../../master-models.js";
 import { db } from "../db/client.js";
 import { systemApiConfig, providerProfiles } from "../db/schema.js";
 import { aiProviderBaseUrl, aiProviderApiKey } from "../lib/env.js";
@@ -219,6 +220,30 @@ function parseStringRecord(value: unknown): Record<string, string> {
   return out;
 }
 
+function addSupportedModelIdAliases(target: Set<string>, modelId: string): void {
+  const trimmed = modelId.trim();
+  if (!trimmed) return;
+  target.add(trimmed);
+  const canonical = canonicalizeModelId(trimmed);
+  if (canonical && canonical.trim()) target.add(canonical);
+}
+
+function providerSupportsModelId(supportedModelIds: string[], canonicalModelId: string): boolean {
+  const canonicalTarget = canonicalizeModelId(canonicalModelId) ?? canonicalModelId;
+  const aliases = new Set<string>();
+  addSupportedModelIdAliases(aliases, canonicalModelId);
+  addSupportedModelIdAliases(aliases, canonicalTarget);
+
+  for (const supportedId of supportedModelIds) {
+    const supportedAliases = new Set<string>();
+    addSupportedModelIdAliases(supportedAliases, supportedId);
+    for (const alias of aliases) {
+      if (supportedAliases.has(alias)) return true;
+    }
+  }
+  return false;
+}
+
 // ── All-enabled-profiles read (per-model routing + UNION catalog) ─────────────
 
 // Reads every enabled provider_profiles row with a non-empty base URL, parsed +
@@ -360,7 +385,7 @@ export async function resolveSupportedModelIds(): Promise<string[] | null> {
   if (profiles.length === 0) return null;
   const union = new Set<string>();
   for (const p of profiles) {
-    for (const id of p.supportedModelIds) union.add(id);
+    for (const id of p.supportedModelIds) addSupportedModelIdAliases(union, id);
   }
   return [...union];
 }
@@ -394,7 +419,7 @@ export interface ProviderChain {
 // See docs/superpowers/specs/2026-06-05-provider-failover-design.md §3.2.
 export async function resolveProviderChainForModel(canonicalModelId: string): Promise<ProviderChain> {
   const profiles = await readAllEnabledProfiles();
-  const match = profiles.find((p) => p.supportedModelIds.includes(canonicalModelId));
+  const match = profiles.find((p) => providerSupportsModelId(p.supportedModelIds, canonicalModelId));
 
   if (match && match.apiKey) {
     const primary: ProviderContext = {

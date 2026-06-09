@@ -253,11 +253,15 @@ console.log(resp.choices[0].message.content);
         "apiKey": "yzk_live_SENIN_ANAHTARIN"
       },
       "models": {
+        "claude-opus-4-8": { "name": "Claude Opus 4.8" },
         "claude-sonnet-4-6": { "name": "Claude Sonnet 4.6" },
         "claude-opus-4-7": { "name": "Claude Opus 4.7" },
+        "claude-opus-4-6": { "name": "Claude Opus 4.6" },
         "gpt-5.4": { "name": "GPT-5.4" },
         "gpt-5.5": { "name": "GPT-5.5" },
-        "gemini-3.1-pro-preview": { "name": "Gemini 3.1 Pro Preview" }
+        "gpt-5.4-mini": { "name": "GPT-5.4 Mini" },
+        "gpt-5.4-nano": { "name": "GPT-5.4 Nano" },
+        "o4-mini": { "name": "o4-mini" }
       }
     }
   }
@@ -266,7 +270,10 @@ console.log(resp.choices[0].message.content);
 
 > Diğer istemciler (Cline, Roo Code, Kilo Code, Cursor): hepsinde "OpenAI
 > Compatible" sağlayıcı seç, Base URL `https://yapayzekalab.org/v1`, API Key
-> `yzk_live_...`, model olarak katalogdaki bir ID.
+> `yzk_live_...`, model olarak `/v1/models` içinde dönen kısa listeden bir ID
+> seç. Önerilenler: `claude-opus-4-8`, `claude-opus-4-7`,
+> `claude-opus-4-6`, `claude-sonnet-4-6`, `gpt-5.5`, `gpt-5.4`,
+> `gpt-5.4-mini`, `gpt-5.4-nano`, `o4-mini`.
 
 ---
 
@@ -274,9 +281,9 @@ console.log(resp.choices[0].message.content);
 
 | Endpoint | Açıklama |
 |---|---|
-| `GET /v1/models` | Aktif model kataloğu |
-| `GET /v1/models/count` | Aktif model adedi |
-| `GET /v1/providers` | Sağlayıcı özeti |
+| `GET /v1/models` | Cline/RooCode/OpenAI-compatible istemciler için kısa aktif model kataloğu |
+| `GET /v1/models/count` | Kısa aktif model adedi |
+| `GET /v1/providers` | Kısa katalogdaki sağlayıcı özeti |
 | `GET /v1/balance` | Kalan TL ve USD bakiye |
 | `POST /v1/chat/completions` | Ana üretim endpointi (OpenAI formatı) |
 | `POST /v1/messages` | Anthropic-uyumlu mesaj endpointi (Claude Code) |

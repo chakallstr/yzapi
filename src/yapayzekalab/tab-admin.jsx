@@ -1264,7 +1264,7 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
   const [rikaResellerLoading, setRikaResellerLoading] = useState(false);
   const [rikaModelBusy, setRikaModelBusy] = useState(false);
   const [rikaToggleBusy, setRikaToggleBusy] = useState(false);
-  const [gptRouting, setGptRouting] = useState(null); // 'rika' | 'popusk' | null
+  const [gptRouting, setGptRouting] = useState(null); // 'primary' | 'backup' | null
 
   const selectedModel = useMemo(
     () => modelPolicies.find((row) => row.modelId === selectedModelId) || modelPolicies[0] || null,
@@ -1488,7 +1488,7 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
     try {
       await adminRequest('/api/admin/gpt-routing', token, { method: 'POST', body: { target } });
       await loadGptRouting();
-      setProfileNotice(`GPT-5.5/5.4 → ${target === 'popusk' ? 'Popusk' : 'Rika'}`);
+      setProfileNotice(`GPT-5.5/5.4 → ${target === 'primary' ? 'birincil sağlayıcı' : 'yedek sağlayıcı'}`);
     } catch (e) {
       setProfilesError(e.message || 'Rota değiştirilemedi.');
     } finally { setRikaModelBusy(false); }
@@ -1910,7 +1910,7 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
           {(() => {
             const rikaProfile = profiles.find((p) => p.id === 'rika');
             if (!rikaProfile) return null;
-            const gptRoutedToRika = gptRouting === 'rika';
+            const gptRoutedToBackup = gptRouting === 'backup' || gptRouting === 'rika';
             return (
               <Card pad={18}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -1929,8 +1929,8 @@ const AdminApiSettings = ({ token, apiKeys = [] }) => {
                 <div style={{ marginTop: 14 }}>
                   <Caption>GPT-5.5 / GPT-5.4 rotası</Caption>
                   <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                    {[{ key: 'popusk', label: 'Popusk' }, { key: 'rika', label: 'Rika' }].map(({ key, label }) => {
-                      const isActive = key === 'rika' ? gptRoutedToRika : !gptRoutedToRika;
+                    {[{ key: 'primary', label: 'Birincil' }, { key: 'backup', label: 'Yedek' }].map(({ key, label }) => {
+                      const isActive = key === 'backup' ? gptRoutedToBackup : !gptRoutedToBackup;
                       return (
                         <button
                           key={key}

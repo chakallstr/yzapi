@@ -361,26 +361,33 @@ router.post("/provider-profiles", async (req, res, next) => {
 // ── GPT-5.5/5.4 routing switch (Rika ↔ primary GPT provider) ─────────────
 const GPT55_ROUTE_MODELS = ['gpt-5.5', 'gpt-5.5-2026-04-23', 'gpt-5.4', 'gpt-5.4-2026-03-05'];
 const GPT_PRIMARY_ID = 'closerouter';
+type GptRoutingTarget = 'primary' | 'backup';
+
+function parseGptRoutingTarget(value: string): GptRoutingTarget | null {
+  if (value === 'primary' || value === 'popusk') return 'primary';
+  if (value === 'backup' || value === 'rika') return 'backup';
+  return null;
+}
 
 router.get("/gpt-routing", async (_req, res, next) => {
   try {
     const list = await listProviderProfiles();
     const primary = list.find((p) => p.id === GPT_PRIMARY_ID);
     const inPrimary = (primary?.supportedModelIds ?? []).includes('gpt-5.5');
-    res.json({ target: inPrimary ? 'popusk' : 'rika' });
+    res.json({ target: inPrimary ? 'primary' : 'backup' });
   } catch (e) { next(e); }
 });
 
 router.post("/gpt-routing", async (req, res, next) => {
   try {
-    const target = String((req.body ?? {}).target ?? '');
-    if (target !== 'rika' && target !== 'popusk') {
-      res.status(400).json({ error: 'target must be rika or popusk' }); return;
+    const target = parseGptRoutingTarget(String((req.body ?? {}).target ?? ''));
+    if (!target) {
+      res.status(400).json({ error: 'target must be primary or backup' }); return;
     }
     const list = await listProviderProfiles();
     const primary = list.find((p) => p.id === GPT_PRIMARY_ID);
     const current = primary?.supportedModelIds ?? [];
-    const next = target === 'popusk'
+    const next = target === 'primary'
       ? [...new Set([...current, ...GPT55_ROUTE_MODELS])]
       : current.filter((m) => !GPT55_ROUTE_MODELS.includes(m));
     await upsertProviderProfile({ id: GPT_PRIMARY_ID, supportedModelIds: next });
