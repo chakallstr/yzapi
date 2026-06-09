@@ -201,13 +201,12 @@ describe("billing edge cases (real PG)", () => {
       await cleanPackage(PKG);
     });
 
-    it("GAP-005: negative price package (admin data error, fiyat_tl=-10) — documents whether purchase is blocked or accepted", async () => {
+    it("GAP-005: negative price package (admin data error, fiyat_tl=-10) — service must reject, balance unchanged", async () => {
       const UID = "00005001-0000-0000-0000-000000000001";
       const PKG = "neg-pkg-minus-005";
       await cleanUser(UID);
       await cleanPackage(PKG);
       await seedUser(UID, "neg005@test.local", "10.0000");
-      // Insert with negative price (bypasses service validation, tests DB-level behavior)
       await dbSql`
         INSERT INTO packages (id, ad, kategori, aciklama, tip, gunluk_istek_limiti, sure_gun, allowed_models, fiyat_tl, enabled)
         VALUES (${PKG}, 'Neg', 'Test', '', 'request_limit', 10, 7, '["gpt-4o"]'::jsonb, -10, true)
@@ -215,25 +214,58 @@ describe("billing edge cases (real PG)", () => {
 
       const { purchasePackageWithBalance } = await import("../services/package-purchase-service.js");
 
-      let purchaseError: unknown = null;
-      let purchaseResult: any = null;
-      try {
-        purchaseResult = await purchasePackageWithBalance(UID, PKG, "key-neg-005");
-      } catch (e) {
-        purchaseError = e;
-      }
+      await expect(purchasePackageWithBalance(UID, PKG, "key-neg-005")).rejects.toThrow();
 
       const finalBalance = await getBalance(UID);
+      expect(finalBalance).toBe(10);
 
-      if (purchaseError) {
-        // Expected: service rejects negative price
-        expect(finalBalance).toBe(10);
-      } else {
-        // Document: negative price caused balance INCREASE (a bug to fix)
-        expect(purchaseResult).toBeTruthy();
-        // Flag: this is a critical regression — balance must not exceed original
-        expect(finalBalance).toBeLessThanOrEqual(10 + 10 + 1); // generous margin for doc purposes
-      }
+      await cleanUser(UID);
+      await cleanPackage(PKG);
+    });
+
+    it("GAP-014: configurable package purchase — fiyatTL = Math.ceil(limit/50) * birim * days * sellKur, exact debit", async () => {
+      const UID = "00014001-0000-0000-0000-000000000001";
+      const PKG = "cfg-pkg-014";
+      await cleanUser(UID);
+      await cleanPackage(PKG);
+
+      const cfgRows = await dbSql<{ live_kur: string; kur_buffer: string }[]>`
+        SELECT live_kur, kur_buffer FROM system_config WHERE id = 1 LIMIT 1
+      `;
+      const liveKur = Number(cfgRows[0]?.live_kur ?? 47);
+      const kurBuffer = Number(cfgRows[0]?.kur_buffer ?? 0.03);
+      const sellKur = liveKur * (1 + kurBuffer);
+
+      const birim = 0.90;
+      const customLimit = 100;
+      const customDays = 3;
+      const fiyatUsd = Math.ceil(customLimit / 50) * birim * customDays;
+      const expectedFiyatTL = Math.round(fiyatUsd * sellKur * 100) / 100;
+
+      const startBalance = Math.ceil(expectedFiyatTL) + 100;
+      await seedUser(UID, "cfg014@test.local", startBalance.toFixed(4));
+
+      await dbSql`
+        INSERT INTO packages (id, ad, kategori, aciklama, tip, gunluk_istek_limiti, sure_gun, allowed_models, fiyat_tl,
+                              enabled, is_configurable, min_gunluk_istek, max_gunluk_istek, min_sure_gun, max_sure_gun,
+                              birim_fiyat_usd_per_50)
+        VALUES (${PKG}, ${PKG}, 'Test', '', 'request_limit', 100, 7, '["gpt-4o"]'::jsonb, 0,
+                true, true, 50, 5000, 1, 30, ${birim})
+      `;
+
+      const { purchasePackageWithBalance } = await import("../services/package-purchase-service.js");
+      const result = await purchasePackageWithBalance(UID, PKG, "key-cfg-014", undefined, customLimit, customDays);
+
+      expect(result.entitlementId).toBeTruthy();
+      expect(result.newBalanceTL).toBeCloseTo(startBalance - expectedFiyatTL, 1);
+
+      const txRows = await dbSql<any[]>`SELECT miktar_tl FROM transactions WHERE user_id = ${UID}::uuid AND tip = 'paket_satin_alma'`;
+      expect(txRows.length).toBe(1);
+      expect(Math.abs(Number(txRows[0].miktar_tl))).toBeCloseTo(expectedFiyatTL, 1);
+
+      const entRows = await dbSql<any[]>`SELECT daily_limit_snapshot FROM user_package_entitlements WHERE user_id = ${UID}::uuid`;
+      expect(entRows.length).toBe(1);
+      expect(Number(entRows[0].daily_limit_snapshot)).toBe(customLimit);
 
       await cleanUser(UID);
       await cleanPackage(PKG);
