@@ -20,4 +20,17 @@ describe("admin user detail contract", () => {
     expect(adminUi).toContain("Bakiye hareketleri");
     expect(adminUi).toContain("API key oluştur");
   });
+
+  it("keeps admin users sorted newest-first by default and exposes sort controls", () => {
+    expect(adminRoute).toContain("sortAdminUsers");
+    expect(adminRoute).toContain('const DEFAULT_USER_SORT = "kayitTarihi_desc"');
+    expect(adminRoute).toContain("compareDateDesc");
+
+    expect(adminUi).toContain("USER_SORT_OPTIONS");
+    expect(adminUi).toContain("En yeni üyeler");
+    expect(adminUi).toContain("En eski üyeler");
+    expect(adminUi).toContain("En yüksek bakiye");
+    expect(adminUi).toContain("En çok istek");
+    expect(adminUi).toContain("Sıralama");
+  });
 });

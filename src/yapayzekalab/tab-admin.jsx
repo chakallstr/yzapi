@@ -33,6 +33,17 @@ const ADMIN_SECTIONS = [
   { id: 'animations', label: 'Animasyon', Ico: I.Sparkle },
 ];
 
+const USER_SORT_OPTIONS = [
+  { value: 'kayitTarihi_desc', label: 'En yeni üyeler' },
+  { value: 'kayitTarihi_asc', label: 'En eski üyeler' },
+  { value: 'sonAktivite_desc', label: 'Son aktif olanlar' },
+  { value: 'bakiye_desc', label: 'En yüksek bakiye' },
+  { value: 'bakiye_asc', label: 'En düşük bakiye' },
+  { value: 'istek_desc', label: 'En çok istek' },
+  { value: 'harcama_desc', label: 'En çok harcama' },
+  { value: 'email_asc', label: 'E-posta A-Z' },
+];
+
 const STATUS_TONE = {
   aktif: { bg: 'var(--ok-bg)', fg: '#047857', label: 'aktif' },
   yavaş: { bg: '#fff7ed', fg: '#c2410c', label: 'yavaş' },
@@ -270,6 +281,7 @@ const AdminDashboard = ({ dashboard, config, auditLogs, providers }) => {
 
 const AdminUsers = ({ users, token, refresh, meRole = '', focusUserId = '', focusNonce = '' }) => {
   const [q, setQ] = useState('');
+  const [sortBy, setSortBy] = useState('kayitTarihi_desc');
   const [openUserId, setOpenUserId] = useState('');
   const [detailById, setDetailById] = useState({});
   const [detailLoadingId, setDetailLoadingId] = useState('');
@@ -277,9 +289,25 @@ const AdminUsers = ({ users, token, refresh, meRole = '', focusUserId = '', focu
   const [draftById, setDraftById] = useState({});
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    if (!needle) return users;
-    return users.filter((u) => `${u.email} ${u.adSoyad}`.toLowerCase().includes(needle));
-  }, [q, users]);
+    const rows = needle
+      ? users.filter((u) => `${u.email} ${u.adSoyad}`.toLowerCase().includes(needle))
+      : users;
+    const toTime = (value) => {
+      const parsed = Date.parse(String(value || ''));
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const newestTie = (a, b) => toTime(b.kayitTarihiIso || b.kayitTarihi) - toTime(a.kayitTarihiIso || a.kayitTarihi) || String(a.email || '').localeCompare(String(b.email || ''), 'tr');
+    return [...rows].sort((a, b) => {
+      if (sortBy === 'kayitTarihi_asc') return toTime(a.kayitTarihiIso || a.kayitTarihi) - toTime(b.kayitTarihiIso || b.kayitTarihi) || String(a.email || '').localeCompare(String(b.email || ''), 'tr');
+      if (sortBy === 'sonAktivite_desc') return toTime(b.sonAktivite) - toTime(a.sonAktivite) || newestTie(a, b);
+      if (sortBy === 'bakiye_desc') return Number(b.bakiyeTL || 0) - Number(a.bakiyeTL || 0) || newestTie(a, b);
+      if (sortBy === 'bakiye_asc') return Number(a.bakiyeTL || 0) - Number(b.bakiyeTL || 0) || newestTie(a, b);
+      if (sortBy === 'istek_desc') return Number(b.toplamIstek || 0) - Number(a.toplamIstek || 0) || newestTie(a, b);
+      if (sortBy === 'harcama_desc') return Number(b.toplamHarcamaTL || 0) - Number(a.toplamHarcamaTL || 0) || newestTie(a, b);
+      if (sortBy === 'email_asc') return String(a.email || '').localeCompare(String(b.email || ''), 'tr') || newestTie(a, b);
+      return newestTie(a, b);
+    });
+  }, [q, sortBy, users]);
 
   const updateUser = async (user, patch) => {
     await adminRequest(`/api/admin/users/${user.id}`, token, { method: 'PATCH', body: patch });
@@ -389,7 +417,17 @@ const AdminUsers = ({ users, token, refresh, meRole = '', focusUserId = '', focu
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <Card pad={16}>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Kullanıcı ara…" style={inputStyle} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 1fr) minmax(190px, 240px)', gap: 10 }}>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Kullanıcı ara…" style={inputStyle} />
+          <label style={{ display: 'grid', gap: 5, fontSize: 11, color: 'var(--ink-3)' }}>
+            <span>Sıralama</span>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={inputStyle}>
+              {USER_SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
       </Card>
       <Card pad={0} style={{ overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 2fr) 120px 120px 120px 120px 160px', gap: 12, padding: '13px 16px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
@@ -2960,7 +2998,7 @@ const loadAdminData = async (token) => {
   ] = await Promise.all([
     adminRequest('/api/admin/me', token),
     adminRequest('/api/admin/dashboard', token),
-    adminRequest('/api/admin/users', token),
+    adminRequest('/api/admin/users?sort=kayitTarihi_desc', token),
     adminRequest('/api/admin/announcements', token),
     adminRequest('/api/admin/provider-durumu', token),
     adminRequest('/api/admin/kur-history', token),

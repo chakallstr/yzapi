@@ -60,10 +60,55 @@ import {
 const router = Router();
 const SINGLE_ADMIN_EMAIL = "cix.crazy666@gmail.com";
 const ALLOWED_TRAFFIC_WINDOWS = new Set<TrafficWindow>(["24h", "7d", "30d"]);
+const DEFAULT_USER_SORT = "kayitTarihi_desc";
+const ALLOWED_USER_SORTS = new Set([
+  "kayitTarihi_desc",
+  "kayitTarihi_asc",
+  "sonAktivite_desc",
+  "bakiye_desc",
+  "bakiye_asc",
+  "istek_desc",
+  "harcama_desc",
+  "email_asc",
+]);
 
 function parseTrafficWindow(raw: unknown): TrafficWindow {
   const value = String(raw ?? "24h") as TrafficWindow;
   return ALLOWED_TRAFFIC_WINDOWS.has(value) ? value : "24h";
+}
+
+function parseUserSort(raw: unknown): string {
+  const value = String(raw ?? DEFAULT_USER_SORT);
+  return ALLOWED_USER_SORTS.has(value) ? value : DEFAULT_USER_SORT;
+}
+
+function asTime(value: Date | string | null | undefined): number {
+  if (value instanceof Date) return value.getTime();
+  const parsed = Date.parse(String(value ?? ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function compareDateDesc(a: Date | string | null | undefined, b: Date | string | null | undefined): number {
+  return asTime(b) - asTime(a);
+}
+
+function compareTextAsc(a: string | null | undefined, b: string | null | undefined): number {
+  return String(a ?? "").localeCompare(String(b ?? ""), "tr", { sensitivity: "base" });
+}
+
+function sortAdminUsers(rows: Array<typeof users.$inferSelect>, sort: string) {
+  const selected = parseUserSort(sort);
+  return [...rows].sort((a, b) => {
+    const newestTie = compareDateDesc(a.kayitTarihi, b.kayitTarihi) || compareTextAsc(a.email, b.email);
+    if (selected === "kayitTarihi_asc") return asTime(a.kayitTarihi) - asTime(b.kayitTarihi) || compareTextAsc(a.email, b.email);
+    if (selected === "sonAktivite_desc") return compareDateDesc(a.sonAktivite, b.sonAktivite) || newestTie;
+    if (selected === "bakiye_desc") return Number(b.bakiyeTL) - Number(a.bakiyeTL) || newestTie;
+    if (selected === "bakiye_asc") return Number(a.bakiyeTL) - Number(b.bakiyeTL) || newestTie;
+    if (selected === "istek_desc") return Number(b.toplamIstek) - Number(a.toplamIstek) || newestTie;
+    if (selected === "harcama_desc") return Number(b.toplamHarcamaTL) - Number(a.toplamHarcamaTL) || newestTie;
+    if (selected === "email_asc") return compareTextAsc(a.email, b.email) || newestTie;
+    return newestTie;
+  });
 }
 
 // ── Helper: serialize timestamps to ISO strings ────────────────────────────────
@@ -77,6 +122,7 @@ function serializeUser(u: typeof users.$inferSelect) {
     toplamIstek: u.toplamIstek,
     durum: u.durum,
     kayitTarihi: u.kayitTarihi instanceof Date ? u.kayitTarihi.toISOString().split("T")[0] : String(u.kayitTarihi),
+    kayitTarihiIso: u.kayitTarihi instanceof Date ? u.kayitTarihi.toISOString() : String(u.kayitTarihi),
     sonAktivite: u.sonAktivite instanceof Date ? u.sonAktivite.toISOString() : String(u.sonAktivite),
     plan: u.plan,
     apiKeyCount: u.apiKeyCount,
@@ -566,7 +612,7 @@ router.delete("/model-overrides/:modelId", async (req, res, next) => {
 // ── Users ─────────────────────────────────────────────────────────────────────
 router.get("/users", async (req, res, next) => {
   try {
-    const { search, plan, durum } = req.query as Record<string, string>;
+    const { search, plan, durum, sort } = req.query as Record<string, string>;
     let rows = await db.select().from(users);
 
     if (search) {
@@ -577,6 +623,7 @@ router.get("/users", async (req, res, next) => {
     }
     if (plan) rows = rows.filter((u) => u.plan === plan);
     if (durum) rows = rows.filter((u) => u.durum === durum);
+    rows = sortAdminUsers(rows, sort);
 
     res.json(rows.map(serializeUser));
   } catch (e) { next(e); }
