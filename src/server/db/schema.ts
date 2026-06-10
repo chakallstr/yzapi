@@ -618,6 +618,8 @@ export const packages = pgTable("packages", {
   fiyatTL: numeric("fiyat_tl", { precision: 14, scale: 4 }).notNull(),
   fiyatUsd: numeric("fiyat_usd", { precision: 14, scale: 4 }),
   enabled: boolean("enabled").notNull().default(true),
+  // satista=false → katalogda görünür ama satın alınamaz ("en kısa sürede satışta")
+  satista: boolean("satista").notNull().default(true),
   displayOrder: integer("display_order").notNull().default(0),
   isConfigurable: boolean("is_configurable").notNull().default(false),
   minGunlukIstek: integer("min_gunluk_istek"),

@@ -1081,6 +1081,14 @@ const AdminPackages = ({ token }) => {
     } catch (e) { setError(e.message || 'Durum değiştirilemedi.'); }
   };
 
+  // satista=false → vitrinde "yakında satışta" (satın alma kapalı)
+  const toggleSale = async (row) => {
+    try {
+      await adminRequest(`/api/admin/packages/${encodeURIComponent(row.id)}`, token, { method: 'PATCH', body: { satista: row.satista === false } });
+      await load();
+    } catch (e) { setError(e.message || 'Satış durumu değiştirilemedi.'); }
+  };
+
   const remove = async (row) => {
     if (!window.confirm(`${row.id} paketi kapatılsın mı?`)) return;
     try {
@@ -1107,15 +1115,17 @@ const AdminPackages = ({ token }) => {
       <button disabled={saving} onClick={create}>{saving ? 'Ekleniyor…' : 'Paket Ekle'}</button>
       {loading ? <div style={{ marginTop: 12 }}>Yükleniyor…</div> : (
         <table style={{ width: '100%', marginTop: 12, fontSize: 13 }}>
-          <thead><tr style={{ textAlign: 'left' }}><th>id</th><th>ad</th><th>kategori</th><th>limit/gün</th><th>süre</th><th>₺</th><th>durum</th><th></th></tr></thead>
+          <thead><tr style={{ textAlign: 'left' }}><th>id</th><th>ad</th><th>kategori</th><th>limit/gün</th><th>süre</th><th>₺</th><th>durum</th><th>satış</th><th></th></tr></thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
                 <td>{r.id}</td><td>{r.ad}</td><td><Chip>{r.kategori}</Chip></td>
                 <td>{r.gunlukIstekLimiti}</td><td>{r.sureGun}g</td><td>{Number(r.fiyatTL)}</td>
                 <td>{r.enabled ? 'Açık' : 'Kapalı'}</td>
+                <td>{r.satista === false ? 'Yakında' : 'Satışta'}</td>
                 <td style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => toggle(r)}>{r.enabled ? 'Kapat' : 'Aç'}</button>
+                  <button onClick={() => toggleSale(r)}>{r.satista === false ? 'Satışa Aç' : 'Satışı Durdur'}</button>
                   <button onClick={() => remove(r)}>Sil</button>
                 </td>
               </tr>

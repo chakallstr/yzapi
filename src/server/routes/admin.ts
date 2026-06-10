@@ -1361,6 +1361,7 @@ router.post("/packages", async (req, res, next) => {
       fiyatTL: Number(b.fiyatTL),
       fiyatUsd: b.fiyatUsd != null ? Number(b.fiyatUsd) : null,
       enabled: b.enabled !== false,
+      satista: b.satista !== false,
       displayOrder: Number(b.displayOrder ?? 0),
     });
     await writeAudit("admin_package_create", created.id, `Paket oluşturuldu: ${created.id}`, req.user!.id);

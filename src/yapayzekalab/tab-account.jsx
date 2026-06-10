@@ -562,7 +562,7 @@ const AccountTab = ({ ctx }) => {
   const { tweaks, setTweak, goto } = ctx;
   const fallbackBalanceUSD = 0;
   const tlRate = tweaks.tlRate ?? 34.5;
-  const MIN_USD = 2;
+  const MIN_USD = 5;
 
   // Scroll to sub-section when goto changes (driven by UserMenu items)
   useEffect(() => {
@@ -1168,7 +1168,7 @@ const AccountTab = ({ ctx }) => {
 
           {/* Quick amounts */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
-            {[2, 10, 25, 50].map(a => (
+            {[5, 10, 25, 50].map(a => (
               <TopUpAmount key={a} amount={a} selected={!customAmount && topUp === a} tlRate={tlRate}
                            onSelect={(v) => { setTopUp(v); setCustomAmount(''); }} />
             ))}

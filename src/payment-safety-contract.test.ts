@@ -6,11 +6,13 @@ function source(path: string): string {
 }
 
 describe("payment safety contract", () => {
-  it("uses 250 TL as the default minimum top-up everywhere", () => {
+  it("uses a 5 USD minimum top-up (frontend + backend aligned) and 250 TL config defaults", () => {
     expect(source("./server/db/schema.ts")).toMatch(/minBakiyeTL:.*default\("250"\)/);
     expect(source("./server/db/seed.ts")).toContain('minBakiyeTL: "250"');
     expect(source("./server/routes/payments.ts")).toContain('minBakiyeTL: "250"');
-    expect(source("./yapayzekalab/tab-account.jsx")).toContain("const MIN_USD = 2");
+    // Min ödeme USD-bazlı: panel UI (MIN_USD) ile backend quote guard (MIN_TOPUP_USD) hizalı olmalı
+    expect(source("./server/routes/payments.ts")).toContain("const MIN_TOPUP_USD = 5");
+    expect(source("./yapayzekalab/tab-account.jsx")).toContain("const MIN_USD = 5");
     expect(source("./yapayzekalab/tab-account.jsx")).toContain("amountUsd");
   });
 

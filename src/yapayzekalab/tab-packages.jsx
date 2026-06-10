@@ -43,6 +43,8 @@ const StatusBadge = ({ durum }) => {
 // === Configurable paket kartı (Codex API gibi) =====================
 const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
   const isBusy = busy === pkg.id;
+  // satista=false → vitrinde ama satın alma kapalı ("en kısa sürede satışta")
+  const isComingSoon = pkg.satista === false;
   const meta = metaFor(pkg.kategori);
   const Ic = I[meta.icon] || I.Terminal;
 
@@ -215,17 +217,17 @@ const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
       {/* Satın al butonu */}
       <div style={{ padding: '0 18px 16px' }}>
         <button
-          disabled={isBusy || previewLoading || priceTL <= 0}
+          disabled={isBusy || previewLoading || priceTL <= 0 || isComingSoon}
           onClick={() => onBuy(pkg.id, limit, days)}
           style={{
             width: '100%', padding: '10px 16px', borderRadius: 9, border: 0,
-            background: (isBusy || previewLoading || priceTL <= 0)
+            background: (isBusy || previewLoading || priceTL <= 0 || isComingSoon)
               ? 'var(--border)'
               : `linear-gradient(135deg, ${meta.c1}, ${meta.c2})`,
-            color: (isBusy || previewLoading || priceTL <= 0) ? 'var(--ink-3)' : '#fff',
+            color: (isBusy || previewLoading || priceTL <= 0 || isComingSoon) ? 'var(--ink-3)' : '#fff',
             fontSize: 13, fontWeight: 600,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-            cursor: (isBusy || previewLoading || priceTL <= 0) ? 'default' : 'pointer',
+            cursor: (isBusy || previewLoading || priceTL <= 0 || isComingSoon) ? 'default' : 'pointer',
             opacity: (isBusy || previewLoading) ? 0.7 : 1,
             transition: 'opacity 0.15s',
           }}
@@ -234,8 +236,8 @@ const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" className="spin-slow">
               <path d="M21 12a9 9 0 1 1-6.219-8.56" />
             </svg>
-          ) : '⚡'}
-          {isBusy ? t('packages.buying') : `Detayları gör →`}
+          ) : isComingSoon ? '🕒' : '⚡'}
+          {isBusy ? t('packages.buying') : isComingSoon ? t('packages.comingSoonBtn') : `Detayları gör →`}
         </button>
       </div>
     </Card>
@@ -247,6 +249,8 @@ const PackageCard = ({ pkg, busy, onBuy, onActivateCode, t }) => {
   const isBusy = busy === pkg.id;
   const isDelivery = pkg.tip === 'account_delivery';
   const isTrial = pkg.kategori === 'Deneme';
+  // satista=false → vitrinde ama satın alma kapalı ("en kısa sürede satışta")
+  const isComingSoon = pkg.satista === false;
   // ₺0 = yalnız anahtar/kod ile verilir (doğrudan satın alınamaz, abuse engeli)
   const isCodeOnly = Number(pkg.fiyatTL) <= 0;
   const meta = metaFor(pkg.kategori);
@@ -287,6 +291,15 @@ const PackageCard = ({ pkg, busy, onBuy, onActivateCode, t }) => {
             fontSize: 9.5, fontWeight: 800, letterSpacing: 0.6, color: meta.c2,
             fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: 4,
           }}>🔑 {t('packages.trialBadge')}</div>
+        )}
+        {/* yakında satışta rozeti */}
+        {isComingSoon && (
+          <div style={{
+            position: 'absolute', top: 10, right: 10,
+            padding: '3px 9px', borderRadius: 999, background: 'rgba(255,255,255,0.95)',
+            fontSize: 9.5, fontWeight: 800, letterSpacing: 0.6, color: meta.c2,
+            fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: 4,
+          }}>🕒 {t('packages.comingSoonBadge')}</div>
         )}
       </div>
 
@@ -365,16 +378,16 @@ const PackageCard = ({ pkg, busy, onBuy, onActivateCode, t }) => {
       {/* Satın Al / Kod ile etkinleştir butonu — kategori renginde */}
       <div style={{ padding: '0 20px 18px' }}>
         <button
-          disabled={isBusy}
+          disabled={isBusy || isComingSoon}
           onClick={() => (isCodeOnly ? onActivateCode?.() : onBuy(pkg.id))}
           style={{
             width: '100%', padding: '10px 16px', borderRadius: 9,
-            background: isBusy ? 'var(--border)' : `linear-gradient(135deg, ${meta.c1}, ${meta.c2})`,
-            color: isBusy ? 'var(--ink-3)' : '#fff',
+            background: (isBusy || isComingSoon) ? 'var(--border)' : `linear-gradient(135deg, ${meta.c1}, ${meta.c2})`,
+            color: (isBusy || isComingSoon) ? 'var(--ink-3)' : '#fff',
             fontSize: 13, fontWeight: 600,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
             transition: 'opacity 0.15s, filter 0.15s', opacity: isBusy ? 0.7 : 1,
-            border: 0, cursor: isBusy ? 'default' : 'pointer',
+            border: 0, cursor: (isBusy || isComingSoon) ? 'default' : 'pointer',
           }}
         >
           {isBusy ? (
@@ -384,6 +397,8 @@ const PackageCard = ({ pkg, busy, onBuy, onActivateCode, t }) => {
               </svg>
               {t('packages.buying')}
             </>
+          ) : isComingSoon ? (
+            <>🕒 {t('packages.comingSoonBtn')}</>
           ) : (
             <>
               {isCodeOnly ? '🔑' : isDelivery ? '📦' : '⚡'}

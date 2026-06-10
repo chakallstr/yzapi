@@ -94,7 +94,7 @@ export async function purchasePackageWithBalance(
   }
 
   const pkgRows = await dbSql<any[]>`
-    SELECT id, ad, fiyat_tl, sure_gun, gunluk_istek_limiti, allowed_models, enabled, tip,
+    SELECT id, ad, fiyat_tl, sure_gun, gunluk_istek_limiti, allowed_models, enabled, satista, tip,
            is_configurable, min_gunluk_istek, max_gunluk_istek, min_sure_gun, max_sure_gun,
            birim_fiyat_usd_per_50
     FROM packages WHERE id = ${packageId} LIMIT 1
@@ -102,6 +102,8 @@ export async function purchasePackageWithBalance(
   if (!pkgRows.length) throw new AppError(404, "Paket bulunamadı");
   const pkg = pkgRows[0];
   if (!pkg.enabled) throw new AppError(400, "Paket satışta değil");
+  // satista=false → vitrinde ama satın alma henüz kapalı ("en kısa sürede satışta")
+  if (pkg.satista === false) throw new AppError(400, "Paket henüz satışta değil — en kısa sürede satışa açılacak");
   if (pkg.tip !== "request_limit" && pkg.tip !== "account_delivery") {
     throw new AppError(400, "Bu paket tipi henüz desteklenmiyor");
   }

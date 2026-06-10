@@ -77,6 +77,15 @@ describe("purchasePackageWithBalance", () => {
     await expect(purchasePackageWithBalance("u1", "p1", "key-3")).rejects.toThrow("satışta değil");
   });
 
+  it("rejects a coming-soon package (satista=false) without debiting", async () => {
+    mockDbSql
+      .mockResolvedValueOnce([]) // dup-check: none
+      .mockResolvedValueOnce([{ ...PKG, satista: false }]); // package lookup: vitrinde ama satışa kapalı
+    const { purchasePackageWithBalance } = await import("./package-purchase-service.js");
+    await expect(purchasePackageWithBalance("u1", "p1", "key-cs")).rejects.toThrow("henüz satışta değil");
+    expect(mockBegin).not.toHaveBeenCalled(); // debit transaction'a hiç girilmez
+  });
+
   it("rejects direct purchase of a negative-price package", async () => {
     mockDbSql
       .mockResolvedValueOnce([]) // dup-check: none

@@ -68,6 +68,16 @@ describe("redeem-code-service", () => {
     expect(res).toEqual({ tip: "package", entitlementId: "ent-pkg-1" });
   });
 
+  it("redeemCode (package) rejects a coming-soon package (satista=false)", async () => {
+    mockTxSql
+      .mockResolvedValueOnce([{ id: "rc1", tip: "package", package_id: "p1", max_uses: 1, used_count: 0, per_user_once: true, expires_at: null, enabled: true }])
+      .mockResolvedValueOnce([{ id: "use1" }])
+      .mockResolvedValueOnce([{ id: "rc1" }])
+      .mockResolvedValueOnce([{ id: "p1", sure_gun: 30, gunluk_istek_limiti: 500, allowed_models: ["gpt-5.5"], enabled: true, satista: false }]);
+    const { redeemCode } = await import("./redeem-code-service.js");
+    await expect(redeemCode("u1", "abc")).rejects.toThrow("henüz satışta değil");
+  });
+
   it("redeemCode rejects exhausted code (used_count>=max_uses)", async () => {
     mockTxSql.mockResolvedValueOnce([{ id: "rc1", tip: "balance", amount_tl: "50", max_uses: 1, used_count: 1, per_user_once: true, expires_at: null, enabled: true }]);
     const { redeemCode } = await import("./redeem-code-service.js");

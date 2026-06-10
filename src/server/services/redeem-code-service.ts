@@ -79,10 +79,12 @@ export async function redeemCode(userId: string, codeInput: string): Promise<Red
     if (rc.tip === "package") {
       if (!rc.package_id) throw new AppError(400, "Kod paketi tanımsız");
       const pkgRows = await txSql<any[]>`
-        SELECT id, sure_gun, gunluk_istek_limiti, allowed_models, enabled
+        SELECT id, sure_gun, gunluk_istek_limiti, allowed_models, enabled, satista
         FROM packages WHERE id = ${rc.package_id} LIMIT 1
       `;
       if (!pkgRows.length || !pkgRows[0].enabled) throw new AppError(400, "Kod paketi geçersiz/kapalı");
+      // satista=false ("en kısa sürede satışta") → kod ile de erken erişim verilmez
+      if (pkgRows[0].satista === false) throw new AppError(400, "Paket henüz satışta değil — en kısa sürede satışa açılacak");
       const pkg = pkgRows[0];
       const entitlementId = await grantPackageEntitlement(txSql, {
         userId,

@@ -211,6 +211,20 @@
       "when": 1781817600000,
       "tag": "0029_package_tpm_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1781904000000,
+      "tag": "0030_package_satista",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1781990400000,
+      "tag": "0031_min_topup_5usd",
+      "breakpoints": true
     }
   ]
 }

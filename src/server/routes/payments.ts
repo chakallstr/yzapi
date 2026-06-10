@@ -107,13 +107,13 @@ function buildPaymentNotification(opts: {
   };
 }
 
-const MIN_TOPUP_USD = 2;
+const MIN_TOPUP_USD = 5;
 
 async function buildQuoteFromRequest(body: Record<string, unknown>) {
   const kur = await getPaymentKur();
   const rawAmountUsd = body.amountUsd ?? (body.miktarTL !== undefined ? Number(body.miktarTL) / kur : undefined);
   const amountUsd = Number(rawAmountUsd);
-  // Min ödeme USD-tabanlı ($2) — frontend (MIN_USD=2) ile hizalı. Üst sınır config'ten (maxBakiyeTL).
+  // Min ödeme USD-tabanlı ($5) — frontend (MIN_USD=5) ile hizalı. Üst sınır config'ten (maxBakiyeTL).
   // (Eski ₺250 TL-floor yerine; geçersiz/küçük tutarda buildUsdTopupQuote throw etmeden 400 döner.)
   if (!Number.isFinite(amountUsd) || amountUsd < MIN_TOPUP_USD) {
     return {
