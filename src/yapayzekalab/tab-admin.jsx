@@ -1089,6 +1089,24 @@ const AdminPackages = ({ token }) => {
     } catch (e) { setError(e.message || 'Satış durumu değiştirilemedi.'); }
   };
 
+  // Paket upstream override: endpoint + API key (key şifreli saklanır, geri görüntülenmez)
+  const setProvider = async (row) => {
+    const baseUrl = window.prompt(`${row.id} — upstream endpoint URL (boş = temizle):`, row.providerBaseUrl || '');
+    if (baseUrl === null) return;
+    const apiKey = window.prompt(`${row.id} — upstream API key (boş bırak = mevcut kalsın; "-" yaz = temizle):`, '');
+    if (apiKey === null) return;
+    try {
+      await adminRequest(`/api/admin/packages/${encodeURIComponent(row.id)}/provider`, token, {
+        method: 'POST',
+        body: {
+          providerBaseUrl: baseUrl.trim(),
+          ...(apiKey === '' ? {} : { providerApiKey: apiKey === '-' ? '' : apiKey.trim() }),
+        },
+      });
+      await load();
+    } catch (e) { setError(e.message || 'Upstream ayarlanamadı.'); }
+  };
+
   const remove = async (row) => {
     if (!window.confirm(`${row.id} paketi kapatılsın mı?`)) return;
     try {
@@ -1115,7 +1133,7 @@ const AdminPackages = ({ token }) => {
       <button disabled={saving} onClick={create}>{saving ? 'Ekleniyor…' : 'Paket Ekle'}</button>
       {loading ? <div style={{ marginTop: 12 }}>Yükleniyor…</div> : (
         <table style={{ width: '100%', marginTop: 12, fontSize: 13 }}>
-          <thead><tr style={{ textAlign: 'left' }}><th>id</th><th>ad</th><th>kategori</th><th>limit/gün</th><th>süre</th><th>₺</th><th>durum</th><th>satış</th><th></th></tr></thead>
+          <thead><tr style={{ textAlign: 'left' }}><th>id</th><th>ad</th><th>kategori</th><th>limit/gün</th><th>süre</th><th>₺</th><th>durum</th><th>satış</th><th>API</th><th></th></tr></thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
@@ -1123,9 +1141,13 @@ const AdminPackages = ({ token }) => {
                 <td>{r.gunlukIstekLimiti}</td><td>{r.sureGun}g</td><td>{Number(r.fiyatTL)}</td>
                 <td>{r.enabled ? 'Açık' : 'Kapalı'}</td>
                 <td>{r.satista === false ? 'Yakında' : 'Satışta'}</td>
+                <td title={r.providerBaseUrl || 'Özel upstream yok (normal routing)'}>
+                  {r.providerBaseUrl ? '✓' : '—'}{r.providerKeySet ? ' 🔑' : ''}
+                </td>
                 <td style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => toggle(r)}>{r.enabled ? 'Kapat' : 'Aç'}</button>
                   <button onClick={() => toggleSale(r)}>{r.satista === false ? 'Satışa Aç' : 'Satışı Durdur'}</button>
+                  <button onClick={() => setProvider(r)}>API</button>
                   <button onClick={() => remove(r)}>Sil</button>
                 </td>
               </tr>

@@ -40,6 +40,7 @@ import {
   setPackageEnabled,
   deletePackage,
 } from "../services/package-service.js";
+import { setPackageProviderOverride } from "../services/package-provider-override.js";
 import { generateRedeemCodes, listRedeemCodes, setRedeemCodeEnabled } from "../services/redeem-code-service.js";
 import { listAllDeliveryOrders, markDeliveryDelivered, cancelDeliveryWithRefund } from "../services/account-delivery-service.js";
 import { getRikaResellerStatus } from "../services/rika-reseller-service.js";
@@ -1333,7 +1334,12 @@ router.post("/gozcu/findings/:id/heal", async (req, res, next) => {
 // ── Paketler (Faz 1) ─────────────────────────────────────────────────────────
 router.get("/packages", async (_req, res, next) => {
   try {
-    res.json(await listAllPackages());
+    const rows = await listAllPackages();
+    // Key cipher'ı admin'e bile dönmez — yalnız "set'li mi" bilgisi (providerKeySet)
+    res.json(rows.map(({ providerApiKeyCipher, ...rest }) => ({
+      ...rest,
+      providerKeySet: Boolean(providerApiKeyCipher),
+    })));
   } catch (e) {
     next(e);
   }
@@ -1390,6 +1396,26 @@ router.post("/packages/:id/toggle", async (req, res, next) => {
     const enabled = (req.body as Record<string, unknown>)?.enabled === true;
     await setPackageEnabled(req.params.id, enabled);
     await writeAudit("admin_package_toggle", req.params.id, `Paket ${enabled ? "açıldı" : "kapatıldı"}: ${req.params.id}`, req.user!.id);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** Paket-bazlı upstream override: endpoint + API key (şifreli saklanır, asla geri dönmez).
+ *  providerBaseUrl: ""/null → temizle; providerApiKey: undefined → dokunma, ""/null → temizle. */
+router.post("/packages/:id/provider", async (req, res, next) => {
+  try {
+    const b = req.body as { providerBaseUrl?: string | null; providerApiKey?: string | null };
+    const ok = await setPackageProviderOverride(req.params.id, {
+      providerBaseUrl: b?.providerBaseUrl,
+      providerApiKey: b?.providerApiKey,
+    });
+    if (!ok) {
+      res.status(404).json({ error: "Paket bulunamadı" });
+      return;
+    }
+    await writeAudit("admin_package_provider", req.params.id, `Paket upstream override güncellendi: ${req.params.id}`, req.user!.id);
     res.json({ ok: true });
   } catch (e) {
     next(e);

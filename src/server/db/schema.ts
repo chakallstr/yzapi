@@ -629,6 +629,10 @@ export const packages = pgTable("packages", {
   birimFiyatUsdPer50: numeric("birim_fiyat_usd_per_50", { precision: 10, scale: 4 }),
   maxContextTokens: integer("max_context_tokens"),
   tpmLimit: integer("tpm_limit"),
+  // Paket-bazlı upstream override: ikisi de doluysa paket trafiği bu endpoint'e gider;
+  // boşken normal per-model routing (davranış değişmez). Key AES-256-GCM şifreli.
+  providerBaseUrl: text("provider_base_url"),
+  providerApiKeyCipher: text("provider_api_key_cipher"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });

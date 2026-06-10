@@ -225,6 +225,13 @@
       "when": 1781990400000,
       "tag": "0031_min_topup_5usd",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1782076800000,
+      "tag": "0032_package_provider_override",
+      "breakpoints": true
     }
   ]
 }

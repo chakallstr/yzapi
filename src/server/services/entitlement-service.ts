@@ -7,6 +7,9 @@ export interface PackageCoverage {
   maxContextTokens?: number;
   tpmLimit?: number;
   packageId?: string;
+  // Paket-bazlı upstream override (ikisi de doluysa proxy bu endpoint'i kullanır)
+  providerBaseUrl?: string;
+  providerApiKeyCipher?: string;
 }
 
 // In-memory fixed-window TPM tracker keyed by "userId:packageId"
@@ -53,7 +56,7 @@ export async function checkPackageCoverage(userId: string, modelId: string): Pro
 
 /** Atomik: en erken biten kapsayan haktan bir günlük slot rezerve et. */
 export async function tryReservePackageSlot(userId: string, modelId: string): Promise<PackageCoverage> {
-  const rows = await dbSql<{ id: string; max_context_tokens: number | null; tpm_limit: number | null; package_id: string }[]>`
+  const rows = await dbSql<{ id: string; max_context_tokens: number | null; tpm_limit: number | null; package_id: string; provider_base_url: string | null; provider_api_key_cipher: string | null }[]>`
     UPDATE user_package_entitlements AS upe
     SET requests_today = CASE WHEN upe.last_reset_date < CURRENT_DATE THEN 1 ELSE upe.requests_today + 1 END,
         last_reset_date = CURRENT_DATE,
@@ -71,7 +74,8 @@ export async function tryReservePackageSlot(userId: string, modelId: string): Pr
         LIMIT 1
         FOR UPDATE SKIP LOCKED
       )
-    RETURNING upe.id, upe.package_id, p.max_context_tokens, p.tpm_limit
+    RETURNING upe.id, upe.package_id, p.max_context_tokens, p.tpm_limit,
+              p.provider_base_url, p.provider_api_key_cipher
   `;
   if (rows.length) {
     const r = rows[0];
@@ -81,6 +85,8 @@ export async function tryReservePackageSlot(userId: string, modelId: string): Pr
       packageId: r.package_id,
       maxContextTokens: r.max_context_tokens ?? undefined,
       tpmLimit: r.tpm_limit ?? undefined,
+      providerBaseUrl: r.provider_base_url ?? undefined,
+      providerApiKeyCipher: r.provider_api_key_cipher ?? undefined,
     };
   }
   return { covered: false };
