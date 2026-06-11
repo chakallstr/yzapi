@@ -460,16 +460,11 @@ const EntitlementCard = ({ ent, t }) => {
           </div>
         )}
 
-        {/* Context ve kural bilgisi */}
+        {/* Kural bilgisi (context limiti bilinçli olarak GÖSTERİLMEZ) */}
         <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', background: 'var(--border)', borderRadius: 4, padding: '2px 6px' }}>
             her istek = 1 sayılır
           </span>
-          {ent.maxContextTokens && (
-            <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', background: 'var(--border)', borderRadius: 4, padding: '2px 6px' }}>
-              maks. {(ent.maxContextTokens / 1000).toLocaleString('tr-TR')}k token bağlam
-            </span>
-          )}
           <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', background: 'var(--border)', borderRadius: 4, padding: '2px 6px' }}>
             bitiş: {new Date(ent.expiresAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
           </span>
