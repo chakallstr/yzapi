@@ -15,6 +15,10 @@ import {
 export interface ChatUsage {
   promptTokens: number;
   completionTokens: number;
+  // Upstream HİÇ token üretmeden kapandı (ilk-token timeout) → bu istek ÜCRETSİZ
+  // settle edilmeli: proxy bunu status:"error"a çevirir (PAYG'de tam iade, pakette
+  // slot serbest), "stream_missing_usage" prompt-token floor'una DÜŞMEZ.
+  noCharge?: boolean;
   // DENETİM İZİ (opsiyonel, billing'i ETKİLEMEZ): sağlayıcının HAM usage objesi
   // (Anthropic cache_read_input_tokens / cache_creation_input_tokens dahil).
   // Faturalama yalnız promptTokens/completionTokens'ı kullanır; bu alan sadece
@@ -46,6 +50,8 @@ export interface TextRequest {
 export interface AttemptOptions {
   timeoutMs?: number;
   maxAttempts?: number;
+  // Streaming: ilk içerik token'ına kadar bütçe (ms). undefined → FIRST_TOKEN_TIMEOUT_MS.
+  firstTokenMs?: number;
 }
 
 const OMNIROUTE_MODEL_MAP: Record<string, string> = {
@@ -375,6 +381,12 @@ export async function forwardTextEndpoint(
   return { raw: json, usage: estimateUsageFromPayload(providerBody, json) };
 }
 
+// İlk içerik token'ı için kısa bütçe (time-to-first-token). Upstream header döndükten
+// sonra bu süre içinde HİÇBİR veri akmazsa istemci ("API request" ekranı) idleMs (canlı
+// 5 dk) kadar asılı kalmasın — stream'i temiz kapat, ücret ALMA. İlk chunk geldikten
+// sonra chunk'lar arası bekleme normal idleMs'e döner (uzun üretimleri kesmeyiz).
+export const FIRST_TOKEN_TIMEOUT_MS = 45_000;
+
 export async function forwardChatStream(
   body: ChatRequest,
   res: Response,
@@ -434,10 +446,18 @@ export async function forwardChatStream(
 
     let buffer = "";
 
-    const finalize = () => {
+    const finalize = (opts?: { noCharge?: boolean }) => {
       if (settled) return;
       settled = true;
       clearIdle();
+      if (opts?.noCharge) {
+        // Upstream hiç token üretmedi (ilk-token timeout) → ücret YOK (K1 mantığı).
+        usage.promptTokens = 0;
+        usage.completionTokens = 0;
+        usage.noCharge = true;
+        resolve(usage);
+        return;
+      }
       if (usage.promptTokens <= 0) {
         usage.promptTokens = estimateTextTokens(providerBody.messages ?? "");
       }
@@ -449,23 +469,39 @@ export async function forwardChatStream(
 
     // Idle watchdog: upstream bağlıyken belirli süre VERİ AKMAZSA istemci
     // sonsuza kadar "API request"te asılı kalmasın — stream'i temiz kapat.
-    // (defaultStreamTimeoutMs zaten header bekleme süresi; bu, akış ortasında
-    // upstream susarsa devreye girer.)
+    // İKİ FAZLI: ilk içerik token'ına kadar KISA bütçe (firstTokenMs); ilk chunk
+    // geldikten sonra chunk'lar arası uzun idleMs (uzun üretim kesilmez).
+    // (idleMs = defaultStreamTimeoutMs, canlıda 5 dk — tek başına ilk-token için
+    // fazla uzundu; Roo/Cline'ın "API request"te asılı kalması tam olarak buydu.)
     const idleMs = runtimeConfig.defaultStreamTimeoutMs ?? 120_000;
+    const firstTokenMs = Math.min(attempt?.firstTokenMs ?? FIRST_TOKEN_TIMEOUT_MS, idleMs);
+    let firstChunkSeen = false;
     let idleTimer: ReturnType<typeof setTimeout> | undefined;
     function clearIdle() { if (idleTimer) clearTimeout(idleTimer); }
     function resetIdle() {
       clearIdle();
+      const waitMs = firstChunkSeen ? idleMs : firstTokenMs;
       idleTimer = setTimeout(() => {
-        logger.error({ url, idleMs }, "ai provider stream idle timeout — upstream veri göndermedi");
+        logger.error(
+          { url, waitMs, phase: firstChunkSeen ? "idle" : "first_token" },
+          "ai provider stream idle timeout — upstream veri göndermedi",
+        );
         nodeStream.destroy();
+        if (!firstChunkSeen) {
+          // Hiç veri gelmeden timeout: istemciye temiz bir hata olayı yaz.
+          try {
+            res.write(`data: ${JSON.stringify({ error: { message: "upstream timeout: no response from model", type: "upstream_timeout" } })}\n\n`);
+            res.write("data: [DONE]\n\n");
+          } catch { /* res kapalı olabilir */ }
+        }
         try { res.end(); } catch { /* zaten kapalı */ }
-        finalize();
-      }, idleMs);
+        finalize({ noCharge: !firstChunkSeen });
+      }, waitMs);
     }
     resetIdle();
 
     nodeStream.on("data", (chunk: Buffer) => {
+      firstChunkSeen = true;
       resetIdle();
       const text = chunk.toString();
       buffer += text;
@@ -502,8 +538,10 @@ export async function forwardChatStream(
     });
 
     nodeStream.on("end", () => {
+      // firstChunkSeen=false ⇒ 200+header geldi ama HİÇ veri akmadan temiz kapandı
+      // (no-response) → ücret alma (ilk-token timeout ile aynı ekonomik durum).
       res.end();
-      finalize();
+      finalize({ noCharge: !firstChunkSeen });
     });
 
     nodeStream.on("error", (err: Error) => {
@@ -584,10 +622,22 @@ export async function forwardChatStreamAsResponses(
     const nodeStream = Readable.fromWeb(upstream.body as import("stream/web").ReadableStream);
     let buffer = "";
 
-    const finalize = () => {
+    const finalize = (opts?: { noCharge?: boolean }) => {
       if (settled) return;
       settled = true;
       clearIdle();
+      if (opts?.noCharge) {
+        // Upstream hiç token üretmedi (ilk-token timeout) → ücret YOK (K1 mantığı).
+        usage.promptTokens = 0;
+        usage.completionTokens = 0;
+        usage.noCharge = true;
+        try {
+          writeEvents(translator.fail("upstream returned no response (no tokens generated)"));
+        } catch { /* res kapalı olabilir */ }
+        try { res.end(); } catch { /* zaten kapalı */ }
+        resolve(usage);
+        return;
+      }
       if (usage.promptTokens <= 0) usage.promptTokens = estimateTextTokens(providerBody.messages ?? "");
       if (usage.completionTokens <= 0) usage.completionTokens = estimateTextTokens(assistantText);
       try {
@@ -598,19 +648,26 @@ export async function forwardChatStreamAsResponses(
     };
 
     const idleMs = runtimeConfig.defaultStreamTimeoutMs ?? 120_000;
+    const firstTokenMs = Math.min(attempt?.firstTokenMs ?? FIRST_TOKEN_TIMEOUT_MS, idleMs);
+    let firstChunkSeen = false;
     let idleTimer: ReturnType<typeof setTimeout> | undefined;
     function clearIdle() { if (idleTimer) clearTimeout(idleTimer); }
     function resetIdle() {
       clearIdle();
+      const waitMs = firstChunkSeen ? idleMs : firstTokenMs;
       idleTimer = setTimeout(() => {
-        logger.error({ url, idleMs }, "responses stream idle timeout — upstream veri göndermedi");
+        logger.error(
+          { url, waitMs, phase: firstChunkSeen ? "idle" : "first_token" },
+          "responses stream idle timeout — upstream veri göndermedi",
+        );
         nodeStream.destroy();
-        finalize();
-      }, idleMs);
+        finalize({ noCharge: !firstChunkSeen });
+      }, waitMs);
     }
     resetIdle();
 
     nodeStream.on("data", (chunk: Buffer) => {
+      firstChunkSeen = true;
       resetIdle();
       buffer += chunk.toString();
       const lines = buffer.split("\n");
@@ -639,7 +696,8 @@ export async function forwardChatStreamAsResponses(
     });
 
     nodeStream.on("end", () => {
-      finalize();
+      // Veri akmadan temiz kapanış (no-response) → ücret alma (timeout ile aynı durum).
+      finalize({ noCharge: !firstChunkSeen });
     });
 
     nodeStream.on("error", (err: Error) => {

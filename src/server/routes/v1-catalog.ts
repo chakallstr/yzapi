@@ -28,6 +28,10 @@ export interface V1CatalogEntry {
   enabled: boolean;
 }
 
+// Roo Code / Cline / Codex gibi OpenAI-uyumlu istemcilere /v1/models'te gösterilen
+// KISA, küratörlü liste. Amaç: müşteri kurulumda güvenilir bir modele düşsün.
+// Çıkarılanlar (gpt-5.4-mini/-nano, o4-mini) hâlâ id ile çağrılabilir — sadece
+// listelenmez (o4-mini reasoning gecikmesi "donmuş" görünüyordu; mini/nano kalabalıktı).
 export const V1_CLIENT_MODEL_IDS = [
   "claude-opus-4.8",
   "claude-opus-4-7",
@@ -35,9 +39,6 @@ export const V1_CLIENT_MODEL_IDS = [
   "claude-sonnet-4-6",
   "gpt-5.5",
   "gpt-5.4",
-  "gpt-5.4-mini",
-  "gpt-5.4-nano",
-  "o4-mini",
 ] as const;
 
 export function filterV1ClientCatalogEntries(entries: V1CatalogEntry[]): V1CatalogEntry[] {

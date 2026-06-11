@@ -119,13 +119,17 @@ describe("public /v1 catalog contract", () => {
       const ids = payload.data.map((model: { id: string }) => model.id);
 
       expect(ids).toEqual(V1_CLIENT_MODEL_IDS);
-      expect(ids).toHaveLength(9);
+      expect(ids).toHaveLength(6);
       expect(ids).toContain("claude-opus-4.8");
       expect(ids).toContain("gpt-5.5");
       expect(ids).toContain("gpt-5.4");
       expect(ids).not.toContain("gpt-5.5-2026-04-23");
       expect(ids).not.toContain("gpt-5.1");
       expect(ids).not.toContain("gemini-3.1-pro-preview");
+      // Curated trim: reasoning + mini/nano hidden from the client catalog
+      expect(ids).not.toContain("o4-mini");
+      expect(ids).not.toContain("gpt-5.4-mini");
+      expect(ids).not.toContain("gpt-5.4-nano");
 
       const count = await fetch(`${baseUrl}/v1/models/count`);
       expect(await count.json()).toEqual({ count: V1_CLIENT_MODEL_IDS.length });

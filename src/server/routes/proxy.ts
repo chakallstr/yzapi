@@ -628,12 +628,19 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       const responseMs = Date.now() - start;
 
       const hasUsage = usage.promptTokens > 0 || usage.completionTokens > 0;
-      const streamStatus = hasUsage
-        ? "success"
-        : (runtimeConfig?.streamMissingUsageFallbackEnabled === false ? "error" : "stream_missing_usage");
+      // Upstream hiç token üretmeden kapandıysa (ilk-token timeout, usage.noCharge) →
+      // ÜCRETSİZ: status:"error" (settleReservedUsage 0 tahsil + tam iade; pakette
+      // slot serbest). Aksi halde mevcut davranış: usage yoksa stream_missing_usage floor.
+      const streamStatus = usage.noCharge
+        ? "error"
+        : hasUsage
+          ? "success"
+          : (runtimeConfig?.streamMissingUsageFallbackEnabled === false ? "error" : "stream_missing_usage");
       // Giriş token floor'u: yalnız sağlayıcı bozuk-düşük raporladığında devreye girer
       // (geçerli raporda char/4 ile şişirmez). Bkz resolveBilledPromptTokens.
-      const billedPromptTokens = resolveBilledPromptTokens(usage.promptTokens, guard.contextTokens);
+      const billedPromptTokens = usage.noCharge
+        ? 0
+        : resolveBilledPromptTokens(usage.promptTokens, guard.contextTokens);
       await settleBilling({
         billedViaPackage,
         entitlementId,
@@ -643,7 +650,7 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
         usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens },
         requestId,
         rawUsageJson: usage,
-        errorCode: streamStatus === "stream_missing_usage" ? "stream_missing_usage" : undefined,
+        errorCode: usage.noCharge ? "upstream_first_token_timeout" : (streamStatus === "stream_missing_usage" ? "stream_missing_usage" : undefined),
         responseMs,
         status: streamStatus,
         profileId: chatStreamProfileId ?? undefined,
@@ -908,10 +915,16 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
       const responseMs = Date.now() - start;
 
       const hasUsage = usage.promptTokens > 0 || usage.completionTokens > 0;
-      const streamStatus = hasUsage
-        ? "success"
-        : (runtimeConfig?.streamMissingUsageFallbackEnabled === false ? "error" : "stream_missing_usage");
-      const billedPromptTokens = resolveBilledPromptTokens(usage.promptTokens, guard.contextTokens);
+      // İlk-token timeout (usage.noCharge) → ÜCRETSİZ: status:"error" (0 tahsil + iade /
+      // pakette slot serbest). Aksi halde usage yoksa stream_missing_usage floor.
+      const streamStatus = usage.noCharge
+        ? "error"
+        : hasUsage
+          ? "success"
+          : (runtimeConfig?.streamMissingUsageFallbackEnabled === false ? "error" : "stream_missing_usage");
+      const billedPromptTokens = usage.noCharge
+        ? 0
+        : resolveBilledPromptTokens(usage.promptTokens, guard.contextTokens);
       await settleBilling({
         billedViaPackage,
         entitlementId,
@@ -921,7 +934,7 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
         usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens },
         requestId,
         rawUsageJson: usage,
-        errorCode: streamStatus === "stream_missing_usage" ? "stream_missing_usage" : undefined,
+        errorCode: usage.noCharge ? "upstream_first_token_timeout" : (streamStatus === "stream_missing_usage" ? "stream_missing_usage" : undefined),
         responseMs,
         status: streamStatus,
         profileId: responsesStreamProfileId ?? undefined,
