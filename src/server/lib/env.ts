@@ -75,6 +75,14 @@ const schema = z.object({
   CLOSEROUTER_BASE_URL: z.string().optional(),
   RATE_LIMIT_PER_KEY_PER_MIN: z.coerce.number().default(60),
 
+  // CodeFast reseller (upstream). We buy packages at the reseller's 10% discount
+  // and resell on yapayzekalab.org. The reseller master key (cf_res_live_…) is a
+  // SECRET — backend only, never to the frontend/public API. Disabled by default;
+  // provisioning + CF-proxy routing are no-ops until ENABLED + key are set.
+  CODEFAST_RESELLER_ENABLED: z.coerce.boolean().default(false),
+  CODEFAST_RESELLER_BASE_URL: z.string().url().default("https://reseller-api.codefast.app"),
+  CODEFAST_RESELLER_API_KEY: z.string().optional(),
+
   // Shopier payment (optional — returns 503 when unset)
   SHOPIER_API_KEY: z.string().optional(),
   SHOPIER_API_SECRET: z.string().optional(),
