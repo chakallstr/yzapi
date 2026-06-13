@@ -26,7 +26,7 @@ export function AdminCodefast({ token }) {
   const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [keyInputs, setKeyInputs] = useState({}); // entitlementId → cf_rc_live_ key
+  const [keyInputs, setKeyInputs] = useState({}); // entitlementId → müşteri anahtarı
   const [busy, setBusy] = useState('');
 
   const load = useCallback(async () => {
@@ -46,7 +46,7 @@ export function AdminCodefast({ token }) {
 
   const deliver = async (entitlementId) => {
     const key = (keyInputs[entitlementId] || '').trim();
-    if (!key) { setError('cf_rc_live_ keyi girin'); return; }
+    if (!key) { setError('Müşteri anahtarını girin'); return; }
     setBusy(entitlementId); setError('');
     try {
       await adminPost(`/api/admin/codefast/entitlements/${entitlementId}/deliver-manual`, { customerApiKey: key }, token);
@@ -96,7 +96,7 @@ export function AdminCodefast({ token }) {
 
       <Card pad={16}>
         <div style={{ fontSize: 16, fontWeight: 650, marginBottom: 6 }}>Elle Teslim Kuyruğu (Claude)</div>
-        <Caption>CodeFast admininin teslim ettiği cf_rc_live_ keyini buraya gir → müşteri erişimi aktifleşir.</Caption>
+        <Caption>CodeFast admininin teslim ettiği müşteri anahtarını buraya gir → müşteri erişimi aktifleşir.</Caption>
         <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {pending.map((e) => (
             <div key={e.entitlementId} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
@@ -105,7 +105,7 @@ export function AdminCodefast({ token }) {
                 <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{e.email || e.userId} · {e.slug}</div>
               </div>
               <input
-                placeholder="cf_rc_live_..."
+                placeholder="CodeFast müşteri anahtarı"
                 value={keyInputs[e.entitlementId] || ''}
                 onChange={(ev) => setKeyInputs((s) => ({ ...s, [e.entitlementId]: ev.target.value }))}
                 style={{ flex: 1, minWidth: 220, fontSize: 12, padding: '6px 8px' }}
