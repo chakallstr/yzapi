@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("./codefast-reseller-service.js", () => ({
   cfCreateOrder: vi.fn(),
+  cfGetOrder: vi.fn(),
   extractCustomerKey: (o: any) => o?.customer_api_key?.api_key ?? null,
   CodefastError: class CodefastError extends Error {
     constructor(public status: number, message: string) { super(message); this.name = "CodefastError"; }
@@ -52,6 +53,36 @@ describe("codefast-provisioning-service", () => {
       expect.objectContaining({ items: [{ catalog_id: "claude", claude_token_millions: 25 }] }),
       "k2",
     );
+  });
+
+  it("auto product, no key on create (idempotent replay) + cfGetOrder also no key → failed (NOT pending)", async () => {
+    const { cfCreateOrder, cfGetOrder } = await import("./codefast-reseller-service.js");
+    (cfCreateOrder as any).mockResolvedValue({
+      order: { id: "ord5", status: "fulfilled" }, customer: { id: "c5" }, manual_review_required: false, idempotent: true,
+      // customer_api_key OMITTED (idempotent replay)
+    });
+    (cfGetOrder as any).mockResolvedValue({ order: { id: "ord5", status: "fulfilled" }, manual_review_required: false }); // still no key
+    const { provisionCodefastEntitlement } = await import("./codefast-provisioning-service.js");
+    const r = await provisionCodefastEntitlement({
+      entitlementId: "e5", userId: "u5", externalOrderId: "o5",
+      pkg: { cfCatalogId: "c1", cfApiSlug: "codex-api", cfManual: false, gunlukIstekLimiti: 500, sureGun: 30 },
+    });
+    expect(r.cfStatus).toBe("failed"); // auto ürün anahtarsız → failed (çağıran iade eder), pending DEĞİL
+    expect(cfGetOrder).toHaveBeenCalledWith("ord5");
+  });
+
+  it("auto product, no key on create but cfGetOrder RECOVERS key → provisioned", async () => {
+    const { cfCreateOrder, cfGetOrder } = await import("./codefast-reseller-service.js");
+    (cfCreateOrder as any).mockResolvedValue({
+      order: { id: "ord6", status: "fulfilled" }, customer: { id: "c6" }, manual_review_required: false, idempotent: true,
+    });
+    (cfGetOrder as any).mockResolvedValue({ order: { id: "ord6", status: "fulfilled" }, manual_review_required: false, customer_api_key: { api_key: "cf_rc_live_recovered" } });
+    const { provisionCodefastEntitlement } = await import("./codefast-provisioning-service.js");
+    const r = await provisionCodefastEntitlement({
+      entitlementId: "e6", userId: "u6", externalOrderId: "o6",
+      pkg: { cfCatalogId: "c1", cfApiSlug: "codex-api", cfManual: false, gunlukIstekLimiti: 500, sureGun: 30 },
+    });
+    expect(r.cfStatus).toBe("provisioned");
   });
 
   it("CF error → failed (never throws)", async () => {

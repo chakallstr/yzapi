@@ -12,7 +12,7 @@
  */
 import { dbSql } from "../db/client.js";
 import { encryptApiKey } from "./api-key-service.js";
-import { cfCreateOrder, extractCustomerKey, CodefastError } from "./codefast-reseller-service.js";
+import { cfCreateOrder, cfGetOrder, extractCustomerKey, CodefastError } from "./codefast-reseller-service.js";
 
 export interface CfPkgMeta {
   cfCatalogId: string;
@@ -52,8 +52,28 @@ export async function provisionCodefastEntitlement(args: {
       },
       externalOrderId,
     );
-    const key = extractCustomerKey(order);
-    const manual = order.manual_review_required || pkg.cfManual || !key;
+    let key = extractCustomerKey(order);
+    const isManualProduct = order.manual_review_required || pkg.cfManual;
+    // AUTO ürün ama key yok (idempotent replay anomalisi — replay customer_api_key DÖNDÜRMEZ):
+    // order'dan kurtarmayı dene; kurtarılamazsa 'failed' (çağıran iade eder) — pending_manual'da
+    // SONSUZA dek takılı bırakma (müşteri öder, 409 alır, kurtuluş yok).
+    if (!key && !isManualProduct) {
+      try {
+        const fresh = await cfGetOrder(order.order.id);
+        key = extractCustomerKey(fresh);
+      } catch { /* yut — aşağıda failed'e düşer */ }
+      if (!key) {
+        await dbSql`
+          UPDATE user_package_entitlements
+          SET cf_customer_id = ${userId}, cf_order_id = ${order.order.id}, cf_api_slug = ${pkg.cfApiSlug},
+              cf_status = 'failed', updated_at = now()
+          WHERE id = ${entitlementId}::uuid
+        `.catch(() => {});
+        console.error("[codefast] auto product returned no customer key (irrecoverable)", entitlementId, order.order.id);
+        return { cfStatus: "failed", cfOrderId: order.order.id };
+      }
+    }
+    const manual = isManualProduct || !key; // manuel ürün: key yok → pending_manual (beklenen)
     const status: ProvisionResult["cfStatus"] = manual ? "pending_manual" : "provisioned";
     await dbSql`
       UPDATE user_package_entitlements

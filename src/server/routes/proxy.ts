@@ -434,13 +434,15 @@ async function handleTextJsonEndpoint(
     // Paket-bazlı upstream override: paketin endpoint+key alanları DOLUYSA istek oraya
     // gider (failover yok); boş/çözülemezken normal routing — davranış değişmez.
     if (billedViaPackage) {
-      // CodeFast paket kapsıyor ama müşteri keyi henüz yok (pending_manual / failed teslimat) → 409.
-      if (pkgSlot.cfApiSlug && !pkgSlot.cfRcKeyCipher) {
+      const cfChain = pkgSlot.cfApiSlug ? entitlementOverrideChain(pkgSlot, env.CODEFAST_RESELLER_BASE_URL) : null;
+      // CF paketi kapsıyor ama KULLANILABİLİR müşteri keyi YOK (pending_manual / failed /
+      // çözülemeyen cipher) → normal routing'e SESSİZCE düşme (yanlış sağlayıcıya gider,
+      // CF paketinden faturalanır). Slotu iade et + 409.
+      if (pkgSlot.cfApiSlug && !cfChain) {
         await releasePackageSlot(pkgSlot.entitlementId!);
         throw new AppError(409, "Paket teslim ediliyor; birkaç dakika içinde aktifleşecek.");
       }
       // Önce CodeFast müşteri-keyi zinciri (entitlement), yoksa paket-bazlı override.
-      const cfChain = entitlementOverrideChain(pkgSlot, env.CODEFAST_RESELLER_BASE_URL);
       const pkgChain = cfChain ?? packageOverrideChain(pkgSlot);
       if (pkgChain) chain = pkgChain;
     }
@@ -632,13 +634,15 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
     let chain = await resolveProviderChainForModel(masterModel.id);
     // Paket-bazlı upstream override (bkz handleTextJsonEndpoint): doluysa tek-sağlayıcı zincir.
     if (billedViaPackage) {
-      // CodeFast paket kapsıyor ama müşteri keyi henüz yok (pending_manual / failed teslimat) → 409.
-      if (pkgSlot.cfApiSlug && !pkgSlot.cfRcKeyCipher) {
+      const cfChain = pkgSlot.cfApiSlug ? entitlementOverrideChain(pkgSlot, env.CODEFAST_RESELLER_BASE_URL) : null;
+      // CF paketi kapsıyor ama KULLANILABİLİR müşteri keyi YOK (pending_manual / failed /
+      // çözülemeyen cipher) → normal routing'e SESSİZCE düşme (yanlış sağlayıcıya gider,
+      // CF paketinden faturalanır). Slotu iade et + 409.
+      if (pkgSlot.cfApiSlug && !cfChain) {
         await releasePackageSlot(pkgSlot.entitlementId!);
         throw new AppError(409, "Paket teslim ediliyor; birkaç dakika içinde aktifleşecek.");
       }
       // Önce CodeFast müşteri-keyi zinciri (entitlement), yoksa paket-bazlı override.
-      const cfChain = entitlementOverrideChain(pkgSlot, env.CODEFAST_RESELLER_BASE_URL);
       const pkgChain = cfChain ?? packageOverrideChain(pkgSlot);
       if (pkgChain) chain = pkgChain;
     }
@@ -925,13 +929,15 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
     let chain = await resolveProviderChainForModel(masterModel.id);
     // Paket-bazlı upstream override (bkz handleTextJsonEndpoint): doluysa tek-sağlayıcı zincir.
     if (billedViaPackage) {
-      // CodeFast paket kapsıyor ama müşteri keyi henüz yok (pending_manual / failed teslimat) → 409.
-      if (pkgSlot.cfApiSlug && !pkgSlot.cfRcKeyCipher) {
+      const cfChain = pkgSlot.cfApiSlug ? entitlementOverrideChain(pkgSlot, env.CODEFAST_RESELLER_BASE_URL) : null;
+      // CF paketi kapsıyor ama KULLANILABİLİR müşteri keyi YOK (pending_manual / failed /
+      // çözülemeyen cipher) → normal routing'e SESSİZCE düşme (yanlış sağlayıcıya gider,
+      // CF paketinden faturalanır). Slotu iade et + 409.
+      if (pkgSlot.cfApiSlug && !cfChain) {
         await releasePackageSlot(pkgSlot.entitlementId!);
         throw new AppError(409, "Paket teslim ediliyor; birkaç dakika içinde aktifleşecek.");
       }
       // Önce CodeFast müşteri-keyi zinciri (entitlement), yoksa paket-bazlı override.
-      const cfChain = entitlementOverrideChain(pkgSlot, env.CODEFAST_RESELLER_BASE_URL);
       const pkgChain = cfChain ?? packageOverrideChain(pkgSlot);
       if (pkgChain) chain = pkgChain;
     }

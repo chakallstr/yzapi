@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { dbSql } from "../db/client.js";
 import { env } from "../lib/env.js";
+import { logger } from "../lib/logger.js";
 import { InsufficientBalanceError, AppError } from "../lib/errors.js";
 import { grantPackageEntitlement } from "./entitlement-service.js";
 
@@ -63,13 +64,15 @@ async function loadPurchaseState(userId: string, txKey: string): Promise<Purchas
     SELECT id FROM transactions WHERE idempotency_key = ${txKey} LIMIT 1
   `;
   let entitlementId = "";
+  let cfStatus: PurchaseResult["cfStatus"] | undefined;
   if (txRows.length) {
-    const entRows = await dbSql<{ id: string }[]>`
-      SELECT id FROM user_package_entitlements WHERE purchase_transaction_id = ${txRows[0].id}::uuid LIMIT 1
+    const entRows = await dbSql<{ id: string; cf_status: string | null }[]>`
+      SELECT id, cf_status FROM user_package_entitlements WHERE purchase_transaction_id = ${txRows[0].id}::uuid LIMIT 1
     `;
     entitlementId = entRows[0]?.id ?? "";
+    cfStatus = (entRows[0]?.cf_status as PurchaseResult["cfStatus"]) ?? undefined;
   }
-  return { entitlementId, newBalanceTL: Number(balRows[0]?.bakiye_tl ?? 0), duplicate: true };
+  return { entitlementId, newBalanceTL: Number(balRows[0]?.bakiye_tl ?? 0), duplicate: true, cfStatus };
 }
 
 /**
@@ -240,16 +243,15 @@ async function refundFailedCodefastPurchase(
   txKey: string,
   paketAd: string,
 ): Promise<void> {
-  // 1) entitlement revoke (idempotent: yalnız aktifse)
-  await dbSql`
-    UPDATE user_package_entitlements SET status = 'revoked', updated_at = now()
-    WHERE id = ${entitlementId}::uuid AND status = 'active'
-  `;
-  // 2) ücret iadesi (idempotent: cf_refund_<txKey> UNIQUE)
+  // ⚠️ ASLA throw ETMEZ — çağıran her durumda 503 "iade edildi" mesajını atabilsin.
+  // Her adım BAĞIMSIZ guard'lı: bir adımın hatası diğerlerini engellemez. Sıralama PARAYA
+  // göre: önce ücret iadesi (en kritik), sonra entitlement revoke, sonra CF order revoke.
+
+  // 1) ÜCRET İADESİ (idempotent: cf_refund_<txKey> UNIQUE) — ÖNCE.
   const refundKey = "cf_refund_" + txKey;
-  const dup = await dbSql<{ id: string }[]>`SELECT id FROM transactions WHERE idempotency_key = ${refundKey} LIMIT 1`;
-  if (!dup.length) {
-    try {
+  try {
+    const dup = await dbSql<{ id: string }[]>`SELECT id FROM transactions WHERE idempotency_key = ${refundKey} LIMIT 1`;
+    if (!dup.length) {
       await dbSql.begin(async (txSql) => {
         const u = await txSql<{ bakiye_tl: string; email: string }[]>`
           UPDATE users SET bakiye_tl = bakiye_tl + ${fiyatTL}::numeric, son_aktivite = now()
@@ -258,7 +260,7 @@ async function refundFailedCodefastPurchase(
         `;
         if (!u.length) return;
         const sonrasi = Number(u[0].bakiye_tl);
-        const oncesi = sonrasi - fiyatTL;
+        const oncesi = Math.round((sonrasi - fiyatTL) * 10000) / 10000; // numeric(14,4) parite
         await txSql`
           INSERT INTO transactions
             (user_id, user_email, tip, miktar_tl, onceki_bakiye, sonraki_bakiye, aciklama, metod, idempotency_key)
@@ -267,9 +269,21 @@ async function refundFailedCodefastPurchase(
              ${oncesi}::numeric, ${sonrasi}::numeric, ${"İade: " + paketAd + " (tedarik başarısız)"}, 'bakiye', ${refundKey})
         `;
       });
-    } catch (e) {
-      if ((e as { code?: string })?.code !== "23505") throw e; // yarış: zaten iade edildi
     }
+  } catch (e) {
+    if ((e as { code?: string })?.code !== "23505") {
+      // İade BAŞARISIZ — para kritik: alarm bırak (Gözcü/ops görsün), ama akışı bloklama.
+      logger.error({ err: e, userId, entitlementId, refundKey }, "codefast refund FAILED — müşteri parası iade edilemedi");
+    }
+  }
+  // 2) entitlement revoke (idempotent: yalnız aktifse)
+  try {
+    await dbSql`
+      UPDATE user_package_entitlements SET status = 'revoked', updated_at = now()
+      WHERE id = ${entitlementId}::uuid AND status = 'active'
+    `;
+  } catch (e) {
+    logger.error({ err: e, entitlementId }, "codefast refund — entitlement revoke failed");
   }
   // 3) CF order revoke (varsa) — best-effort, akışı bloklamaz
   try {
