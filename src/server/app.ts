@@ -12,6 +12,7 @@ import { userAuth } from "./middleware/user-auth.js";
 import { requireWhatsappVerified } from "./middleware/whatsapp-verified.js";
 import adminRouter from "./routes/admin.js";
 import adminAuthRouter from "./routes/admin-auth.js";
+import adminCodefastRouter from "./routes/admin-codefast.js";
 import authRouter from "./routes/auth.js";
 import userRouter from "./routes/user.js";
 import modelsRouter from "./routes/models.js";
@@ -138,6 +139,8 @@ export function createApp(): express.Express {
 
   // API routes
   app.use("/api/admin", adminAuthRouter);
+  // CodeFast admin (owner-only, ayrı router) — genel adminRouter'dan ÖNCE mount (yol önceliği).
+  app.use("/api/admin/codefast", adminAuth, requireWhatsappVerified, adminCodefastRouter);
   app.use("/api/admin", adminAuth, requireWhatsappVerified, adminRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/user", userAuth, requireWhatsappVerified, userRouter);
