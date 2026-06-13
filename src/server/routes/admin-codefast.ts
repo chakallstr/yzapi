@@ -12,10 +12,12 @@ import { attachManualCustomerKey } from "../services/codefast-provisioning-servi
 
 const router = Router();
 
-// Owner-only guard (req.admin admin-auth tarafından set edilir).
+// Owner-only guard. ⚠️ req.admin.role HER ZAMAN "admin"tir; gerçek rol req.adminRole
+// ("owner"|"partner") — admin-auth.ts set eder. Owner kontrolü ONU okumalı.
 function requireOwner(req: Request, _res: Response, next: NextFunction) {
-  const role = (req as unknown as { admin?: { role?: string } }).admin?.role;
-  if (role !== "owner") throw new AppError(403, "Bu işlem yalnız hesap sahibine açıktır.");
+  if ((req as unknown as { adminRole?: string }).adminRole !== "owner") {
+    throw new AppError(403, "Bu işlem yalnız hesap sahibine açıktır.");
+  }
   next();
 }
 router.use(requireOwner);

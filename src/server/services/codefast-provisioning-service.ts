@@ -103,8 +103,9 @@ export async function provisionCodefastEntitlement(args: {
  */
 export async function attachManualCustomerKey(entitlementId: string, customerApiKey: string): Promise<boolean> {
   const key = customerApiKey.trim();
-  if (!key.startsWith("cf_rc_live_")) {
-    throw new CodefastError(400, "Geçersiz customer key (cf_rc_live_ ile başlamalı)");
+  // Format: cf_rc_live_ + key gövdesi (yalnız güvenli karakterler), makul uzunluk sınırı.
+  if (!/^cf_rc_live_[A-Za-z0-9_-]{8,160}$/.test(key)) {
+    throw new CodefastError(400, "Geçersiz customer key (cf_rc_live_ formatında olmalı)");
   }
   const rows = await dbSql<{ id: string }[]>`
     UPDATE user_package_entitlements
