@@ -633,6 +633,12 @@ export const packages = pgTable("packages", {
   // boşken normal per-model routing (davranış değişmez). Key AES-256-GCM şifreli.
   providerBaseUrl: text("provider_base_url"),
   providerApiKeyCipher: text("provider_api_key_cipher"),
+  // CodeFast reseller katalog metadatası (NULL = CodeFast paketi değil).
+  cfCatalogId: text("cf_catalog_id"),
+  cfApiSlug: text("cf_api_slug"),
+  cfManual: boolean("cf_manual").notNull().default(false),
+  cfTokenMillions: integer("cf_token_millions"),
+  cfResellerCostTl: numeric("cf_reseller_cost_tl", { precision: 14, scale: 4 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });
@@ -651,6 +657,12 @@ export const userPackageEntitlements = pgTable(
     requestsToday: integer("requests_today").notNull().default(0),
     lastResetDate: date("last_reset_date").notNull().default(sql`CURRENT_DATE`),
     purchaseTransactionId: uuid("purchase_transaction_id").references(() => transactions.id),
+    // CodeFast per-customer provisioning (NULL = CodeFast paketi değil).
+    cfCustomerId: text("cf_customer_id"),
+    cfOrderId: text("cf_order_id"),
+    cfApiSlug: text("cf_api_slug"),
+    cfRcKeyCipher: text("cf_rc_key_cipher"),
+    cfStatus: text("cf_status"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
   },

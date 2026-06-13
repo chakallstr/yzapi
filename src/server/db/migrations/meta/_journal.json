@@ -232,6 +232,13 @@
       "when": 1782076800000,
       "tag": "0032_package_provider_override",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1782163200000,
+      "tag": "0033_codefast_reseller",
+      "breakpoints": true
     }
   ]
 }
