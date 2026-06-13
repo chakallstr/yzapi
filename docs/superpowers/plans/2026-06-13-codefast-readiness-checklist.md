@@ -41,5 +41,13 @@ Para: müşteri→yzapi (TL) → entitlement → yzapi→CF order (CF bakiyesi �
 - [ ] Admin uçları (ayrı router admin-codefast.ts; kirli admin.ts'e dokunma): balance/sync/manuel-teslim/marj.
 - [ ] Kontrat testleri + tam doğrulama (lint/test/itest/build/scan:public).
 
+## ✅ CANLI DOĞRULANMIŞ API CONTRACT (2026-06-13, ₺0 NVIDIA probu ile)
+- `POST /v1/orders` → 201; `data` = `{order:{id,status:"fulfilled",external_order_id,reseller_cost_amount,...}, customer:{id}, quote, ledger_id, idempotent, entitlement_ids:[...], manual_review_required, customer_api_key:{api_key:"cf_rc_live_...", record:{id,key_prefix}}}`.
+- ⚠️ `customer_api_key` yalnız İLK oluşturmada döner; idempotent replay'de YOK (`idempotent:true`). → key ilk başarıda yakalanmalı; retry'de re-issue gerekebilir (panel "Customer API key → Oluştur" karşılığı endpoint — henüz bulunmadı, gerekince ara).
+- `quote` bakiye düşmez; NVIDIA cost=0 doğrulandı.
+- `POST /v1/orders/:id/revoke` → 200 `{status:"revoked"}` ÇALIŞIYOR (iade/revoke yolu hazır).
+- Proxy auth: `cf_rc_live_` geçerli → 200/target'a ulaşır; geçersiz → 403 `API_KEY_NOT_FOUND`. NVIDIA target CF tarafında 500 `TARGET_SECRET_MISSING` (CF'nin yapılandırması; auth bizde çalışıyor). Müşteri keyi customer-scoped — sahip olmadığı slug'a 403.
+- Tipler bu şekle göre düzeltildi (codefast-reseller-service.ts CfOrderResult + extractCustomerKey).
+
 ## DOKUNULMAZ hatırlatma
 billing reserve/settle/K1, MASTER_MODELS 42-lock, provider codename no-leak, admin email sabiti — değiştirme; CF işi bunların ÜSTÜNE additive.
