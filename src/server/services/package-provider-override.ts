@@ -47,10 +47,40 @@ export interface EntitlementProviderSlot {
 }
 
 /**
+ * CodeFast slug → modelMap (yzapi-canonical → CF-wire id).
+ * Yalnız yzapi id'si CF'nin beklediğinden FARKLI olan slug'lar için gerekir.
+ * claude-api: yzapi tire/nokta + tarihli formlar → CF nokta formu (CF supported_models
+ * canlı doğrulandı: claude-fable-5/opus-4.8/4.7/4.6, sonnet-4.6/4.5, haiku-4.5).
+ * Diğer slug'lar (codex/glm/grok/…): yzapi id'si == CF wire (verbatim) → map gerekmez.
+ */
+const CF_SLUG_MODEL_MAPS: Record<string, Record<string, string>> = {
+  "claude-api": {
+    "claude-opus-4.8": "claude-opus-4.8",
+    "claude-opus-4-8": "claude-opus-4.8",
+    "claude-opus-4.7": "claude-opus-4.7",
+    "claude-opus-4-7": "claude-opus-4.7",
+    "claude-opus-4.6": "claude-opus-4.6",
+    "claude-opus-4-6": "claude-opus-4.6",
+    "claude-sonnet-4.6": "claude-sonnet-4.6",
+    "claude-sonnet-4-6": "claude-sonnet-4.6",
+    "claude-sonnet-4.5": "claude-sonnet-4.5",
+    "claude-sonnet-4-5-20250929": "claude-sonnet-4.5",
+    "claude-haiku-4.5": "claude-haiku-4.5",
+    "claude-haiku-4-5-20251001": "claude-haiku-4.5",
+    "claude-fable-5": "claude-fable-5",
+  },
+};
+
+export function cfModelMapForSlug(slug: string): Record<string, string> {
+  return CF_SLUG_MODEL_MAPS[slug] ?? {};
+}
+
+/**
  * CodeFast müşteri-başına override zinciri: entitlement'ın cf_rc_live_ keyi + slug'ı
  * doluysa istek `<base>/proxy/<slug>` ucuna gider (örn /proxy/claude-api/v1/messages),
  * `Authorization: Bearer cf_rc_live_…` ile. Slug/key boş ya da key çözülemiyorsa null
  * (paket-override'a / normal routing'e düşülür). Tek sağlayıcı — failover YOK.
+ * modelMap slug'a göre yzapi-canonical → CF-wire çevirir (claude tire↔nokta).
  */
 export function entitlementOverrideChain(slot: EntitlementProviderSlot, base: string): ProviderChain | null {
   const slug = (slot.cfApiSlug ?? "").trim();
@@ -64,7 +94,7 @@ export function entitlementOverrideChain(slot: EntitlementProviderSlot, base: st
       profileId: `cf:${slot.entitlementId ?? "?"}`,
       baseUrl,
       apiKey,
-      modelMap: {}, // canonical model id verbatim (CodeFast kendi id'lerini bekler)
+      modelMap: cfModelMapForSlug(slug),
       source: { baseUrl: "db", apiKey: "db" },
     },
     fallback: null,

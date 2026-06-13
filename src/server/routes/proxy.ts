@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { aiProviderApiKey } from "../lib/env.js";
+import { aiProviderApiKey, env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { AppError, BadRequestError, InsufficientBalanceError, ModelDisabledError, ModelNotFoundError, RateLimitError } from "../lib/errors.js";
 import { canonicalizeModelId, type MasterModel } from "../../master-models.js";
@@ -19,7 +19,7 @@ import { resolveActiveCatalogModel } from "../services/added-model-service.js";
 import { getActiveProviderAdapter } from "../services/provider-adapter.js";
 import { resolveProviderForModel, resolveProviderChainForModel } from "../services/provider-config-service.js";
 import { forwardWithFailover } from "../services/provider-failover.js";
-import { packageOverrideChain } from "../services/package-provider-override.js";
+import { packageOverrideChain, entitlementOverrideChain } from "../services/package-provider-override.js";
 import { db } from "../db/client.js";
 import { modelOverrides, systemConfig, users } from "../db/schema.js";
 import { eq } from "drizzle-orm";
@@ -409,6 +409,11 @@ async function handleTextJsonEndpoint(
       if (await hasActivePackageForModel(userId, masterModel.id)) {
         throw new AppError(402, "Günlük istek limitiniz doldu. Yeni paket alın ya da kredinizden kullanın.");
       }
+      // CodeFast yalnız-paket modeli PAYG ile kullanılamaz (codefast profilinin kullanılır
+      // per-customer keyi yoktur) — rezervasyondan ÖNCE engelle (orphan reserve olmasın).
+      if ((await resolveProviderChainForModel(masterModel.id)).primary.profileId === "codefast") {
+        throw new AppError(402, "Bu model yalnız ilgili paket ile kullanılabilir; lütfen uygun paketi satın alın.");
+      }
       await reserveUsageBudget({
         userId,
         apiKeyId,
@@ -429,7 +434,14 @@ async function handleTextJsonEndpoint(
     // Paket-bazlı upstream override: paketin endpoint+key alanları DOLUYSA istek oraya
     // gider (failover yok); boş/çözülemezken normal routing — davranış değişmez.
     if (billedViaPackage) {
-      const pkgChain = packageOverrideChain(pkgSlot);
+      // CodeFast paket kapsıyor ama müşteri keyi henüz yok (pending_manual / failed teslimat) → 409.
+      if (pkgSlot.cfApiSlug && !pkgSlot.cfRcKeyCipher) {
+        await releasePackageSlot(pkgSlot.entitlementId!);
+        throw new AppError(409, "Paket teslim ediliyor; birkaç dakika içinde aktifleşecek.");
+      }
+      // Önce CodeFast müşteri-keyi zinciri (entitlement), yoksa paket-bazlı override.
+      const cfChain = entitlementOverrideChain(pkgSlot, env.CODEFAST_RESELLER_BASE_URL);
+      const pkgChain = cfChain ?? packageOverrideChain(pkgSlot);
       if (pkgChain) chain = pkgChain;
     }
     if (chain.primary.profileId === "rika") (providerBody as Record<string, unknown>).customerId = userId;
@@ -598,6 +610,11 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       if (await hasActivePackageForModel(userId, masterModel.id)) {
         throw new AppError(402, "Günlük istek limitiniz doldu. Yeni paket alın ya da kredinizden kullanın.");
       }
+      // CodeFast yalnız-paket modeli PAYG ile kullanılamaz (codefast profilinin kullanılır
+      // per-customer keyi yoktur) — rezervasyondan ÖNCE engelle (orphan reserve olmasın).
+      if ((await resolveProviderChainForModel(masterModel.id)).primary.profileId === "codefast") {
+        throw new AppError(402, "Bu model yalnız ilgili paket ile kullanılabilir; lütfen uygun paketi satın alın.");
+      }
       await reserveUsageBudget({
         userId,
         apiKeyId,
@@ -615,7 +632,14 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
     let chain = await resolveProviderChainForModel(masterModel.id);
     // Paket-bazlı upstream override (bkz handleTextJsonEndpoint): doluysa tek-sağlayıcı zincir.
     if (billedViaPackage) {
-      const pkgChain = packageOverrideChain(pkgSlot);
+      // CodeFast paket kapsıyor ama müşteri keyi henüz yok (pending_manual / failed teslimat) → 409.
+      if (pkgSlot.cfApiSlug && !pkgSlot.cfRcKeyCipher) {
+        await releasePackageSlot(pkgSlot.entitlementId!);
+        throw new AppError(409, "Paket teslim ediliyor; birkaç dakika içinde aktifleşecek.");
+      }
+      // Önce CodeFast müşteri-keyi zinciri (entitlement), yoksa paket-bazlı override.
+      const cfChain = entitlementOverrideChain(pkgSlot, env.CODEFAST_RESELLER_BASE_URL);
+      const pkgChain = cfChain ?? packageOverrideChain(pkgSlot);
       if (pkgChain) chain = pkgChain;
     }
     if (chain.primary.profileId === "rika") (providerBody as Record<string, unknown>).customerId = userId;
@@ -879,6 +903,11 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
       if (await hasActivePackageForModel(userId, masterModel.id)) {
         throw new AppError(402, "Günlük istek limitiniz doldu. Yeni paket alın ya da kredinizden kullanın.");
       }
+      // CodeFast yalnız-paket modeli PAYG ile kullanılamaz (codefast profilinin kullanılır
+      // per-customer keyi yoktur) — rezervasyondan ÖNCE engelle (orphan reserve olmasın).
+      if ((await resolveProviderChainForModel(masterModel.id)).primary.profileId === "codefast") {
+        throw new AppError(402, "Bu model yalnız ilgili paket ile kullanılabilir; lütfen uygun paketi satın alın.");
+      }
       await reserveUsageBudget({
         userId,
         apiKeyId,
@@ -896,7 +925,14 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
     let chain = await resolveProviderChainForModel(masterModel.id);
     // Paket-bazlı upstream override (bkz handleTextJsonEndpoint): doluysa tek-sağlayıcı zincir.
     if (billedViaPackage) {
-      const pkgChain = packageOverrideChain(pkgSlot);
+      // CodeFast paket kapsıyor ama müşteri keyi henüz yok (pending_manual / failed teslimat) → 409.
+      if (pkgSlot.cfApiSlug && !pkgSlot.cfRcKeyCipher) {
+        await releasePackageSlot(pkgSlot.entitlementId!);
+        throw new AppError(409, "Paket teslim ediliyor; birkaç dakika içinde aktifleşecek.");
+      }
+      // Önce CodeFast müşteri-keyi zinciri (entitlement), yoksa paket-bazlı override.
+      const cfChain = entitlementOverrideChain(pkgSlot, env.CODEFAST_RESELLER_BASE_URL);
+      const pkgChain = cfChain ?? packageOverrideChain(pkgSlot);
       if (pkgChain) chain = pkgChain;
     }
     if (chain.primary.profileId === "rika") (providerBody as Record<string, unknown>).customerId = userId;
