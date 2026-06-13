@@ -136,7 +136,8 @@ export async function purchasePackageWithBalance(
 
   // CodeFast paket: satıştan ÖNCE quote ön-kontrolü (orderlanabilir mi?). Bakiye DÜŞMEZ.
   // Ürün CF tarafında satılamaz durumdaysa müşteriyi hiç tahsil etmeden 503 ile durdur.
-  if (env.CODEFAST_RESELLER_ENABLED && pkg.cf_catalog_id) {
+  // Yalnız request_limit: account_delivery'de CF provisioning yok (yanlış cf_catalog_id'yi savun).
+  if (env.CODEFAST_RESELLER_ENABLED && pkg.cf_catalog_id && pkg.tip === "request_limit") {
     const { cfQuote } = await import("./codefast-reseller-service.js");
     try {
       await cfQuote([

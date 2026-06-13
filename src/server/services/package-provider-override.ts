@@ -52,6 +52,10 @@ export interface EntitlementProviderSlot {
  * claude-api: yzapi tire/nokta + tarihli formlar → CF nokta formu (CF supported_models
  * canlı doğrulandı: claude-fable-5/opus-4.8/4.7/4.6, sonnet-4.6/4.5, haiku-4.5).
  * Diğer slug'lar (codex/glm/grok/…): yzapi id'si == CF wire (verbatim) → map gerekmez.
+ * NOT: claude-api listesi CF'nin DESTEKLEDİĞİ modellerle SINIRLIDIR (CF katalog sınırı —
+ * fable-5/opus-4.8/4.7/4.6, sonnet-4.6/4.5, haiku-4.5). opus-4.5/4.1/sonnet-4 gibi eski
+ * modeller CF'de YOK → bilerek haritada değil; CF paketinin allowed_models'ına da konmamalı
+ * (seed disiplini). Eksik sanıp ekleme.
  */
 const CF_SLUG_MODEL_MAPS: Record<string, Record<string, string>> = {
   "claude-api": {
