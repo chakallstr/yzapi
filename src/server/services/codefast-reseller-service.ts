@@ -80,14 +80,31 @@ export interface CfOrderReq {
   items: CfQuoteItemReq[];
 }
 
+/**
+ * Real reseller /v1/orders response shape (verified live 2026-06-13).
+ * `data` = { order, customer, quote, ledger_id, idempotent, entitlement_ids,
+ *            manual_review_required, customer_api_key }.
+ * ⚠️ `customer_api_key` is an OBJECT ({api_key, record}) and is returned ONLY on
+ * first creation — an idempotent replay omits it (capture the key on first success).
+ */
 export interface CfOrderResult {
-  id: string;
-  status: string;
-  reseller_cost_amount: number;
+  order: {
+    id: string;
+    status: string; // "fulfilled" | "manual_review" | …
+    external_order_id?: string;
+    reseller_cost_amount?: number;
+  };
+  customer?: { id: string; external_customer_id?: string };
+  entitlement_ids?: string[];
   manual_review_required: boolean;
-  /** cf_rc_live_… for auto-fulfilled products. Absent for manual_review (Claude). */
-  customer_api_key?: string;
-  items: Array<Record<string, unknown> & { fulfillment_status: string; customer_api_key?: string }>;
+  idempotent?: boolean;
+  /** Present only on first order creation (object form). `.api_key` = cf_rc_live_… */
+  customer_api_key?: { api_key: string; record?: { id: string; key_prefix?: string } };
+}
+
+/** Extract the cf_rc_live_ string from an order result (null if absent / idempotent replay). */
+export function extractCustomerKey(o: CfOrderResult): string | null {
+  return o.customer_api_key?.api_key ?? null;
 }
 
 export const cfCatalog = () => cf<CfCatalogItem[]>("GET", "/v1/catalog");

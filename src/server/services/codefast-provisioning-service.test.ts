@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("./codefast-reseller-service.js", () => ({
   cfCreateOrder: vi.fn(),
+  extractCustomerKey: (o: any) => o?.customer_api_key?.api_key ?? null,
   CodefastError: class CodefastError extends Error {
     constructor(public status: number, message: string) { super(message); this.name = "CodefastError"; }
   },
@@ -18,8 +19,9 @@ describe("codefast-provisioning-service", () => {
   it("auto product → stores key + provisioned, sends Idempotency-Key", async () => {
     const { cfCreateOrder } = await import("./codefast-reseller-service.js");
     (cfCreateOrder as any).mockResolvedValue({
-      id: "ord1", status: "completed", manual_review_required: false, reseller_cost_amount: 1035,
-      customer_api_key: "cf_rc_live_abc", items: [{ fulfillment_status: "auto_fulfilled" }],
+      order: { id: "ord1", status: "fulfilled", reseller_cost_amount: 1035 },
+      customer: { id: "cust1" }, entitlement_ids: ["ent1"], manual_review_required: false,
+      customer_api_key: { api_key: "cf_rc_live_abc" },
     });
     const { provisionCodefastEntitlement } = await import("./codefast-provisioning-service.js");
     const r = await provisionCodefastEntitlement({
@@ -37,7 +39,8 @@ describe("codefast-provisioning-service", () => {
   it("manual product (Claude) → pending_manual, no key stored", async () => {
     const { cfCreateOrder } = await import("./codefast-reseller-service.js");
     (cfCreateOrder as any).mockResolvedValue({
-      id: "ord2", status: "manual_review", manual_review_required: true, reseller_cost_amount: 155.25, items: [{ fulfillment_status: "manual_review" }],
+      order: { id: "ord2", status: "manual_review", reseller_cost_amount: 155.25 },
+      customer: { id: "cust2" }, manual_review_required: true,
     });
     const { provisionCodefastEntitlement } = await import("./codefast-provisioning-service.js");
     const r = await provisionCodefastEntitlement({

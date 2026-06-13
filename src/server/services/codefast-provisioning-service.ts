@@ -12,7 +12,7 @@
  */
 import { dbSql } from "../db/client.js";
 import { encryptApiKey } from "./api-key-service.js";
-import { cfCreateOrder, CodefastError } from "./codefast-reseller-service.js";
+import { cfCreateOrder, extractCustomerKey, CodefastError } from "./codefast-reseller-service.js";
 
 export interface CfPkgMeta {
   cfCatalogId: string;
@@ -52,20 +52,20 @@ export async function provisionCodefastEntitlement(args: {
       },
       externalOrderId,
     );
-    const key = order.customer_api_key ?? order.items?.find((i) => i.customer_api_key)?.customer_api_key;
+    const key = extractCustomerKey(order);
     const manual = order.manual_review_required || pkg.cfManual || !key;
     const status: ProvisionResult["cfStatus"] = manual ? "pending_manual" : "provisioned";
     await dbSql`
       UPDATE user_package_entitlements
       SET cf_customer_id = ${userId},
-          cf_order_id = ${order.id},
+          cf_order_id = ${order.order.id},
           cf_api_slug = ${pkg.cfApiSlug},
           cf_rc_key_cipher = ${key ? encryptApiKey(key) : null},
           cf_status = ${status},
           updated_at = now()
       WHERE id = ${entitlementId}::uuid
     `;
-    return { cfStatus: status, cfOrderId: order.id };
+    return { cfStatus: status, cfOrderId: order.order.id };
   } catch (e) {
     const msg = e instanceof CodefastError ? e.message : String(e);
     await dbSql`

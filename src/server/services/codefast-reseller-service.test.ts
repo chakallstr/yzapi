@@ -39,26 +39,38 @@ describe("codefast-reseller-service", () => {
     expect(JSON.parse(init.body)).toEqual({ items: [{ catalog_id: "c1", limit_amount: 500, duration_days: 30 }] });
   });
 
-  it("cfCreateOrder sends Idempotency-Key and create_customer_api_key:true", async () => {
+  it("cfCreateOrder sends Idempotency-Key and create_customer_api_key:true; extractCustomerKey reads .api_key", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      status: 200,
+      status: 201,
       json: async () => ({
         success: true,
-        data: { id: "ord1", status: "completed", manual_review_required: false, reseller_cost_amount: 1035, customer_api_key: "cf_rc_live_abc", items: [] },
+        data: {
+          order: { id: "ord1", status: "fulfilled", reseller_cost_amount: 1035 },
+          customer: { id: "cust1" },
+          entitlement_ids: ["ent1"],
+          manual_review_required: false,
+          customer_api_key: { api_key: "cf_rc_live_abc", record: { id: "k1", key_prefix: "cf_rc_live_abc" } },
+        },
       }),
     });
     vi.stubGlobal("fetch", fetchMock);
-    const { cfCreateOrder } = await import("./codefast-reseller-service.js");
+    const { cfCreateOrder, extractCustomerKey } = await import("./codefast-reseller-service.js");
     const o = await cfCreateOrder(
       { external_customer_id: "u1", external_order_id: "o1", items: [{ catalog_id: "c1", limit_amount: 500, duration_days: 30 }] },
       "idem-key-1",
     );
-    expect(o.customer_api_key).toBe("cf_rc_live_abc");
+    expect(o.order.id).toBe("ord1");
+    expect(extractCustomerKey(o)).toBe("cf_rc_live_abc");
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toContain("/v1/orders");
     expect(init.headers["Idempotency-Key"]).toBe("idem-key-1");
     expect(JSON.parse(init.body).create_customer_api_key).toBe(true);
+  });
+
+  it("extractCustomerKey returns null on idempotent replay (no customer_api_key)", async () => {
+    const { extractCustomerKey } = await import("./codefast-reseller-service.js");
+    expect(extractCustomerKey({ order: { id: "x", status: "fulfilled" }, manual_review_required: false } as any)).toBeNull();
   });
 
   it("throws CodefastError on non-2xx", async () => {
