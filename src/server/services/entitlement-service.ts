@@ -10,6 +10,12 @@ export interface PackageCoverage {
   // Paket-bazlı upstream override (ikisi de doluysa proxy bu endpoint'i kullanır)
   providerBaseUrl?: string;
   providerApiKeyCipher?: string;
+  // CodeFast müşteri-başına override: entitlement'a sabitlenen proxy slug + cf_rc_live_ key.
+  // Doluysa proxy reseller-api/proxy/<slug>'a forward eder; cfStatus=pending_manual ise
+  // (Claude elle teslim) key henüz yok → proxy 409 döner.
+  cfApiSlug?: string;
+  cfRcKeyCipher?: string;
+  cfStatus?: string;
 }
 
 // In-memory fixed-window TPM tracker keyed by "userId:packageId"
@@ -56,7 +62,7 @@ export async function checkPackageCoverage(userId: string, modelId: string): Pro
 
 /** Atomik: en erken biten kapsayan haktan bir günlük slot rezerve et. */
 export async function tryReservePackageSlot(userId: string, modelId: string): Promise<PackageCoverage> {
-  const rows = await dbSql<{ id: string; max_context_tokens: number | null; tpm_limit: number | null; package_id: string; provider_base_url: string | null; provider_api_key_cipher: string | null }[]>`
+  const rows = await dbSql<{ id: string; max_context_tokens: number | null; tpm_limit: number | null; package_id: string; provider_base_url: string | null; provider_api_key_cipher: string | null; cf_api_slug: string | null; cf_rc_key_cipher: string | null; cf_status: string | null }[]>`
     UPDATE user_package_entitlements AS upe
     SET requests_today = CASE WHEN upe.last_reset_date < CURRENT_DATE THEN 1 ELSE upe.requests_today + 1 END,
         last_reset_date = CURRENT_DATE,
@@ -75,7 +81,8 @@ export async function tryReservePackageSlot(userId: string, modelId: string): Pr
         FOR UPDATE SKIP LOCKED
       )
     RETURNING upe.id, upe.package_id, p.max_context_tokens, p.tpm_limit,
-              p.provider_base_url, p.provider_api_key_cipher
+              p.provider_base_url, p.provider_api_key_cipher,
+              upe.cf_api_slug, upe.cf_rc_key_cipher, upe.cf_status
   `;
   if (rows.length) {
     const r = rows[0];
@@ -87,6 +94,9 @@ export async function tryReservePackageSlot(userId: string, modelId: string): Pr
       tpmLimit: r.tpm_limit ?? undefined,
       providerBaseUrl: r.provider_base_url ?? undefined,
       providerApiKeyCipher: r.provider_api_key_cipher ?? undefined,
+      cfApiSlug: r.cf_api_slug ?? undefined,
+      cfRcKeyCipher: r.cf_rc_key_cipher ?? undefined,
+      cfStatus: r.cf_status ?? undefined,
     };
   }
   return { covered: false };

@@ -40,6 +40,37 @@ export function packageOverrideChain(slot: PackageProviderSlot): ProviderChain |
   };
 }
 
+export interface EntitlementProviderSlot {
+  entitlementId?: string;
+  cfApiSlug?: string | null;
+  cfRcKeyCipher?: string | null;
+}
+
+/**
+ * CodeFast müşteri-başına override zinciri: entitlement'ın cf_rc_live_ keyi + slug'ı
+ * doluysa istek `<base>/proxy/<slug>` ucuna gider (örn /proxy/claude-api/v1/messages),
+ * `Authorization: Bearer cf_rc_live_…` ile. Slug/key boş ya da key çözülemiyorsa null
+ * (paket-override'a / normal routing'e düşülür). Tek sağlayıcı — failover YOK.
+ */
+export function entitlementOverrideChain(slot: EntitlementProviderSlot, base: string): ProviderChain | null {
+  const slug = (slot.cfApiSlug ?? "").trim();
+  const cipher = (slot.cfRcKeyCipher ?? "").trim();
+  if (!slug || !cipher) return null;
+  const apiKey = decryptApiKey(cipher);
+  if (!apiKey) return null;
+  const baseUrl = `${base.replace(/\/+$/, "")}/proxy/${slug}`;
+  return {
+    primary: {
+      profileId: `cf:${slot.entitlementId ?? "?"}`,
+      baseUrl,
+      apiKey,
+      modelMap: {}, // canonical model id verbatim (CodeFast kendi id'lerini bekler)
+      source: { baseUrl: "db", apiKey: "db" },
+    },
+    fallback: null,
+  };
+}
+
 export interface ProviderOverrideInput {
   /** "" veya null → temizle; dolu string → set. */
   providerBaseUrl?: string | null;
