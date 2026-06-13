@@ -7,15 +7,15 @@ Para: müşteri→yzapi (TL) → entitlement → yzapi→CF order (CF bakiyesi �
 İstek: yzk_live_ → /v1/* → 404-gate → paket slot → entitlement override chain → reseller-api/proxy/<slug>/* (cf_rc_live_) → CF metreler.
 
 ## 🔴 Lansman-blocker boşluklar
-- [ ] **#1 Para bütünlüğü:** provisioning başarısız (CF 402/bakiye bitti) → müşteri ödedi ama key yok. ÇÖZÜM (karar gerek):
-  - A) Satıştan önce CF quote + bakiye ön-kontrolü (yetersizse satışı durdur/"yakında").
-  - B) Provisioning fail → otomatik yzapi iadesi (transactions 'iade') + entitlement revoke.
-  - C) Retry job (Idempotency-Key güvenli) + N denemede teslim olmazsa iade.
-  - Öneri: B+C (retry, sonra iade) + bakiye alarmı.
+- [ ] **#1 Para bütünlüğü — KARAR: İKİSİ BİREN (A+B+C):**
+  - A) Satıştan ÖNCE: cfQuote ile maliyet+orderlanabilirlik doğrula + (varsa) CF bakiye yeterli mi; değilse satışı engelle (402/"geçici olarak satışta değil"). [CF balance API yoksa → funded olunca probe; yoksa A pratikte "quote-precheck + order-fail-refund"a iner.]
+  - B) Provisioning fail → otomatik yzapi iadesi (transactions 'iade', idempotent) + entitlement revoke + müşteriye bildirim.
+  - C) Retry job (cron, cf_status='failed', Idempotency-Key güvenli) → N denemede teslim olmazsa B (iade).
+  - + CF düşük-bakiye alarmı (Gözcü).
 - [ ] **#3 CF modelMap:** override `modelMap={}` verbatim — yzapi "claude-haiku-4-5"(tire) ↔ CF "claude-haiku-4.5"(nokta) uyuşmaz. CF-wire çeviri haritası gerek (entitlementOverrideChain'e modelMap parametresi; slug-bazlı). Yeni modellerde (added_models) id'leri CF-wire ile birebir tanımla → map gereksiz.
 
 ## 🟠 Mimari netleştirmeler (kod etkiler)
-- [ ] **#2 Profil çakışması:** `codefast` profili YALNIZ yeni modeller (Composer/Grok/GLM/Kimi/NVIDIA/görsel) içerir. Claude/GPT'yi EKLEME (wellflow/popusk ile disjoint kalsın). CF Claude/GPT paketleri override-chain ile yönlenir; PAYG aynı model mevcut upstream'e gider.
+- [ ] **#2 Profil çakışması — KARAR: Claude/GPT CF paketi olarak DA satılır.** `codefast` profili YALNIZ yeni modeller (Composer/Grok/GLM/Kimi/NVIDIA/görsel) içerir → Claude/GPT'yi EKLEME (wellflow/popusk ile disjoint kalsın). CF Claude/GPT **paketleri** override-chain ile CF'ye yönlenir (paket kapsamı varken); PAYG ya da CF-dışı paket → aynı model mevcut upstream'e (iki paralel kanal). modelMap (#3) Claude dash/dot çevirisi bu yüzden ŞART.
 - [ ] **#5 Görsel/video ürünleri:** /v1/images/* ayrı handler + chargeImage. Override 3 text call-site'a kuruldu; görsel satılacaksa image handler'lara da entitlement override + paket akışı gerek. (Faz: text önce, görsel sonra.)
 - [ ] **#8 Claude Max token-bazlı:** yzapi istek sayar, CF token sayar. yzapi limiti yüksek bırak; CF token bütçesini metreler; tükenince CF hata. "Kalan token" yzapi'de gösterilmez (kabul) — veya GET /v1/customers/:id/usage ile periyodik çek.
 - [ ] **#6 Yenileme:** aynı paketi tekrar al → grantPackageEntitlement süre uzatır; CF order yeniden açılmalı/uzatılmalı, cf_order_id/cf_rc_key üzerine yazma davranışı netleştir (yeni order = yeni key mi?).
