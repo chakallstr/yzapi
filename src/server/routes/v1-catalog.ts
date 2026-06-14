@@ -138,6 +138,9 @@ export function buildV1ModelsResponse(entries: V1CatalogEntry[] = defaultCatalog
       id: model.id,
       object: "model" as const,
       name: model.name,
+      // Claude Code "gateway model discovery" picker'ı etiket için display_name'i
+      // kullanır; yoksa ham id gösterir. name ile aynı (provider sızıntısı yok).
+      display_name: model.name,
       owned_by: providerSlug(model),
       provider: {
         name: model.provider,

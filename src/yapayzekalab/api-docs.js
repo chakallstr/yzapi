@@ -20,11 +20,13 @@ export const API_DOC_SECTIONS = [
           "Blokta yalnızca `yzk_live_YOUR_KEY` yazan yeri kendi anahtarınla değiştir. (Giriş yaptıysan zaten senin anahtarın gömülüdür, dokunmana gerek yok.)",
           "Blok bitince ekranda `claude` başlar. Bundan sonra her terminalde `claude` yazıp Enter'la açarsın.",
           "Önemli: Claude Code'da adres KÖK olmalı — `https://yapayzekalab.org` (sonuna `/v1` EKLEME, Claude Code yolu kendi ekler). Anahtar `ANTHROPIC_AUTH_TOKEN`'a girer, `ANTHROPIC_API_KEY`'e DEĞİL.",
+          "Model değiştirmek için Claude Code içinde `/model` yaz: 4.8 / 4.7 / 4.6 / Sonnet 4.6 listeden seçilir. Bunu açan satır bloktaki `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1` — ayrıca Claude Code güncel olmalı (`claude update`, v2.1.129+). Liste boş gelirse bile doğrudan `/model claude-opus-4-7` (veya `claude-opus-4-6`) yazıp Enter'a basman yeterli; o model anında devreye girer.",
         ],
         code: `export ANTHROPIC_BASE_URL="https://yapayzekalab.org"
 export ANTHROPIC_AUTH_TOKEN="yzk_live_YOUR_KEY"
 export ANTHROPIC_MODEL="claude-opus-4-8"
 export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
+export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1
 claude`,
         osVariants: {
           windows: `# PowerShell — tum blogu yapistir, Enter tusuna bas. Hicbir sey kurulu degilse bile calisir.
@@ -58,17 +60,20 @@ $env:ANTHROPIC_BASE_URL = "https://yapayzekalab.org"
 $env:ANTHROPIC_AUTH_TOKEN = $Token
 $env:ANTHROPIC_MODEL = "claude-opus-4-8"
 $env:ANTHROPIC_SMALL_FAST_MODEL = "claude-sonnet-4-6"
+$env:CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY = "1"
 
 [Environment]::SetEnvironmentVariable("ANTHROPIC_BASE_URL", "https://yapayzekalab.org", "User")
 [Environment]::SetEnvironmentVariable("ANTHROPIC_AUTH_TOKEN", $Token, "User")
 [Environment]::SetEnvironmentVariable("ANTHROPIC_MODEL", "claude-opus-4-8", "User")
 [Environment]::SetEnvironmentVariable("ANTHROPIC_SMALL_FAST_MODEL", "claude-sonnet-4-6", "User")
+[Environment]::SetEnvironmentVariable("CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY", "1", "User")
 
 # setx ile de kalici yaz (yeni pencerelerde de gecerli)
 setx ANTHROPIC_BASE_URL "https://yapayzekalab.org" >$null
 setx ANTHROPIC_AUTH_TOKEN "$Token" >$null
 setx ANTHROPIC_MODEL "claude-opus-4-8" >$null
 setx ANTHROPIC_SMALL_FAST_MODEL "claude-sonnet-4-6" >$null
+setx CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY "1" >$null
 
 # Onceki saglayici %USERPROFILE%\\.claude\\settings.json yazdiysa "env" blogundaki eski ANTHROPIC_* anahtarlarini sil.
 
@@ -97,12 +102,13 @@ TOKEN="yzk_live_YOUR_KEY"
 
 # Onceki saglayicidan kalanlari temizle (oturum + ~/.zshrc + settings.json notu)
 unset ANTHROPIC_API_KEY ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN
-sed -i '' -e '/^export ANTHROPIC_/d' ~/.zshrc 2>/dev/null
+sed -i '' -e '/^export ANTHROPIC_/d' -e '/^export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY/d' ~/.zshrc 2>/dev/null
 
 export ANTHROPIC_BASE_URL="https://yapayzekalab.org"
 export ANTHROPIC_AUTH_TOKEN="$TOKEN"
 export ANTHROPIC_MODEL="claude-opus-4-8"
 export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
+export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1
 
 # Kalici yap (yeni terminallerde de gecerli)
 {
@@ -110,6 +116,7 @@ export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
   echo "export ANTHROPIC_AUTH_TOKEN=\\"$TOKEN\\""
   echo "export ANTHROPIC_MODEL=\\"claude-opus-4-8\\""
   echo "export ANTHROPIC_SMALL_FAST_MODEL=\\"claude-sonnet-4-6\\""
+  echo "export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1"
 } >> ~/.zshrc
 # Eski saglayici ~/.claude/settings.json yazdiysa "env" blogundaki eski ANTHROPIC_* anahtarlarini sil.
 
@@ -137,12 +144,13 @@ TOKEN="yzk_live_YOUR_KEY"
 
 # Onceki saglayicidan kalanlari temizle (oturum + ~/.bashrc + settings.json notu)
 unset ANTHROPIC_API_KEY ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN
-sed -i -e '/^export ANTHROPIC_/d' ~/.bashrc 2>/dev/null
+sed -i -e '/^export ANTHROPIC_/d' -e '/^export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY/d' ~/.bashrc 2>/dev/null
 
 export ANTHROPIC_BASE_URL="https://yapayzekalab.org"
 export ANTHROPIC_AUTH_TOKEN="$TOKEN"
 export ANTHROPIC_MODEL="claude-opus-4-8"
 export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
+export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1
 
 # Kalici yap (yeni terminallerde de gecerli)
 {
@@ -150,6 +158,7 @@ export ANTHROPIC_SMALL_FAST_MODEL="claude-sonnet-4-6"
   echo "export ANTHROPIC_AUTH_TOKEN=\\"$TOKEN\\""
   echo "export ANTHROPIC_MODEL=\\"claude-opus-4-8\\""
   echo "export ANTHROPIC_SMALL_FAST_MODEL=\\"claude-sonnet-4-6\\""
+  echo "export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1"
 } >> ~/.bashrc
 # Eski saglayici ~/.claude/settings.json yazdiysa "env" blogundaki eski ANTHROPIC_* anahtarlarini sil.
 
@@ -176,7 +185,8 @@ New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude" | Out-Null
     "ANTHROPIC_BASE_URL": "https://yapayzekalab.org",
     "ANTHROPIC_AUTH_TOKEN": "yzk_live_YOUR_KEY",
     "ANTHROPIC_MODEL": "claude-opus-4-8",
-    "ANTHROPIC_SMALL_FAST_MODEL": "claude-sonnet-4-6"
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-sonnet-4-6",
+    "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY": "1"
   }
 }
 "@ | Set-Content -Encoding UTF8 "$env:USERPROFILE\.claude\settings.json"
@@ -195,7 +205,8 @@ cat > ~/.claude/settings.json << 'EOF'
     "ANTHROPIC_BASE_URL": "https://yapayzekalab.org",
     "ANTHROPIC_AUTH_TOKEN": "yzk_live_YOUR_KEY",
     "ANTHROPIC_MODEL": "claude-opus-4-8",
-    "ANTHROPIC_SMALL_FAST_MODEL": "claude-sonnet-4-6"
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-sonnet-4-6",
+    "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY": "1"
   }
 }
 EOF
@@ -214,7 +225,8 @@ cat > ~/.claude/settings.json << 'EOF'
     "ANTHROPIC_BASE_URL": "https://yapayzekalab.org",
     "ANTHROPIC_AUTH_TOKEN": "yzk_live_YOUR_KEY",
     "ANTHROPIC_MODEL": "claude-opus-4-8",
-    "ANTHROPIC_SMALL_FAST_MODEL": "claude-sonnet-4-6"
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-sonnet-4-6",
+    "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY": "1"
   }
 }
 EOF
