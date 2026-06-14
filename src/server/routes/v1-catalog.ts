@@ -49,6 +49,25 @@ export function filterV1ClientCatalogEntries(entries: V1CatalogEntry[]): V1Catal
   });
 }
 
+// Claude Code "gateway model discovery" picker'ı, /v1/models'taki id Claude Code'un
+// BUILT-IN model tablosuyla BİREBİR (string) eşleşirse o modeli "From gateway" listesinden
+// ELER (dedup: zaten yerleşik olanı tekrar listeleme). claude-opus-4-7/-4-6 ve sonnet-4-6
+// DASH formu Claude Code 2.1.x built-in tablosunda VAR → eleniyorlardı; yalnız claude-opus-4.8
+// (NOKTA form, built-in'de yok) hayatta kalıyordu. Çözüm: bu üç modeli istemciye NOKTA form id
+// ile sun → built-in tabloyla eşleşmez → dedup'tan geçer → picker'da görünür. NOKTA form zaten
+// geçerli alias (master-models aliases) → /v1/messages tarafında canonicalizeModelId DASH'e
+// çevirir, dolayısıyla routing/billing/model_overrides AYNEN korunur (yalnız wire-name sunumu;
+// dash gönderen mevcut istemciler de çalışmaya devam eder, dash hâlâ kabul edilen girdi).
+const CLIENT_FACING_DOT_ID: Record<string, string> = {
+  "claude-opus-4-7": "claude-opus-4.7",
+  "claude-opus-4-6": "claude-opus-4.6",
+  "claude-sonnet-4-6": "claude-sonnet-4.6",
+};
+
+export function clientFacingModelId(masterId: string): string {
+  return CLIENT_FACING_DOT_ID[masterId] ?? masterId;
+}
+
 function providerSlug(model: MasterModel): string {
   return model.providerSlug ?? model.provider.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
@@ -135,7 +154,7 @@ export function buildV1ModelsResponse(entries: V1CatalogEntry[] = defaultCatalog
   return {
     object: "list" as const,
     data: enabledEntries.map(({ model, computed }) => ({
-      id: model.id,
+      id: clientFacingModelId(model.id),
       object: "model" as const,
       name: model.name,
       // Claude Code "gateway model discovery" picker'ı etiket için display_name'i

@@ -7,6 +7,7 @@ import {
   buildV1ModelCountResponse,
   buildV1ModelsResponse,
   buildV1ProvidersResponse,
+  clientFacingModelId,
   createV1CatalogRouter,
   filterV1ClientCatalogEntries,
   V1_CLIENT_MODEL_IDS,
@@ -118,9 +119,17 @@ describe("public /v1 catalog contract", () => {
       const payload = await models.json();
       const ids = payload.data.map((model: { id: string }) => model.id);
 
-      expect(ids).toEqual(V1_CLIENT_MODEL_IDS);
+      // İstemciye sunulan id'ler: Claude Code "gateway model discovery" dedup'ından
+      // geçmeleri için 4-7/4-6/sonnet-4-6 NOKTA forma remap'lenir (clientFacingModelId).
+      expect(ids).toEqual(V1_CLIENT_MODEL_IDS.map(clientFacingModelId));
       expect(ids).toHaveLength(6);
       expect(ids).toContain("claude-opus-4.8");
+      // Dedup'tan geçen NOKTA-form id'ler (DASH form Claude Code built-in'iyle eşleşip eleniyordu)
+      expect(ids).toContain("claude-opus-4.7");
+      expect(ids).toContain("claude-opus-4.6");
+      expect(ids).toContain("claude-sonnet-4.6");
+      expect(ids).not.toContain("claude-opus-4-7");
+      expect(ids).not.toContain("claude-sonnet-4-6");
       expect(ids).toContain("gpt-5.5");
       expect(ids).toContain("gpt-5.4");
       expect(ids).not.toContain("gpt-5.5-2026-04-23");
@@ -133,7 +142,8 @@ describe("public /v1 catalog contract", () => {
 
       const count = await fetch(`${baseUrl}/v1/models/count`);
       expect(await count.json()).toEqual({ count: V1_CLIENT_MODEL_IDS.length });
-      expect(filterV1ClientCatalogEntries(entries).map((entry) => entry.model.id)).toEqual(ids);
+      // Filtre master (DASH) id'leri V1_CLIENT_MODEL_IDS sırasında döndürür; yanıt id'leri ise remap'li.
+      expect(filterV1ClientCatalogEntries(entries).map((entry) => entry.model.id)).toEqual([...V1_CLIENT_MODEL_IDS]);
     } finally {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => error ? reject(error) : resolve());
