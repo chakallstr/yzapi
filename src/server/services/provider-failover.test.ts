@@ -10,7 +10,13 @@ describe("isFailoverEligible", () => {
   it("502/503/504 → eligible", () => {
     for (const s of [502, 503, 504]) expect(isFailoverEligible({ status: s })).toBe(true);
   });
-  it("4xx and non-{502,503,504} 5xx → NOT eligible", () => {
+  it("upstream 402 (platform quota exhausted) → eligible (fallback uses a different account)", () => {
+    expect(isFailoverEligible({ status: 402 })).toBe(true);
+    expect(
+      isFailoverEligible({ status: 402, body: { error: { code: "insufficient_quota" } } }),
+    ).toBe(true);
+  });
+  it("other 4xx and non-{502,503,504} 5xx → NOT eligible", () => {
     for (const s of [400, 401, 403, 404, 429, 500, 501]) expect(isFailoverEligible({ status: s })).toBe(false);
   });
   it("budget abort (AbortError/TimeoutError) → eligible", () => {
@@ -36,6 +42,7 @@ const primary = { profileId: "wellflow", baseUrl: "p", apiKey: "k", modelMap: {}
 const fallback = { profileId: "closerouter", baseUrl: "f", apiKey: "k", modelMap: {}, source: {} as never } as never;
 const e503 = () => Object.assign(new Error("x"), { status: 503 });
 const e400 = () => Object.assign(new Error("x"), { status: 400 });
+const e402 = () => Object.assign(new Error("x"), { status: 402, body: { error: { code: "insufficient_quota" } } });
 
 describe("forwardWithFailover", () => {
   beforeEach(() => __resetBreaker());
@@ -54,6 +61,13 @@ describe("forwardWithFailover", () => {
     expect(r).toMatchObject({ result: "fb", servedBy: "closerouter", failedOver: true });
     expect(run.mock.calls[0][1]).toMatchObject({ maxAttempts: 1, timeoutMs: 7000 });
     expect(run.mock.calls[1][1]).toBeUndefined();
+  });
+
+  it("primary 402 (quota exhausted, eligible) → fallback served", async () => {
+    const run = vi.fn().mockRejectedValueOnce(e402()).mockResolvedValueOnce("fb");
+    const r = await forwardWithFailover({ primary, fallback }, {}, run);
+    expect(r).toMatchObject({ result: "fb", servedBy: "closerouter", failedOver: true });
+    expect(run).toHaveBeenCalledTimes(2);
   });
 
   it("primary 400 (not eligible) → propagate, NO failover, breaker stays closed", async () => {

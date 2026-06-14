@@ -18,8 +18,14 @@ const FAILOVER_CONNECT_CODES = new Set([
 ]);
 
 // Only INFRASTRUCTURE failures are eligible (spec §3.3): 502/503/504 + connection-level
-// (connect timeout/refused/DNS) + our single-shot budget abort. Any 4xx and any other
+// (connect timeout/refused/DNS) + our single-shot budget abort. Other 4xx and other
 // 5xx (incl 500/501) are NOT eligible — the fallback would just return the same app error.
+// EXCEPTION (2026-06-15): upstream 402 IS eligible. In this gateway a 402 from upstream
+// always means OUR platform account on that provider ran out of quota/balance
+// (insufficient_quota) — never the customer's fault (customer balance is checked by
+// reserveUsageBudget BEFORE forward). The fallback uses a DIFFERENT provider account, so
+// it can serve. Without this, a primary's quota exhaustion took down Claude even though
+// the configured fallback (popusk) had funds — see usage_records upstream_402 cluster.
 export function isFailoverEligible(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
   const e = err as {
@@ -29,6 +35,7 @@ export function isFailoverEligible(err: unknown): boolean {
     message?: string;
     cause?: { code?: string; message?: string };
   };
+  if (e.status === 402) return true;
   if (e.status === 502 || e.status === 503 || e.status === 504) return true;
   if (e.name === "AbortError" || e.name === "TimeoutError") return true; // primary budget abort
   const code = e.cause?.code ?? e.code;
