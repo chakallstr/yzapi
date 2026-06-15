@@ -52,6 +52,13 @@ function consumeBucket(scope: string, limit: number): { allowed: boolean; retryA
   };
 }
 
+// Tek atımlık aksiyon limiti (ör. ödeme bildirimi 1/dk). Token tüketir, RESTORE ETMEZ
+// (checkRateLimit'in çok-guard restore mantığından farklı; burada aksiyon gerçekleşti sayılır).
+export function consumeActionRate(scope: string, perMinute: number): { allowed: boolean; retryAfter?: number } {
+  const r = consumeBucket(scope, perMinute);
+  return { allowed: r.allowed, retryAfter: r.retryAfter };
+}
+
 export interface RateLimitResult {
   allowed: boolean;
   retryAfter?: number;
