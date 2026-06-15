@@ -17,7 +17,14 @@
  *     1) added_models.enabled=true  2) provider_profiles['codefast'].enabled=true
  *     3) packages.satista=true (admin "Satışa Aç")
  *
- * ⚠️ TIER-2 model id'leri açıklama-bazlı TAHMİN (VERIFY işaretli) — CF proxy açılınca kesinleştir.
+ * MODEL ID DOĞRULAMA (2026-06-15, CF proxy açıldıktan sonra canlı + katalog metadata ile):
+ *   ✓ codex/gemini (T1): order+proxy çalışıyor — lansman-hazır.
+ *   ✓ composer: katalog public_model_id="composer-2.5-fast" (upstream "grok-composer-2.5-fast").
+ *   ✓ kimi: canlı /proxy/kimi-k2-6-api/v1/models = ["kimi-k2.6"] (tam eşleşme).
+ *   ✓ nvidia: gerçek id'ler NAMESPACE'li (z-ai/…, nvidia/…) — aşağıda düzeltildi; canlı + katalog example_models ile doğrulandı.
+ *   ⚠️ glm + grok: CF reseller order'ı 500 "Unexpected reseller worker error" veriyor (CF-tarafı bug,
+ *      Codex/Gemini ücretli order'ları çalışırken bu ikisi patlıyor) → id'ler DOĞRULANAMADI, modelsVerified=false
+ *      kalır. CF bu iki ürünü düzeltince /proxy/<slug>/v1/models ile kesinleştir.
  */
 import { dbSql } from "../src/server/db/client.js";
 import { encryptApiKey } from "../src/server/services/api-key-service.js";
@@ -45,25 +52,29 @@ const PRODUCTS: Prod[] = [
     listTl: 600, gunluk: 750, sureGun: 30, manual: false, tier2: true, modelsVerified: false,
     models: ["glm-5.1", "glm-5-turbo", "glm-4.7", "glm-4.5-air"] },
   { id: "cf-composer", ad: "CodeFast Composer 2.5 Fast — Aylık", cfCatalogId: "12e78870-bf25-417d-a41f-18ce43576379", cfApiSlug: "composer-api",
-    listTl: 1500, gunluk: 500, sureGun: 30, manual: false, tier2: true, modelsVerified: false,
-    models: ["composer-2.5-fast"] },
+    listTl: 1500, gunluk: 500, sureGun: 30, manual: false, tier2: true, modelsVerified: true,
+    models: ["composer-2.5-fast"] }, // ✓ katalog public_model_id (2026-06-15)
   { id: "cf-grok", ad: "CodeFast Grok — Aylık", cfCatalogId: "a2cf1570-7d1b-4f8d-a67f-40245935e43e", cfApiSlug: "grok-api",
     listTl: 500, gunluk: 500, sureGun: 30, manual: false, tier2: true, modelsVerified: false,
-    models: ["grok-4", "grok-3"] }, // VERIFY: CF Grok wire id'leri
+    models: ["grok-4", "grok-3"] }, // ⚠️ DOĞRULANAMADI — CF order 500 (worker bug); CF düzeltince /v1/models ile kesinleştir
   { id: "cf-kimi", ad: "CodeFast Sınırsız Kimi K2.6 — Aylık", cfCatalogId: "720376e2-bd07-4fe4-9cc1-25b084c38cdd", cfApiSlug: "kimi-k2-6-api",
-    listTl: 900, gunluk: 100000, sureGun: 30, manual: false, tier2: true, modelsVerified: false,
-    models: ["kimi-k2.6"] },
+    listTl: 900, gunluk: 100000, sureGun: 30, manual: false, tier2: true, modelsVerified: true,
+    models: ["kimi-k2.6"] }, // ✓ canlı /proxy/kimi-k2-6-api/v1/models (2026-06-15)
   { id: "cf-nvidia", ad: "CodeFast NVIDIA (Bedava) — Aylık", cfCatalogId: "fdb8ce1b-9114-4945-b331-6f948d8681ce", cfApiSlug: "nvidia-api",
-    listTl: 0, gunluk: 1500, sureGun: 30, manual: false, tier2: true, modelsVerified: false,
-    models: ["deepseek-v4-flash", "kimi-k2.6", "step-3.7-flash", "glm-5.1", "nemotron-3-ultra-550b", "minimax-m2.7"] }, // VERIFY
+    listTl: 0, gunluk: 1500, sureGun: 30, manual: false, tier2: true, modelsVerified: true,
+    // ✓ canlı /proxy/nvidia-api/v1/models + katalog example_models (2026-06-15) — NAMESPACE'li gerçek id'ler
+    models: ["deepseek-ai/deepseek-v4-flash", "moonshotai/kimi-k2.6", "stepfun-ai/step-3.7-flash", "z-ai/glm-5.1", "nvidia/nemotron-3-ultra-550b-a55b", "minimaxai/minimax-m2.7"] },
 ];
 
 // TIER-2 modellerinin gösterim adları (added_models.name).
 const MODEL_NAMES: Record<string, string> = {
+  // glm/grok/composer/kimi ürün id'leri
   "glm-5.1": "GLM 5.1", "glm-5-turbo": "GLM 5 Turbo", "glm-4.7": "GLM 4.7", "glm-4.5-air": "GLM 4.5 Air",
   "composer-2.5-fast": "Composer 2.5 Fast", "grok-4": "Grok 4", "grok-3": "Grok 3", "kimi-k2.6": "Kimi K2.6",
-  "deepseek-v4-flash": "DeepSeek V4 Flash", "step-3.7-flash": "Step 3.7 Flash",
-  "nemotron-3-ultra-550b": "Nemotron 3 Ultra 550B", "minimax-m2.7": "MiniMax M2.7",
+  // nvidia ürünü — NAMESPACE'li gerçek id'ler (2026-06-15 canlı doğrulama)
+  "deepseek-ai/deepseek-v4-flash": "DeepSeek V4 Flash", "moonshotai/kimi-k2.6": "Kimi K2.6",
+  "stepfun-ai/step-3.7-flash": "Step 3.7 Flash", "z-ai/glm-5.1": "GLM 5.1",
+  "nvidia/nemotron-3-ultra-550b-a55b": "Nemotron 3 Ultra 550B", "minimaxai/minimax-m2.7": "MiniMax M2.7",
 };
 
 async function upsertPackage(p: Prod) {
