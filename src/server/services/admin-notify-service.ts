@@ -20,7 +20,7 @@
 import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 
-export type AdminEventKind = "yeni_uye" | "odeme_denemesi" | "odeme_sorunu" | "sistem_uyarisi";
+export type AdminEventKind = "yeni_uye" | "odeme_denemesi" | "odeme_yapildi" | "odeme_sorunu" | "sistem_uyarisi";
 
 export interface AdminNotifyEvent {
   kind: AdminEventKind;
@@ -28,6 +28,7 @@ export interface AdminNotifyEvent {
   userEmail?: string;
   method?: string;
   amountTL?: number;
+  amountUsd?: number;
   reference?: string;
   status?: string;
   detail?: string;
@@ -75,13 +76,21 @@ export function formatAdminEvent(event: AdminNotifyEvent): string {
         : "🔴"
       : event.kind === "odeme_sorunu"
         ? "🔴"
-        : event.kind === "odeme_denemesi"
-          ? "💳"
-          : "🆕";
+        : event.kind === "odeme_yapildi"
+          ? "✅"
+          : event.kind === "odeme_denemesi"
+            ? "💳"
+            : "🆕";
   const lines = [`${ikon} YapayZekaLab — ${event.title}`];
   if (event.userEmail) lines.push(`Kullanıcı: ${event.userEmail}`);
   if (event.method) lines.push(`Yöntem: ${event.method}`);
-  if (typeof event.amountTL === "number" && Number.isFinite(event.amountTL)) {
+  if (typeof event.amountUsd === "number" && Number.isFinite(event.amountUsd)) {
+    const tl =
+      typeof event.amountTL === "number" && Number.isFinite(event.amountTL)
+        ? ` ≈ ₺${event.amountTL.toFixed(2)}`
+        : "";
+    lines.push(`Tutar: $${event.amountUsd.toFixed(2)}${tl}`);
+  } else if (typeof event.amountTL === "number" && Number.isFinite(event.amountTL)) {
     lines.push(`Tutar: ₺${event.amountTL.toFixed(2)}`);
   }
   if (event.reference) lines.push(`Referans: ${event.reference}`);

@@ -46,6 +46,26 @@ describe("admin-notify formatAdminEvent (saf)", () => {
     const text = formatAdminEvent({ kind: "odeme_denemesi", title: "T", amountTL: NaN });
     expect(text).not.toContain("Tutar");
   });
+
+  it("ödeme yapıldı olayını formatlar (✅ + USD≈TL)", () => {
+    const text = formatAdminEvent({
+      kind: "odeme_yapildi",
+      title: "Ödeme YAPILDI (müşteri bildirdi)",
+      userEmail: "c@d.com",
+      amountUsd: 10,
+      amountTL: 478,
+      reference: "ABC123",
+    });
+    expect(text).toContain("✅ YapayZekaLab — Ödeme YAPILDI (müşteri bildirdi)");
+    expect(text).toContain("Tutar: $10.00 ≈ ₺478.00");
+    expect(text).toContain("Referans: ABC123");
+  });
+
+  it("amountUsd yoksa eski ₺-only davranışı korunur", () => {
+    const text = formatAdminEvent({ kind: "odeme_denemesi", title: "T", amountTL: 100 });
+    expect(text).toContain("Tutar: ₺100.00");
+    expect(text).not.toContain("$");
+  });
 });
 
 describe("admin-notify normalizeRecipient (saf)", () => {
