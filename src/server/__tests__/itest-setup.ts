@@ -17,6 +17,10 @@ process.env.APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:4567";
 process.env.CLOSEROUTER_API_KEY = "closerouter_test_key";
 process.env.CLOSEROUTER_BASE_URL = "https://api.closerouter.dev/v1";
 process.env.WHATSAPP_OTP_ENABLED = "false";
+// IBAN ödeme yöntemi itest fixtures (iban/init dedup testleri için).
+process.env.IBAN_BANK_NAME = process.env.IBAN_BANK_NAME || "Test Bank";
+process.env.IBAN_NUMBER = process.env.IBAN_NUMBER || "TR000000000000000000000000";
+process.env.IBAN_OWNER = process.env.IBAN_OWNER || "Test Owner";
 // Shopier OSB (Paket 3) — fixed-link auto-credit itest fixtures.
 process.env.SHOPIER_OSB_USERNAME = process.env.SHOPIER_OSB_USERNAME || "osb_itest_user";
 process.env.SHOPIER_OSB_PASSWORD = process.env.SHOPIER_OSB_PASSWORD || "osb_itest_pass";
