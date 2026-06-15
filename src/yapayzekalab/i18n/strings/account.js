@@ -158,6 +158,8 @@ export default {
     'account.instruction.memo': 'Memo:',
     'account.instruction.whatsappNotify': 'WhatsApp ödeme bildirimi yap',
     'account.instruction.whatsappMissing': 'WhatsApp bildirim numarası henüz tanımlı değil; ödeme sonrası destek ekibiyle iletişime geçin.',
+    'account.instruction.confirmPaid': 'Ödedim — WhatsApp ile bildir',
+    'account.topUp.cooldown': 'Bilgiler gönderildi · {n}s',
 
     // API keys card
     'account.keys.bearerPrefix': 'Authorization: Bearer',
@@ -386,6 +388,8 @@ export default {
     'account.instruction.memo': 'Memo:',
     'account.instruction.whatsappNotify': 'Send WhatsApp payment notice',
     'account.instruction.whatsappMissing': 'The WhatsApp notification number is not set yet; contact the support team after payment.',
+    'account.instruction.confirmPaid': 'I paid — notify via WhatsApp',
+    'account.topUp.cooldown': 'Details sent · {n}s',
 
     // API keys card
     'account.keys.bearerPrefix': 'Authorization: Bearer',
