@@ -15,6 +15,7 @@ import { logger } from "../lib/logger.js";
 import { isIbanConfigured, validatePaymentAmount } from "../services/payment-guards.js";
 import { adminPaymentNotificationEmail } from "../services/email-service.js";
 import { notifyAdmin } from "../services/admin-notify-service.js";
+import { consumeActionRate } from "../services/rate-limit-service.js";
 import { buildUsdTopupQuote } from "../services/payment-pricing.js";
 import { dodoConfigured, initDodoPayment, verifyDodoWebhook } from "../services/dodopayments-service.js";
 
@@ -93,7 +94,7 @@ function buildPaymentNotification(opts: {
 }) {
   const whatsappNumber = normalizeWhatsappNumber(opts.settings.paymentWhatsappNumber);
   const whatsappMessage = [
-    "YapayZekaLab ödeme bildirimi",
+    "Ödeme yapıldı ✅ — YapayZekaLab ödeme bildirimi",
     `Yöntem: ${opts.method}`,
     `Bakiye: $${opts.amountUsd.toFixed(2)}`,
     `Ödeme: ${opts.payableLabel}`,
@@ -732,61 +733,102 @@ router.post("/iban/init", userAuth, requireWhatsappVerified, async (req, res, ne
     }
 
     const kdv = calcKdv(quote.payableTL);
+    const userId = req.user!.id;
+
+    // 60sn içinde aynı tutarla açılmış bekleyen IBAN ödemesi varsa onu yeniden kullan
+    // (mükerrer payments/pending satırı + bildirim spam'ini önler — IBAN her durumda gösterilir).
+    const recent = await db
+      .select({
+        id: payments.id,
+        payableTL: payments.payableTL,
+        idempotencyKey: payments.idempotencyKey,
+        olusturma: payments.olusturma,
+      })
+      .from(payments)
+      .where(and(eq(payments.userId, userId), eq(payments.metod, "iban"), eq(payments.durum, "bekliyor")))
+      .orderBy(desc(payments.olusturma))
+      .limit(1);
+
+    const recentRow = recent[0];
+    const reused = Boolean(
+      recentRow &&
+        recentRow.olusturma instanceof Date &&
+        Date.now() - recentRow.olusturma.getTime() < 60_000 &&
+        recentRow.payableTL !== null &&
+        Math.abs(Number(recentRow.payableTL) - quote.payableTL) < 0.005,
+    );
+
     // Müşteriye görünmeyen iç eşleştirme anahtarı (payments ↔ pending_iban_payments).
-    const idempotencyKey = generateIdempotencyKey();
+    let paymentId: string;
+    let idempotencyKey: string;
+    if (reused) {
+      paymentId = recentRow!.id;
+      idempotencyKey = recentRow!.idempotencyKey ?? generateIdempotencyKey();
+    } else {
+      idempotencyKey = generateIdempotencyKey();
+      const paymentInserted = await db
+        .insert(payments)
+        .values({
+          userId,
+          metod: "iban",
+          miktarTL: String(quote.payableTL),
+          kdvTL: String(kdv.kdvTL),
+          netTL: String(kdv.netTL),
+          amountUsd: String(quote.amountUsd),
+          payableTL: String(quote.payableTL),
+          creditTL: String(quote.creditTL),
+          kurAtPayment: String(quote.kur),
+          roundingTL: String(quote.roundingTL),
+          durum: "bekliyor",
+          idempotencyKey,
+        })
+        .returning({ id: payments.id });
+      paymentId = paymentInserted[0].id;
 
-    // Create payment row
-    const paymentInserted = await db.insert(payments).values({
-      userId: req.user!.id,
-      metod: "iban",
-      miktarTL: String(quote.payableTL),
-      kdvTL: String(kdv.kdvTL),
-      netTL: String(kdv.netTL),
-      amountUsd: String(quote.amountUsd),
-      payableTL: String(quote.payableTL),
-      creditTL: String(quote.creditTL),
-      kurAtPayment: String(quote.kur),
-      roundingTL: String(quote.roundingTL),
-      durum: "bekliyor",
-      idempotencyKey,
-    }).returning({ id: payments.id });
+      await db.insert(pendingIbanPayments).values({
+        userId,
+        miktarTL: String(quote.payableTL),
+        kdvTL: String(kdv.kdvTL),
+        amountUsd: String(quote.amountUsd),
+        payableTL: String(quote.payableTL),
+        creditTL: String(quote.creditTL),
+        kurAtPayment: String(quote.kur),
+        roundingTL: String(quote.roundingTL),
+        referansKodu: idempotencyKey,
+      });
+    }
 
-    const paymentId = paymentInserted[0].id;
-
-    const userRows = await db.select({ email: users.email })
-      .from(users).where(eq(users.id, req.user!.id)).limit(1);
+    const userRows = await db
+      .select({ email: users.email, adSoyad: users.adSoyad })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
     const settings = await getManualPaymentSettings();
 
-    // Create pending iban record
-    await db.insert(pendingIbanPayments).values({
-      userId: req.user!.id,
-      miktarTL: String(quote.payableTL),
-      kdvTL: String(kdv.kdvTL),
-      amountUsd: String(quote.amountUsd),
-      payableTL: String(quote.payableTL),
-      creditTL: String(quote.creditTL),
-      kurAtPayment: String(quote.kur),
-      roundingTL: String(quote.roundingTL),
-      referansKodu: idempotencyKey,
-    });
-
-    adminPaymentNotificationEmail({
-      title: "Yeni IBAN ödeme bildirimi",
-      userEmail: userRows[0]?.email,
-      method: "iban",
-      amountUsd: quote.amountUsd,
-      payableTL: quote.payableTL,
-      creditTL: quote.creditTL,
-      status: "bekliyor",
-    }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
-    notifyAdmin({
-      kind: "odeme_denemesi",
-      title: "Ödeme başlatıldı (IBAN)",
-      userEmail: userRows[0]?.email,
-      method: "iban",
-      amountTL: quote.payableTL,
-      status: "bekliyor",
-    }).catch((e: unknown) => logger.error({ err: e }, "admin notify (iban init) failed"));
+    // Aşama 1 "Ödeme hazırlanıyor" bildirimi: yalnız yeni kayıtta VE kullanıcı başına 1/dk
+    // (müşteri butona ard arda bassa bile mükerrer bildirim gitmez).
+    if (!reused && consumeActionRate(`iban_notify_${userId}`, 1).allowed) {
+      adminPaymentNotificationEmail({
+        title: "Yeni IBAN ödeme bildirimi",
+        userEmail: userRows[0]?.email,
+        method: "iban",
+        amountUsd: quote.amountUsd,
+        payableTL: quote.payableTL,
+        creditTL: quote.creditTL,
+        status: "bekliyor",
+      }).catch((e: unknown) => logger.error({ err: e }, "admin payment notification failed"));
+      notifyAdmin({
+        kind: "odeme_denemesi",
+        title: "Ödeme hazırlanıyor (IBAN)",
+        userEmail: userRows[0]?.email,
+        method: "iban",
+        amountUsd: quote.amountUsd,
+        amountTL: quote.payableTL,
+        reference: idempotencyKey,
+        status: "bekliyor",
+        detail: userRows[0]?.adSoyad ? `Ad: ${userRows[0].adSoyad}` : undefined,
+      }).catch((e: unknown) => logger.error({ err: e }, "admin notify (iban init) failed"));
+    }
 
     res.json({
       paymentId,
@@ -807,6 +849,64 @@ router.post("/iban/init", userAuth, requireWhatsappVerified, async (req, res, ne
       aciklama: "Havale/EFT açıklama kısmını lütfen BOŞ bırakın. Ödeme sonrası WhatsApp ile bildirim yapabilirsiniz.",
     });
   } catch (e) { next(e); }
+});
+
+// ── POST /api/payments/iban/confirm — müşteri "ödedim" dedi → admin'e bildir ────
+// DB'ye YAZMAZ (durum değişmez, bakiyeye dokunmaz); yalnız sahiplik doğrular + WhatsApp.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+router.post("/iban/confirm", userAuth, requireWhatsappVerified, async (req, res, next) => {
+  try {
+    const userId = req.user!.id;
+    const limit = consumeActionRate(`iban_confirm_${userId}`, 1);
+    if (!limit.allowed) {
+      res.status(429).json({ error: "Çok sık denediniz, lütfen biraz bekleyin.", retryAfter: limit.retryAfter });
+      return;
+    }
+
+    const paymentId = String((req.body as Record<string, unknown>)?.paymentId ?? "").trim();
+    if (!UUID_RE.test(paymentId)) {
+      res.status(404).json({ error: "Ödeme bulunamadı." });
+      return;
+    }
+
+    const rows = await db
+      .select({
+        id: payments.id,
+        payableTL: payments.payableTL,
+        amountUsd: payments.amountUsd,
+        idempotencyKey: payments.idempotencyKey,
+      })
+      .from(payments)
+      .where(and(eq(payments.id, paymentId), eq(payments.userId, userId), eq(payments.metod, "iban")))
+      .limit(1);
+    const row = rows[0];
+    if (!row) {
+      res.status(404).json({ error: "Ödeme bulunamadı." });
+      return;
+    }
+
+    const userRows = await db
+      .select({ email: users.email, adSoyad: users.adSoyad })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    notifyAdmin({
+      kind: "odeme_yapildi",
+      title: "Ödeme YAPILDI (müşteri bildirdi)",
+      userEmail: userRows[0]?.email,
+      method: "iban",
+      amountUsd: row.amountUsd === null ? undefined : Number(row.amountUsd),
+      amountTL: row.payableTL === null ? undefined : Number(row.payableTL),
+      reference: row.idempotencyKey ?? undefined,
+      status: "müşteri ödedim dedi",
+      detail: userRows[0]?.adSoyad ? `Ad: ${userRows[0].adSoyad}` : undefined,
+    }).catch((e: unknown) => logger.error({ err: e }, "admin notify (iban confirm) failed"));
+
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
 });
 
 // ── POST /api/payments/crypto/init ───────────────────────────────────────────
