@@ -595,6 +595,7 @@ const AccountTab = ({ ctx }) => {
   const [paymentRows, setPaymentRows] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState(null);
   const [paymentInstruction, setPaymentInstruction] = useState(null);
+  const [topUpCooldown, setTopUpCooldown] = useState(0);
   const [team, setTeam] = useState([]);
   const [webhooks, setWebhooks] = useState(null);
   const [sandboxKey, setSandboxKey] = useState(null);
@@ -946,6 +947,22 @@ const AccountTab = ({ ctx }) => {
   const selectedPaymentMethod = paymentMethods?.[backendPaymentMethod];
   const paymentMethodEnabled = selectedPaymentMethod?.enabled !== false;
 
+  // Ödeme butonu başarılı IBAN init'ten sonra 60sn geri-sayımla pasifleşir (müşterinin
+  // ard arda basıp bildirim tetiklemesini önler; sunucu da ayrıca tekilleştirir).
+  useEffect(() => {
+    if (topUpCooldown <= 0) return undefined;
+    const id = setInterval(() => setTopUpCooldown((s) => (s <= 1 ? 0 : s - 1)), 1000);
+    return () => clearInterval(id);
+  }, [topUpCooldown]);
+
+  // Müşteri "Ödedim" linkine basınca: <a> wa.me'yi açar (müşterinin kendi WhatsApp'ı);
+  // bu handler AYRICA sistemin de Ufuk'a otomatik bildirmesi için confirm ucunu çağırır.
+  const onConfirmIbanPaidNotify = () => {
+    const paymentId = paymentInstruction?.paymentId;
+    if (!paymentId) return;
+    apiJson('/api/payments/iban/confirm', { method: 'POST', body: { paymentId } }).catch(() => {});
+  };
+
   const onTopUp = async () => {
     if (effectiveAmount < MIN_USD) return;
     if (!paymentMethodEnabled) {
@@ -985,6 +1002,7 @@ const AccountTab = ({ ctx }) => {
         setPaymentInstruction({
           method: 'iban',
           title: t('account.instruction.ibanTitle'),
+          paymentId: result?.paymentId,
           quote: result?.quote,
           payableLabel: `₺${Number(result?.quote?.payableTL || payableTL).toFixed(0)}`,
           balanceLabel: `$${Number(result?.quote?.amountUsd || effectiveAmount).toFixed(2)}`,
@@ -992,6 +1010,7 @@ const AccountTab = ({ ctx }) => {
           whatsapp: result?.whatsapp,
           note: result?.aciklama,
         });
+        setTopUpCooldown(60);
         await loadAccount();
         return;
       }
@@ -1302,11 +1321,15 @@ const AccountTab = ({ ctx }) => {
 
               <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                 {buildWhatsAppPaymentLink(paymentInstruction) ? (
-                  <a href={buildWhatsAppPaymentLink(paymentInstruction)} target="_blank" rel="noreferrer" style={{
-                    padding: '8px 10px', borderRadius: 9, background: 'var(--ink)', color: '#fff',
-                    fontSize: 11.5, fontWeight: 600, textDecoration: 'none',
-                  }}>
-                    {t('account.instruction.whatsappNotify')}
+                  <a href={buildWhatsAppPaymentLink(paymentInstruction)} target="_blank" rel="noreferrer"
+                     onClick={paymentInstruction.method === 'iban' ? onConfirmIbanPaidNotify : undefined}
+                     style={{
+                       padding: '8px 10px', borderRadius: 9, background: 'var(--ink)', color: '#fff',
+                       fontSize: 11.5, fontWeight: 600, textDecoration: 'none',
+                     }}>
+                    {paymentInstruction.method === 'iban'
+                      ? t('account.instruction.confirmPaid')
+                      : t('account.instruction.whatsappNotify')}
                   </a>
                 ) : (
                   <span style={{ fontSize: 10.5, color: 'var(--ink-3)', lineHeight: 1.5 }}>
@@ -1317,15 +1340,18 @@ const AccountTab = ({ ctx }) => {
             </div>
           )}
 
-          <button onClick={onTopUp} disabled={belowMin || effectiveAmount < MIN_USD || !paymentMethodEnabled} style={{
+          <button onClick={onTopUp} disabled={belowMin || effectiveAmount < MIN_USD || !paymentMethodEnabled || topUpCooldown > 0} style={{
             width: '100%', padding: '11px 0', borderRadius: 10,
-            background: belowMin || !paymentMethodEnabled ? 'var(--ink-4)' : 'var(--accent)', color: '#fff',
+            background: belowMin || !paymentMethodEnabled || topUpCooldown > 0 ? 'var(--ink-4)' : 'var(--accent)', color: '#fff',
             fontSize: 13, fontWeight: 600,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            opacity: belowMin || !paymentMethodEnabled ? 0.55 : 1, cursor: belowMin || !paymentMethodEnabled ? 'not-allowed' : 'pointer',
+            opacity: belowMin || !paymentMethodEnabled || topUpCooldown > 0 ? 0.55 : 1,
+            cursor: belowMin || !paymentMethodEnabled || topUpCooldown > 0 ? 'not-allowed' : 'pointer',
           }}>
             <I.Wallet size={14} stroke="#fff" />
-            <span>{t('account.topUp.payButton', { total: paymentTotalLabel, amount: effectiveAmount.toFixed(2) })}</span>
+            <span>{topUpCooldown > 0
+              ? t('account.topUp.cooldown', { n: topUpCooldown })
+              : t('account.topUp.payButton', { total: paymentTotalLabel, amount: effectiveAmount.toFixed(2) })}</span>
           </button>
 
           <div style={{ fontSize: 10.5, color: 'var(--ink-3)', textAlign: 'center', marginTop: 10, fontFamily: 'var(--font-mono)', lineHeight: 1.55 }}>
