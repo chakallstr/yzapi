@@ -77,7 +77,20 @@ export interface CfOrderReq {
   external_order_id: string;
   customer?: { email?: string; username?: string };
   create_customer_api_key?: boolean;
-  items: CfQuoteItemReq[];
+  /** items VEYA template_id verilir (ikisi birden değil). template_id = CF panel şablonu. */
+  items?: CfQuoteItemReq[];
+  template_id?: string;
+}
+
+/** Kayıtlı CF paket şablonu (özet). */
+export interface CfTemplate {
+  id: string;
+  name: string;
+  status: string;
+  currency: string;
+  duration_days: number | null;
+  item_count?: number;
+  items_summary?: string;
 }
 
 /**
@@ -109,6 +122,13 @@ export function extractCustomerKey(o: CfOrderResult): string | null {
 
 export const cfCatalog = () => cf<CfCatalogItem[]>("GET", "/v1/catalog");
 export const cfQuote = (items: CfQuoteItemReq[]) => cf<CfQuoteResult>("POST", "/v1/orders/quote", { items });
+/** Şablon-bazlı quote (bakiye düşmez): `{template_id, external_customer_id}`. */
+export const cfQuoteTemplate = (templateId: string, externalCustomerId: string) =>
+  cf<CfQuoteResult>("POST", "/v1/orders/quote", { template_id: templateId, external_customer_id: externalCustomerId });
+/** Kayıtlı CF paket şablonlarını listele (admin: pakete bağlamak için id seç). */
+export const cfListTemplates = () => cf<CfTemplate[]>("GET", "/v1/package-templates");
+export const cfGetTemplate = (id: string) =>
+  cf<{ template: CfTemplate; items: unknown[] }>("GET", `/v1/package-templates/${encodeURIComponent(id)}`);
 export const cfCreateCustomer = (b: { external_customer_id: string; email?: string; username?: string }) =>
   cf<{ id: string; external_customer_id: string }>("POST", "/v1/customers", b);
 export const cfCreateOrder = (b: CfOrderReq, idempotencyKey: string) =>

@@ -26,7 +26,7 @@ router.use(requireOwner);
 router.get("/packages", async (_req: Request, res: Response) => {
   const rows = await dbSql<any[]>`
     SELECT id, ad, kategori, fiyat_tl, cf_reseller_cost_tl, cf_api_slug, cf_catalog_id,
-           cf_manual, cf_token_millions, enabled, satista, gunluk_istek_limiti, sure_gun
+           cf_manual, cf_token_millions, cf_template_id, enabled, satista, gunluk_istek_limiti, sure_gun
     FROM packages WHERE cf_api_slug IS NOT NULL
     ORDER BY ad ASC
   `;
@@ -38,6 +38,7 @@ router.get("/packages", async (_req: Request, res: Response) => {
     return {
       id: r.id, ad: r.ad, slug: r.cf_api_slug, manual: r.cf_manual === true,
       tokenMillions: r.cf_token_millions, gunlukLimit: r.gunluk_istek_limiti, sureGun: r.sure_gun,
+      templateId: r.cf_template_id ?? null,
       alisTl: alis, satisTl: satis, marjTl, marjPct, enabled: r.enabled === true, satista: r.satista === true,
     };
   });
@@ -72,6 +73,47 @@ router.post("/entitlements/:id/deliver-manual", async (req: Request, res: Respon
   const ok = await attachManualCustomerKey(entitlementId, customerApiKey);
   if (!ok) throw new AppError(404, "Entitlement bulunamadı");
   res.json({ success: true, entitlementId, cfStatus: "provisioned" });
+});
+
+/** CF kayıtlı paket şablonları (admin: pakete bağlamak için template id seç). */
+router.get("/templates", async (_req: Request, res: Response) => {
+  const { cfListTemplates } = await import("../services/codefast-reseller-service.js");
+  try {
+    const tpls = await cfListTemplates();
+    res.json({
+      templates: tpls.map((t) => ({
+        id: t.id, name: t.name, status: t.status, currency: t.currency,
+        durationDays: t.duration_days, itemCount: t.item_count ?? null, itemsSummary: t.items_summary ?? null,
+      })),
+    });
+  } catch (e) {
+    throw new AppError(503, "CodeFast şablonlarına ulaşılamadı: " + (e as Error).message);
+  }
+});
+
+/**
+ * Bir CF paketini şablona bağla/çöz (deploy GEREKMEZ — provisioning her satın almada DB'den taze okur).
+ * Body: { templateId: string|null }. Doluysa order template_id ile, null/boş ise items[catalog_id] akışı.
+ */
+router.post("/packages/:id/template", async (req: Request, res: Response) => {
+  const id = String(req.params.id ?? "");
+  if (!id) throw new AppError(400, "packageId gerekli");
+  const raw = (req.body as { templateId?: unknown })?.templateId;
+  let templateId: string | null;
+  if (raw === null || raw === undefined || raw === "") {
+    templateId = null;
+  } else if (typeof raw === "string" && /^[A-Za-z0-9-]{6,64}$/.test(raw.trim())) {
+    templateId = raw.trim();
+  } else {
+    throw new AppError(400, "Geçersiz templateId (boş bırak veya geçerli şablon id'si gir)");
+  }
+  const rows = await dbSql<{ id: string }[]>`
+    UPDATE packages SET cf_template_id = ${templateId}, updated_at = now()
+    WHERE id = ${id} AND cf_api_slug IS NOT NULL
+    RETURNING id
+  `;
+  if (!rows.length) throw new AppError(404, "CodeFast paketi bulunamadı");
+  res.json({ success: true, packageId: id, templateId });
 });
 
 /** CF canlı katalog (admin görünümü — sync/karar için). */

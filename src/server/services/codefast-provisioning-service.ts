@@ -21,6 +21,8 @@ export interface CfPkgMeta {
   gunlukIstekLimiti: number;
   sureGun: number;
   cfTokenMillions?: number | null;
+  /** DOLU → order template_id ile yapılır (CF panel şablonu); NULL/boş → items[catalog_id] akışı. */
+  cfTemplateId?: string | null;
 }
 
 export interface ProvisionResult {
@@ -37,21 +39,21 @@ export async function provisionCodefastEntitlement(args: {
   username?: string;
 }): Promise<ProvisionResult> {
   const { entitlementId, userId, externalOrderId, pkg } = args;
+  // HİBRİT: cf_template_id doluysa CF panel şablonuyla (template_id), yoksa items[catalog_id] ile order.
+  const useTemplate = typeof pkg.cfTemplateId === "string" && pkg.cfTemplateId.length > 0;
   const item = pkg.cfTokenMillions
     ? { catalog_id: pkg.cfCatalogId, claude_token_millions: pkg.cfTokenMillions }
     : { catalog_id: pkg.cfCatalogId, limit_amount: pkg.gunlukIstekLimiti, duration_days: pkg.sureGun };
+  const orderReq = {
+    external_customer_id: userId,
+    external_order_id: externalOrderId,
+    customer: { email: args.email, username: args.username },
+    create_customer_api_key: true,
+    ...(useTemplate ? { template_id: pkg.cfTemplateId as string } : { items: [item] }),
+  };
 
   try {
-    const order = await cfCreateOrder(
-      {
-        external_customer_id: userId,
-        external_order_id: externalOrderId,
-        customer: { email: args.email, username: args.username },
-        create_customer_api_key: true,
-        items: [item],
-      },
-      externalOrderId,
-    );
+    const order = await cfCreateOrder(orderReq, externalOrderId);
     let key = extractCustomerKey(order);
     const isManualProduct = order.manual_review_required || pkg.cfManual;
     // AUTO ürün ama key yok (idempotent replay anomalisi — replay customer_api_key DÖNDÜRMEZ):

@@ -55,6 +55,39 @@ describe("codefast-provisioning-service", () => {
     );
   });
 
+  it("template paketi → order template_id ile gider (items YOK), key saklanır", async () => {
+    const { cfCreateOrder } = await import("./codefast-reseller-service.js");
+    (cfCreateOrder as any).mockResolvedValue({
+      order: { id: "ordT", status: "fulfilled" }, customer: { id: "cT" }, manual_review_required: false,
+      customer_api_key: { api_key: "cf_rc_live_tpl" },
+    });
+    const { provisionCodefastEntitlement } = await import("./codefast-provisioning-service.js");
+    const r = await provisionCodefastEntitlement({
+      entitlementId: "eT", userId: "uT", externalOrderId: "oT",
+      pkg: { cfCatalogId: "c1", cfApiSlug: "codex-api", cfManual: false, gunlukIstekLimiti: 500, sureGun: 30, cfTemplateId: "tpl-abc-123" },
+    });
+    expect(r.cfStatus).toBe("provisioned");
+    const [body] = (cfCreateOrder as any).mock.calls[0];
+    expect(body.template_id).toBe("tpl-abc-123");
+    expect(body.items).toBeUndefined();
+  });
+
+  it("cfTemplateId boş string → items[] akışına düşer (template'e geçmez)", async () => {
+    const { cfCreateOrder } = await import("./codefast-reseller-service.js");
+    (cfCreateOrder as any).mockResolvedValue({
+      order: { id: "ordE", status: "fulfilled" }, customer: { id: "cE" }, manual_review_required: false,
+      customer_api_key: { api_key: "cf_rc_live_e" },
+    });
+    const { provisionCodefastEntitlement } = await import("./codefast-provisioning-service.js");
+    await provisionCodefastEntitlement({
+      entitlementId: "eE", userId: "uE", externalOrderId: "oE",
+      pkg: { cfCatalogId: "c1", cfApiSlug: "codex-api", cfManual: false, gunlukIstekLimiti: 500, sureGun: 30, cfTemplateId: "" },
+    });
+    const [body] = (cfCreateOrder as any).mock.calls[0];
+    expect(body.template_id).toBeUndefined();
+    expect(body.items).toEqual([{ catalog_id: "c1", limit_amount: 500, duration_days: 30 }]);
+  });
+
   it("auto product, no key on create (idempotent replay) + cfGetOrder also no key → failed (NOT pending)", async () => {
     const { cfCreateOrder, cfGetOrder } = await import("./codefast-reseller-service.js");
     (cfCreateOrder as any).mockResolvedValue({

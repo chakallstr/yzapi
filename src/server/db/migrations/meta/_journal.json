@@ -239,6 +239,13 @@
       "when": 1782163200000,
       "tag": "0033_codefast_reseller",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1782249600000,
+      "tag": "0034_codefast_template_id",
+      "breakpoints": true
     }
   ]
 }

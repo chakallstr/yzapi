@@ -639,6 +639,8 @@ export const packages = pgTable("packages", {
   cfManual: boolean("cf_manual").notNull().default(false),
   cfTokenMillions: integer("cf_token_millions"),
   cfResellerCostTl: numeric("cf_reseller_cost_tl", { precision: 14, scale: 4 }),
+  // CF package-template id (DOLU → order/quote template_id ile; NULL → items[catalog_id] akışı).
+  cfTemplateId: text("cf_template_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });

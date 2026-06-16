@@ -103,7 +103,7 @@ export async function purchasePackageWithBalance(
     SELECT id, ad, fiyat_tl, sure_gun, gunluk_istek_limiti, allowed_models, enabled, satista, tip,
            is_configurable, min_gunluk_istek, max_gunluk_istek, min_sure_gun, max_sure_gun,
            birim_fiyat_usd_per_50,
-           cf_catalog_id, cf_api_slug, cf_manual, cf_token_millions
+           cf_catalog_id, cf_api_slug, cf_manual, cf_token_millions, cf_template_id
     FROM packages WHERE id = ${packageId} LIMIT 1
   `;
   if (!pkgRows.length) throw new AppError(404, "Paket bulunamadı");
@@ -137,14 +137,19 @@ export async function purchasePackageWithBalance(
   // CodeFast paket: satıştan ÖNCE quote ön-kontrolü (orderlanabilir mi?). Bakiye DÜŞMEZ.
   // Ürün CF tarafında satılamaz durumdaysa müşteriyi hiç tahsil etmeden 503 ile durdur.
   // Yalnız request_limit: account_delivery'de CF provisioning yok (yanlış cf_catalog_id'yi savun).
-  if (env.CODEFAST_RESELLER_ENABLED && pkg.cf_catalog_id && pkg.tip === "request_limit") {
-    const { cfQuote } = await import("./codefast-reseller-service.js");
+  if (env.CODEFAST_RESELLER_ENABLED && (pkg.cf_catalog_id || pkg.cf_template_id) && pkg.tip === "request_limit") {
+    const { cfQuote, cfQuoteTemplate } = await import("./codefast-reseller-service.js");
     try {
-      await cfQuote([
-        pkg.cf_token_millions
-          ? { catalog_id: pkg.cf_catalog_id, claude_token_millions: Number(pkg.cf_token_millions) }
-          : { catalog_id: pkg.cf_catalog_id, limit_amount: effectiveLimit, duration_days: effectiveDays },
-      ]);
+      // HİBRİT: cf_template_id doluysa şablon-quote, yoksa items-quote.
+      if (pkg.cf_template_id) {
+        await cfQuoteTemplate(String(pkg.cf_template_id), userId);
+      } else {
+        await cfQuote([
+          pkg.cf_token_millions
+            ? { catalog_id: pkg.cf_catalog_id, claude_token_millions: Number(pkg.cf_token_millions) }
+            : { catalog_id: pkg.cf_catalog_id, limit_amount: effectiveLimit, duration_days: effectiveDays },
+        ]);
+      }
     } catch {
       throw new AppError(503, "Bu paket şu anda tedarik edilemiyor; lütfen daha sonra tekrar deneyin.");
     }
@@ -207,7 +212,7 @@ export async function purchasePackageWithBalance(
 
   // CodeFast provisioning — para tx COMMIT olduktan SONRA (network side-effect tx dışında).
   // pending_manual (Claude elle teslim) bir HATA değildir; yalnız 'failed'te iade edilir.
-  if (env.CODEFAST_RESELLER_ENABLED && pkg.cf_catalog_id && result.tip === "request_limit" && result.entitlementId) {
+  if (env.CODEFAST_RESELLER_ENABLED && (pkg.cf_catalog_id || pkg.cf_template_id) && result.tip === "request_limit" && result.entitlementId) {
     const { provisionCodefastEntitlement } = await import("./codefast-provisioning-service.js");
     const prov = await provisionCodefastEntitlement({
       entitlementId: result.entitlementId,
@@ -220,6 +225,7 @@ export async function purchasePackageWithBalance(
         gunlukIstekLimiti: effectiveLimit,
         sureGun: effectiveDays,
         cfTokenMillions: pkg.cf_token_millions ? Number(pkg.cf_token_millions) : null,
+        cfTemplateId: pkg.cf_template_id ?? null,
       },
       username: userId,
     });
