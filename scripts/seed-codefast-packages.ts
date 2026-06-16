@@ -82,20 +82,34 @@ const MODEL_NAMES: Record<string, string> = {
   "nvidia/nemotron-3-ultra-550b-a55b": "Nemotron 3 Ultra 550B", "minimaxai/minimax-m2.7": "MiniMax M2.7",
 };
 
+// CF package-template id'leri (2026-06-16 API'den oluşturuldu; tek-ürünlü, seed konfigiyle: 30 gün).
+// DOLU → provisioning order'ı template_id ile yapar (hibrit, commit 72ace0a); admin'den de değiştirilebilir.
+// ⚠️ Bu id'ler reseller HESABINA özel (cix.crazy666@…); şablon silinir/yeniden oluşturulursa güncelle.
+const CF_TEMPLATE_IDS: Record<string, string> = {
+  "cf-codex": "61ac5f41-db26-4ff0-a1b4-d147b7724213",
+  "cf-gemini": "208c6825-5db2-4241-95bc-1e05dbbb8294",
+  "cf-glm": "bc639441-f252-415e-aa5f-dca1395a23a6",
+  "cf-grok": "c5179ee7-1c71-47f0-bdfa-2d676efec400",
+  "cf-composer": "699ca8cd-93ce-4f56-94c4-f229a84d31f9",
+  "cf-kimi": "9b838e4d-956f-4719-805f-4843c74d7ef1",
+  "cf-nvidia": "89583a03-12fc-455d-9934-3b53f25625aa",
+};
+
 async function upsertPackage(p: Prod) {
   await dbSql`
     INSERT INTO packages
       (id, ad, kategori, aciklama, tip, gunluk_istek_limiti, sure_gun, allowed_models,
-       fiyat_tl, enabled, satista, cf_catalog_id, cf_api_slug, cf_manual, cf_reseller_cost_tl)
+       fiyat_tl, enabled, satista, cf_catalog_id, cf_api_slug, cf_manual, cf_reseller_cost_tl, cf_template_id)
     VALUES
       (${p.id}, ${p.ad}, 'CodeFast', ${p.ad}, 'request_limit', ${p.gunluk}, ${p.sureGun},
        ${JSON.stringify(p.models)}::jsonb, ${satis(p.listTl)}, true, false,
-       ${p.cfCatalogId}, ${p.cfApiSlug}, ${p.manual}, ${alis(p.listTl)})
+       ${p.cfCatalogId}, ${p.cfApiSlug}, ${p.manual}, ${alis(p.listTl)}, ${CF_TEMPLATE_IDS[p.id] ?? null})
     ON CONFLICT (id) DO UPDATE SET
       ad = EXCLUDED.ad, aciklama = EXCLUDED.aciklama, allowed_models = EXCLUDED.allowed_models,
       gunluk_istek_limiti = EXCLUDED.gunluk_istek_limiti, sure_gun = EXCLUDED.sure_gun,
       cf_catalog_id = EXCLUDED.cf_catalog_id, cf_api_slug = EXCLUDED.cf_api_slug,
-      cf_manual = EXCLUDED.cf_manual, cf_reseller_cost_tl = EXCLUDED.cf_reseller_cost_tl, updated_at = now()
+      cf_manual = EXCLUDED.cf_manual, cf_reseller_cost_tl = EXCLUDED.cf_reseller_cost_tl,
+      cf_template_id = EXCLUDED.cf_template_id, updated_at = now()
       -- KASITLI: fiyat_tl/satista/enabled DOKUNULMAZ (admin marjı + lansman durumu korunur)
   `;
   console.log(`  ✓ ${p.id.padEnd(12)} alış ₺${alis(p.listTl)}  satış ₺${satis(p.listTl)} (5x)  ${p.tier2 ? "TIER2" : "ready"}${p.modelsVerified ? "" : " ⚠VERIFY-ids"}`);
