@@ -22,9 +22,11 @@
  *   ✓ composer: katalog public_model_id="composer-2.5-fast" (upstream "grok-composer-2.5-fast").
  *   ✓ kimi: canlı /proxy/kimi-k2-6-api/v1/models = ["kimi-k2.6"] (tam eşleşme).
  *   ✓ nvidia: gerçek id'ler NAMESPACE'li (z-ai/…, nvidia/…) — aşağıda düzeltildi; canlı + katalog example_models ile doğrulandı.
- *   ⚠️ glm + grok: CF reseller order'ı 500 "Unexpected reseller worker error" veriyor (CF-tarafı bug,
- *      Codex/Gemini ücretli order'ları çalışırken bu ikisi patlıyor) → id'ler DOĞRULANAMADI, modelsVerified=false
- *      kalır. CF bu iki ürünü düzeltince /proxy/<slug>/v1/models ile kesinleştir.
+ *   ✓ glm + grok (2026-06-16, CF worker bug'ı DÜZELDİKTEN sonra): order 201 + proxy doğrulandı.
+ *      glm: /proxy/glm-api/v1/models = [glm-4.5, glm-4.5-air, glm-4.6, glm-4.7, glm-5, glm-5-turbo, glm-5.1]
+ *           (seed'deki 4 id bu listede VAR → doğru). grok: 8 grok-family id chat'te 200 OK → seed grok-4/grok-3
+ *           YANLIŞTI, gerçeklerle değiştirildi (grok-4.3 / grok-4.20-0309-(non-)reasoning / grok-3-mini(-fast)).
+ *      (Eski not: 16-06 öncesi glm/grok order'ı 500 "Unexpected reseller worker error" veriyordu — CF düzeltti.)
  */
 import { dbSql } from "../src/server/db/client.js";
 import { encryptApiKey } from "../src/server/services/api-key-service.js";
@@ -49,14 +51,15 @@ const PRODUCTS: Prod[] = [
     models: ["gemini-3.1-pro-preview", "gemini-3-flash-preview"] },
   // ── TIER-2 (yzapi'de YOK → added_models + codefast profili; id'ler VERIFY) ──
   { id: "cf-glm", ad: "CodeFast GLM (5.1/5-turbo/4.7) — Aylık", cfCatalogId: "02bd32b5-7f1b-4ab3-83c7-3a57dc3c71b5", cfApiSlug: "glm-api",
-    listTl: 600, gunluk: 750, sureGun: 30, manual: false, tier2: true, modelsVerified: false,
-    models: ["glm-5.1", "glm-5-turbo", "glm-4.7", "glm-4.5-air"] },
+    listTl: 600, gunluk: 750, sureGun: 30, manual: false, tier2: true, modelsVerified: true,
+    models: ["glm-5.1", "glm-5-turbo", "glm-4.7", "glm-4.5-air"] }, // ✓ canlı /proxy/glm-api/v1/models (2026-06-16)
   { id: "cf-composer", ad: "CodeFast Composer 2.5 Fast — Aylık", cfCatalogId: "12e78870-bf25-417d-a41f-18ce43576379", cfApiSlug: "composer-api",
     listTl: 1500, gunluk: 500, sureGun: 30, manual: false, tier2: true, modelsVerified: true,
     models: ["composer-2.5-fast"] }, // ✓ katalog public_model_id (2026-06-15)
-  { id: "cf-grok", ad: "CodeFast Grok — Aylık", cfCatalogId: "a2cf1570-7d1b-4f8d-a67f-40245935e43e", cfApiSlug: "grok-api",
-    listTl: 500, gunluk: 500, sureGun: 30, manual: false, tier2: true, modelsVerified: false,
-    models: ["grok-4", "grok-3"] }, // ⚠️ DOĞRULANAMADI — CF order 500 (worker bug); CF düzeltince /v1/models ile kesinleştir
+  { id: "cf-grok", ad: "CodeFast Grok (4.3 / 4.20 / 3-mini) — Aylık", cfCatalogId: "a2cf1570-7d1b-4f8d-a67f-40245935e43e", cfApiSlug: "grok-api",
+    listTl: 500, gunluk: 500, sureGun: 30, manual: false, tier2: true, modelsVerified: true,
+    // ✓ 2026-06-16 canlı: 8 grok-family id chat 200; seed grok-4/grok-3 (mevcut değildi) gerçeklerle değiştirildi
+    models: ["grok-4.3", "grok-4.20-0309-reasoning", "grok-4.20-0309-non-reasoning", "grok-3-mini", "grok-3-mini-fast"] },
   { id: "cf-kimi", ad: "CodeFast Sınırsız Kimi K2.6 — Aylık", cfCatalogId: "720376e2-bd07-4fe4-9cc1-25b084c38cdd", cfApiSlug: "kimi-k2-6-api",
     listTl: 900, gunluk: 100000, sureGun: 30, manual: false, tier2: true, modelsVerified: true,
     models: ["kimi-k2.6"] }, // ✓ canlı /proxy/kimi-k2-6-api/v1/models (2026-06-15)
@@ -70,7 +73,9 @@ const PRODUCTS: Prod[] = [
 const MODEL_NAMES: Record<string, string> = {
   // glm/grok/composer/kimi ürün id'leri
   "glm-5.1": "GLM 5.1", "glm-5-turbo": "GLM 5 Turbo", "glm-4.7": "GLM 4.7", "glm-4.5-air": "GLM 4.5 Air",
-  "composer-2.5-fast": "Composer 2.5 Fast", "grok-4": "Grok 4", "grok-3": "Grok 3", "kimi-k2.6": "Kimi K2.6",
+  "composer-2.5-fast": "Composer 2.5 Fast", "kimi-k2.6": "Kimi K2.6",
+  "grok-4.3": "Grok 4.3", "grok-4.20-0309-reasoning": "Grok 4.20 (reasoning)",
+  "grok-4.20-0309-non-reasoning": "Grok 4.20", "grok-3-mini": "Grok 3 Mini", "grok-3-mini-fast": "Grok 3 Mini Fast",
   // nvidia ürünü — NAMESPACE'li gerçek id'ler (2026-06-15 canlı doğrulama)
   "deepseek-ai/deepseek-v4-flash": "DeepSeek V4 Flash", "moonshotai/kimi-k2.6": "Kimi K2.6",
   "stepfun-ai/step-3.7-flash": "Step 3.7 Flash", "z-ai/glm-5.1": "GLM 5.1",
