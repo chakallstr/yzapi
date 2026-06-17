@@ -641,6 +641,10 @@ export const packages = pgTable("packages", {
   cfResellerCostTl: numeric("cf_reseller_cost_tl", { precision: 14, scale: 4 }),
   // CF package-template id (DOLU → order/quote template_id ile; NULL → items[catalog_id] akışı).
   cfTemplateId: text("cf_template_id"),
+  // Custom builder: birim maliyet (TL/birim/gün; lifetime'da TL/birim, gün yok), birim tipi, maliyet-0 sabit-satış override.
+  cfUnitCostTl: numeric("cf_unit_cost_tl", { precision: 14, scale: 6 }),
+  birimTipi: text("birim_tipi").notNull().default("istek"),
+  birimSatisOverrideTl: numeric("birim_satis_override_tl", { precision: 14, scale: 4 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });
