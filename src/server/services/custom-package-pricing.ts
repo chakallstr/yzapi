@@ -27,6 +27,17 @@ export function roundClean(tl: number): number {
   return Math.round(tl / step) * step;
 }
 
+/**
+ * Builder limit adım kuralı: min 50; <500 → 5'in katı; ≥500 → 50'nin katı.
+ * Geçerliyse null, değilse hata mesajı döner. (Lifetime/sabit dahil tüm builder ürünleri.)
+ */
+export function limitStepError(limit: number): string | null {
+  if (!Number.isInteger(limit) || limit < 50) return "Limit en az 50 olmalı";
+  const step = limit < 500 ? 5 : 50;
+  if (limit % step !== 0) return `Limit ${step}'in katı olmalı (${limit < 500 ? "50–500 arası 5'er" : "500 üstü 50'şer"})`;
+  return null;
+}
+
 export interface CustomPriceInput {
   unitCostTl: number;          // cf_unit_cost_tl
   limit: number;               // günlük limit (lifetime'da toplam bakiye limiti)

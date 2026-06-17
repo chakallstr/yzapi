@@ -1,5 +1,28 @@
 import { describe, it, expect } from "vitest";
-import { volumeMarkup, roundClean, computeCustomPrice } from "./custom-package-pricing.js";
+import { volumeMarkup, roundClean, computeCustomPrice, limitStepError } from "./custom-package-pricing.js";
+
+describe("limitStepError — adım kuralı (min50, <500 5'er, ≥500 50'şer)", () => {
+  it("geçerli değerler null döner", () => {
+    expect(limitStepError(50)).toBeNull();
+    expect(limitStepError(55)).toBeNull();
+    expect(limitStepError(495)).toBeNull();
+    expect(limitStepError(500)).toBeNull();
+    expect(limitStepError(550)).toBeNull();
+    expect(limitStepError(2000)).toBeNull();
+  });
+  it("min altı reddedilir", () => {
+    expect(limitStepError(45)).not.toBeNull();
+    expect(limitStepError(0)).not.toBeNull();
+  });
+  it("<500 5'in katı değilse reddedilir", () => {
+    expect(limitStepError(52)).not.toBeNull();
+    expect(limitStepError(123)).not.toBeNull();
+  });
+  it("≥500 50'nin katı değilse reddedilir", () => {
+    expect(limitStepError(525)).not.toBeNull();
+    expect(limitStepError(1001)).not.toBeNull();
+  });
+});
 
 describe("volumeMarkup(L) — hacim-kademeli marj", () => {
   it("L ≤ 500 → 2.5", () => {

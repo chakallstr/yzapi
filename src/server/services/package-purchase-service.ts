@@ -4,7 +4,7 @@ import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { InsufficientBalanceError, AppError } from "../lib/errors.js";
 import { grantPackageEntitlement } from "./entitlement-service.js";
-import { computeCustomPrice, type BirimTipi } from "./custom-package-pricing.js";
+import { computeCustomPrice, limitStepError, type BirimTipi } from "./custom-package-pricing.js";
 
 /** Configurable paket için anlık fiyat hesabı (TL + USD). */
 export async function previewConfigurablePrice(
@@ -48,6 +48,9 @@ export async function previewConfigurablePrice(
   const birimTipi = (pkg.birim_tipi ?? "istek") as BirimTipi;
   const satisOverride = pkg.birim_satis_override_tl == null ? null : Number(pkg.birim_satis_override_tl);
   if (cfUnitCost !== null || birimTipi === "sabit") {
+    // Builder adım kuralı (backend zorunlu — UI'ye güvenme): min50, <500 5'er, ≥500 50'şer.
+    const stepErr = limitStepError(customLimit);
+    if (stepErr) throw new AppError(400, stepErr);
     const { fiyatTL } = computeCustomPrice({
       unitCostTl: cfUnitCost ?? 0,
       limit: customLimit,
