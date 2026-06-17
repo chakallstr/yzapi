@@ -4,6 +4,7 @@ import { env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { InsufficientBalanceError, AppError } from "../lib/errors.js";
 import { grantPackageEntitlement } from "./entitlement-service.js";
+import { computeCustomPrice, type BirimTipi } from "./custom-package-pricing.js";
 
 /** Configurable paket için anlık fiyat hesabı (TL + USD). */
 export async function previewConfigurablePrice(
@@ -14,7 +15,8 @@ export async function previewConfigurablePrice(
   const [pkgRows, cfgRows] = await Promise.all([
     dbSql<any[]>`
       SELECT is_configurable, min_gunluk_istek, max_gunluk_istek,
-             min_sure_gun, max_sure_gun, birim_fiyat_usd_per_50, enabled
+             min_sure_gun, max_sure_gun, birim_fiyat_usd_per_50, enabled,
+             cf_unit_cost_tl, birim_tipi, birim_satis_override_tl
       FROM packages WHERE id = ${packageId} LIMIT 1
     `,
     dbSql<{ live_kur: string; kur_buffer: string }[]>`
@@ -41,6 +43,23 @@ export async function previewConfigurablePrice(
   const kurBuffer = Number(cfgRows[0]?.kur_buffer ?? 0.03);
   const sellKur = liveKur * (1 + kurBuffer);
 
+  // Yeni CF-maliyet bazlı hacim-kademeli motor (cf_unit_cost_tl set'liyse veya sabit-birim ürünse).
+  const cfUnitCost = pkg.cf_unit_cost_tl == null ? null : Number(pkg.cf_unit_cost_tl);
+  const birimTipi = (pkg.birim_tipi ?? "istek") as BirimTipi;
+  const satisOverride = pkg.birim_satis_override_tl == null ? null : Number(pkg.birim_satis_override_tl);
+  if (cfUnitCost !== null || birimTipi === "sabit") {
+    const { fiyatTL } = computeCustomPrice({
+      unitCostTl: cfUnitCost ?? 0,
+      limit: customLimit,
+      days: customDays,
+      birimTipi,
+      birimSatisOverrideTl: satisOverride,
+    });
+    const fiyatUsd = sellKur > 0 ? Math.round((fiyatTL / sellKur) * 100) / 100 : 0;
+    return { fiyatTL, fiyatUsd, birimFiyatUsd: 0 };
+  }
+
+  // Eski USD formülü (geriye uyum — cf_unit_cost_tl set'li olmayan configurable paketler).
   const fiyatUsd = Math.ceil(customLimit / 50) * birim * customDays;
   const fiyatTL = Math.round(fiyatUsd * sellKur * 100) / 100;
   return { fiyatTL, fiyatUsd: Math.round(fiyatUsd * 100) / 100, birimFiyatUsd: birim };
@@ -126,6 +145,9 @@ export async function purchasePackageWithBalance(
     if (!customLimit || !customDays) throw new AppError(400, "Configurable paket için limit ve süre gerekli");
     const preview = await previewConfigurablePrice(packageId, customLimit, customDays);
     fiyatTL = preview.fiyatTL;
+    // Para güvenliği: yanlış-yapılandırma (cf_unit_cost_tl=0 / 'sabit' override eksik) → 0 fiyat.
+    // 0/negatif tahsille ASLA ilerleme (bedava paket/hesap-teslim satışını engelle).
+    if (!(fiyatTL > 0)) throw new AppError(400, "Paket fiyatı hesaplanamadı (geçersiz yapılandırma)");
     effectiveLimit = customLimit;
     effectiveDays = customDays;
   } else {
