@@ -15,7 +15,7 @@ export async function listPublicPackages() {
       SELECT id, ad, kategori, aciklama, tip, gunluk_istek_limiti, sure_gun,
              allowed_models, fiyat_tl, fiyat_usd, display_order, satista,
              is_configurable, min_gunluk_istek, max_gunluk_istek,
-             min_sure_gun, max_sure_gun, birim_fiyat_usd_per_50
+             min_sure_gun, max_sure_gun, birim_fiyat_usd_per_50, birim_tipi
       FROM packages WHERE enabled = true
       ORDER BY display_order ASC, ad ASC
     `,
@@ -34,7 +34,7 @@ export async function getPublicPackage(id: string) {
       SELECT id, ad, kategori, aciklama, tip, gunluk_istek_limiti, sure_gun,
              allowed_models, fiyat_tl, fiyat_usd, display_order, satista,
              is_configurable, min_gunluk_istek, max_gunluk_istek,
-             min_sure_gun, max_sure_gun, birim_fiyat_usd_per_50
+             min_sure_gun, max_sure_gun, birim_fiyat_usd_per_50, birim_tipi
       FROM packages WHERE id = ${id} AND enabled = true LIMIT 1
     `,
     dbSql<{ live_kur: string; kur_buffer: string }[]>`
@@ -67,6 +67,7 @@ function publicShape(r: any, liveKur = 0, kurBuffer = 0.03) {
     minSureGun: r.min_sure_gun != null ? Number(r.min_sure_gun) : null,
     maxSureGun: r.max_sure_gun != null ? Number(r.max_sure_gun) : null,
     birimFiyatUsdPer50: r.birim_fiyat_usd_per_50 != null ? Number(r.birim_fiyat_usd_per_50) : null,
+    birimTipi: r.birim_tipi ?? "istek",  // UI ipucu (istek/kredi/lifetime/sabit); maliyet DEĞİL
     liveKur,
     kurBuffer,
   };

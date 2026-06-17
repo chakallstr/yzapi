@@ -48,11 +48,15 @@ const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
   const meta = metaFor(pkg.kategori);
   const Ic = I[meta.icon] || I.Terminal;
 
-  const STEP = 50;
+  // Kademeli adım: 50–500 arası 5'er, 500 üstü 50'şer (backend limitStepError ile birebir).
+  const snapLimit = (v) => { const s = v < 500 ? 5 : 50; return Math.round(v / s) * s; };
   const minLimit = pkg.minGunlukIstek ?? 50;
   const maxLimit = pkg.maxGunlukIstek ?? 5000;
   const minDays  = pkg.minSureGun ?? 1;
-  const maxDays  = pkg.maxSureGun ?? 30;
+  const maxDays  = pkg.maxSureGun ?? 90;
+  // Birim tipi: lifetime → süre yok (ömür boyu bakiye); kredi → görsel; aksi istek.
+  const isLifetime = pkg.birimTipi === 'lifetime';
+  const unitLabel = pkg.birimTipi === 'kredi' ? 'kredi' : 'istek';
 
   const [limit, setLimit] = useState(Math.min(500, maxLimit));
   const [days,  setDays]  = useState(1);
@@ -77,8 +81,7 @@ const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
   useEffect(() => { fetchPreview(limit, days); }, [limit, days]);
 
   const handleLimitChange = (v) => {
-    const clamped = Math.max(minLimit, Math.min(maxLimit, Math.round(v / STEP) * STEP));
-    setLimit(clamped);
+    setLimit(Math.max(minLimit, Math.min(maxLimit, snapLimit(v))));
   };
   const handleDaysChange = (v) => {
     const clamped = Math.max(minDays, Math.min(maxDays, Math.round(v)));
@@ -139,7 +142,7 @@ const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
           )}
         </div>
         <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: -6 }}>
-          {days} gün erişim · {limit.toLocaleString('tr-TR')} istek / gün
+          {isLifetime ? 'Ömür boyu' : `${days} gün`} erişim · {limit.toLocaleString('tr-TR')} {unitLabel}{isLifetime ? ' bakiye' : ' / gün'}
         </div>
 
         {/* Seçili limit özeti */}
@@ -151,7 +154,7 @@ const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
           fontSize: 12, color: meta.c2, fontWeight: 600,
         }}>
           <span>✓</span>
-          {pkg.kategori} API: {limit.toLocaleString('tr-TR')} istek / günlük
+          {pkg.kategori} API: {limit.toLocaleString('tr-TR')} {unitLabel}{isLifetime ? ' bakiye' : ' / günlük'}
         </div>
 
         {/* Özelleştir akordeonu */}
@@ -170,8 +173,8 @@ const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
             </span>
           </button>
           {open && (
-            <div style={{ padding: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, borderTop: '1px solid var(--border)' }}>
-              <div>
+            <div style={{ padding: '12px', display: 'grid', gridTemplateColumns: isLifetime ? '1fr' : '1fr 1fr', gap: 10, borderTop: '1px solid var(--border)' }}>
+              {!isLifetime && (<div>
                 <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 5 }}>
                   Kullanım süresi
                 </div>
@@ -189,14 +192,14 @@ const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
                 <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 3 }}>
                   {minDays}–{maxDays} gün arası
                 </div>
-              </div>
+              </div>)}
               <div>
                 <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 5 }}>
                   {pkg.kategori} API limiti
                 </div>
                 <input
                   type="number"
-                  min={minLimit} max={maxLimit} step={STEP} value={limit}
+                  min={minLimit} max={maxLimit} step={5} value={limit}
                   onChange={(e) => handleLimitChange(Number(e.target.value))}
                   style={{
                     width: '100%', padding: '8px 10px', borderRadius: 7,
@@ -206,7 +209,7 @@ const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
                   }}
                 />
                 <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 3 }}>
-                  {minLimit.toLocaleString('tr-TR')}–{maxLimit.toLocaleString('tr-TR')} istek ({STEP}'şer artış)
+                  {minLimit.toLocaleString('tr-TR')}–{maxLimit.toLocaleString('tr-TR')} istek (50–500 arası 5'er, üstü 50'şer)
                 </div>
               </div>
             </div>
