@@ -376,6 +376,16 @@ async function handleShopierCallbackBody(
     },
   );
 
+  if (credit.success && !credit.alreadyCredited) {
+    notifyAdmin({
+      kind: "odeme_yapildi",
+      title: "Ödeme onaylandı (Shopier kart)",
+      method: "shopier",
+      amountTL: creditTL,
+      reference: paymentId,
+    }).catch(() => {});
+  }
+
   finishShopierResponse(res, opts.mode, credit.success || Boolean(credit.alreadyCredited), {
     alreadyCredited: Boolean(credit.alreadyCredited),
   });
@@ -546,6 +556,15 @@ async function handleShopierOsbBody(body: unknown, res: Response): Promise<void>
   );
 
   if (credit.success || credit.alreadyCredited) {
+    if (credit.success && !credit.alreadyCredited) {
+      notifyAdmin({
+        kind: "odeme_yapildi",
+        title: "Ödeme onaylandı (Shopier OSB)",
+        method: "shopier_osb",
+        amountTL: product.creditTL,
+        reference: osbIdemKey,
+      }).catch(() => {});
+    }
     res.status(200).send("success");
     return;
   }

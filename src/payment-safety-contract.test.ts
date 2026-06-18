@@ -137,6 +137,27 @@ describe("payment safety contract", () => {
     expect(shopierService).toContain("product_name: `Bakiye Yukleme — ${opts.miktarTL} TL`");
   });
 
+  it("notifies admin (odeme_yapildi) on a successful Shopier callback credit, but not on replay", () => {
+    const paymentsRoute = source("./server/routes/payments.ts");
+
+    // Callback success site: after creditUserBalance("shopier", ...) returns, a notifyAdmin
+    // with kind "odeme_yapildi" must fire — guarded so a replay (alreadyCredited) does NOT notify.
+    expect(paymentsRoute).toMatch(
+      /credit\.success\s*&&\s*!credit\.alreadyCredited[\s\S]{0,260}notifyAdmin\(\{[\s\S]{0,260}kind:\s*"odeme_yapildi"/,
+    );
+    expect(paymentsRoute).toMatch(/kind:\s*"odeme_yapildi"[\s\S]{0,300}Shopier kart/);
+  });
+
+  it("notifies admin (odeme_yapildi) on a successful Shopier OSB auto-credit, but not on replay", () => {
+    const paymentsRoute = source("./server/routes/payments.ts");
+
+    // OSB success site: same guard — fresh credit (success && !alreadyCredited) notifies once;
+    // an already-credited replay must not re-notify.
+    expect(paymentsRoute).toMatch(
+      /credit\.success\s*&&\s*!credit\.alreadyCredited[\s\S]{0,260}notifyAdmin\(\{[\s\S]{0,260}kind:\s*"odeme_yapildi"[\s\S]{0,260}Shopier OSB/,
+    );
+  });
+
   it("supports a safe Shopier OSB relay without breaking an existing Shopier service", () => {
     const paymentsRoute = source("./server/routes/payments.ts");
     const env = source("./server/lib/env.ts");
