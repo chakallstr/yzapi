@@ -158,6 +158,42 @@ describe("payment safety contract", () => {
     );
   });
 
+  it("routes an OSB productId mapped to a package through grantOsbPackageEntitlement (not balance), guarded by product.packageId", () => {
+    const paymentsRoute = source("./server/routes/payments.ts");
+    const shopierService = source("./server/services/shopier-service.ts");
+    const grantService = source("./server/services/shopier-osb-package-service.ts");
+
+    // B2.1: OSB map value carries an OPTIONAL packageId (balance entries keep working).
+    expect(shopierService).toMatch(/packageId\?:\s*string/);
+    expect(shopierService).toMatch(/typeof v\.packageId === "string"/);
+
+    // INERT GUARD: the package branch only runs when product.packageId is set;
+    // otherwise the existing creditUserBalance path is reached unchanged.
+    expect(paymentsRoute).toMatch(/if\s*\(product\.packageId\)\s*\{/);
+    expect(paymentsRoute).toContain("grantOsbPackageEntitlement");
+    expect(paymentsRoute).toContain("loadPackageForGrantDb");
+    expect(paymentsRoute).toContain("grantEntitlementDb");
+    // package grant uses the osb_<orderid> idempotency anchor (exactly-once)
+    expect(grantService).toContain("`osb_${args.orderId}`");
+    // fresh grant → odeme_yapildi; not on replay (already)
+    expect(grantService).toMatch(/if\s*\(!r\.already\)[\s\S]{0,120}notifyPaid/);
+
+    // B2.2: inactive / not-for-sale / unknown package → no grant, dead-letter + odeme_sorunu
+    expect(grantService).toMatch(/enabled\s*\|\|\s*pkg\.satista === false/);
+    expect(grantService).toContain('reason: "unknown_package"');
+    expect(grantService).toContain('reason: "package_not_sellable"');
+    expect(grantService).toMatch(/recordDeadLetter\([\s\S]{0,200}notifyProblem/);
+    expect(paymentsRoute).toMatch(/notifyProblem[\s\S]{0,200}kind:\s*"odeme_sorunu"/);
+  });
+
+  it("keeps the OSB balance path inert when no productId maps to a package (current prod config)", () => {
+    const paymentsRoute = source("./server/routes/payments.ts");
+    // The classic balance credit (creditUserBalance + odeme_yapildi "Shopier OSB") is
+    // still present and is what runs when product.packageId is undefined.
+    expect(paymentsRoute).toMatch(/const credit = await creditUserBalance\([\s\S]{0,200}"shopier_osb"/);
+    expect(paymentsRoute).toMatch(/credit\.success\s*&&\s*!credit\.alreadyCredited[\s\S]{0,260}kind:\s*"odeme_yapildi"[\s\S]{0,260}Shopier OSB/);
+  });
+
   it("supports a safe Shopier OSB relay without breaking an existing Shopier service", () => {
     const paymentsRoute = source("./server/routes/payments.ts");
     const env = source("./server/lib/env.ts");

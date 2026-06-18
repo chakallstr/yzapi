@@ -258,6 +258,11 @@ export function verifyOsbNotification(body: unknown): OsbVerifyResult {
 export interface OsbProduct {
   priceTL: number;
   creditTL: number;
+  /**
+   * Opsiyonel (B2): set'liyse bu productId TL bakiye yüklemek yerine bir PAKET
+   * (entitlement) verir. Yoksa (varsayılan/canlı durum) eski bakiye yolu — INERT.
+   */
+  packageId?: string;
 }
 
 let _osbProductMapCache: Record<string, OsbProduct> | null | undefined;
@@ -282,7 +287,12 @@ export function getOsbProductMap(): Record<string, OsbProduct> {
       const priceTL = Number(v.priceTL);
       const creditTL = Number(v.creditTL);
       if (Number.isFinite(priceTL) && priceTL > 0 && Number.isFinite(creditTL) && creditTL > 0) {
-        map[String(pid)] = { priceTL, creditTL };
+        // B2: opsiyonel packageId — yalnız non-boş string kabul edilir (savunmacı;
+        // boş/sayı/yanlış tip → undefined = eski bakiye yolu, INERT geriye-uyum).
+        const packageId = typeof v.packageId === "string" && v.packageId.trim()
+          ? v.packageId.trim()
+          : undefined;
+        map[String(pid)] = packageId ? { priceTL, creditTL, packageId } : { priceTL, creditTL };
       }
     }
     _osbProductMapCache = map;

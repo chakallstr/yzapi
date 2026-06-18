@@ -26,4 +26,10 @@ process.env.SHOPIER_OSB_USERNAME = process.env.SHOPIER_OSB_USERNAME || "osb_ites
 process.env.SHOPIER_OSB_PASSWORD = process.env.SHOPIER_OSB_PASSWORD || "osb_itest_pass";
 process.env.SHOPIER_OSB_PRODUCT_MAP =
   process.env.SHOPIER_OSB_PRODUCT_MAP ||
-  JSON.stringify({ "47233749": { priceTL: 899, creditTL: 899 } });
+  JSON.stringify({
+    "47233749": { priceTL: 899, creditTL: 899 }, // balance-only (back-compat)
+    // B2: package-granting productIds (resolved to seeded packages in the OSB itest)
+    "55501001": { priceTL: 1500, creditTL: 1500, packageId: "osb-it-pkg-active" },
+    "55501002": { priceTL: 1500, creditTL: 1500, packageId: "osb-it-pkg-inactive" },
+    "55501003": { priceTL: 1500, creditTL: 1500, packageId: "osb-it-pkg-ghost" },
+  });

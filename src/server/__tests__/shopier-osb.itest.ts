@@ -170,3 +170,70 @@ describe("Shopier OSB notify — real DB credit path", () => {
     expect(dl[0].n).toBe(0);
   });
 });
+
+// ── B2: productId → PAKET (entitlement) grant — real DB ─────────────────────────
+const PKG_ACTIVE = "osb-it-pkg-active";
+const PKG_INACTIVE = "osb-it-pkg-inactive";
+const PKG_PRODUCT = "55501001"; // → osb-it-pkg-active (active+satista)
+const PKG_PRODUCT_INACTIVE = "55501002"; // → osb-it-pkg-inactive (enabled=false)
+const PKG_PRODUCT_GHOST = "55501003"; // → osb-it-pkg-ghost (no such package row)
+const PKG_PRICE = 1500;
+
+function pkgPayload(orderid: string, productid: string) {
+  return validPayload(orderid, { productid, price: String(PKG_PRICE) });
+}
+async function entitlementCount(): Promise<number> {
+  const r = await dbSql`SELECT COUNT(*)::int AS n FROM user_package_entitlements WHERE user_id = ${TEST_USER_ID}::uuid AND status='active'`;
+  return r[0].n;
+}
+
+describe("Shopier OSB notify — productId grants a PACKAGE (B2)", () => {
+  beforeAll(async () => {
+    await dbSql`DELETE FROM user_package_entitlements WHERE user_id = ${TEST_USER_ID}::uuid`;
+    await dbSql`DELETE FROM packages WHERE id IN (${PKG_ACTIVE}, ${PKG_INACTIVE})`;
+    await dbSql`INSERT INTO packages (id, ad, kategori, gunluk_istek_limiti, sure_gun, fiyat_tl, enabled, satista)
+                VALUES (${PKG_ACTIVE}, 'OSB IT Aktif Paket', 'Codex', 1000, 30, ${PKG_PRICE}::numeric, true, true)`;
+    await dbSql`INSERT INTO packages (id, ad, kategori, gunluk_istek_limiti, sure_gun, fiyat_tl, enabled, satista)
+                VALUES (${PKG_INACTIVE}, 'OSB IT Kapali Paket', 'Codex', 1000, 30, ${PKG_PRICE}::numeric, false, true)`;
+  });
+  afterAll(async () => {
+    await dbSql`DELETE FROM user_package_entitlements WHERE user_id = ${TEST_USER_ID}::uuid`;
+    await dbSql`DELETE FROM packages WHERE id IN (${PKG_ACTIVE}, ${PKG_INACTIVE})`;
+  });
+  beforeEach(async () => {
+    await dbSql`DELETE FROM user_package_entitlements WHERE user_id = ${TEST_USER_ID}::uuid`;
+  });
+
+  it("grants the package exactly once, credits NO balance (200 success)", async () => {
+    const r = await request(app).post("/api/payments/shopier/osb-notify").type("form").send(osbBody(pkgPayload("OSB-IT-P1", PKG_PRODUCT)));
+    expect(r.status).toBe(200);
+    expect(r.text).toBe("success");
+    expect(await getBalance()).toBe(0); // NOT a balance top-up
+    expect(await entitlementCount()).toBe(1);
+  });
+
+  it("does not double-grant a duplicate delivery (same orderid)", async () => {
+    await request(app).post("/api/payments/shopier/osb-notify").type("form").send(osbBody(pkgPayload("OSB-IT-P2", PKG_PRODUCT)));
+    const r2 = await request(app).post("/api/payments/shopier/osb-notify").type("form").send(osbBody(pkgPayload("OSB-IT-P2", PKG_PRODUCT)));
+    expect(r2.status).toBe(200);
+    expect(await entitlementCount()).toBe(1); // still single grant
+    const tx = await dbSql`SELECT COUNT(*)::int AS n FROM transactions WHERE idempotency_key = 'pkg_osb_OSB-IT-P2'`;
+    expect(tx[0].n).toBe(1);
+  });
+
+  it("dead-letters an INACTIVE (enabled=false) package, grants nothing (200 success)", async () => {
+    const r = await request(app).post("/api/payments/shopier/osb-notify").type("form").send(osbBody(pkgPayload("OSB-IT-P3", PKG_PRODUCT_INACTIVE)));
+    expect(r.status).toBe(200);
+    expect(await entitlementCount()).toBe(0);
+    const dl = await dbSql`SELECT reason FROM shopier_osb_dead_letters WHERE shopier_order_id = 'OSB-IT-P3'`;
+    expect(dl[0].reason).toBe("package_not_sellable");
+  });
+
+  it("dead-letters an UNKNOWN package id, grants nothing (200 success)", async () => {
+    const r = await request(app).post("/api/payments/shopier/osb-notify").type("form").send(osbBody(pkgPayload("OSB-IT-P4", PKG_PRODUCT_GHOST)));
+    expect(r.status).toBe(200);
+    expect(await entitlementCount()).toBe(0);
+    const dl = await dbSql`SELECT reason FROM shopier_osb_dead_letters WHERE shopier_order_id = 'OSB-IT-P4'`;
+    expect(dl[0].reason).toBe("unknown_package");
+  });
+});

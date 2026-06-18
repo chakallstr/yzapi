@@ -9,6 +9,7 @@ import { requireWhatsappVerified } from "../middleware/whatsapp-verified.js";
 import { adminAuth } from "../middleware/admin-auth.js";
 import { calcKdv, creditUserBalance } from "../services/payment-common.js";
 import { buildCheckoutForm, verifyCallback, verifyOsbNotification, isOsbTestOrder, resolveOsbProduct } from "../services/shopier-service.js";
+import { grantOsbPackageEntitlement, loadPackageForGrantDb, grantEntitlementDb } from "../services/shopier-osb-package-service.js";
 import { createInvoice, verifyWebhook } from "../services/cryptomus-service.js";
 import { writeAudit } from "../services/audit-service.js";
 import { logger } from "../lib/logger.js";
@@ -514,6 +515,54 @@ async function handleShopierOsbBody(body: unknown, res: Response): Promise<void>
     return;
   }
   const userId = matchedUsers[0].id;
+
+  // B2 — productId bir PAKETE eşliyse (opsiyonel; haritada packageId set'liyse) TL
+  // bakiye yüklemek yerine entitlement ver. packageId YOKSA (canlı varsayılan) bu
+  // dal HİÇ çalışmaz → aşağıdaki bakiye yolu byte-for-byte aynı kalır (INERT).
+  if (product.packageId) {
+    const grant = await grantOsbPackageEntitlement(
+      {
+        loadPackageForGrant: loadPackageForGrantDb,
+        grantEntitlement: grantEntitlementDb,
+        recordDeadLetter: (oid, reason, _detail) =>
+          recordOsbDeadLetter(oid, reason, payload),
+        notifyPaid: ({ userId: uid, packageId, orderId: oid }) =>
+          notifyAdmin({
+            kind: "odeme_yapildi",
+            title: "Paket satın alındı (Shopier OSB)",
+            method: "shopier_osb",
+            amountTL: product.priceTL,
+            reference: `osb_${oid}`,
+            detail: `Kullanıcı ${uid} · paket ${packageId}`,
+          }).catch(() => {}),
+        notifyProblem: ({ userId: uid, packageId, orderId: oid, reason }) =>
+          notifyAdmin({
+            kind: "odeme_sorunu",
+            title: "Shopier OSB paketi verilemedi (para alındı)",
+            method: "shopier_osb",
+            amountTL: product.priceTL,
+            reference: `osb_${oid}`,
+            status: reason,
+            detail: `Kullanıcı ${uid} · paket ${packageId} — manuel kontrol gerekir.`,
+          }).catch(() => {}),
+      },
+      { userId, packageId: product.packageId, orderId },
+    ).catch((e: unknown) => {
+      logger.error({ err: e, orderId }, "OSB package grant threw");
+      return { granted: false } as { granted: boolean; deadLetter?: boolean };
+    });
+
+    // Para alındı ama paket verilemedi (grant throw etti, dead-letter da yazılmadı)
+    // → Shopier retry etsin (gerçek hata; 500). Dead-letter/aktiflik-guard durumunda
+    // 200 success ack (Shopier retry fırtınasını önle; admin zaten uyarıldı).
+    if (!grant.granted && !grant.deadLetter) {
+      logger.error({ orderId }, "Shopier OSB package grant failed — returning 500 for retry");
+      res.status(500).send("error");
+      return;
+    }
+    res.status(200).send("success");
+    return;
+  }
 
   // Z1 — kredilendirmeden ÖNCE payments satırını oluştur/bul. creditUserBalance
   // satırı yalnız UPDATE eder (INSERT etmez) ve idempotency'i payments.id (uuid) ile
