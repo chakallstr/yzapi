@@ -119,7 +119,9 @@ export default {
     'account.panelLoadFailed': 'Panel verileri alınamadı',
 
     'account.topUp.caption': 'Bakiye yükle · USD',
-    'account.refund.title': 'İade politikası — okumak için tıklayın',
+    'account.refund.title': 'İade Politikası',
+    'account.refund.accept': 'İade politikasını okudum ve kabul ediyorum.',
+    'account.refund.gate': 'Devam etmek için iade politikasını onaylayın.',
     'account.refund.body': 'API hizmeti dijital ve anında teslim edilen bir hizmettir; kullanıma açıldığı andan itibaren geri alınamaz. Kara para aklama ve mali suçların önlenmesine ilişkin yükümlülükler gereği, yüklenen bakiye ve API hizmeti bedeli iade EDİLMEZ. Ödeme yaparak iade talep edilemeyeceğini kabul etmiş olursunuz. (Yalnızca tarafımızdan kaynaklanan hatalı veya mükerrer tahsilatlar bu kapsamın dışındadır.)',
     'account.topUp.min': 'min ${amount}',
     'account.topUp.customPlaceholder': 'Özel tutar (min ${amount})',
@@ -351,7 +353,9 @@ export default {
     'account.panelLoadFailed': 'Could not fetch panel data',
 
     'account.topUp.caption': 'Add balance · USD',
-    'account.refund.title': 'Refund policy — click to read',
+    'account.refund.title': 'Refund Policy',
+    'account.refund.accept': 'I have read and accept the refund policy.',
+    'account.refund.gate': 'Please accept the refund policy to continue.',
     'account.refund.body': 'The API service is digital and delivered instantly; once it becomes usable it cannot be reversed. In line with anti–money-laundering and financial-crime obligations, loaded balance and API service fees are NON-REFUNDABLE. By paying, you accept that no refund can be requested. (Only erroneous or duplicate charges caused by us are excluded.)',
     'account.topUp.min': 'min ${amount}',
     'account.topUp.customPlaceholder': 'Custom amount (min ${amount})',

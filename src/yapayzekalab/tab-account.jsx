@@ -596,6 +596,8 @@ const AccountTab = ({ ctx }) => {
   const [paymentMethods, setPaymentMethods] = useState(null);
   const [paymentInstruction, setPaymentInstruction] = useState(null);
   const [topUpCooldown, setTopUpCooldown] = useState(0);
+  // İade politikası onay kapısı: onaylanmadan ödeme alanı bulanık/kapalı (her ziyarette tekrar onay).
+  const [refundOk, setRefundOk] = useState(false);
   const [team, setTeam] = useState([]);
   const [webhooks, setWebhooks] = useState(null);
   const [sandboxKey, setSandboxKey] = useState(null);
@@ -964,6 +966,7 @@ const AccountTab = ({ ctx }) => {
   };
 
   const onTopUp = async () => {
+    if (!refundOk) return; // iade politikası onaylanmadan ödeme başlatılamaz (klavye/bypass savunması)
     if (effectiveAmount < MIN_USD) return;
     if (!paymentMethodEnabled) {
       setPanelError(selectedPaymentMethod?.reason || t('account.topUp.methodClosedAlert'));
@@ -1185,15 +1188,27 @@ const AccountTab = ({ ctx }) => {
             <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)' }}>{t('account.topUp.min', { amount: MIN_USD })}</Chip>
           </div>
 
-          {/* İade politikası — küçük, tıklanabilir/açılır uyarı (kara para aklama önlemi → iade yok) */}
-          <details style={{ marginBottom: 14, padding: '9px 12px', borderRadius: 9, background: '#fffbeb', border: '1px solid #fde68a' }}>
-            <summary style={{ cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#92400e', listStyle: 'none', userSelect: 'none' }}>
-              ⚠️ {t('account.refund.title')}
-            </summary>
-            <div style={{ fontSize: 11.5, color: '#78350f', lineHeight: 1.55, marginTop: 7 }}>
-              {t('account.refund.body')}
-            </div>
-          </details>
+          {/* İade politikası ONAY KAPISI — onaylanmadan aşağıdaki ödeme alanı bulanık + tıklanamaz */}
+          <div style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 10, background: '#fffbeb', border: `1px solid ${refundOk ? '#fde68a' : '#f59e0b'}` }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#92400e', marginBottom: 6 }}>⚠️ {t('account.refund.title')}</div>
+            <div style={{ fontSize: 11.5, color: '#78350f', lineHeight: 1.55, marginBottom: 10 }}>{t('account.refund.body')}</div>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#92400e' }}>
+              <input type="checkbox" checked={refundOk} onChange={(e) => setRefundOk(e.target.checked)} style={{ marginTop: 1, width: 16, height: 16, cursor: 'pointer', accentColor: '#d97706' }} />
+              <span>{t('account.refund.accept')}</span>
+            </label>
+            {!refundOk && (
+              <div style={{ fontSize: 11, color: '#b45309', marginTop: 7, fontWeight: 600 }}>{t('account.refund.gate')}</div>
+            )}
+          </div>
+
+          {/* Ödeme alanı — iade politikası onaylanana dek BULANIK + tıklanamaz */}
+          <div aria-hidden={!refundOk} style={{
+            filter: refundOk ? 'none' : 'blur(5px)',
+            pointerEvents: refundOk ? 'auto' : 'none',
+            userSelect: refundOk ? 'auto' : 'none',
+            opacity: refundOk ? 1 : 0.6,
+            transition: 'filter .25s ease, opacity .25s ease',
+          }}>
 
           {/* Quick amounts */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
@@ -1350,7 +1365,7 @@ const AccountTab = ({ ctx }) => {
             </div>
           )}
 
-          <button onClick={onTopUp} disabled={belowMin || effectiveAmount < MIN_USD || !paymentMethodEnabled || topUpCooldown > 0} style={{
+          <button onClick={onTopUp} disabled={!refundOk || belowMin || effectiveAmount < MIN_USD || !paymentMethodEnabled || topUpCooldown > 0} style={{
             width: '100%', padding: '11px 0', borderRadius: 10,
             background: belowMin || !paymentMethodEnabled || topUpCooldown > 0 ? 'var(--ink-4)' : 'var(--accent)', color: '#fff',
             fontSize: 13, fontWeight: 600,
@@ -1367,6 +1382,7 @@ const AccountTab = ({ ctx }) => {
           <div style={{ fontSize: 10.5, color: 'var(--ink-3)', textAlign: 'center', marginTop: 10, fontFamily: 'var(--font-mono)', lineHeight: 1.55 }}>
             {t('account.topUp.footerPre')} <strong style={{ color: 'var(--ink-2)' }}>{t('account.topUp.footerRoundStrong')}</strong> {t('account.topUp.footerMid')} <strong style={{ color: 'var(--ink-2)' }}>${MIN_USD}</strong>.
           </div>
+          </div>{/* /ödeme alanı (iade onay kapısı) */}
         </Card>
       </div>
 
