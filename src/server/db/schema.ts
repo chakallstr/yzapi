@@ -691,6 +691,8 @@ export const redeemCodes = pgTable("redeem_codes", {
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   enabled: boolean("enabled").notNull().default(true),
   aciklama: text("aciklama").notNull().default(""),
+  // Admin 'Kopyala' dedi → dağıtıldı işareti (panelde kararır; key silinmez).
+  copiedAt: timestamp("copied_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });

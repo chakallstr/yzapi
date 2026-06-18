@@ -59,4 +59,14 @@ describe("redeem-only (Deneme) trial", () => {
     expect((res as any).entitlementId).toBeTruthy();
     expect(await balance()).toBe(before); // bedava — para hareketi yok
   });
+
+  it("markRedeemCodeCopied: 'kopyalandı' işareti (key SİLİNMEZ, copied_at set)", async () => {
+    const { markRedeemCodeCopied, listRedeemCodes } = await import("../services/redeem-code-service.js");
+    const mine = (await listRedeemCodes()).filter((c: any) => c.package_id === PKG);
+    const target = mine.find((c: any) => !c.copied_at && Number(c.used_count) === 0) || mine[0];
+    await markRedeemCodeCopied(target.id);
+    const after = (await listRedeemCodes()).find((c: any) => c.id === target.id) as any;
+    expect(after.copied_at).toBeTruthy();   // işaretlendi
+    expect(after.code).toBe(target.code);   // ama key hâlâ DB'de (silinmedi)
+  });
 });

@@ -151,11 +151,16 @@ export async function generateRedeemCodes(input: GenerateInput): Promise<{ codes
 export async function listRedeemCodes() {
   return await dbSql`
     SELECT id, code, tip, amount_tl, package_id, max_uses, used_count, per_user_once,
-           expires_at, enabled, aciklama, created_at
+           expires_at, enabled, aciklama, created_at, copied_at
     FROM redeem_codes ORDER BY created_at DESC LIMIT 500
   `;
 }
 
 export async function setRedeemCodeEnabled(id: string, enabled: boolean): Promise<void> {
   await dbSql`UPDATE redeem_codes SET enabled = ${enabled}, updated_at = now() WHERE id = ${id}::uuid`;
+}
+
+/** Admin 'Kopyala' dedi → kodu dağıtıldı olarak işaretle (idempotent; key SİLİNMEZ, panelde kararır). */
+export async function markRedeemCodeCopied(id: string): Promise<void> {
+  await dbSql`UPDATE redeem_codes SET copied_at = now(), updated_at = now() WHERE id = ${id}::uuid AND copied_at IS NULL`;
 }

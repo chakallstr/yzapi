@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db, dbSql } from "../db/client.js";
 import {
@@ -41,7 +41,7 @@ import {
   deletePackage,
 } from "../services/package-service.js";
 import { setPackageProviderOverride } from "../services/package-provider-override.js";
-import { generateRedeemCodes, listRedeemCodes, setRedeemCodeEnabled } from "../services/redeem-code-service.js";
+import { generateRedeemCodes, listRedeemCodes, setRedeemCodeEnabled, markRedeemCodeCopied } from "../services/redeem-code-service.js";
 import { listAllDeliveryOrders, markDeliveryDelivered, cancelDeliveryWithRefund } from "../services/account-delivery-service.js";
 import { getRikaResellerStatus } from "../services/rika-reseller-service.js";
 import {
@@ -57,6 +57,11 @@ import {
   deleteAddedModel,
   listAddedModels,
 } from "../services/added-model-service.js";
+import {
+  getLiveStateSummary,
+  getLiveStateTables,
+  getLiveStateTableRows,
+} from "../services/admin-live-state-service.js";
 
 const router = Router();
 const SINGLE_ADMIN_EMAIL = "cix.crazy666@gmail.com";
@@ -81,6 +86,12 @@ function parseTrafficWindow(raw: unknown): TrafficWindow {
 function parseUserSort(raw: unknown): string {
   const value = String(raw ?? DEFAULT_USER_SORT);
   return ALLOWED_USER_SORTS.has(value) ? value : DEFAULT_USER_SORT;
+}
+
+function requireOwner(req: Request, res: Response): boolean {
+  if (req.adminRole === "owner") return true;
+  res.status(403).json({ error: "Owner admin required" });
+  return false;
 }
 
 function asTime(value: Date | string | null | undefined): number {
@@ -948,6 +959,35 @@ router.get("/audit-logs", async (_req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// ── Live State (owner-only) ───────────────────────────────────────────────────
+router.get("/live-state/summary", async (req, res, next) => {
+  if (!requireOwner(req, res)) return;
+  try {
+    res.json(await getLiveStateSummary());
+  } catch (e) { next(e); }
+});
+
+router.get("/live-state/tables", async (req, res, next) => {
+  if (!requireOwner(req, res)) return;
+  try {
+    res.json(await getLiveStateTables());
+  } catch (e) { next(e); }
+});
+
+router.get("/live-state/table/:table", async (req, res, next) => {
+  if (!requireOwner(req, res)) return;
+  try {
+    const result = await getLiveStateTableRows(req.params.table, req.query);
+    await writeAudit(
+      "live_state_table_read",
+      req.params.table,
+      `limit=${result.limit} offset=${result.offset} order=${result.order}`,
+      req.admin?.sub,
+    );
+    res.json(result);
+  } catch (e) { next(e); }
+});
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 router.get("/dashboard", async (_req, res, next) => {
   try {
@@ -1468,6 +1508,16 @@ router.post("/redeem-codes/:id/toggle", async (req, res, next) => {
     const enabled = (req.body as Record<string, unknown>)?.enabled === true;
     await setRedeemCodeEnabled(req.params.id, enabled);
     await writeAudit("admin_redeem_code_toggle", req.params.id, `Kod ${enabled ? "açıldı" : "kapatıldı"}`, req.user!.id);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/redeem-codes/:id/copied", async (req, res, next) => {
+  try {
+    await markRedeemCodeCopied(req.params.id);
+    await writeAudit("admin_redeem_code_copied", req.params.id, "Kod kopyalandı (dağıtıldı işaretlendi)", req.user!.id);
     res.json({ ok: true });
   } catch (e) {
     next(e);

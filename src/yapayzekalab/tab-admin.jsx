@@ -7,6 +7,8 @@ import { authFetch } from './auth-client.js';
 import { AdminTrafficAnalytics } from './tab-admin-traffic.jsx';
 import { AdminMaliIzleme } from './tab-admin-mali-izleme.jsx';
 import { AdminGozcu } from './tab-admin-gozcu.jsx';
+import { AdminLiveState } from './tab-admin-live-state.jsx';
+import { AdminCodefast } from './tab-admin-codefast.jsx';
 
 const LAUNCH_ADMIN_EMAIL = 'cix.crazy666@gmail.com';
 const ACCESS_TOKEN_KEY = 'yz_access_token';
@@ -30,6 +32,8 @@ const ADMIN_SECTIONS = [
   { id: 'telegram', label: 'Telegram', Ico: I.Bell },
   { id: 'apikeys', label: 'API anahtarları', Ico: I.Key },
   { id: 'logs', label: 'Loglar', Ico: I.Terminal },
+  { id: 'live-state', label: 'Canlı veri', Ico: I.Database },
+  { id: 'codefast', label: 'CodeFast', Ico: I.Wallet },
   { id: 'animations', label: 'Animasyon', Ico: I.Sparkle },
 ];
 
@@ -930,6 +934,13 @@ const AdminRedeemCodes = ({ token }) => {
     catch (e) { setError(e.message || 'Durum değiştirilemedi.'); }
   };
 
+  // 'Kopyala' → kodu panoya al + sistemde "dağıtıldı" işaretle (kararsın). Key SİLİNMEZ.
+  const copyCode = async (row) => {
+    try { await navigator.clipboard.writeText(row.code); } catch {}
+    try { await adminRequest(`/api/admin/redeem-codes/${row.id}/copied`, token, { method: 'POST' }); await load(); }
+    catch (e) { setError(e.message || 'Kopyalandı işaretlenemedi.'); }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* ── Deneme Paketi hızlı üretim ── */}
@@ -991,14 +1002,15 @@ const AdminRedeemCodes = ({ token }) => {
         )}
         {loading ? <div style={{ marginTop: 12 }}>Yükleniyor…</div> : (
           <table style={{ width: '100%', marginTop: 12, fontSize: 13 }}>
-            <thead><tr style={{ textAlign: 'left' }}><th>kod</th><th>tip</th><th>değer</th><th>kullanım</th><th>durum</th><th></th><th></th></tr></thead>
+            <thead><tr style={{ textAlign: 'left' }}><th>kod</th><th>tip</th><th>değer</th><th>kullanım</th><th>durum</th><th></th><th></th><th></th></tr></thead>
             <tbody>
               {rows.map((r) => [
-                <tr key={r.id}>
-                  <td style={{ fontFamily: 'monospace' }}>{r.code}</td><td>{r.tip}</td>
+                <tr key={r.id} style={{ opacity: (Number(r.used_count) > 0 || r.copied_at) ? 0.45 : 1 }}>
+                  <td style={{ fontFamily: 'monospace', textDecoration: (Number(r.used_count) > 0 || r.copied_at) ? 'line-through' : 'none' }}>{r.code}</td><td>{r.tip}</td>
                   <td>{r.tip === 'balance' ? `₺${Number(r.amount_tl)}` : pkgName(r.package_id)}</td>
                   <td>{r.used_count}/{r.max_uses}</td>
-                  <td>{r.enabled ? 'Açık' : 'Kapalı'}</td>
+                  <td>{Number(r.used_count) > 0 ? '🔴 kullanıldı' : r.copied_at ? '📋 kopyalandı' : (r.enabled ? '🟢 müsait' : 'kapalı')}</td>
+                  <td><button onClick={() => copyCode(r)} style={{ fontSize: 11, padding: '2px 8px' }}>Kopyala</button></td>
                   <td><button onClick={() => toggle(r)}>{r.enabled ? 'Kapat' : 'Aç'}</button></td>
                   <td>
                     {Number(r.used_count) > 0 && (
@@ -1010,7 +1022,7 @@ const AdminRedeemCodes = ({ token }) => {
                 </tr>,
                 expandedUses === r.id && (
                   <tr key={`${r.id}-uses`}>
-                    <td colSpan={7} style={{ padding: '6px 0 10px 16px', background: 'var(--surface-2)' }}>
+                    <td colSpan={8} style={{ padding: '6px 0 10px 16px', background: 'var(--surface-2)' }}>
                       {usesLoading && !usesData[r.id] ? <span style={{ fontSize: 12 }}>Yükleniyor…</span> : (
                         <table style={{ fontSize: 12, width: '100%' }}>
                           <thead><tr><th style={{ textAlign: 'left', fontWeight: 500 }}>e-posta</th><th style={{ textAlign: 'left', fontWeight: 500 }}>ad soyad</th><th style={{ textAlign: 'left', fontWeight: 500 }}>kullanım tarihi</th></tr></thead>
@@ -3168,6 +3180,8 @@ const AdminTab = ({ ctx = {} }) => {
         {section === 'telegram' && <AdminTelegram token={token} />}
         {section === 'apikeys' && <AdminApiKeys apiKeys={data.apiKeys || []} users={data.users || []} token={token} refresh={refresh} filterUserId={trafficApiKeyJump.userId} filterApiKeyId={trafficApiKeyJump.apiKeyId} filterNonce={trafficApiKeyJump.nonce} />}
         {section === 'logs' && <AdminLogs reconciliation={data.reconciliation} auditLogs={data.auditLogs || []} token={token} />}
+        {section === 'live-state' && <AdminLiveState token={token} />}
+        {section === 'codefast' && <AdminCodefast token={token} />}
         {section === 'animations' && <AdminAnimations tweaks={tweaks} setTweak={setTweak} />}
       </div>
     </div>

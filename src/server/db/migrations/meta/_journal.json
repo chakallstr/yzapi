@@ -253,6 +253,13 @@
       "when": 1782336000000,
       "tag": "0035_custom_package_builder",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1782422400000,
+      "tag": "0036_redeem_code_copied",
+      "breakpoints": true
     }
   ]
 }
