@@ -260,6 +260,13 @@
       "when": 1782422400000,
       "tag": "0036_redeem_code_copied",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1782508800000,
+      "tag": "0037_package_per_user_once",
+      "breakpoints": true
     }
   ]
 }

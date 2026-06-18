@@ -620,6 +620,8 @@ export const packages = pgTable("packages", {
   enabled: boolean("enabled").notNull().default(true),
   // satista=false → katalogda görünür ama satın alınamaz ("en kısa sürede satışta")
   satista: boolean("satista").notNull().default(true),
+  // true → kullanıcı bu paketi yalnızca bir kez alabilir (ücretsiz/free tier suistimal koruması).
+  perUserOnce: boolean("per_user_once").notNull().default(false),
   displayOrder: integer("display_order").notNull().default(0),
   isConfigurable: boolean("is_configurable").notNull().default(false),
   minGunlukIstek: integer("min_gunluk_istek"),
