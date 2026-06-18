@@ -1185,6 +1185,16 @@ const AccountTab = ({ ctx }) => {
             <Chip tone="neutral" style={{ fontFamily: 'var(--font-mono)' }}>{t('account.topUp.min', { amount: MIN_USD })}</Chip>
           </div>
 
+          {/* İade politikası — küçük, tıklanabilir/açılır uyarı (kara para aklama önlemi → iade yok) */}
+          <details style={{ marginBottom: 14, padding: '9px 12px', borderRadius: 9, background: '#fffbeb', border: '1px solid #fde68a' }}>
+            <summary style={{ cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#92400e', listStyle: 'none', userSelect: 'none' }}>
+              ⚠️ {t('account.refund.title')}
+            </summary>
+            <div style={{ fontSize: 11.5, color: '#78350f', lineHeight: 1.55, marginTop: 7 }}>
+              {t('account.refund.body')}
+            </div>
+          </details>
+
           {/* Quick amounts */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
             {[5, 10, 25, 50].map(a => (
