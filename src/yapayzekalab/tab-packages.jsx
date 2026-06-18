@@ -48,8 +48,8 @@ const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
   const meta = metaFor(pkg.kategori);
   const Ic = I[meta.icon] || I.Terminal;
 
-  // Kademeli adım: 50–500 arası 5'er, 500 üstü 50'şer (backend limitStepError ile birebir).
-  const snapLimit = (v) => { const s = v < 500 ? 5 : 50; return Math.round(v / s) * s; };
+  // Kademeli adım: 50–500 arası 5'er, 500 üstü 50'şer; HEP YUKARI yuvarla (backend limitStepError uyumlu).
+  const snapLimit = (v) => { const s = v < 500 ? 5 : 50; return Math.ceil(v / s) * s; };
   const minLimit = pkg.minGunlukIstek ?? 50;
   const maxLimit = pkg.maxGunlukIstek ?? 5000;
   const minDays  = pkg.minSureGun ?? 1;
@@ -60,6 +60,9 @@ const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
 
   const [limit, setLimit] = useState(Math.min(500, maxLimit));
   const [days,  setDays]  = useState(1);
+  // Serbest yazım için ham metin state'i; snap/sınır SADECE odaktan çıkınca (blur) uygulanır.
+  const [limitText, setLimitText] = useState(String(Math.min(500, maxLimit)));
+  const [daysText, setDaysText] = useState('1');
   const [preview, setPreview] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -80,12 +83,18 @@ const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
 
   useEffect(() => { fetchPreview(limit, days); }, [limit, days]);
 
-  const handleLimitChange = (v) => {
-    setLimit(Math.max(minLimit, Math.min(maxLimit, snapLimit(v))));
+  // Odaktan çıkınca uygula: kullanıcı serbest yazar, blur'da yukarı-yuvarla + sınırla.
+  const commitLimit = () => {
+    const n = parseInt(limitText, 10);
+    if (!n || isNaN(n)) { setLimitText(String(limit)); return; }
+    const snapped = Math.max(minLimit, Math.min(maxLimit, snapLimit(n)));
+    setLimit(snapped); setLimitText(String(snapped));
   };
-  const handleDaysChange = (v) => {
-    const clamped = Math.max(minDays, Math.min(maxDays, Math.round(v)));
-    setDays(clamped);
+  const commitDays = () => {
+    const n = parseInt(daysText, 10);
+    if (!n || isNaN(n)) { setDaysText(String(days)); return; }
+    const clamped = Math.max(minDays, Math.min(maxDays, n));
+    setDays(clamped); setDaysText(String(clamped));
   };
 
   const priceUsd = preview?.fiyatUsd ?? 0;
@@ -180,8 +189,10 @@ const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
                 </div>
                 <input
                   type="number"
-                  min={minDays} max={maxDays} step={1} value={days}
-                  onChange={(e) => handleDaysChange(Number(e.target.value))}
+                  min={minDays} max={maxDays} step={1} value={daysText}
+                  onChange={(e) => setDaysText(e.target.value)}
+                  onBlur={commitDays}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                   style={{
                     width: '100%', padding: '8px 10px', borderRadius: 7,
                     border: '1px solid var(--border-st)', background: 'var(--surface-2)',
@@ -199,8 +210,10 @@ const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
                 </div>
                 <input
                   type="number"
-                  min={minLimit} max={maxLimit} step={5} value={limit}
-                  onChange={(e) => handleLimitChange(Number(e.target.value))}
+                  min={minLimit} max={maxLimit} step={5} value={limitText}
+                  onChange={(e) => setLimitText(e.target.value)}
+                  onBlur={commitLimit}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                   style={{
                     width: '100%', padding: '8px 10px', borderRadius: 7,
                     border: '1px solid var(--border-st)', background: 'var(--surface-2)',
@@ -209,7 +222,7 @@ const ConfigurablePackageCard = ({ pkg, busy, onBuy, t }) => {
                   }}
                 />
                 <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 3 }}>
-                  {minLimit.toLocaleString('tr-TR')}–{maxLimit.toLocaleString('tr-TR')} istek (50–500 arası 5'er, üstü 50'şer)
+                  {minLimit.toLocaleString('tr-TR')}–{maxLimit.toLocaleString('tr-TR')} {unitLabel} (50–500 arası 5'er, üstü 50'şer — yukarı yuvarlanır)
                 </div>
               </div>
             </div>
