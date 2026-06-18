@@ -122,7 +122,7 @@ export async function purchasePackageWithBalance(
   }
 
   const pkgRows = await dbSql<any[]>`
-    SELECT id, ad, fiyat_tl, sure_gun, gunluk_istek_limiti, allowed_models, enabled, satista, tip,
+    SELECT id, ad, kategori, fiyat_tl, sure_gun, gunluk_istek_limiti, allowed_models, enabled, satista, tip,
            is_configurable, min_gunluk_istek, max_gunluk_istek, min_sure_gun, max_sure_gun,
            birim_fiyat_usd_per_50,
            cf_catalog_id, cf_api_slug, cf_manual, cf_token_millions, cf_template_id
@@ -131,6 +131,8 @@ export async function purchasePackageWithBalance(
   if (!pkgRows.length) throw new AppError(404, "Paket bulunamadı");
   const pkg = pkgRows[0];
   if (!pkg.enabled) throw new AppError(400, "Paket satışta değil");
+  // 'Deneme' = redeem-only (yalnız kod/key ile): doğrudan satın alma kapalı, gridde gizli.
+  if (pkg.kategori === "Deneme") throw new AppError(400, "Bu paket yalnızca kod/key ile etkinleştirilir");
   // satista=false → vitrinde ama satın alma henüz kapalı ("en kısa sürede satışta")
   if (pkg.satista === false) throw new AppError(400, "Paket henüz satışta değil — en kısa sürede satışa açılacak");
   if (pkg.tip !== "request_limit" && pkg.tip !== "account_delivery") {

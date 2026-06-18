@@ -16,7 +16,7 @@ export async function listPublicPackages() {
              allowed_models, fiyat_tl, fiyat_usd, display_order, satista,
              is_configurable, min_gunluk_istek, max_gunluk_istek,
              min_sure_gun, max_sure_gun, birim_fiyat_usd_per_50, birim_tipi
-      FROM packages WHERE enabled = true
+      FROM packages WHERE enabled = true AND COALESCE(kategori, '') <> 'Deneme'
       ORDER BY display_order ASC, ad ASC
     `,
     dbSql<{ live_kur: string; kur_buffer: string }[]>`
@@ -35,7 +35,7 @@ export async function getPublicPackage(id: string) {
              allowed_models, fiyat_tl, fiyat_usd, display_order, satista,
              is_configurable, min_gunluk_istek, max_gunluk_istek,
              min_sure_gun, max_sure_gun, birim_fiyat_usd_per_50, birim_tipi
-      FROM packages WHERE id = ${id} AND enabled = true LIMIT 1
+      FROM packages WHERE id = ${id} AND enabled = true AND COALESCE(kategori, '') <> 'Deneme' LIMIT 1
     `,
     dbSql<{ live_kur: string; kur_buffer: string }[]>`
       SELECT live_kur, kur_buffer FROM system_config WHERE id = 1 LIMIT 1
