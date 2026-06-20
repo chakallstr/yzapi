@@ -31,9 +31,15 @@ export function formatPurchaseRef(date: Date, rand: string): string {
 /**
  * DB'de henüz kullanılmamış bir purchase_ref üretir.
  * Üretimde pre-check; partial unique index nihai garantidir.
- * sql: postgres-js Sql veya TransactionSql (transaction içi çağrı için).
+ *
+ * `sql`: postgres-js `dbSql` (pool) VEYA transaction içi `txSql`. Tip `any` çünkü
+ * postgres-js'in `TransactionSql`'i `Sql`'i tam extend etmez (CLOSE/END/options
+ * eksik) ve çok-overload'lu call signature'ı basit bir fonksiyon tipine de
+ * yapısal olarak atanamaz — iki gerçek çağrı yeri (purchase-service txSql +
+ * test stub) güvenli, runtime davranışı testlerle kilitli.
  */
 export async function generateUniquePurchaseRef(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sql: any,
   date: Date,
   maxAttempts = 5,
