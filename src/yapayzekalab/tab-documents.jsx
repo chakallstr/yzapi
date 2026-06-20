@@ -1,7 +1,8 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { I, Card, Chip, Caption } from './shared.jsx';
 import { API_DOC_SECTIONS, CLIENT_GUIDES, buildApiDocsPlainText, OS_LABELS } from './api-docs.js';
 import { apiJson, hasStoredAuth } from './auth-client.js';
+import { ApiKeysPanel } from './api-keys-panel.jsx';
 
 const KEY_PLACEHOLDER = 'yzk_live_YOUR_KEY';
 const OS_ORDER = ['windows', 'macos', 'linux'];
@@ -563,6 +564,20 @@ const DocumentsTab = () => {
     return () => { cancelled = true; };
   }, []);
 
+  // API panelinden anahtar oluşturulunca/silinince kod örneklerindeki kişisel
+  // anahtarı tazele (unmount-guard'sız hafif yeniden çekme — manuel tetiklenir).
+  const refreshDocKey = useCallback(async () => {
+    if (!hasStoredAuth()) { setKeyState('none'); setMyKey(''); return; }
+    try {
+      const keys = await apiJson('/api/user/api-keys');
+      const active = Array.isArray(keys) ? keys.find((k) => k.aktif !== false) || keys[0] : null;
+      if (!active) { setKeyState('none'); setMyKey(''); return; }
+      const revealed = await apiJson(`/api/user/api-keys/${active.id}/reveal`);
+      if (revealed?.key) { setMyKey(revealed.key); setKeyMasked(revealed.maskedKey || active.maskedKey || ''); setKeyState('ready'); }
+      else { setKeyMasked(active.maskedKey || ''); setKeyState('none'); }
+    } catch { setKeyState('error'); }
+  }, []);
+
   const hasKey = keyState === 'ready' && Boolean(myKey);
   const reveal = hasKey && showKey;
   const personalize = (text) => personalizeText(text, myKey, reveal);
@@ -684,11 +699,14 @@ const DocumentsTab = () => {
       ) : null)}
 
       {view === 'hub' ? (
-        <DocsHub
-          guides={CLIENT_GUIDES}
-          onPick={(id) => { setView(id); window.scrollTo({ top: 0 }); }}
-          onClassic={(k) => { setView('classic'); window.setTimeout(() => { if (k) navigateToDoc(k); else window.scrollTo({ top: 0 }); }, 60); }}
-        />
+        <>
+          <ApiKeysPanel onKeysChanged={refreshDocKey} />
+          <DocsHub
+            guides={CLIENT_GUIDES}
+            onPick={(id) => { setView(id); window.scrollTo({ top: 0 }); }}
+            onClassic={(k) => { setView('classic'); window.setTimeout(() => { if (k) navigateToDoc(k); else window.scrollTo({ top: 0 }); }, 60); }}
+          />
+        </>
       ) : selectedGuide ? (
         <ClientGuidePage guide={selectedGuide} onBack={() => { setView('hub'); window.scrollTo({ top: 0 }); }} renderInline={renderInline} apiKey={reveal ? myKey : null} />
       ) : (

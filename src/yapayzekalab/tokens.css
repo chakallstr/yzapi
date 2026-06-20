@@ -33,6 +33,7 @@
   /* Status palette (mostly constant across themes) */
   --ok:    #10b981;
   --ok-bg: #ecfdf5;
+  --ok-ink: #047857;
   --warn:  #f59e0b;
   --err:   #ef4444;
 
