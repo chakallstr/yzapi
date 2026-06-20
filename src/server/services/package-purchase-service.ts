@@ -5,6 +5,7 @@ import { logger } from "../lib/logger.js";
 import { InsufficientBalanceError, AppError } from "../lib/errors.js";
 import { grantPackageEntitlement } from "./entitlement-service.js";
 import { computeCustomPrice, limitStepError, type BirimTipi } from "./custom-package-pricing.js";
+import { generateUniquePurchaseRef } from "./purchase-ref.js";
 
 /** Configurable paket için anlık fiyat hesabı (TL + USD). */
 export async function previewConfigurablePrice(
@@ -208,13 +209,14 @@ export async function purchasePackageWithBalance(
 
       // idempotency_key UNIQUE: eşzamanlı mükerrer istek burada 23505 fırlatır → tx rollback
       // (debit geri alınır), kaybeden istek aşağıdaki catch'te idempotent duruma döner.
+      const purchaseRef = await generateUniquePurchaseRef(txSql, new Date());
       const txRows = await txSql<{ id: string }[]>`
         INSERT INTO transactions
-          (user_id, user_email, tip, miktar_tl, onceki_bakiye, sonraki_bakiye, aciklama, metod, idempotency_key)
+          (user_id, user_email, tip, miktar_tl, onceki_bakiye, sonraki_bakiye, aciklama, metod, idempotency_key, purchase_ref, package_id)
         VALUES
           (${userId}::uuid, ${updated[0].email}, 'paket_satin_alma', ${-fiyatTL}::numeric,
            ${prevBalance}::numeric, ${newBalance}::numeric, ${"Paket: " + pkg.ad}, 'bakiye',
-           ${txKey})
+           ${txKey}, ${purchaseRef}, ${packageId})
         RETURNING id
       `;
       const txId = txRows[0].id;

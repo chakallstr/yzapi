@@ -1,6 +1,5 @@
 // src/server/services/purchase-ref.ts
 import { randomInt } from "node:crypto";
-import { dbSql } from "../db/client.js";
 
 /** 32 karakter, belirsizlik-yok: I/O/0/1 ve küçük harf YOK. */
 export const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -29,14 +28,13 @@ export function formatPurchaseRef(date: Date, rand: string): string {
   return `YZK-${istanbulYYMMDD(date)}-${rand}`;
 }
 
-type SqlClient = typeof dbSql;
-
 /**
  * DB'de henüz kullanılmamış bir purchase_ref üretir.
  * Üretimde pre-check; partial unique index nihai garantidir.
+ * sql: postgres-js Sql veya TransactionSql (transaction içi çağrı için).
  */
 export async function generateUniquePurchaseRef(
-  sql: SqlClient,
+  sql: any,
   date: Date,
   maxAttempts = 5,
 ): Promise<string> {
