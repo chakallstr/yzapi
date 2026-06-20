@@ -160,4 +160,43 @@ describe("request guard service", () => {
       topPMax: 1,
     })).toThrow("top_p 0 ile 1 arasında olmalı.");
   });
+
+  it("strips sampling params (temperature/top_p/top_k) when the model rejects them", () => {
+    // Opus 4.7/4.8/Fable reject these params upstream (400 invalid_request_error
+    // "temperature is deprecated for this model"). Clients like Cline/Roo send them
+    // by default — the gateway must drop them before forwarding.
+    const guard = buildRequestGuard({
+      endpoint: "chat",
+      model,
+      body: { model: "claude-opus-4.8", messages: [], temperature: 0.7, top_p: 0.9, top_k: 40 },
+      rejectsSamplingParams: true,
+    });
+
+    expect(guard.guardedBody).not.toHaveProperty("temperature");
+    expect(guard.guardedBody).not.toHaveProperty("top_p");
+    expect(guard.guardedBody).not.toHaveProperty("top_k");
+  });
+
+  it("does NOT range-validate sampling params for models that reject them (they are stripped instead)", () => {
+    // Even an out-of-range temperature must not 400 — it is simply dropped.
+    expect(() => buildRequestGuard({
+      endpoint: "chat",
+      model,
+      body: { model: "claude-opus-4.8", messages: [], temperature: 2.5 },
+      temperatureMin: 0,
+      temperatureMax: 2,
+      rejectsSamplingParams: true,
+    })).not.toThrow();
+  });
+
+  it("keeps sampling params for models that accept them (default behavior)", () => {
+    const guard = buildRequestGuard({
+      endpoint: "chat",
+      model,
+      body: { model: "claude-sonnet-4-6", messages: [], temperature: 0.7, top_p: 0.9 },
+    });
+
+    expect(guard.guardedBody.temperature).toBe(0.7);
+    expect(guard.guardedBody.top_p).toBe(0.9);
+  });
 });

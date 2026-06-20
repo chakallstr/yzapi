@@ -3,6 +3,7 @@ import { tr as baseTr } from './tr.js';
 import { en as baseEn } from './en.js';
 import appShell from './strings/app-shell.js';
 import packages from './strings/packages.js';
+import mypackages from './strings/mypackages.js';
 import aiChat from './strings/ai-chat.js';
 import studio from './strings/studio.js';
 import status from './strings/status.js';
@@ -23,7 +24,7 @@ import telegramTopup from './strings/telegram-topup.js';
    ============================================ */
 
 const FRAGMENTS = [
-  appShell, packages, aiChat, studio, status, support,
+  appShell, packages, mypackages, aiChat, studio, status, support,
   home, account, activity, models, shared, telegramTopup,
 ];
 

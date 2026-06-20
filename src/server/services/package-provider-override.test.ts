@@ -58,6 +58,50 @@ describe("packageOverrideChain", () => {
   });
 });
 
+describe("entitlementOverrideChain (CodeFast reseller)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns null when slug or key cipher is missing (CF kapalı → normal routing)", async () => {
+    const { entitlementOverrideChain } = await import("./package-provider-override.js");
+    const base = "https://reseller-api.codefast.app";
+    expect(entitlementOverrideChain({ entitlementId: "e1" }, base)).toBeNull();
+    expect(entitlementOverrideChain({ entitlementId: "e1", cfApiSlug: "codex-api" }, base)).toBeNull();
+    expect(entitlementOverrideChain({ entitlementId: "e1", cfRcKeyCipher: "v1.a.b.c" }, base)).toBeNull();
+    expect(mockDecrypt).not.toHaveBeenCalled();
+  });
+
+  it("returns null when the cipher cannot be decrypted (istek kırılmaz)", async () => {
+    mockDecrypt.mockReturnValueOnce(null);
+    const { entitlementOverrideChain } = await import("./package-provider-override.js");
+    expect(
+      entitlementOverrideChain(
+        { entitlementId: "e1", cfApiSlug: "codex-api", cfRcKeyCipher: "broken" },
+        "https://reseller-api.codefast.app",
+      ),
+    ).toBeNull();
+  });
+
+  it("appends /v1 to the proxy path → /proxy/<slug>/v1 (CF 404 'Hata Oluştu' fix)", async () => {
+    mockDecrypt.mockReturnValueOnce("cf_rc_live_secret");
+    const { entitlementOverrideChain } = await import("./package-provider-override.js");
+    const chain = entitlementOverrideChain(
+      { entitlementId: "e1", cfApiSlug: "codex-api", cfRcKeyCipher: "v1.iv.tag.data" },
+      "https://reseller-api.codefast.app/",
+    );
+    expect(chain).toEqual({
+      primary: {
+        profileId: "cf:e1",
+        // upstream forward /chat/completions·/responses·/messages ekler → tam: /proxy/codex-api/v1/chat/completions
+        baseUrl: "https://reseller-api.codefast.app/proxy/codex-api/v1",
+        apiKey: "cf_rc_live_secret",
+        modelMap: {},
+        source: { baseUrl: "db", apiKey: "db" },
+      },
+      fallback: null,
+    });
+  });
+});
+
 describe("setPackageProviderOverride", () => {
   beforeEach(() => vi.clearAllMocks());
 

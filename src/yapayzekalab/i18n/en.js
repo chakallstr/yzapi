@@ -20,6 +20,7 @@ export const en = {
   'nav.home': 'Home',
   'nav.models': 'Models',
   'nav.packages': 'Packages',
+  'nav.mypackages': 'My Packages',
   'nav.aiChat': 'AI Chat',
   'nav.studio': 'Studio',
   'nav.documents': 'Documents',

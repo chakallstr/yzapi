@@ -45,6 +45,24 @@ describe("forwardTextEndpoint", () => {
     expect(result.usage.providerRaw).toEqual({ input_tokens: 100, output_tokens: 25 });
   });
 
+  it("CF mirror: x-codefast-remaining header'ını usage.cfRemaining'e yakalar", async () => {
+    nock("https://api.closerouter.dev", { reqheaders: { authorization: "Bearer closerouter_test_key" } })
+      .post("/v1/responses")
+      .reply(200, { id: "resp_cf", usage: { input_tokens: 10, output_tokens: 5 } }, { "x-codefast-remaining": "412" });
+
+    const result = await forwardTextEndpoint("responses", { model: "gpt-5.5", input: "x" }, ctx());
+    expect(result.usage.cfRemaining).toBe(412);
+  });
+
+  it("CF dışı sağlayıcı (header yok) → cfRemaining null", async () => {
+    nock("https://api.closerouter.dev", { reqheaders: { authorization: "Bearer closerouter_test_key" } })
+      .post("/v1/responses")
+      .reply(200, { id: "resp_nocf", usage: { input_tokens: 10, output_tokens: 5 } });
+
+    const result = await forwardTextEndpoint("responses", { model: "gpt-5.5", input: "x" }, ctx());
+    expect(result.usage.cfRemaining).toBeNull();
+  });
+
   it("forwards /messages requests and reads prompt/completion token usage", async () => {
     nock("https://api.closerouter.dev", {
       reqheaders: { authorization: "Bearer closerouter_test_key" },

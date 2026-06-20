@@ -32,6 +32,7 @@ import {
   upsertModelRuntimePolicy,
   upsertSystemApiConfig,
 } from "../services/api-settings-service.js";
+import { computeDisplayConsumed } from "../services/entitlement-service.js";
 import { listImplementedProviderIds } from "../services/provider-adapter.js";
 import {
   listAllPackages,
@@ -648,7 +649,7 @@ router.get("/users/:id/detail", async (req, res, next) => {
     if (!userRows.length) return res.status(404).json({ error: "Kullanıcı bulunamadı" });
 
     const user = userRows[0];
-    const [keyRows, usageRows, txRows, usageAggRows, pkgAggRows] = await Promise.all([
+    const [keyRows, usageRows, txRows, usageAggRows, pkgAggRows, entRows] = await Promise.all([
       db.select().from(apiKeys).where(eq(apiKeys.userId, id)).orderBy(desc(apiKeys.olusturma)),
       db.select().from(usageRecords).where(eq(usageRecords.userId, id)).orderBy(desc(usageRecords.timestamp)).limit(50),
       db.select().from(transactions).where(eq(transactions.userId, id)).orderBy(desc(transactions.timestamp)).limit(50),
@@ -673,10 +674,47 @@ router.get("/users/:id/detail", async (req, res, next) => {
         FROM usage_records
         WHERE user_id = ${id}::uuid
       `,
-      dbSql<{ package_requests: string; active_entitlements: string }[]>`
+      dbSql<{ package_requests: string; package_failed: string; active_entitlements: string }[]>`
         SELECT
-          (SELECT COUNT(*) FROM usage_records WHERE user_id = ${id}::uuid AND billed_via = 'package') AS package_requests,
+          (SELECT COUNT(*) FROM usage_records WHERE user_id = ${id}::uuid AND billed_via = 'package' AND status = 'success') AS package_requests,
+          (SELECT COUNT(*) FROM usage_records WHERE user_id = ${id}::uuid AND billed_via = 'package' AND status <> 'success') AS package_failed,
           (SELECT COUNT(*) FROM user_package_entitlements WHERE user_id = ${id}::uuid AND status = 'active' AND expires_at > now()) AS active_entitlements
+      `,
+      // Kullanıcının TÜM paket geçmişi (aktif + bitmiş/süresi dolmuş) — admin per-kullanıcı görünüm.
+      // Salt-read; billing/kotaya dokunmaz. listUserEntitlements ile aynı tüketim mantığı (CF-lazy vs günlük).
+      dbSql<{
+        id: string;
+        package_id: string;
+        paket_adi: string;
+        kategori: string;
+        daily_limit_snapshot: number;
+        requests_today: number;
+        cf_remaining: number | null;
+        cf_units_ordered: number | null;
+        used_success: number;
+        birim_tipi: string | null;
+        activated_at: Date;
+        expires_at: Date;
+        status: string;
+        expired: boolean;
+      }[]>`
+        SELECT e.id, e.package_id, p.ad AS paket_adi, p.kategori, p.birim_tipi,
+               e.daily_limit_snapshot,
+               CASE WHEN e.last_reset_date < CURRENT_DATE THEN 0 ELSE e.requests_today END AS requests_today,
+               e.cf_remaining, e.cf_units_ordered, COALESCE(uc.used_success, 0) AS used_success,
+               e.activated_at, e.expires_at, e.status,
+               (e.expires_at <= now()) AS expired
+        FROM user_package_entitlements e
+        JOIN packages p ON p.id = e.package_id
+        LEFT JOIN (
+          SELECT entitlement_id, count(*) AS used_success
+          FROM usage_records
+          WHERE user_id = ${id}::uuid AND status = 'success' AND entitlement_id IS NOT NULL
+          GROUP BY entitlement_id
+        ) uc ON uc.entitlement_id = e.id
+        WHERE e.user_id = ${id}::uuid
+        ORDER BY (e.status = 'active' AND e.expires_at > now()) DESC, e.activated_at DESC
+        LIMIT 100
       `,
     ]);
 
@@ -726,7 +764,39 @@ router.get("/users/:id/detail", async (req, res, next) => {
     const totalOutputTokens = Number(agg.total_output_tokens);
     const totalCostTL = Number(agg.total_cost_tl);
     const userCode = user.id ? `u-${String(user.id).replace(/-/g, "").slice(0, 8)}` : null;
-    const pkgAgg = pkgAggRows[0] ?? { package_requests: "0", active_entitlements: "0" };
+    const pkgAgg = pkgAggRows[0] ?? { package_requests: "0", package_failed: "0", active_entitlements: "0" };
+
+    // Paket geçmişi: her hak için kalan/kullanılan + durum kodu (CF-lazy vs günlük tüketim).
+    const entitlements = (entRows ?? []).map((r) => {
+      const limit = Number(r.daily_limit_snapshot);
+      const cfLazy = Number(r.cf_units_ordered) > 0;
+      const consumed = computeDisplayConsumed(
+        limit, Number(r.cf_units_ordered), r.cf_remaining == null ? null : Number(r.cf_remaining),
+        Number(r.requests_today), Number(r.used_success),
+      );
+      const kalan = Math.max(0, limit - consumed);
+      const expired = r.expired === true;
+      let durum: string;
+      if (r.status !== "active") durum = r.status; // iptal vb. ham durum
+      else if (expired) durum = "suresi_doldu";
+      else if (kalan <= 0) durum = cfLazy ? "tukendi" : "gunluk_doldu";
+      else durum = "aktif";
+      return {
+        id: r.id,
+        packageId: r.package_id,
+        paketAdi: r.paket_adi,
+        kategori: r.kategori,
+        birimTipi: r.birim_tipi ?? null,
+        gunlukLimit: limit,
+        kullanilan: consumed,
+        kalan,
+        cfLazy,
+        cfRemaining: cfLazy ? (r.cf_remaining == null ? null : Number(r.cf_remaining)) : null,
+        activatedAt: r.activated_at,
+        expiresAt: r.expires_at,
+        durum,
+      };
+    });
 
     res.json({
       user: serializeUser(user),
@@ -742,12 +812,14 @@ router.get("/users/:id/detail", async (req, res, next) => {
         activeApiKeyCount: keyRows.filter((row) => row.aktif).length,
         totalApiKeyCount: keyRows.length,
         packageRequests: Number(pkgAgg.package_requests),
+        packageFailed: Number(pkgAgg.package_failed),
         activeEntitlements: Number(pkgAgg.active_entitlements),
       },
       apiKeys: keyRows.map((row) => serializeApiKey(row, user.email)),
       usageRecords: usageRows.map(serializeUsageRecord),
       transactions: txRows.map(serializeTransaction),
       modelStats,
+      entitlements,
     });
   } catch (e) { next(e); }
 });

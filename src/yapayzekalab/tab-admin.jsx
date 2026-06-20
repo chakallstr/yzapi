@@ -137,6 +137,15 @@ const money = (value) => `₺${Number(value || 0).toLocaleString('tr-TR', { mini
 const usd = (value) => `$${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const initials = (name = '') => name.split(' ').filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'YZ';
 const userCodeFromId = (id = '') => (id ? `u-${String(id).replace(/-/g, '').slice(0, 8)}` : '—');
+const entitlementDurumMeta = (durum) => {
+  switch (durum) {
+    case 'aktif': return { label: 'AKTİF', bg: '#dcfce7', fg: '#15803d' };
+    case 'gunluk_doldu': return { label: 'GÜNLÜK DOLDU', bg: '#fef3c7', fg: '#b45309' };
+    case 'tukendi': return { label: 'TÜKENDİ', bg: '#fee2e2', fg: '#b91c1c' };
+    case 'suresi_doldu': return { label: 'SÜRESİ DOLDU', bg: '#e5e7eb', fg: '#4b5563' };
+    default: return { label: String(durum || '—').toUpperCase(), bg: '#e5e7eb', fg: '#4b5563' };
+  }
+};
 const normalizeDecimalInput = (value) => String(value ?? '').trim().replace(',', '.');
 const StatusChip = ({ status }) => {
   const tone = STATUS_TONE[status] || STATUS_TONE.bekliyor;
@@ -510,11 +519,11 @@ const AdminUsers = ({ users, token, refresh, meRole = '', focusUserId = '', focu
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 14 }}>
-                          <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Toplam istek</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{fmt.num(detail.summary?.requestCount || 0)}</div></div>
+                          <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Toplam istek</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{fmt.num(detail.summary?.successfulRequests || 0)}</div>{(detail.summary?.failedRequests || 0) > 0 && <Caption>{fmt.num(detail.summary.failedRequests)} başarısız</Caption>}</div>
                           <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Input token</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{fmt.num(detail.summary?.totalInputTokens || 0)}</div></div>
                           <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Output token</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{fmt.num(detail.summary?.totalOutputTokens || 0)}</div></div>
                           <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Toplam harcama</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{money(detail.summary?.totalCostTL || 0)}</div></div>
-                          <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Paket isteği</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{fmt.num(detail.summary?.packageRequests || 0)}</div></div>
+                          <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Paket isteği</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{fmt.num(detail.summary?.packageRequests || 0)}</div>{(detail.summary?.packageFailed || 0) > 0 && <Caption>{fmt.num(detail.summary.packageFailed)} başarısız</Caption>}</div>
                           <div style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)' }}><Caption>Aktif paket</Caption><div className="tnum" style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{detail.summary?.activeEntitlements || 0}</div></div>
                         </div>
 
@@ -616,6 +625,42 @@ const AdminUsers = ({ users, token, refresh, meRole = '', focusUserId = '', focu
                             ))}
                           </Card>
                         </div>
+
+                        <Card pad={0} style={{ overflow: 'hidden', marginTop: 14 }}>
+                          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>Paketler</div>
+                            <Caption>Aktif + bitmiş/süresi dolmuş paket geçmişi</Caption>
+                          </div>
+                          {(detail.entitlements || []).length === 0 ? <div style={{ padding: 14 }}><EmptyState>Paket kaydı yok.</EmptyState></div> : detail.entitlements.map((ent, index) => {
+                            const meta = entitlementDurumMeta(ent.durum);
+                            const isLast = index === detail.entitlements.length - 1;
+                            const unit = ent.cfLazy ? 'ünite' : (ent.birimTipi === 'kredi' ? 'kredi' : 'istek');
+                            const showQuota = Number(ent.gunlukLimit) > 0;
+                            return (
+                              <div key={ent.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(160px, 1fr) 120px minmax(150px, 0.9fr) 170px', gap: 10, padding: '10px 14px', borderBottom: isLast ? 'none' : '1px solid var(--border)', fontSize: 11.5, alignItems: 'center' }}>
+                                <div>
+                                  <div style={{ fontWeight: 600 }}>{ent.paketAdi}</div>
+                                  <div style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{ent.kategori}</div>
+                                </div>
+                                <div>
+                                  <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 600, background: meta.bg, color: meta.fg }}>{meta.label}</span>
+                                </div>
+                                <div>
+                                  {showQuota ? (
+                                    <>
+                                      <span className="tnum" style={{ fontWeight: 600 }}>{fmt.num(ent.kalan)}</span>
+                                      <span style={{ color: 'var(--ink-3)' }}> / {fmt.num(ent.gunlukLimit)} {unit} kaldı</span>
+                                      {!ent.cfLazy && <Caption>{fmt.num(ent.kullanilan)} bugün kullanıldı</Caption>}
+                                    </>
+                                  ) : <span style={{ color: 'var(--ink-3)' }}>—</span>}
+                                </div>
+                                <div style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                                  {safeDate(ent.activatedAt)} → {safeDate(ent.expiresAt)}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </Card>
                       </Card>
                     );
                   })()}

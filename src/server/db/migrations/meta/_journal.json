@@ -267,6 +267,27 @@
       "when": 1782508800000,
       "tag": "0037_package_per_user_once",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1782595200000,
+      "tag": "0038_entitlement_cf_remaining",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1782681600000,
+      "tag": "0039_token_saver",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1782768000000,
+      "tag": "0040_package_pause_payg",
+      "breakpoints": true
     }
   ]
 }

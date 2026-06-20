@@ -74,6 +74,8 @@ export interface PurchaseResult {
   tip?: "request_limit" | "account_delivery";
   newBalanceTL: number;
   duplicate?: boolean;
+  /** Mevcut aktif paketin süresi uzatıldı mı (yeni satır YERİNE). Tedarik fail'inde over-revocation guard'ı. */
+  extended?: boolean;
   /** CodeFast paketinde tedarik durumu: provisioned (anında) | pending_manual (Claude elle teslim). */
   cfStatus?: "provisioned" | "pending_manual" | "failed";
 }
@@ -110,6 +112,8 @@ export async function purchasePackageWithBalance(
   contact?: string,
   customLimit?: number,
   customDays?: number,
+  /** true → mevcut aktif hak olsa bile EXTEND etme, yeni satır aç ("Paketimi Yenile" bunu kullanır). */
+  forceNewRow = false,
 ): Promise<PurchaseResult> {
   const txKey = "pkg_purchase_" + userId + "_" + (idempotencyKey && idempotencyKey.trim() ? idempotencyKey.trim() : randomUUID());
 
@@ -226,15 +230,17 @@ export async function purchasePackageWithBalance(
         return { deliveryOrderId: ord[0].id, newBalanceTL: newBalance, tip: "account_delivery" as const };
       }
 
-      const entitlementId = await grantPackageEntitlement(txSql, {
+      // ayriSatir: Yenile (forceNewRow) VEYA configurable paket → EXTEND yerine yeni satır (#1 overwrite fix).
+      const ayriSatir = forceNewRow || Boolean(pkg.is_configurable);
+      const { entitlementId, extended } = await grantPackageEntitlement(txSql, {
         userId,
         packageId,
         sureGun: effectiveDays,
         gunlukIstekLimiti: effectiveLimit,
         allowedModels: pkg.allowed_models ?? [],
         purchaseTransactionId: txId,
-      });
-      return { entitlementId, newBalanceTL: newBalance, tip: "request_limit" as const };
+      }, ayriSatir);
+      return { entitlementId, extended, newBalanceTL: newBalance, tip: "request_limit" as const };
     });
   } catch (e) {
     // Eşzamanlı mükerrer (UNIQUE idempotency_key) → çift tahsil olmadı; mevcut durumu döndür.
@@ -264,12 +270,49 @@ export async function purchasePackageWithBalance(
       username: userId,
     });
     if (prov.cfStatus === "failed") {
-      await refundFailedCodefastPurchase(userId, result.entitlementId, fiyatTL, txKey, pkg.ad);
+      await refundFailedCodefastPurchase(userId, result.entitlementId, fiyatTL, txKey, pkg.ad, result.extended === true);
       throw new AppError(503, "Paket tedarik edilemedi; ücret bakiyenize iade edildi. Lütfen tekrar deneyin.");
     }
     result.cfStatus = prov.cfStatus; // 'provisioned' | 'pending_manual'
   }
   return result;
+}
+
+/**
+ * "Paketimi Yenile" (Paketlerim sekmesi) — mevcut bir paketi BAKİYEDEN yeniden satın alır:
+ * taze istek kotası + yeni entitlement satırı (forceNewRow=true). HER pakette çalışır (günlük şart değil).
+ * Para + CF tedarik akışı purchasePackageWithBalance ile BİREBİR AYNI (ek money-path YOK; idempotent;
+ * tedarik fail → otomatik iade). Configurable pakette müşterinin SEÇTİĞİ (limit×süre) korunur; sabit
+ * pakette paketin kendi config'i. Eski satır olduğu gibi kalır (kalanı + bu taze kota toplanır).
+ */
+export async function renewEntitlement(
+  userId: string,
+  entitlementId: string,
+): Promise<PurchaseResult> {
+  const rows = await dbSql<any[]>`
+    SELECT e.package_id, e.daily_limit_snapshot, e.activated_at, e.expires_at,
+           p.is_configurable, p.per_user_once, p.tip
+    FROM user_package_entitlements e JOIN packages p ON p.id = e.package_id
+    WHERE e.id = ${entitlementId}::uuid AND e.user_id = ${userId}::uuid
+    LIMIT 1`;
+  if (!rows.length) throw new AppError(404, "Paket bulunamadı");
+  const e = rows[0];
+  if (e.tip !== "request_limit") throw new AppError(400, "Bu paket tipi yenilenemez");
+  if (e.per_user_once) throw new AppError(400, "Bu paket tek seferlik — yenilenemez");
+  let customLimit: number | undefined;
+  let customDays: number | undefined;
+  if (e.is_configurable) {
+    customLimit = Number(e.daily_limit_snapshot);
+    const ms = new Date(e.expires_at).getTime() - new Date(e.activated_at).getTime();
+    customDays = Math.max(1, Math.round(ms / 86_400_000));
+  }
+  // ÇİFT-TAHSİL KORUMASI: idempotency key'i client'a GÜVENMEDEN, sunucuda niyet-bazlı + 90sn pencere
+  // ile türet. forceNewRow=true EXTEND-toplama emniyetini kaldırdığı için, client per-tık random key
+  // gönderse / çok-sekme / çok-cihaz / refresh-retry olsa bile aynı 90sn'de TEK tahsil olur
+  // (purchase'ın dup-check'i pkg_purchase_<userId>_<key> ile yakalar; aynı entitlement+pencere → aynı key).
+  const renewKey = `renew_${entitlementId}_${Math.floor(Date.now() / 90_000)}`;
+  // forceNewRow=true → taze kota. enabled/satista/Deneme/bakiye guard'ları purchasePackageWithBalance'ta.
+  return purchasePackageWithBalance(userId, e.package_id, renewKey, undefined, customLimit, customDays, true);
 }
 
 /**
@@ -283,6 +326,7 @@ async function refundFailedCodefastPurchase(
   fiyatTL: number,
   txKey: string,
   paketAd: string,
+  extended: boolean,
 ): Promise<void> {
   // ⚠️ ASLA throw ETMEZ — çağıran her durumda 503 "iade edildi" mesajını atabilsin.
   // Her adım BAĞIMSIZ guard'lı: bir adımın hatası diğerlerini engellemez. Sıralama PARAYA
@@ -317,22 +361,41 @@ async function refundFailedCodefastPurchase(
       logger.error({ err: e, userId, entitlementId, refundKey }, "codefast refund FAILED — müşteri parası iade edilemedi");
     }
   }
-  // 2) entitlement revoke (idempotent: yalnız aktifse)
-  try {
-    await dbSql`
-      UPDATE user_package_entitlements SET status = 'revoked', updated_at = now()
-      WHERE id = ${entitlementId}::uuid AND status = 'active'
-    `;
-  } catch (e) {
-    logger.error({ err: e, entitlementId }, "codefast refund — entitlement revoke failed");
-  }
-  // 3) CF order revoke (varsa) — best-effort, akışı bloklamaz
-  try {
-    const ent = await dbSql<{ cf_order_id: string | null }[]>`SELECT cf_order_id FROM user_package_entitlements WHERE id = ${entitlementId}::uuid LIMIT 1`;
-    const oid = ent[0]?.cf_order_id;
-    if (oid) {
-      const { cfRevokeOrder } = await import("./codefast-reseller-service.js");
-      await cfRevokeOrder(oid).catch(() => {});
+  // 2) entitlement revoke (idempotent: yalnız aktifse) — AMA EXTEND ise REVOKE ETME:
+  // bu satın alma mevcut HÂLÂ GEÇERLİ bir paketin süresini uzatmıştı; revoke o paketi de yok eder
+  // (over-revocation). Extend'de müşteri parasını iade ettik + paketi olduğu gibi bırakıyoruz
+  // (uzatılmış süre küçük bir lehte-fazla; geçerli erişimi yok etmekten daima iyi). cf_status'u da
+  // sıfırla ki gate eski 'failed'e takılmasın.
+  if (!extended) {
+    try {
+      await dbSql`
+        UPDATE user_package_entitlements SET status = 'revoked', updated_at = now()
+        WHERE id = ${entitlementId}::uuid AND status = 'active'
+      `;
+    } catch (e) {
+      logger.error({ err: e, entitlementId }, "codefast refund — entitlement revoke failed");
     }
-  } catch { /* yut */ }
+  } else {
+    try {
+      await dbSql`
+        UPDATE user_package_entitlements SET cf_status = 'provisioned', updated_at = now()
+        WHERE id = ${entitlementId}::uuid AND status = 'active' AND cf_status = 'failed'
+      `;
+    } catch (e) {
+      logger.error({ err: e, entitlementId }, "codefast refund (extend) — cf_status reset failed");
+    }
+  }
+  // 3) CF order revoke (varsa) — best-effort, akışı bloklamaz. EXTEND'de ASLA: entitlement.cf_order_id
+  // hâlâ ORİJİNAL (geçerli) order'ı işaret eder (fail'de provisioning cf_order_id'yi güncellemez) →
+  // revoke müşterinin geçerli erişimini yok ederdi.
+  if (!extended) {
+    try {
+      const ent = await dbSql<{ cf_order_id: string | null }[]>`SELECT cf_order_id FROM user_package_entitlements WHERE id = ${entitlementId}::uuid LIMIT 1`;
+      const oid = ent[0]?.cf_order_id;
+      if (oid) {
+        const { cfRevokeOrder } = await import("./codefast-reseller-service.js");
+        await cfRevokeOrder(oid).catch(() => {});
+      }
+    } catch { /* yut */ }
+  }
 }

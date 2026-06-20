@@ -41,7 +41,7 @@ describe("purchasePackageWithBalance", () => {
       .mockResolvedValueOnce([{ id: "ent1" }]); // insert entitlement
     const { purchasePackageWithBalance } = await import("./package-purchase-service.js");
     const res = await purchasePackageWithBalance("u1", "p1", "key-2");
-    expect(res).toEqual({ entitlementId: "ent1", newBalanceTL: 60, tip: "request_limit" });
+    expect(res).toEqual({ entitlementId: "ent1", extended: false, newBalanceTL: 60, tip: "request_limit" });
   });
 
   it("account_delivery package debits balance and creates a delivery order", async () => {
@@ -93,5 +93,33 @@ describe("purchasePackageWithBalance", () => {
     const { purchasePackageWithBalance } = await import("./package-purchase-service.js");
     await expect(purchasePackageWithBalance("u1", "p1", "key-neg")).rejects.toThrow();
     expect(mockBegin).not.toHaveBeenCalled(); // never reaches the debit transaction
+  });
+});
+
+describe("renewEntitlement (Paketimi Yenile)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockBegin.mockImplementation(async (fn: (s: typeof mockTxSql) => unknown) => fn(mockTxSql));
+  });
+
+  it("404 when entitlement not found / not owned by user", async () => {
+    mockDbSql.mockResolvedValueOnce([]); // SELECT entitlement+package → none
+    const { renewEntitlement } = await import("./package-purchase-service.js");
+    await expect(renewEntitlement("u1", "e-missing")).rejects.toThrow("bulunamadı");
+    expect(mockBegin).not.toHaveBeenCalled(); // hiç tahsil/satın alma yapılmaz
+  });
+
+  it("400 when package tip is not request_limit (e.g. account_delivery)", async () => {
+    mockDbSql.mockResolvedValueOnce([{ package_id: "p1", tip: "account_delivery", is_configurable: false, per_user_once: false }]);
+    const { renewEntitlement } = await import("./package-purchase-service.js");
+    await expect(renewEntitlement("u1", "e1")).rejects.toThrow("yenilenemez");
+    expect(mockBegin).not.toHaveBeenCalled();
+  });
+
+  it("400 when package is per_user_once (single-use, not renewable)", async () => {
+    mockDbSql.mockResolvedValueOnce([{ package_id: "p1", tip: "request_limit", is_configurable: false, per_user_once: true }]);
+    const { renewEntitlement } = await import("./package-purchase-service.js");
+    await expect(renewEntitlement("u1", "e1")).rejects.toThrow("tek seferlik");
+    expect(mockBegin).not.toHaveBeenCalled();
   });
 });

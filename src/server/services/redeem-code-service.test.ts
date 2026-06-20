@@ -10,7 +10,7 @@ vi.mock("../db/client.js", () => ({
 }));
 
 vi.mock("./entitlement-service.js", () => ({
-  grantPackageEntitlement: vi.fn().mockResolvedValue("ent-pkg-1"),
+  grantPackageEntitlement: vi.fn().mockResolvedValue({ entitlementId: "ent-pkg-1", extended: false }),
 }));
 
 describe("redeem-code-service", () => {

@@ -66,6 +66,8 @@ export const users = pgTable(
     githubId: text("github_id"),
     lang: text("lang").notNull().default("tr"),
     role: text("role").notNull().default("user"),
+    // "Kullandığın kadar öde" modu: açıkken paket kotası atlanır, istekler TL bakiyeden token-bazlı düşer.
+    paygMode: boolean("payg_mode").notNull().default(false),
     lastLowBalanceAlert: timestamp("last_low_balance_alert", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
@@ -173,6 +175,7 @@ export const systemApiConfig = pgTable("system_api_config", {
   maintenanceModeForApi: boolean("maintenance_mode_for_api").notNull().default(false),
   maintenanceMessage: text("maintenance_message").notNull().default("API geçici olarak bakım modunda."),
   strictCanonicalModelIds: boolean("strict_canonical_model_ids").notNull().default(true),
+  tokenSaverEnabled: boolean("token_saver_enabled").notNull().default(false),
   providerBaseUrl: text("provider_base_url"),
   providerApiKeyCipher: text("provider_api_key_cipher"),
   providerApiKeyUpdatedAt: timestamp("provider_api_key_updated_at", { withTimezone: true }),
@@ -671,6 +674,13 @@ export const userPackageEntitlements = pgTable(
     cfApiSlug: text("cf_api_slug"),
     cfRcKeyCipher: text("cf_rc_key_cipher"),
     cfStatus: text("cf_status"),
+    // CF mirror: x-codefast-remaining header'ından yakalanan GERÇEK kalan ünite (NULL = yakalanmadı).
+    cfRemaining: integer("cf_remaining"),
+    cfRemainingAt: timestamp("cf_remaining_at", { withTimezone: true }),
+    // Lazy provisioning: CF'den şimdiye dek satın alınan toplam ünite (50'şer artar, cap = daily_limit_snapshot).
+    cfUnitsOrdered: integer("cf_units_ordered").notNull().default(0),
+    // Müşteri "duraklat" dedi → bu paket istek tüketmez (süre işlemeye devam eder).
+    paused: boolean("paused").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
   },

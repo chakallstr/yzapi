@@ -9,7 +9,7 @@ export type AdminRole = "owner" | "partner";
 export const ALL_TABS = [
   "dashboard", "traffic", "mali-izleme", "gozcu", "api", "users", "overrides",
   "packages", "codes", "teslimler", "announce", "providers", "kur", "payments",
-  "telegram", "apikeys", "logs", "animations",
+  "telegram", "apikeys", "logs", "live-state", "animations",
 ] as const;
 
 // partner'a açık sekme id'leri (ALL_TABS'ın alt kümesi; sıra önemli değil — panel ADMIN_SECTIONS sırasını kullanır).

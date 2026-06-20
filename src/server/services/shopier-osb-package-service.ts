@@ -160,7 +160,7 @@ export async function grantEntitlementDb(params: {
         RETURNING id
       `;
       const txId = txRows[0].id;
-      const entitlementId = await grantPackageEntitlement(txSql, {
+      const { entitlementId } = await grantPackageEntitlement(txSql, {
         userId: params.userId,
         packageId: params.packageId,
         sureGun: params.pkg.sureGun,

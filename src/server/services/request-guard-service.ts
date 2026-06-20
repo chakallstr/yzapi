@@ -23,6 +23,9 @@ interface BuildRequestGuardOptions {
   topPMin?: number;
   topPMax?: number;
   endpointEnabled?: boolean;
+  // true → temperature/top_p/top_k upstream'e GÖNDERİLMEDEN strip edilir (Opus 4.7/4.8/Fable
+  // bunları reddeder). Bu durumda aralık doğrulaması da atlanır (parametre nasılsa silinecek).
+  rejectsSamplingParams?: boolean;
 }
 
 export interface RequestGuardResult {
@@ -52,6 +55,9 @@ const NON_CONTEXT_KEYS = new Set([
 // Reseller clients may include customerId in the request body for their own
 // tracking. The gateway consumes it internally but must never forward it upstream.
 const STRIP_BEFORE_UPSTREAM = new Set(["customerId"]);
+
+// Opus 4.7/4.8/Fable/Mythos bunları reddeder (upstream 400). rejectsSamplingParams=true ise silinir.
+const SAMPLING_PARAMS = ["temperature", "top_p", "top_k"] as const;
 
 export function estimateTextTokens(value: unknown): number {
   if (value === null || value === undefined) return 0;
@@ -145,24 +151,28 @@ export function buildRequestGuard(opts: BuildRequestGuardOptions): RequestGuardR
     }
   }
 
-  const temperature = numericInRange(opts.body.temperature);
-  if (
-    temperature !== null &&
-    opts.temperatureMin !== undefined &&
-    opts.temperatureMax !== undefined &&
-    (temperature < opts.temperatureMin || temperature > opts.temperatureMax)
-  ) {
-    throw new BadRequestError(`temperature ${opts.temperatureMin} ile ${opts.temperatureMax} arasında olmalı.`);
-  }
+  // Sampling parametrelerini reddeden modellerde (Opus 4.7/4.8/Fable) aralık doğrulaması
+  // ATLANIR — parametreler nasılsa aşağıda strip edilecek, dolayısıyla 400 atmaya gerek yok.
+  if (!opts.rejectsSamplingParams) {
+    const temperature = numericInRange(opts.body.temperature);
+    if (
+      temperature !== null &&
+      opts.temperatureMin !== undefined &&
+      opts.temperatureMax !== undefined &&
+      (temperature < opts.temperatureMin || temperature > opts.temperatureMax)
+    ) {
+      throw new BadRequestError(`temperature ${opts.temperatureMin} ile ${opts.temperatureMax} arasında olmalı.`);
+    }
 
-  const topP = numericInRange(opts.body.top_p);
-  if (
-    topP !== null &&
-    opts.topPMin !== undefined &&
-    opts.topPMax !== undefined &&
-    (topP < opts.topPMin || topP > opts.topPMax)
-  ) {
-    throw new BadRequestError(`top_p ${opts.topPMin} ile ${opts.topPMax} arasında olmalı.`);
+    const topP = numericInRange(opts.body.top_p);
+    if (
+      topP !== null &&
+      opts.topPMin !== undefined &&
+      opts.topPMax !== undefined &&
+      (topP < opts.topPMin || topP > opts.topPMax)
+    ) {
+      throw new BadRequestError(`top_p ${opts.topPMin} ile ${opts.topPMax} arasında olmalı.`);
+    }
   }
 
   const contextTokens = estimateRequestContextTokens(opts.body);
@@ -185,6 +195,9 @@ export function buildRequestGuard(opts: BuildRequestGuardOptions): RequestGuardR
   );
   const guardedBody = { ...opts.body };
   for (const key of STRIP_BEFORE_UPSTREAM) delete guardedBody[key];
+  if (opts.rejectsSamplingParams) {
+    for (const key of SAMPLING_PARAMS) delete guardedBody[key];
+  }
 
   if (opts.endpoint === "responses") {
     guardedBody.max_output_tokens = reservedCompletionTokens;

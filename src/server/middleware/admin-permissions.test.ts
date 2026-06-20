@@ -61,6 +61,9 @@ describe("requiredRoleFor — owner-only + fail-closed", () => {
     ["GET", "/api/admin/packages"],
     ["POST", "/api/admin/redeem-codes"],
     ["GET", "/api/admin/delivery-orders"],
+    ["GET", "/api/admin/live-state/summary"],
+    ["GET", "/api/admin/live-state/tables"],
+    ["GET", "/api/admin/live-state/table/users"],
     ["POST", "/api/admin/users/u1/role"],
     ["GET", "/api/admin/gelecekteki-bilinmeyen-uc"],
   ])("owner-only: %s %s", (method, path) => {
@@ -77,7 +80,7 @@ describe("sekme setleri", () => {
       (t) => !(PARTNER_TABS as readonly string[]).includes(t),
     );
     expect([...ownerOnly].sort()).toEqual(
-      ["api", "codes", "kur", "overrides", "packages", "providers", "teslimler"].sort(),
+      ["api", "codes", "kur", "live-state", "overrides", "packages", "providers", "teslimler"].sort(),
     );
   });
   it("allowedTabsForRole rolleri doğru eşler", () => {

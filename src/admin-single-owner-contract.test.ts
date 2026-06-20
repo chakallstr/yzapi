@@ -44,10 +44,13 @@ describe("single owner admin contract", () => {
   });
 
   it("maps the Google OAuth return dashboard route into the authenticated account area", () => {
-    const app = source("src/App.tsx");
+    // The tab<->path map (shared by App.tsx initial route + the popstate
+    // handler) owns this aliasing now.
+    const routes = source("src/yapayzekalab/tab-routes.js");
 
-    expect(app).toContain('path.startsWith("/dashboard")');
-    expect(app).toContain('return "account"');
+    expect(routes).toContain("p.startsWith('/dashboard')");
+    expect(routes).toContain("return 'account'");
+    expect(source("src/App.tsx")).toContain("tabForPath(window.location.pathname)");
   });
 
   it("prevents the single owner admin account from being suspended through admin user updates", () => {

@@ -431,6 +431,17 @@ const PackageCard = ({ pkg, busy, onBuy, onActivateCode, t }) => {
 const EntitlementCard = ({ ent, t }) => {
   const pct = ent.gunlukLimit > 0 ? Math.round((ent.kullanilanBugun / ent.gunlukLimit) * 100) : 0;
   const exhausted = ent.gunlukLimit > 0 && ent.kalanBugun <= 0;
+  // Tam tarih + saat (müşteri yerel saat diliminde — TR için GMT+3): "19 Haz 2026 00:08"
+  const fmtDateTime = (s) => {
+    if (!s) return null;
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleString('tr-TR', {
+      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+  };
+  const alimStr = fmtDateTime(ent.activatedAt);
+  const bitisStr = fmtDateTime(ent.expiresAt);
   return (
     <div style={{
       display: 'flex', gap: 14, padding: '14px 0',
@@ -481,9 +492,16 @@ const EntitlementCard = ({ ent, t }) => {
           <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', background: 'var(--border)', borderRadius: 4, padding: '2px 6px' }}>
             her istek = 1 sayılır
           </span>
-          <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', background: 'var(--border)', borderRadius: 4, padding: '2px 6px' }}>
-            bitiş: {new Date(ent.expiresAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
-          </span>
+          {alimStr && (
+            <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', background: 'var(--border)', borderRadius: 4, padding: '2px 6px' }}>
+              alım: {alimStr}
+            </span>
+          )}
+          {bitisStr && (
+            <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: exhausted ? 'var(--warn, #d97706)' : 'var(--ink-2)', background: 'var(--border)', borderRadius: 4, padding: '2px 6px', fontWeight: 600 }}>
+              bitiş: {bitisStr}
+            </span>
+          )}
         </div>
       </div>
     </div>

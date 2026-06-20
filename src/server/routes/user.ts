@@ -13,8 +13,8 @@ import {
 } from "../services/report-service.js";
 import { extractUsageBreakdown } from "../services/usage-breakdown.js";
 import { getUserUsageStats, type UsageStatsWindow } from "../services/user-usage-stats-service.js";
-import { listUserEntitlements } from "../services/entitlement-service.js";
-import { purchasePackageWithBalance } from "../services/package-purchase-service.js";
+import { listUserEntitlements, listUserPackagesForPanel, setEntitlementPaused } from "../services/entitlement-service.js";
+import { purchasePackageWithBalance, renewEntitlement } from "../services/package-purchase-service.js";
 import { packagesFeatureEnabled } from "../services/package-service.js";
 import { redeemCode } from "../services/redeem-code-service.js";
 import { listUserDeliveryOrders } from "../services/account-delivery-service.js";
@@ -135,6 +135,56 @@ router.get("/entitlements", async (req, res, next) => {
   }
 });
 
+// "Paketlerim" sekmesi: müşterinin TÜM paketleri (aktif + duraklatılmış + bitmiş/süresi dolmuş)
+router.get("/packages", async (req, res, next) => {
+  try {
+    res.json(await listUserPackagesForPanel(req.user!.id));
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Paket duraklat (istek tüketmeyi durdur; süre işlemeye DEVAM eder)
+router.post("/entitlements/:id/pause", async (req, res, next) => {
+  try {
+    const ok = await setEntitlementPaused(req.user!.id, req.params.id, true);
+    if (!ok) { res.status(404).json({ error: "Paket bulunamadı" }); return; }
+    await writeAudit("package_pause", req.params.id, "Müşteri paketi duraklattı", req.user!.id);
+    res.json({ ok: true, paused: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Paket devam ettir
+router.post("/entitlements/:id/resume", async (req, res, next) => {
+  try {
+    const ok = await setEntitlementPaused(req.user!.id, req.params.id, false);
+    if (!ok) { res.status(404).json({ error: "Paket bulunamadı" }); return; }
+    await writeAudit("package_resume", req.params.id, "Müşteri paketi devam ettirdi", req.user!.id);
+    res.json({ ok: true, paused: false });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Paketimi Yenile — bakiyeden yeniden satın al (taze kota, yeni satır). Çift-tık koruması Idempotency-Key.
+router.post("/entitlements/:id/renew", async (req, res, next) => {
+  try {
+    if (!(await packagesFeatureEnabled())) {
+      res.status(404).json({ error: "Paket özelliği kapalı" });
+      return;
+    }
+    // Idempotency key SUNUCUDA türetilir (renewEntitlement içinde, niyet+90sn pencere) → çift-tahsil
+    // koruması client key'e bağlı değil (çok-sekme/çok-cihaz/refresh-retry dahil).
+    const result = await renewEntitlement(req.user!.id, req.params.id);
+    await writeAudit("package_renew", req.params.id, "Müşteri paketini yeniledi (bakiyeden)", req.user!.id);
+    res.json(result);
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.post("/packages/:id/purchase", async (req, res, next) => {
   try {
     if (!(await packagesFeatureEnabled())) {
@@ -198,7 +248,7 @@ router.get("/me", async (req, res, next) => {
 // PATCH /api/user/me — update display name and/or language preference (both optional)
 router.patch("/me", async (req, res, next) => {
   try {
-    const updates: { adSoyad?: string; lang?: string; updatedAt?: Date } = {};
+    const updates: { adSoyad?: string; lang?: string; paygMode?: boolean; updatedAt?: Date } = {};
     const auditParts: string[] = [];
 
     if (req.body?.adSoyad !== undefined) {
@@ -219,6 +269,12 @@ router.patch("/me", async (req, res, next) => {
       }
       updates.lang = lang;
       auditParts.push(`dil: ${lang}`);
+    }
+
+    if (req.body?.paygMode !== undefined) {
+      const on = req.body.paygMode === true || req.body.paygMode === "true";
+      updates.paygMode = on;
+      auditParts.push(`kullandığın-kadar-öde: ${on ? "açık" : "kapalı"}`);
     }
 
     if (auditParts.length === 0) {

@@ -32,7 +32,8 @@ describe("codefast-provisioning-service", () => {
     });
     expect(r).toEqual({ cfStatus: "provisioned", cfOrderId: "ord1" });
     expect(cfCreateOrder).toHaveBeenCalledWith(
-      expect.objectContaining({ external_customer_id: "u1", items: [{ catalog_id: "c1", limit_amount: 500, duration_days: 30 }] }),
+      // LAZY: peşin 500 değil, ilk 150'lik batch (kalan top-up ile gelir).
+      expect.objectContaining({ external_customer_id: "u1", items: [{ catalog_id: "c1", limit_amount: 150, duration_days: 30 }] }),
       "pkg_purchase_u1_x",
     );
   });
@@ -85,7 +86,22 @@ describe("codefast-provisioning-service", () => {
     });
     const [body] = (cfCreateOrder as any).mock.calls[0];
     expect(body.template_id).toBeUndefined();
-    expect(body.items).toEqual([{ catalog_id: "c1", limit_amount: 500, duration_days: 30 }]);
+    expect(body.items).toEqual([{ catalog_id: "c1", limit_amount: 150, duration_days: 30 }]); // LAZY ilk batch
+  });
+
+  it("LAZY: ilk order min(150, limit) ünite — limit 30 ise 30, 500 ise 150", async () => {
+    const { cfCreateOrder } = await import("./codefast-reseller-service.js");
+    (cfCreateOrder as any).mockResolvedValue({
+      order: { id: "ordL", status: "fulfilled" }, customer: { id: "cL" }, manual_review_required: false,
+      customer_api_key: { api_key: "cf_rc_live_l" },
+    });
+    const { provisionCodefastEntitlement } = await import("./codefast-provisioning-service.js");
+    await provisionCodefastEntitlement({
+      entitlementId: "eL", userId: "uL", externalOrderId: "oL",
+      pkg: { cfCatalogId: "c1", cfApiSlug: "codex-api", cfManual: false, gunlukIstekLimiti: 30, sureGun: 1 },
+    });
+    const [body] = (cfCreateOrder as any).mock.calls[0];
+    expect(body.items).toEqual([{ catalog_id: "c1", limit_amount: 30, duration_days: 1 }]); // min(150,30)=30
   });
 
   it("auto product, no key on create (idempotent replay) + cfGetOrder also no key → failed (NOT pending)", async () => {

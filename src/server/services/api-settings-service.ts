@@ -42,6 +42,8 @@ export type RuntimeApiConfig = {
   maintenanceModeForApi: boolean;
   maintenanceMessage: string;
   strictCanonicalModelIds: boolean;
+  /** Token Saver: tool çıktılarını upstream'e gitmeden sıkıştır (default kapalı). */
+  tokenSaverEnabled: boolean;
   updatedAt: string | null;
 };
 
@@ -70,6 +72,7 @@ export const DEFAULT_API_SETTINGS: Omit<RuntimeApiConfig, "updatedAt"> = {
   maintenanceModeForApi: false,
   maintenanceMessage: "API geçici olarak bakım modunda.",
   strictCanonicalModelIds: true,
+  tokenSaverEnabled: false,
 };
 
 export type ApiKeyPolicySnapshot = {
@@ -144,6 +147,7 @@ function serializeRuntimeConfig(row?: typeof systemApiConfig.$inferSelect | null
     maintenanceModeForApi: row?.maintenanceModeForApi ?? DEFAULT_API_SETTINGS.maintenanceModeForApi,
     maintenanceMessage: row?.maintenanceMessage || DEFAULT_API_SETTINGS.maintenanceMessage,
     strictCanonicalModelIds: row?.strictCanonicalModelIds ?? DEFAULT_API_SETTINGS.strictCanonicalModelIds,
+    tokenSaverEnabled: row?.tokenSaverEnabled ?? DEFAULT_API_SETTINGS.tokenSaverEnabled,
     updatedAt: row?.updatedAt instanceof Date ? row.updatedAt.toISOString() : null,
   };
 }
@@ -373,6 +377,7 @@ export async function upsertSystemApiConfig(input: Partial<RuntimeApiConfig>) {
     maintenanceModeForApi: input.maintenanceModeForApi ?? current.maintenanceModeForApi,
     maintenanceMessage: String(input.maintenanceMessage || current.maintenanceMessage),
     strictCanonicalModelIds: input.strictCanonicalModelIds ?? current.strictCanonicalModelIds,
+    tokenSaverEnabled: input.tokenSaverEnabled ?? current.tokenSaverEnabled,
     updatedAt: new Date(),
   };
 

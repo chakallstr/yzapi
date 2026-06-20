@@ -6,6 +6,7 @@ import {
   mockLogs, mockProviderStatus, useLogStream,
 } from './shared.jsx';
 import { useT, LangToggle } from './i18n/index.jsx';
+import { pathForTab, tabForPath } from './tab-routes.js';
 import { AccountTab } from './tab-account.jsx';
 import { ActivityTab } from './tab-activity.jsx';
 import { AdminTab } from './tab-admin.jsx';
@@ -13,6 +14,7 @@ import { DocumentsTab } from './tab-documents.jsx';
 import { HomeTab } from './tab-home.jsx';
 import { ModelsTab } from './tab-models.jsx';
 import { PackagesTab } from './tab-packages.jsx';
+import { MyPackagesTab } from './tab-mypackages.jsx';
 import { AiChatTab } from './tab-ai-chat.jsx';
 import { StudioTab } from './tab-studio.jsx';
 import { StatusTab } from './tab-status.jsx';
@@ -84,7 +86,7 @@ const ACCENT_MAP = {
 
 const ADMIN_EMAIL = 'cix.crazy666@gmail.com';
 const FALLBACK_USD_TRY = 47.084289;
-const PROTECTED_TABS = new Set(['activity', 'account', 'admin', 'ai-chat', 'studio']);
+const PROTECTED_TABS = new Set(['activity', 'account', 'admin', 'ai-chat', 'studio', 'mypackages']);
 const SUPPORT_WHATSAPP_NUMBER = '905319310781';
 const SUPPORT_WHATSAPP_URL = `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}`;
 const FALLBACK_TELEGRAM_BOT_URL = 'https://t.me/YapayZekaLabAPIBot';
@@ -683,6 +685,7 @@ const TopBar = ({ active, onTab, balanceUSD, tlRate, onUserAction, isAuthenticat
     { id: 'home',     label: t('nav.home'),  Ico: I.Home },
     { id: 'models',   label: t('nav.models'),   Ico: I.Layers },
     { id: 'packages', label: t('nav.packages'),   Ico: I.Wallet },
+    ...(isAuthenticated ? [{ id: 'mypackages', label: t('nav.mypackages'), Ico: I.Wallet }] : []),
     { id: 'ai-chat',  label: t('nav.aiChat'),    Ico: I.Sparkle },
     // { id: 'studio',   label: t('nav.studio'),     Ico: I.Layers },
     { id: 'documents',label: t('nav.documents'),  Ico: I.File },
@@ -1189,6 +1192,23 @@ const App = ({ initialTab = 'home' }) => {
     return () => { cancelled = true; };
   }, [setTweak]);
 
+  // Bakım/uyarı duyurusu — aktif 'uyari' tipli duyuruyu üstte BELİRGİN banner olarak göster
+  // (bildirim ziline ek olarak). DB'de duyuru aktif=false yapılınca banner kendiliğinden kaybolur.
+  const [maintenanceNotice, setMaintenanceNotice] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/announcements/active')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((rows) => {
+        if (cancelled) return;
+        const list = Array.isArray(rows) ? rows : [];
+        const warn = list.find((r) => r && r.tip === 'uyari');
+        setMaintenanceNotice(warn?.mesaj || '');
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   // Streaming logs — running based on streamRate tweak
   const rateMap = { off: { running: false, mul: 1 }, slow: { running: true, mul: 0.5 }, normal: { running: true, mul: 1 }, fast: { running: true, mul: 2.5 } };
   const rate = rateMap[t.streamRate] || rateMap.normal;
@@ -1236,6 +1256,59 @@ const App = ({ initialTab = 'home' }) => {
       setTab('home');
     }
   }, [tab, profile, isAdmin]);
+
+  // --- Browser history <-> tab sync -------------------------------------
+  // The panel renders "pages" as React state (`tab`). Without writing these
+  // transitions to the History API, the only entries in the browser stack are
+  // the external OAuth redirect hops — so pressing Back left the SPA and
+  // re-hit a server auth route, throwing the user out. Mirror the active tab
+  // into the URL (pushState) and listen for Back/Forward (popstate) so
+  // navigation stays inside the SPA.
+  const historySyncReady = useRef(false);
+  useEffect(() => {
+    const desiredUrl = `${pathForTab(tab)}${window.location.search}${window.location.hash}`;
+    const urlTab = tabForPath(window.location.pathname);
+    if (!historySyncReady.current) {
+      // First run: align the URL with the initial tab WITHOUT adding a
+      // back-target (mount must not create a spurious history entry).
+      historySyncReady.current = true;
+      if (urlTab !== tab) {
+        window.history.replaceState(window.history.state, document.title, desiredUrl);
+      }
+      return;
+    }
+    // After a Back/Forward press the browser has already restored the URL, so
+    // urlTab === tab here and we correctly skip pushing. We only push for
+    // genuine in-app navigation (the URL still points at the previous tab).
+    if (urlTab !== tab) {
+      window.history.pushState(window.history.state, document.title, desiredUrl);
+    }
+  }, [tab]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      const urlTab = tabForPath(window.location.pathname);
+      let target = urlTab;
+      // Apply the same guards selectTab() uses so Back/Forward never lands on
+      // a tab the current user can't see (which would otherwise bounce/kick).
+      if (target === 'admin' && !isAdmin) target = 'home';
+      if (!isAuthenticated && PROTECTED_TABS.has(target)) target = 'home';
+      if (target !== urlTab) {
+        // Rewrite the URL in place to the tab we can actually show so the sync
+        // effect sees a match (no extra entry) and the address bar stays
+        // truthful — never push during a Back/Forward.
+        window.history.replaceState(
+          window.history.state,
+          document.title,
+          `${pathForTab(target)}${window.location.search}${window.location.hash}`,
+        );
+      }
+      setPendingTab(null);
+      setTab(target);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [isAuthenticated, isAdmin]);
 
   const selectTab = (nextTab) => {
     if (nextTab === 'admin' && !isAdmin) {
@@ -1299,6 +1372,20 @@ const App = ({ initialTab = 'home' }) => {
         }}
       />
 
+      {maintenanceNotice && (
+        <div className="fade-in" style={{
+          background: '#fffbeb',
+          borderBottom: '1px solid #fde68a',
+          padding: '13px 24px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+        }}>
+          <PulseDot color="#a16207" size={8} />
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#92400e', textAlign: 'center' }}>
+            {maintenanceNotice}
+          </div>
+        </div>
+      )}
+
       {(lowBalanceWarn || emptyBalance) && (
         <div className="fade-in" style={{
           background: emptyBalance ? '#fef2f2' : '#fffbeb',
@@ -1336,6 +1423,7 @@ const App = ({ initialTab = 'home' }) => {
         {tab === 'home'     && <HomeTab     ctx={ctx} onTab={selectTab} onAction={onUserAction} />}
         {tab === 'models'   && <ModelsTab   ctx={ctx} />}
         {tab === 'packages' && <PackagesTab />}
+        {tab === 'mypackages' && <MyPackagesTab ctx={ctx} />}
         {tab === 'ai-chat' && <AiChatTab />}
         {tab === 'studio' && <StudioTab />}
         {tab === 'activity' && <ActivityTab ctx={ctx} />}

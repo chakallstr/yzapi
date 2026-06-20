@@ -92,7 +92,11 @@ export function entitlementOverrideChain(slot: EntitlementProviderSlot, base: st
   if (!slug || !cipher) return null;
   const apiKey = decryptApiKey(cipher);
   if (!apiKey) return null;
-  const baseUrl = `${base.replace(/\/+$/, "")}/proxy/${slug}`;
+  // CF reseller proxy ucu `/proxy/<slug>/v1/<endpoint>` bekler (örn /proxy/codex-api/v1/chat/completions);
+  // upstream forward fn'leri (closerouter-service) baseUrl'e `/chat/completions` · `/responses` · `/messages`
+  // ekler (BAŞTA /v1 YOK), normal provider base_url'lerinde /v1 zaten gömülü olduğu için. CF base'i
+  // (reseller-api.codefast.app, /v1 YOK) için /v1'i burada eklemezsek CF 404 "Hata Oluştu" döner.
+  const baseUrl = `${base.replace(/\/+$/, "")}/proxy/${slug}/v1`;
   return {
     primary: {
       profileId: `cf:${slot.entitlementId ?? "?"}`,

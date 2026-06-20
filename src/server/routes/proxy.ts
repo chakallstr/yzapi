@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { aiProviderApiKey, env } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { AppError, BadRequestError, InsufficientBalanceError, ModelDisabledError, ModelNotFoundError, RateLimitError } from "../lib/errors.js";
-import { canonicalizeModelId, type MasterModel } from "../../master-models.js";
+import { canonicalizeModelId, modelRejectsSamplingParams, type MasterModel } from "../../master-models.js";
 import { checkRateLimit } from "../services/rate-limit-service.js";
 import { reserveUsageBudget, settleReservedUsage } from "../services/billing-service.js";
 import {
@@ -10,6 +10,7 @@ import {
   tryReservePackageSlot,
   releasePackageSlot,
   recordPackageUsage,
+  updateCfRemaining,
   consumeTpmOrDeny,
   hasActivePackageForModel,
 } from "../services/entitlement-service.js";
@@ -20,6 +21,7 @@ import { getActiveProviderAdapter } from "../services/provider-adapter.js";
 import { resolveProviderForModel, resolveProviderChainForModel } from "../services/provider-config-service.js";
 import { forwardWithFailover } from "../services/provider-failover.js";
 import { packageOverrideChain, entitlementOverrideChain } from "../services/package-provider-override.js";
+import { topUpCfIfNeeded } from "../services/codefast-provisioning-service.js";
 import { db } from "../db/client.js";
 import { modelOverrides, systemConfig, users } from "../db/schema.js";
 import { eq } from "drizzle-orm";
@@ -259,7 +261,7 @@ async function settleBilling(opts: {
   userId: string;
   apiKeyId: string;
   model: MasterModel;
-  usage: { promptTokens: number; completionTokens: number };
+  usage: { promptTokens: number; completionTokens: number; cfRemaining?: number | null };
   requestId: string;
   upstreamRequestId?: string;
   rawUsageJson?: unknown;
@@ -269,10 +271,20 @@ async function settleBilling(opts: {
   profileId?: string;
 }): Promise<{ costTL: number; remainingTL: number }> {
   if (opts.billedViaPackage) {
-    const isError = opts.status === "error";
-    if (isError && opts.entitlementId) {
+    // Slot iadesi (K1'in kota ikizi): yalnız 'error' değil, HER charge-etmeyen sonuç (stream_missing_usage /
+    // abort) slotu geri versin — yoksa cevapsız istek requests_today'i kalıcı şişirir (non-CF pakette günlük
+    // kotayı sızdırır; CF pakette artık kapı sayacı değil ama telemetri/audit dürüst kalır). cost=0 değişmez.
+    const released = opts.status !== "success";
+    if (released && opts.entitlementId) {
       await releasePackageSlot(opts.entitlementId);
     }
+    // CF mirror: CF cevabındaki gerçek kalan üniteyi entitlement'a yaz (CF ile birebir senkron).
+    if (opts.entitlementId && opts.usage.cfRemaining != null) {
+      await updateCfRemaining(opts.entitlementId, opts.usage.cfRemaining);
+    }
+    // Lazy provisioning: buffer azaldıysa arka planda +50 ünite al (paketin CF toplamına gelince durur).
+    // Fire-and-forget — isteği bloklamaz; bir sonraki istek dolu buffer'la gelir.
+    if (opts.entitlementId) void topUpCfIfNeeded(opts.entitlementId).catch(() => {});
     if (opts.entitlementId) {
       await recordPackageUsage({
         userId: opts.userId,
@@ -282,10 +294,10 @@ async function settleBilling(opts: {
         inputUsage: opts.usage.promptTokens,
         outputUsage: opts.usage.completionTokens,
         responseMs: opts.responseMs,
-        status: isError ? "error" : "success",
+        status: released ? "error" : "success",
         requestId: opts.requestId,
         upstreamRequestId: opts.upstreamRequestId,
-        errorCode: isError ? opts.errorCode : undefined,
+        errorCode: released ? (opts.errorCode ?? opts.status) : undefined,
       });
     }
     const snap = await getUserBalanceSnapshot(opts.userId);
@@ -309,6 +321,15 @@ async function settleBilling(opts: {
 function upstreamErrorCode(err: unknown): string {
   const e = err as Error & { status?: number };
   return e.status ? `upstream_${e.status}` : "upstream_error";
+}
+
+/** CF 403 LIMIT_EXCEEDED body'sinden kalan üniteyi çıkar (yoksa null) — mirror gate'inin 0'a inmesi için. */
+function cfRemainingFromError(err: unknown): number | null {
+  const body = (err as { body?: Record<string, any> })?.body;
+  const rem = body?.error?.details?.remaining ?? body?.details?.remaining;
+  if (rem == null) return null;
+  const n = Number(rem);
+  return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
 // chat/completions gövdesinden web_search opsiyonunu çözer. Kabul edilen biçimler:
@@ -386,6 +407,7 @@ async function handleTextJsonEndpoint(
       temperatureMax: enforcement.runtimeConfig.defaultTemperatureMax,
       topPMin: enforcement.runtimeConfig.defaultTopPMin,
       topPMax: enforcement.runtimeConfig.defaultTopPMax,
+      rejectsSamplingParams: modelRejectsSamplingParams(enforcement.masterModel.id),
     });
     // Faz 1 paket kota dalı (reserve'den ÖNCE): istek bir paket entitlement'ının
     // kapsadığı modeldeyse ve günlük kota varsa atomik slot rezerve edilir ve bakiye
@@ -466,7 +488,7 @@ async function handleTextJsonEndpoint(
       userId,
       apiKeyId,
       model: masterModel,
-      usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens },
+      usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens, cfRemaining: usage.cfRemaining },
       requestId,
       rawUsageJson: usage,
       responseMs,
@@ -489,7 +511,7 @@ async function handleTextJsonEndpoint(
         userId,
         apiKeyId,
         model: masterModel,
-        usage: { promptTokens: guard.contextTokens, completionTokens: 0 },
+        usage: { promptTokens: guard.contextTokens, completionTokens: 0, cfRemaining: cfRemainingFromError(err) },
         requestId,
         rawUsageJson: { promptTokens: guard.contextTokens, completionTokens: 0 },
         errorCode: upstreamErrorCode(err),
@@ -589,6 +611,7 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       temperatureMax: enforcement.runtimeConfig.defaultTemperatureMax,
       topPMin: enforcement.runtimeConfig.defaultTopPMin,
       topPMax: enforcement.runtimeConfig.defaultTopPMax,
+      rejectsSamplingParams: modelRejectsSamplingParams(enforcement.masterModel.id),
     });
     // Faz 1 paket kota dalı (reserve'den ÖNCE): istek bir paket entitlement'ının
     // kapsadığı modeldeyse ve günlük kota varsa atomik slot rezerve edilir ve bakiye
@@ -675,7 +698,7 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
         userId,
         apiKeyId,
         model: masterModel,
-        usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens },
+        usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens, cfRemaining: usage.cfRemaining },
         requestId,
         rawUsageJson: usage,
         errorCode: usage.noCharge ? "upstream_first_token_timeout" : (streamStatus === "stream_missing_usage" ? "stream_missing_usage" : undefined),
@@ -701,7 +724,7 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
         userId,
         apiKeyId,
         model: masterModel,
-        usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens },
+        usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens, cfRemaining: usage.cfRemaining },
         requestId,
         rawUsageJson: usage,
         responseMs,
@@ -754,7 +777,7 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
         userId,
         apiKeyId,
         model: masterModel,
-        usage: { promptTokens: guard.contextTokens, completionTokens: 0 },
+        usage: { promptTokens: guard.contextTokens, completionTokens: 0, cfRemaining: cfRemainingFromError(err) },
         requestId,
         rawUsageJson: { promptTokens: guard.contextTokens, completionTokens: 0 },
         errorCode: upstreamErrorCode(err),
@@ -883,6 +906,7 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
       temperatureMax: enforcement.runtimeConfig.defaultTemperatureMax,
       topPMin: enforcement.runtimeConfig.defaultTopPMin,
       topPMax: enforcement.runtimeConfig.defaultTopPMax,
+      rejectsSamplingParams: modelRejectsSamplingParams(enforcement.masterModel.id),
     });
 
     // Faz 1 paket kota dalı (reserve'den ÖNCE): istek bir paket entitlement'ının
@@ -973,7 +997,7 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
         userId,
         apiKeyId,
         model: masterModel,
-        usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens },
+        usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens, cfRemaining: usage.cfRemaining },
         requestId,
         rawUsageJson: usage,
         errorCode: usage.noCharge ? "upstream_first_token_timeout" : (streamStatus === "stream_missing_usage" ? "stream_missing_usage" : undefined),
@@ -993,7 +1017,7 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
         userId,
         apiKeyId,
         model: masterModel,
-        usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens },
+        usage: { promptTokens: billedPromptTokens, completionTokens: usage.completionTokens, cfRemaining: usage.cfRemaining },
         requestId,
         rawUsageJson: usage,
         responseMs,
@@ -1017,7 +1041,7 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
         userId,
         apiKeyId,
         model: masterModel,
-        usage: { promptTokens: guard.contextTokens, completionTokens: 0 },
+        usage: { promptTokens: guard.contextTokens, completionTokens: 0, cfRemaining: cfRemainingFromError(err) },
         requestId,
         rawUsageJson: { promptTokens: guard.contextTokens, completionTokens: 0 },
         errorCode: upstreamErrorCode(err),

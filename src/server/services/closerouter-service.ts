@@ -4,6 +4,7 @@ import { aiProviderBaseUrl } from "../lib/env.js";
 import { logger } from "../lib/logger.js";
 import { canonicalizeModelId } from "../../master-models.js";
 import { getRuntimeApiConfig } from "./api-settings-service.js";
+import { maybeCompressToolOutputs } from "./token-saver.js";
 import type { ProviderContext } from "./provider-config-service.js";
 import {
   ResponsesStreamTranslator,
@@ -25,6 +26,11 @@ export interface ChatUsage {
   // usage_records.raw_usage_json'a yazılır ki gelecekte "sağlayıcı ne raporladı"
   // sorusu kanıtla cevaplanabilsin (geçmiş kaçak teşhisinde bu alan YOKtu).
   providerRaw?: unknown;
+  // CF reseller mirror: CodeFast proxy her cevapta `x-codefast-remaining` header'ında
+  // müşterinin GERÇEK kalan ünitesini döndürür. CF-arkalı (paket override) istekte bu
+  // yakalanır → entitlement.cf_remaining'e yazılır → panel/gate CF ile BİREBİR senkron.
+  // CF dışı sağlayıcıda header yok → null (yazılmaz). Faturalamayı ETKİLEMEZ.
+  cfRemaining?: number | null;
 }
 
 export interface ImageUsage {
@@ -231,6 +237,14 @@ async function readProviderJson(res: globalThis.Response): Promise<Record<string
   return JSON.parse(text) as Record<string, unknown>;
 }
 
+/** CF reseller proxy `x-codefast-remaining` header'ı → kalan ünite (yoksa/parse edilemezse null). */
+function cfRemainingHeader(res: globalThis.Response): number | null {
+  const raw = res.headers.get("x-codefast-remaining");
+  if (raw == null || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+
 function baseHeaders(apiKey: string | undefined): Record<string, string> {
   return {
     Authorization: `Bearer ${apiKey ?? ""}`,
@@ -320,6 +334,7 @@ export async function forwardChat(
     ctx.modelMap,
   );
   const runtimeConfig = await getRuntimeApiConfig();
+  maybeCompressToolOutputs(providerBody, runtimeConfig); // Token Saver: tool çıktılarını sıkıştır (kapalıysa no-op)
 
   const res = await fetchWithRuntimeTimeout(url, {
     method: "POST",
@@ -341,7 +356,7 @@ export async function forwardChat(
 
   return {
     raw: json,
-    usage: estimateUsageFromPayload(providerBody, json),
+    usage: { ...estimateUsageFromPayload(providerBody, json), cfRemaining: cfRemainingHeader(res) },
   };
 }
 
@@ -359,6 +374,7 @@ export async function forwardTextEndpoint(
     ctx.modelMap,
   );
   const runtimeConfig = await getRuntimeApiConfig();
+  maybeCompressToolOutputs(providerBody, runtimeConfig); // Token Saver: tool çıktılarını sıkıştır (kapalıysa no-op)
 
   const res = await fetchWithRuntimeTimeout(url, {
     method: "POST",
@@ -378,7 +394,7 @@ export async function forwardTextEndpoint(
     throw err;
   }
 
-  return { raw: json, usage: estimateUsageFromPayload(providerBody, json) };
+  return { raw: json, usage: { ...estimateUsageFromPayload(providerBody, json), cfRemaining: cfRemainingHeader(res) } };
 }
 
 // İlk içerik token'ı için kısa bütçe (time-to-first-token). Upstream header döndükten
@@ -408,6 +424,7 @@ export async function forwardChatStream(
     ctx.modelMap,
   );
   const runtimeConfig = await getRuntimeApiConfig();
+  maybeCompressToolOutputs(providerBody, runtimeConfig); // Token Saver: tool çıktılarını sıkıştır (kapalıysa no-op)
 
   logger.info({ model: providerBody.model, user: (providerBody as ChatRequest).user, providerHost: new URL(url).hostname, stream: true }, "upstream request dispatched");
 
@@ -439,7 +456,7 @@ export async function forwardChatStream(
       return;
     }
 
-    const usage: ChatUsage = { promptTokens: 0, completionTokens: 0 };
+    const usage: ChatUsage = { promptTokens: 0, completionTokens: 0, cfRemaining: cfRemainingHeader(upstream) };
     let assistantText = "";
     let settled = false;
     const nodeStream = Readable.fromWeb(upstream.body as import("stream/web").ReadableStream);
@@ -582,6 +599,7 @@ export async function forwardChatStreamAsResponses(
     ctx.modelMap,
   );
   const runtimeConfig = await getRuntimeApiConfig();
+  maybeCompressToolOutputs(providerBody, runtimeConfig); // Token Saver: tool çıktılarını sıkıştır (kapalıysa no-op)
 
   const upstream = await fetchWithRuntimeTimeout(url, {
     method: "POST",
@@ -616,7 +634,7 @@ export async function forwardChatStreamAsResponses(
       return;
     }
 
-    const usage: ChatUsage = { promptTokens: 0, completionTokens: 0 };
+    const usage: ChatUsage = { promptTokens: 0, completionTokens: 0, cfRemaining: cfRemainingHeader(upstream) };
     let assistantText = "";
     let settled = false;
     const nodeStream = Readable.fromWeb(upstream.body as import("stream/web").ReadableStream);

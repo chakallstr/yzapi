@@ -1,8 +1,24 @@
 // API dokümantasyon içeriği. tab-documents.jsx bu diziyi sırayla "Adım 1, 2, 3…"
 // kartları olarak render eder — yani buradaki dizi sırası = sayfadaki adım sırası.
-// Yeni kullanıcı önce aracını bağlamak ister; bu yüzden "clients" (istemci kurulumu)
-// bilerek EN BAŞTA (Adım 1) tutulur.
+// Çocuk-dostu akış: önce "start" (5 adımlık hızlı başlangıç + Hesap görseli),
+// sonra "clients" (istemci kurulumu), ardından "packages" ve "payment", en son
+// teknik API referansı. Bölümler birbirine numarayla DEĞİL adla atıfta bulunur
+// (sıra değişince numara kayar); örn. "«Aracını bağla» bölümü".
 export const API_DOC_SECTIONS = [
+  {
+    key: "start",
+    label: "Hızlı başlangıç",
+    title: "5 adımda başla",
+    intro:
+      "Hiç bilmiyorsan bile: bu 5 adımı sırayla yap, birkaç dakikada ilk yapay zekâ isteğini gönderirsin. Her adımın detayı aşağıdaki bölümlerde.",
+    journeySteps: [
+      { icon: "💳", title: "Bakiye yükle", desc: "Hesap → Bakiye Yükle. En az $5. IBAN, kart veya kripto." },
+      { icon: "🔑", title: "API anahtarı al", desc: "Hesap → API Anahtarları → Yeni Anahtar. yzk_live_ ile başlar — kopyala." },
+      { icon: "🎁", title: "Paket / test key", desc: "İstersen paket al ya da elindeki TEST-… kodunu 'Kodu gir'e yaz — bedava dene." },
+      { icon: "🔌", title: "Aracını bağla", desc: "Claude Code / Cline / Roo / Codex… Base URL + anahtarını gir (aşağıda)." },
+      { icon: "✅", title: "İlk istek", desc: "Soru sor — çalıştı! Kullandığın kadar bakiyenden düşülür." },
+    ],
+  },
   {
     key: "clients",
     label: "Aracını bağla",
@@ -165,6 +181,7 @@ export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1
 which claude && claude --version
 claude`,
         },
+        desktopPath: "~/.claude/settings.json",
         desktopSteps: [
           "npm install -g @anthropic-ai/claude-code komutunu terminalde çalıştır (kuruluysa atla).",
           "İşletim sistemini seç — aşağıdaki sekme. Bloğun TAMAMINI kopyala, terminale yapıştır, Enter'a bas.",
@@ -345,6 +362,7 @@ grep -q 'OPENAI_API_KEY' ~/.bashrc 2>/dev/null || echo 'export OPENAI_API_KEY="y
 codex --version
 codex`,
         },
+        desktopPath: "~/.codex/config.toml",
         desktopSteps: [
           "Codex CLI kurulu değilse terminale `npm install -g @openai/codex` yaz, Enter'a bas.",
           "İşletim sistemini seç — aşağıdaki sekme. Bloğun TAMAMINI kopyala, terminale yapıştır, Enter'a bas.",
@@ -618,6 +636,35 @@ opencode`,
         ],
       },
     ],
+  },
+  {
+    key: "packages",
+    label: "Paketler & ücretsiz",
+    title: "Paketler, özel paket ve ücretsiz deneme",
+    intro:
+      "Token-bazlı bakiyenin yanında sabit-istekli paketler var; ya da kendi paketini kurarsın. İlk kez deniyorsan ücretsiz seçenekler de var. Hepsi Paketler sayfasından.",
+    featureCards: [
+      { tone: "free", badge: "ÜCRETSİZ", icon: "🟢", title: "NVIDIA bedava", desc: "NVIDIA modelleri ₺0 · kişi başı 1 kez · 1000 istek/gün. Paketler sayfasından aç." },
+      { tone: "builder", badge: "KENDİN YAP", icon: "⚙️", title: "Özel paket kur", desc: "Model + günlük limit (50–5000) + süre (1–90 gün) seç → anlık fiyat → bakiyenden al." },
+      { tone: "key", badge: "TEST KEY", icon: "🎟️", title: "Davet / test kodu", desc: "Elindeki TEST-… kodunu Paketler → 'Kodu gir'e yaz → ücretsiz deneme isteği kazan." },
+    ],
+  },
+  {
+    key: "payment",
+    label: "Ödeme & iade",
+    title: "Nasıl ödeme yaparım, iade var mı?",
+    intro:
+      "Bakiye yüklemek için birkaç yöntem var. Önemli: ödeme alanı, iade politikasını okuyup onaylamadan açılmaz (bulanık/kilitli kalır).",
+    paymentMethods: [
+      { icon: "🏦", name: "IBAN / Havale", sub: "Açıklamaya referans kodunu yaz", tag: "Manuel onay" },
+      { icon: "💳", name: "Shopier (kart)", sub: "Kredi / banka kartı", tag: "Otomatik" },
+      { icon: "🪙", name: "Cryptomus (USDT)", sub: "Kripto ile yükleme", tag: "Otomatik" },
+      { icon: "✈️", name: "Telegram", sub: "Telegram üzerinden", tag: "Otomatik" },
+    ],
+    refundPolicy: {
+      title: "İade Politikası",
+      body: "API hizmeti dijital ve anında teslim edilen bir hizmettir; kullanıma açıldığı andan itibaren geri alınamaz. Kara para aklama ve mali suçların önlenmesine ilişkin yükümlülükler gereği, yüklenen bakiye ve API hizmeti bedeli iade EDİLMEZ. Ödeme yaparak iade talep edilemeyeceğini kabul etmiş olursunuz. (Yalnızca tarafımızdan kaynaklanan hatalı veya mükerrer tahsilatlar bu kapsamın dışındadır.)",
+    },
   },
   {
     key: "quickstart",
@@ -982,7 +1029,7 @@ X-YZ-Request-Id: req_123456789`,
       "`/v1/balance` ile kalan bakiyeni doğrula.",
       "`/v1/models` ile aktif modeli seç.",
       "`/v1/chat/completions` ile ilk küçük metin çağrını yap.",
-      "Aracını kalıcı bağla: yukarıdaki Adım 1 (Aracını bağla) — Claude Code, Codex, OpenCode, Cline, Kilo Code, Roo Code veya Cherry Studio.",
+      "Aracını kalıcı bağla: yukarıdaki «Aracını bağla» bölümü — Claude Code, Codex, OpenCode, Cline, Kilo Code, Roo Code veya Cherry Studio.",
     ],
   },
   {
@@ -998,6 +1045,62 @@ X-YZ-Request-Id: req_123456789`,
       "Gerçek canlı akışta görsel ve video çağrılarını bu sürümde açma; kapalıdır.",
       "Yasal metinler, KVKK ve satış koşulları footer bağlantılarında ayrıca bulunur.",
       "Sorun yaşarsan `X-YZ-Request-Id` değerini destek ekibine iletmek hata ayıklamayı hızlandırır.",
+    ],
+  },
+  {
+    key: "codex-desktop",
+    label: "Codex masaüstü kurulumu",
+    title: "Codex masaüstü uygulaması — adım adım kurulum",
+    intro:
+      "OpenAI'nin **Codex masaüstü uygulamasını** YapayZekaLab ile kullanabilirsin — kendi `yzk_live_` anahtarınla. Codex, özel bir sağlayıcıya bağlanmayı resmî olarak destekler: ayar dosyasında adresi `https://yapayzekalab.org/v1` yaparsın, uygulamada da anahtarınla giriş yaparsın. Codex isteklerini OpenAI **Responses API** biçiminde gönderir; YapayZekaLab bu ucu (`/v1/responses`) doğrudan karşılar. Aşağıdaki 5 adımı sırayla yap.",
+    annotatedSteps: [
+      {
+        title: "Codex masaüstü uygulamasını indir ve kur",
+        body: "OpenAI'nin resmî Codex sayfasından (developers.openai.com/codex) masaüstü uygulamasını indir. macOS ve Windows sürümleri var. Kur ve bir kez aç — ama HENÜZ giriş yapma; önce ayar dosyasını yazacağız.",
+        callouts: [
+          "macOS: indirilen dosyayı aç → uygulamayı Applications'a sürükle",
+          "Windows: kurulum sihirbazını çalıştır, bitince uygulamayı aç",
+          "Bu adımda hiçbir hesaba giriş yapma",
+        ],
+      },
+      {
+        title: "Ayar dosyasını oluştur: ~/.codex/config.toml",
+        body: "Codex ayarlarını `~/.codex/config.toml` dosyasından okur (Windows'ta `C:\\Users\\<kullanıcı>\\.codex\\config.toml`). Bu dosya yoksa oluştur ve aşağıdaki üç satırı içine yapıştır. Tek yaptıkları: adresi YapayZekaLab yapmak, modeli `gpt-5.5` seçmek ve girişi API-anahtarına kilitlemek. Gizli bilgi içermez — anahtarı bir sonraki adımda uygulamadan gireceksin.",
+        code: `openai_base_url = "https://yapayzekalab.org/v1"
+model = "gpt-5.5"
+forced_login_method = "api"`,
+        callouts: [
+          "Adres MUTLAKA `https://` ile başlar ve `/v1` ile biter",
+          "model: `gpt-5.5` (en güçlü) veya `gpt-5.4` (ekonomik)",
+          "`forced_login_method = \"api\"` → uygulama ChatGPT yerine senin API anahtarını kullanır (5. adımdaki tuzağı baştan kapatır)",
+        ],
+      },
+      {
+        title: "Uygulamayı aç → API anahtarıyla giriş yap",
+        body: "Codex masaüstü uygulamasını aç. Giriş ekranında «ChatGPT ile gir» DEĞİL, «Sign in with an API key / API anahtarıyla gir» seçeneğini tıkla. Açılan kutuya YapayZekaLab anahtarını (`yzk_live_…`) yapıştır ve onayla.",
+        callouts: [
+          "Anahtarın yoksa: panelde Hesap → API Anahtarları → Yeni Anahtar",
+          "`yzk_live_` ile başlayan anahtarı yapıştır",
+          "ChatGPT ile GİRME — ikisi birden açıkken uygulama yanlış anahtarı gönderir (OpenAI codex #24457)",
+        ],
+      },
+      {
+        title: "Modeli seç ve ilk isteğini gönder",
+        body: "Uygulama açıldığında model `gpt-5.5` görünmeli (config'ten gelir). Bir şey yaz — örn. «merhaba, çalışıyor musun?». Yanıt geldiyse kurulum tamamdır. Kullandığın token kadar YapayZekaLab bakiyenden düşülür.",
+        callouts: [
+          "Modeli sonradan `~/.codex/config.toml` içindeki `model` satırından değiştirebilirsin (gpt-5.5 ↔ gpt-5.4)",
+          "Ücretlendirme: kullandığın token kadar, panel bakiyenden",
+        ],
+      },
+      {
+        title: "Sık karşılaşılan hatalar",
+        body: "Bir sorun çıkarsa neredeyse her zaman bunlardan biridir:",
+        callouts: [
+          "401 / yetki hatası → Hem ChatGPT hem API key ile girmişsin. ChatGPT'den çıkış yap, yalnız API key ile gir (config'teki `forced_login_method = \"api\"` bunu zorlar).",
+          "404 / model bulunamadı → Adres yanlış. `openai_base_url` tam olarak `https://yapayzekalab.org/v1` olmalı.",
+          "Anahtar reddedildi → Anahtar `yzk_live_` ile başlamalı, panelde aktif olmalı ve bakiyen yeterli olmalı.",
+        ],
+      },
     ],
   },
   {
@@ -1131,6 +1234,275 @@ with httpx.stream("POST", url, headers=headers, json=body, timeout=60) as r:
   },
 ];
 
+// ───────────────────────────────────────────────────────────────────────────
+// CLIENT_GUIDES — istemci başına AYRI, baştan sona GÖRSELLİ kurulum rehberi.
+// Documents sekmesi bunları bir "hub" (araç seçimi) + seçilen aracın kendi
+// sayfası olarak render eder (tab-documents.jsx). Her adımda bir `visual` var.
+// `visual.type`: 'app' (uygulama penceresi + satırlar) | 'browser' (adres çubuğu
+// + butonlar) | 'file' (dosya editörü mockup) | 'chat' (sohbet penceresi) |
+// 'errors' (hata kartları) | 'screenshot' (gerçek public/docs png).
+// Mockup'lar koda gömülü ÇİZİMDİR — gerçek/sahte ekran görüntüsü değil, kişisel
+// veri içermez. yzk_live_ yalnızca yer-tutucu olarak geçer (gerçek anahtar YOK).
+// ───────────────────────────────────────────────────────────────────────────
+export const CLIENT_GUIDES = [
+  {
+    id: "codex-desktop",
+    name: "Codex masaüstü",
+    icon: "⌨️",
+    tagline: "OpenAI Codex masaüstü uygulaması",
+    forWhom: "Bilgisayarına Codex uygulamasını kurup yapay zekâ ile kod yazmak isteyenler.",
+    badge: "Masaüstü uygulaması",
+    steps: [
+      {
+        title: "Önce API anahtarını al",
+        showKeyBox: true,
+        body: "YapayZekaLab panelinde **Hesap → API Anahtarları → Yeni Anahtar**'a bas. `yzk_live_` ile başlayan anahtar oluşur. Yanındaki **Kopyala**'ya basıp bir kenara not et — birazdan Codex'e yapıştıracağız.",
+        callouts: [
+          "Anahtar bir kez tam görünür; kopyalamayı unutma",
+          "Hesabında en az birkaç dolar bakiye olsun (yoksa istekler reddedilir)",
+        ],
+        visual: {
+          type: "app",
+          title: "YapayZekaLab — Hesap › API Anahtarları",
+          rows: [
+            { kind: "button", text: "+ Yeni Anahtar", primary: true, note: "1) buna bas" },
+            { kind: "input", label: "Anahtarın", value: "yzk_live_••••••••••••", highlight: true, note: "2) oluşan anahtar" },
+            { kind: "button", text: "Kopyala", highlight: true, note: "3) kopyala" },
+          ],
+        },
+      },
+      {
+        title: "Codex masaüstü uygulamasını indir ve kur",
+        body: "Tarayıcında **developers.openai.com/codex** adresine git, işletim sistemine uygun **indir** butonuna bas. İnen dosyayı kur ve uygulamayı bir kez aç — ama **henüz giriş yapma**, önce ayar dosyasını yazacağız.",
+        callouts: [
+          "macOS: inen dosyayı aç → uygulamayı Applications'a sürükle",
+          "Windows: kurulum sihirbazını çalıştır",
+          "Bu adımda hiçbir hesaba giriş yapma",
+        ],
+        visual: {
+          type: "browser",
+          url: "developers.openai.com/codex",
+          heading: "Codex",
+          sub: "OpenAI'nin kodlama asistanı — masaüstü uygulaması",
+          buttons: [
+            { text: "macOS için indir", primary: true, note: "Mac'tesin → bunu seç" },
+            { text: "Windows için indir", note: "Windows'tasın → bunu seç" },
+          ],
+        },
+      },
+      {
+        title: "Ayar dosyasını oluştur: ~/.codex/config.toml",
+        body: "Codex ayarlarını `~/.codex/config.toml` dosyasından okur. **İşletim sistemini seç** (macOS/Linux veya Windows), aşağıdaki bloğun tamamını kopyala, terminale (Windows'ta **PowerShell**) yapıştır ve Enter'a bas — blok dosyayı senin için oluşturur. Tek yaptığı: adresi YapayZekaLab yapmak, modeli `gpt-5.5` seçmek, girişi API-anahtarına kilitlemek.",
+        osVariants: {
+          macos: {
+            code: "mkdir -p ~/.codex\n# Eski ayar/anahtarları .bak olarak yedekle, aktiflerini temizle\n[ -f ~/.codex/config.toml ] && mv ~/.codex/config.toml ~/.codex/config.toml.bak\n[ -f ~/.codex/auth.json ] && mv ~/.codex/auth.json ~/.codex/auth.json.bak\n# Yeni temiz ayarı yaz\ncat > ~/.codex/config.toml << 'EOF'\nopenai_base_url = \"https://yapayzekalab.org/v1\"\nmodel = \"gpt-5.5\"\nforced_login_method = \"api\"\nEOF\necho \"Tamam: ~/.codex temizlendi ve yeni ayar yazildi.\"",
+          },
+          windows: {
+            code: "New-Item -ItemType Directory -Force -Path \"$env:USERPROFILE\\.codex\" | Out-Null\n# Eski ayar/anahtarlari .bak olarak yedekle, aktiflerini temizle\nif (Test-Path \"$env:USERPROFILE\\.codex\\config.toml\") { Move-Item \"$env:USERPROFILE\\.codex\\config.toml\" \"$env:USERPROFILE\\.codex\\config.toml.bak\" -Force }\nif (Test-Path \"$env:USERPROFILE\\.codex\\auth.json\") { Move-Item \"$env:USERPROFILE\\.codex\\auth.json\" \"$env:USERPROFILE\\.codex\\auth.json.bak\" -Force }\n# Yeni temiz ayari yaz\n@'\nopenai_base_url = \"https://yapayzekalab.org/v1\"\nmodel = \"gpt-5.5\"\nforced_login_method = \"api\"\n'@ | Set-Content -Encoding ascii \"$env:USERPROFILE\\.codex\\config.toml\"\nWrite-Host \"Tamam: .codex temizlendi ve yeni ayar yazildi.\"",
+          },
+        },
+        callouts: [
+          "macOS/Linux: Terminal · Windows: PowerShell (blok her ikisinde de dosyayı oluşturur)",
+          "Eski `config.toml`/`auth.json` (eski anahtar/oturum) `.bak` olarak yedeklenir, aktifleri temizlenir → temiz başlangıç",
+          "Adres MUTLAKA `https://` ile başlar ve `/v1` ile biter",
+          "model: `gpt-5.5` (en güçlü) veya `gpt-5.4` (ekonomik)",
+          "Gizli bilgi yok — anahtarı bir sonraki adımda uygulamadan gireceksin",
+        ],
+        visual: {
+          type: "file",
+          path: "~/.codex/config.toml",
+          lines: [
+            'openai_base_url = "https://yapayzekalab.org/v1"',
+            'model = "gpt-5.5"',
+            'forced_login_method = "api"',
+          ],
+        },
+      },
+      {
+        title: "Uygulamayı aç → API anahtarı ile giriş yap",
+        showKeyBox: true,
+        body: "Codex'i aç. Giriş ekranında **«ChatGPT ile giriş»i DEĞİL**, **«API anahtarı ile giriş»i** seç. Açılan kutuya az önce kopyaladığın `yzk_live_…` anahtarını yapıştır ve onayla.",
+        callouts: [
+          "ChatGPT ile GİRME — ikisi birden açıkken uygulama yanlış anahtarı gönderir",
+          "Kutuya `yzk_live_` ile başlayan anahtarını yapıştır",
+        ],
+        visual: {
+          type: "app",
+          title: "Codex — Giriş",
+          rows: [
+            { kind: "button", text: "ChatGPT ile giriş yap", muted: true, note: "BUNU DEĞİL" },
+            { kind: "button", text: "API anahtarı ile giriş yap", highlight: true, note: "✓ bunu seç" },
+            { kind: "input", label: "API Key", value: "yzk_live_••••••••", highlight: true, note: "anahtarını yapıştır" },
+            { kind: "button", text: "Devam et", primary: true },
+          ],
+        },
+      },
+      {
+        title: "Modeli seç ve ilk isteğini gönder",
+        body: "Uygulama açıldığında model **gpt-5.5** görünmeli (config'ten gelir). Alttaki kutuya bir şey yaz — örn. «merhaba, çalışıyor musun?» — ve gönder. Yanıt geldiyse kurulum tamamdır. Kullandığın token kadar YapayZekaLab bakiyenden düşülür.",
+        callouts: [
+          "Modeli sonra config.toml'daki `model` satırından değiştirebilirsin (gpt-5.5 ↔ gpt-5.4)",
+          "Ücret: kullandığın token kadar, panel bakiyenden",
+        ],
+        visual: {
+          type: "chat",
+          app: "Codex",
+          model: "gpt-5.5",
+          user: "merhaba, çalışıyor musun?",
+          assistant: "Evet, hazırım! Hangi konuda yardımcı olayım?",
+          note: "Bu yanıt geldiyse Codex YapayZekaLab'e bağlandı demektir.",
+        },
+      },
+      {
+        title: "Bir şey ters giderse (sık hatalar)",
+        body: "Sorun çıkarsa neredeyse her zaman bunlardan biridir — kontrol et:",
+        visual: {
+          type: "errors",
+          items: [
+            { code: "401", cause: "Hem ChatGPT hem API key ile girilmiş", fix: "ChatGPT'den çık, yalnız API key ile gir (config'teki forced_login_method=\"api\" bunu zorlar)." },
+            { code: "404", cause: "Adres yanlış", fix: "openai_base_url tam olarak https://yapayzekalab.org/v1 olmalı." },
+            { code: "Anahtar reddedildi", cause: "Anahtar / bakiye sorunu", fix: "Anahtar yzk_live_ ile başlamalı, panelde aktif olmalı ve bakiyen yeterli olmalı." },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "claude-desktop",
+    name: "Claude masaüstü",
+    icon: "🖥️",
+    tagline: "Resmî Claude Desktop uygulaması (Developer Mode)",
+    forWhom: "Bilgisayarına resmî Claude uygulamasını kurup YapayZekaLab anahtarıyla kullanmak isteyenler.",
+    badge: "Masaüstü uygulaması",
+    steps: [
+      {
+        title: "Önce API anahtarını al",
+        showKeyBox: true,
+        body: "YapayZekaLab panelinde **Hesap → API Anahtarları → Yeni Anahtar**'a bas. `yzk_live_` ile başlayan anahtarı **Kopyala** — birazdan Claude'a yapıştıracağız.",
+        callouts: [
+          "Anahtar bir kez tam görünür; kopyalamayı unutma",
+          "Hesabında bakiye olsun (yoksa istekler reddedilir)",
+        ],
+        visual: {
+          type: "app",
+          title: "YapayZekaLab — Hesap › API Anahtarları",
+          rows: [
+            { kind: "button", text: "+ Yeni Anahtar", primary: true, note: "1) buna bas" },
+            { kind: "input", label: "Anahtarın", value: "yzk_live_••••••••", highlight: true, note: "2) oluşan anahtar" },
+            { kind: "button", text: "Kopyala", highlight: true, note: "3) kopyala" },
+          ],
+        },
+      },
+      {
+        title: "Claude Desktop'ı indir ve kur",
+        body: "Tarayıcında **claude.ai/download** adresinden resmî Claude masaüstü uygulamasını indir (macOS / Windows). Kur ve bir kez aç.",
+        callouts: [
+          "macOS: inen dosyayı aç → Applications'a sürükle",
+          "Windows: kurulum sihirbazını çalıştır",
+        ],
+        visual: {
+          type: "browser",
+          url: "claude.ai/download",
+          heading: "Claude",
+          sub: "Resmî masaüstü uygulaması",
+          buttons: [
+            { text: "Download for macOS", primary: true, note: "Mac → bunu seç" },
+            { text: "Download for Windows", note: "Windows → bunu seç" },
+          ],
+        },
+      },
+      {
+        title: "Developer Mode'u aç",
+        body: "Claude Desktop'ın üst menüsünden **Help → Troubleshooting → Enable Developer Mode**'a tıkla. Uygulama yeniden başlar ve üstte yeni bir **Developer** menüsü çıkar.",
+        callouts: [
+          "Menü yolu: Help ▸ Troubleshooting ▸ Enable Developer Mode",
+          "App otomatik yeniden başlar — normal",
+          "Yeniden açılınca üstte 'Developer' menüsü görünür",
+        ],
+        visual: {
+          type: "app",
+          title: "Claude — Üst menü",
+          rows: [
+            { kind: "label", text: "Help ▸ Troubleshooting" },
+            { kind: "button", text: "Enable Developer Mode", highlight: true, note: "buna tıkla" },
+            { kind: "label", text: "→ app yeniden başlar, 'Developer' menüsü gelir" },
+          ],
+        },
+      },
+      {
+        title: "Üçüncü-parti sağlayıcıyı ayarla (YapayZekaLab)",
+        showKeyBox: true,
+        body: "Üstteki **Developer → Configure Third-Party Inference → Connection** ekranını aç. Backend olarak **Anthropic-compatible** seç ve alanları aşağıdaki gibi doldur. Bittiğinde **Apply Locally**'e bas (app yeniden başlar).",
+        callouts: [
+          "Backend: **Anthropic-compatible**",
+          "Gateway base URL: `https://yapayzekalab.org` (kök — uygulama `/v1/messages`'i kendi ekler)",
+          "Gateway API key: senin `yzk_live_…` anahtarın",
+          "Auth scheme: **x-api-key** (YapayZekaLab bunu da, Bearer'ı da kabul eder)",
+          "Daha önce ChatGPT veya başka sağlayıcıyla giriş yaptıysan önce **çıkış yap / eski bağlantıyı temizle** (eski anahtar karışmasın)",
+          "Extra headers: boş bırak → sonra **Apply Locally**",
+        ],
+        visual: {
+          type: "app",
+          title: "Claude — Developer › Configure Third-Party Inference",
+          rows: [
+            { kind: "input", label: "Backend", value: "Anthropic-compatible", note: "bunu seç" },
+            { kind: "input", label: "Gateway base URL", value: "https://yapayzekalab.org", highlight: true, note: "kök adres" },
+            { kind: "input", label: "Gateway API key", value: "yzk_live_••••••••", highlight: true, note: "anahtarını yapıştır" },
+            { kind: "input", label: "Auth scheme", value: "x-api-key", highlight: true, note: "x-api-key seç" },
+            { kind: "button", text: "Apply Locally", primary: true, note: "kaydet → yeniden başlar" },
+          ],
+        },
+      },
+      {
+        title: "Modeli ekle",
+        body: "Aynı ekranda **Add Model**'e bas ve model kimliğini yaz: `claude-opus-4-8` (en güçlü). Sonra **Apply Locally**. İstersen `claude-sonnet-4-6` (ekonomik) veya `claude-opus-4-7` de ekleyebilirsin.",
+        callouts: [
+          "Model ID tam yazılmalı: `claude-opus-4-8`",
+          "Alternatifler: `claude-sonnet-4-6`, `claude-opus-4-7`, `claude-haiku-4-5-20251001`",
+        ],
+        visual: {
+          type: "app",
+          title: "Claude — Add Model",
+          rows: [
+            { kind: "button", text: "+ Add Model", primary: true, note: "buna bas" },
+            { kind: "input", label: "Model ID", value: "claude-opus-4-8", highlight: true, note: "tam bu kimliği yaz" },
+            { kind: "button", text: "Apply Locally", highlight: true, note: "kaydet" },
+          ],
+        },
+      },
+      {
+        title: "İlk isteğini gönder",
+        body: "Claude yeniden açıldığında üstten eklediğin modeli (`claude-opus-4-8`) seç ve bir şey yaz — örn. «merhaba, çalışıyor musun?». Yanıt geldiyse kurulum tamamdır; kullandığın token kadar YapayZekaLab bakiyenden düşülür.",
+        callouts: [
+          "Üst model seçiciden YapayZekaLab modelini seç",
+          "Ücret: kullandığın token kadar, panel bakiyenden",
+        ],
+        visual: {
+          type: "chat",
+          app: "Claude",
+          model: "claude-opus-4-8",
+          user: "merhaba, çalışıyor musun?",
+          assistant: "Evet, hazırım! Nasıl yardımcı olabilirim?",
+          note: "Bu yanıt geldiyse Claude Desktop YapayZekaLab'e bağlandı demektir.",
+        },
+      },
+      {
+        title: "Bir şey ters giderse (sık hatalar)",
+        body: "Sorun çıkarsa neredeyse her zaman bunlardan biridir — kontrol et:",
+        visual: {
+          type: "errors",
+          items: [
+            { code: "401", cause: "Anahtar / şema sorunu", fix: "Gateway API key alanına yzk_live_ anahtarını yapıştırdığından ve auth scheme'in x-api-key olduğundan emin ol." },
+            { code: "404", cause: "Adres yanlış", fix: "Gateway base URL = https://yapayzekalab.org olmalı (kök). Yol /v1/v1/messages görünürse fazladan /v1 yazmışsındır." },
+            { code: "Model bulunamadı", cause: "Model ID yanlış", fix: "Add Model'e tam kimliği yaz: claude-opus-4-8 (görünen ad değil)." },
+            { code: "Seçenek görünmüyor", cause: "Developer Mode kapalı", fix: "Help ▸ Troubleshooting ▸ Enable Developer Mode'u aç; app'i tamamen kapatıp yeniden aç." },
+          ],
+        },
+      },
+    ],
+  },
+];
+
 export const OS_LABELS = { windows: "Windows (PowerShell)", macos: "macOS", linux: "Linux" };
 const OS_ORDER = ["windows", "macos", "linux"];
 
@@ -1152,6 +1524,40 @@ export const buildApiDocsPlainText = () =>
 
     if (section.bullets?.length) {
       parts.push("", ...section.bullets.map((bullet) => `- ${bullet}`));
+    }
+
+    if (section.journeySteps?.length) {
+      section.journeySteps.forEach((step, i) => {
+        parts.push(`${i + 1}. ${step.title} — ${step.desc}`);
+      });
+    }
+
+    if (section.featureCards?.length) {
+      section.featureCards.forEach((card) => {
+        parts.push("", `${card.title} (${card.badge}) — ${card.desc}`);
+      });
+    }
+
+    if (section.annotatedSteps?.length) {
+      section.annotatedSteps.forEach((step, i) => {
+        parts.push("", `${i + 1}. ${step.title}`, step.body);
+        step.callouts?.forEach((c) => parts.push(`- ${c}`));
+        if (step.code) parts.push("", step.code);
+      });
+    }
+
+    if (section.paymentMethods?.length) {
+      section.paymentMethods.forEach((m) => {
+        parts.push(`- ${m.name}: ${m.sub} (${m.tag})`);
+      });
+    }
+
+    if (section.refundPolicy) {
+      parts.push("", section.refundPolicy.title, "", section.refundPolicy.body);
+    }
+
+    if (section.screenshot?.caption) {
+      parts.push("", `[Görsel] ${section.screenshot.caption}`);
     }
 
     if (section.referenceRows?.length) {

@@ -90,4 +90,34 @@ describe("admin /users/:id/detail — ömür-boyu özet (limit(50) bug kilidi)",
     // usageRecords LİSTESİ ise gösterim için son 50 kalır (regresyon değil, tasarım).
     expect(res.body.usageRecords.length).toBe(50);
   });
+
+  it("paket/özet sayıları BAŞARISIZ (status<>success) istekleri SAYMAZ — CF reddi şişirmesin", async () => {
+    // 5 başarılı + 3 başarısız (CF LIMIT_EXCEEDED) paket isteği ekle.
+    for (let i = 0; i < 5; i++) {
+      await dbSql`
+        INSERT INTO usage_records (user_id, api_key_id, model_id, type, input_usage, output_usage,
+          units_usage, cost_usd, cost_tl, request_id, response_ms, status, billed_via)
+        VALUES (${TARGET_ID}::uuid, ${TARGET_KEY_ID}::uuid, 'gpt-5.5', 'text', 10, 5, 0, 0, 0,
+          ${`pkg-ok-${i}`}, 100, 'success', 'package')`;
+    }
+    for (let i = 0; i < 3; i++) {
+      await dbSql`
+        INSERT INTO usage_records (user_id, api_key_id, model_id, type, input_usage, output_usage,
+          units_usage, cost_usd, cost_tl, request_id, response_ms, status, billed_via, error_code)
+        VALUES (${TARGET_ID}::uuid, ${TARGET_KEY_ID}::uuid, 'gpt-5.5', 'text', 0, 0, 0, 0, 0,
+          ${`pkg-fail-${i}`}, 100, 'error', 'package', 'LIMIT_EXCEEDED')`;
+    }
+
+    const token = signAccessToken({ sub: ADMIN_ID, role: "user" });
+    const res = await request(app)
+      .get(`/api/admin/users/${TARGET_ID}/detail`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    const s = res.body.summary;
+    expect(s.packageRequests).toBe(5);                  // YALNIZ başarılı paket isteği (8 DEĞİL)
+    expect(s.packageFailed).toBe(3);                    // başarısız paket isteği ayrı gösterilir
+    expect(s.successfulRequests).toBe(TOTAL_RECORDS + 5); // 65 — başarısızlar hariç
+    expect(s.failedRequests).toBe(3);
+  });
 });

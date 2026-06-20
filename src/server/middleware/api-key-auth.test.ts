@@ -64,4 +64,38 @@ describe("apiKeyAuth", () => {
     expect((req as any).apiKey).toEqual({ id: "key-1", userId: "user-1" });
     expect(next).toHaveBeenCalledOnce();
   });
+
+  // Anthropic-native istemciler (Claude Desktop "Configure Third-Party Inference",
+  // Anthropic SDK) anahtarı `x-api-key` başlığıyla yollar. Bearer'a ek olarak bunu
+  // da kabul et ki yzapi gerçek bir Anthropic-uyumlu gateway olsun.
+  it("accepts the key via the x-api-key header (Anthropic-native clients)", async () => {
+    validateApiKeyMock.mockResolvedValueOnce({
+      user: { id: "user-2", email: "x@test.com" },
+      key: { id: "key-2" },
+    });
+    const { apiKeyAuth } = await import("./api-key-auth.js");
+    const req = { headers: { "x-api-key": "yzk_live_xyz789" } } as unknown as Request;
+    const res = makeRes();
+    const next = vi.fn() as NextFunction;
+
+    await apiKeyAuth(req, res, next);
+
+    expect(validateApiKeyMock).toHaveBeenCalledWith("yzk_live_xyz789");
+    expect((req as any).user).toEqual({ id: "user-2", email: "x@test.com" });
+    expect((req as any).apiKey).toEqual({ id: "key-2", userId: "user-2" });
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  it("returns 401 when x-api-key is present but not a yzk_live_ key", async () => {
+    const { apiKeyAuth } = await import("./api-key-auth.js");
+    const req = { headers: { "x-api-key": "sk-not-ours" } } as unknown as Request;
+    const res = makeRes();
+    const next = vi.fn() as NextFunction;
+
+    await apiKeyAuth(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(validateApiKeyMock).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
 });

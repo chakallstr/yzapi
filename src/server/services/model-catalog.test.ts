@@ -1,5 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { MASTER_MODELS, canonicalizeModelId } from "../../master-models.js";
+import { MASTER_MODELS, canonicalizeModelId, modelRejectsSamplingParams } from "../../master-models.js";
+
+describe("modelRejectsSamplingParams — Opus 4.7+/Fable reject temperature/top_p/top_k", () => {
+  it("returns true for the rejecting family in both dash and dot forms", () => {
+    for (const id of [
+      "claude-opus-4-8", "claude-opus-4.8",
+      "claude-opus-4-7", "claude-opus-4.7",
+      "claude-fable-5", "claude-mythos-5",
+    ]) {
+      expect(modelRejectsSamplingParams(id)).toBe(true);
+    }
+  });
+
+  it("returns false for models that still accept sampling params", () => {
+    for (const id of [
+      "claude-opus-4-6", "claude-opus-4.6",
+      "claude-sonnet-4-6", "claude-sonnet-4.6",
+      "claude-opus-4-5-20251101", "claude-haiku-4-5",
+      "gpt-5.5", "gpt-5.4-mini", undefined as unknown as string,
+    ]) {
+      expect(modelRejectsSamplingParams(id)).toBe(false);
+    }
+  });
+});
 
 describe("MASTER_MODELS — Claude Popusk text catalog", () => {
   it("contains only customer-facing text models", () => {

@@ -86,7 +86,7 @@ export async function redeemCode(userId: string, codeInput: string): Promise<Red
       // satista=false ("en kısa sürede satışta") → kod ile de erken erişim verilmez
       if (pkgRows[0].satista === false) throw new AppError(400, "Paket henüz satışta değil — en kısa sürede satışa açılacak");
       const pkg = pkgRows[0];
-      const entitlementId = await grantPackageEntitlement(txSql, {
+      const { entitlementId } = await grantPackageEntitlement(txSql, {
         userId,
         packageId: pkg.id,
         sureGun: pkg.sure_gun,

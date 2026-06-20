@@ -9,14 +9,15 @@ vi.mock("./api-key-service.js", () => ({
 describe("entitlementOverrideChain (CodeFast per-customer)", () => {
   const BASE = "https://reseller-api.codefast.app";
 
-  it("builds /proxy/<slug> chain with decrypted cf_rc key + claude modelMap (tire↔nokta)", async () => {
+  it("builds /proxy/<slug>/v1 chain with decrypted cf_rc key + claude modelMap (tire↔nokta)", async () => {
     const { entitlementOverrideChain } = await import("./package-provider-override.js");
     const chain = entitlementOverrideChain(
       { entitlementId: "e1", cfApiSlug: "claude-api", cfRcKeyCipher: "cipher(cf_rc_live_abc)" },
       BASE,
     );
     expect(chain).not.toBeNull();
-    expect(chain!.primary.baseUrl).toBe("https://reseller-api.codefast.app/proxy/claude-api");
+    // CF proxy ucu /proxy/<slug>/v1/<endpoint> ister — /v1'siz 404 "Hata Oluştu" döner
+    expect(chain!.primary.baseUrl).toBe("https://reseller-api.codefast.app/proxy/claude-api/v1");
     expect(chain!.primary.apiKey).toBe("cf_rc_live_abc");
     expect(chain!.primary.profileId).toBe("cf:e1");
     // claude-api: yzapi tire/nokta → CF nokta formu
@@ -48,12 +49,12 @@ describe("entitlementOverrideChain (CodeFast per-customer)", () => {
     expect(entitlementOverrideChain({ cfApiSlug: "claude-api", cfRcKeyCipher: "garbage" }, BASE)).toBeNull();
   });
 
-  it("trims trailing slash on base before appending /proxy", async () => {
+  it("trims trailing slash on base before appending /proxy/<slug>/v1", async () => {
     const { entitlementOverrideChain } = await import("./package-provider-override.js");
     const chain = entitlementOverrideChain(
       { entitlementId: "e2", cfApiSlug: "codex-api", cfRcKeyCipher: "cipher(cf_rc_live_z)" },
       "https://reseller-api.codefast.app/",
     );
-    expect(chain!.primary.baseUrl).toBe("https://reseller-api.codefast.app/proxy/codex-api");
+    expect(chain!.primary.baseUrl).toBe("https://reseller-api.codefast.app/proxy/codex-api/v1");
   });
 });

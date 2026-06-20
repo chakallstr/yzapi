@@ -254,3 +254,23 @@ export function canonicalizeModelId(modelId: string | undefined): string | undef
   // 3) Bilinmeyen id → orijinali aynen koru (geriye-uyumlu; bracket'li id'ler sağ kalır).
   return modelId;
 }
+
+// Opus 4.7'den itibaren (4.7, 4.8) + Fable/Mythos ailesi sampling parametrelerini
+// (temperature/top_p/top_k) KABUL ETMEZ: upstream 400 "temperature is deprecated for
+// this model" döndürür. Cline/Roo/Codex gibi istemciler bu parametreleri VARSAYILAN
+// gönderdiği için gateway, bu modellere forward etmeden ÖNCE striplemeli. Eski Claude
+// modelleri (opus 4.6/4.5, sonnet 4.x, haiku) bunları hâlâ kabul eder — onlara dokunma.
+const SAMPLING_PARAM_REJECTING_MODELS = new Set<string>([
+  "claude-opus-4-8",
+  "claude-opus-4-7",
+  "claude-fable-5",
+  "claude-mythos-5",
+]);
+
+export function modelRejectsSamplingParams(modelId: string | undefined): boolean {
+  if (!modelId) return false;
+  const canonical = canonicalizeModelId(modelId) ?? modelId;
+  // Kanonik id'ler karışık biçimde (opus-4.8 NOKTA, opus-4-7 TİRE) — tireye normalize et.
+  const dash = canonical.replace(/\./g, "-");
+  return SAMPLING_PARAM_REJECTING_MODELS.has(dash);
+}

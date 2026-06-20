@@ -24,6 +24,7 @@ export const tr = {
   'nav.home': 'Ana Sayfa',
   'nav.models': 'Modeller',
   'nav.packages': 'Paketler',
+  'nav.mypackages': 'Paketlerim',
   'nav.aiChat': 'AI Chat',
   'nav.studio': 'Studio',
   'nav.documents': 'Documents',

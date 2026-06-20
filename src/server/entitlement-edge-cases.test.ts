@@ -216,11 +216,11 @@ describe("zamanlama edge cases", () => {
     expect(covered).toBe(false);
   });
 
-  it("GAP-01: multiple active entitlements — tryReservePackageSlot picks earliest-expiring (ORDER BY expires_at ASC)", async () => {
-    // The SQL ORDER BY expires_at ASC LIMIT 1 selects the one expiring first.
-    // Mock returns the earliest one.
-    const earliestEntId = "ent-expires-first-111";
-    const mockDbSql = makeDbSqlMock([{ id: earliestEntId }]);
+  it("GAP-01: multiple active entitlements — tryReservePackageSlot picks SMALLEST-first (ORDER BY daily_limit_snapshot ASC, expires_at ASC)", async () => {
+    // Düşükten büyüğe tüketim: SQL ORDER BY daily_limit_snapshot ASC LIMIT 1 önce en KÜÇÜK
+    // paketi seçer (eşitlikte erken biten). Mock seçilen satırı döner.
+    const smallestEntId = "ent-smallest-first-111";
+    const mockDbSql = makeDbSqlMock([{ id: smallestEntId }]);
     vi.doMock("./db/client.js", () => ({ db: {}, dbSql: mockDbSql }));
     vi.doMock("./db/schema.js", () => ({ usageRecords: {} }));
 
@@ -228,7 +228,7 @@ describe("zamanlama edge cases", () => {
     const result = await tryReservePackageSlot("user-multi-001", "gpt-4o");
 
     expect(result.covered).toBe(true);
-    expect(result.entitlementId).toBe(earliestEntId);
+    expect(result.entitlementId).toBe(smallestEntId);
   });
 
   it("GAP-03-tz: grantPackageEntitlement extends existing entitlement expires_at by sureGun days", async () => {
@@ -252,7 +252,7 @@ describe("zamanlama edge cases", () => {
       purchaseTransactionId: "tx-extend-001",
     });
 
-    expect(resultId).toBe(extendedEntId);
+    expect(resultId).toEqual({ entitlementId: extendedEntId, extended: true });
     expect(mockDbSql).toHaveBeenCalledTimes(2);
   });
 
@@ -276,9 +276,31 @@ describe("zamanlama edge cases", () => {
       purchaseTransactionId: null,
     });
 
-    expect(resultId).toBe(newEntId);
+    expect(resultId).toEqual({ entitlementId: newEntId, extended: false });
     // First call = SELECT, second call = INSERT
     expect(mockDbSql).toHaveBeenCalledTimes(2);
+  });
+
+  it("grantPackageEntitlement: ayriSatir=true → aktif hak OLSA BİLE yeni satır (extend etmez, SELECT atlanır)", async () => {
+    const newEntId = "ent-forcenew-444";
+    // ayriSatir=true → existing-lookup ATLANIR; tek DB çağrısı = INSERT.
+    const mockDbSql = vi.fn()
+      .mockImplementationOnce(() => Promise.resolve([{ id: newEntId }])); // INSERT RETURNING
+    vi.doMock("./db/client.js", () => ({ db: {}, dbSql: mockDbSql }));
+    vi.doMock("./db/schema.js", () => ({ usageRecords: {} }));
+
+    const { grantPackageEntitlement } = await import("./services/entitlement-service.js");
+    const result = await grantPackageEntitlement(mockDbSql, {
+      userId: "user-fn-001",
+      packageId: "pkg-fn-001",
+      sureGun: 6,
+      gunlukIstekLimiti: 120,
+      allowedModels: ["gpt-5.5"],
+      purchaseTransactionId: "tx-fn-001",
+    }, true);
+
+    expect(result).toEqual({ entitlementId: newEntId, extended: false });
+    expect(mockDbSql).toHaveBeenCalledTimes(1); // SELECT existing atlandı → yalnız INSERT
   });
 
   it("recordPackageUsage: inserts usage_records row with billedVia='package' and costTL=0", async () => {
@@ -313,5 +335,52 @@ describe("zamanlama edge cases", () => {
     expect(inserted.billedVia).toBe("package");
     expect(inserted.costTL ?? inserted.cost_tl ?? "0").toBe("0"); // Drizzle numeric → string
     expect(inserted.entitlementId ?? inserted.entitlement_id).toBe("ent-rec-001");
+  });
+});
+
+describe("Paketlerim — listUserPackagesForPanel durum eşlemesi + duraklat", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("durum kodlarını doğru hesaplar (aktif/duraklatildi/suresi_doldu/gunluk_doldu/tukendi)", async () => {
+    const rows = [
+      { id: "a", paket_adi: "P-aktif", kategori: "X", daily_limit_snapshot: 500, paused: false, requests_today: 10, cf_remaining: null, cf_units_ordered: 0, activated_at: "2026-06-19", expires_at: "2026-07-19", status: "active", expired: false },
+      { id: "b", paket_adi: "P-duraklatildi", kategori: "X", daily_limit_snapshot: 500, paused: true, requests_today: 0, cf_remaining: null, cf_units_ordered: 0, activated_at: "2026-06-19", expires_at: "2026-07-19", status: "active", expired: false },
+      { id: "c", paket_adi: "P-suresi", kategori: "X", daily_limit_snapshot: 500, paused: false, requests_today: 0, cf_remaining: null, cf_units_ordered: 0, activated_at: "2026-06-01", expires_at: "2026-06-02", status: "active", expired: true },
+      { id: "d", paket_adi: "P-gunluk", kategori: "X", daily_limit_snapshot: 500, paused: false, requests_today: 500, cf_remaining: null, cf_units_ordered: 0, activated_at: "2026-06-19", expires_at: "2026-07-19", status: "active", expired: false },
+      { id: "e", paket_adi: "P-cf-tukendi", kategori: "X", daily_limit_snapshot: 150, paused: false, requests_today: 0, cf_remaining: 0, cf_units_ordered: 150, activated_at: "2026-06-19", expires_at: "2026-07-19", status: "active", expired: false },
+    ];
+    const mockDbSql = makeDbSqlMock(rows);
+    vi.doMock("./db/client.js", () => ({ db: {}, dbSql: mockDbSql }));
+    vi.doMock("./db/schema.js", () => ({ usageRecords: {} }));
+
+    const { listUserPackagesForPanel } = await import("./services/entitlement-service.js");
+    const out = await listUserPackagesForPanel("user-1");
+
+    expect(out.map((p) => p.durum)).toEqual(["aktif", "duraklatildi", "suresi_doldu", "gunluk_doldu", "tukendi"]);
+    expect(out[0].kalan).toBe(490); // 500 - 10
+    expect(out[1].paused).toBe(true);
+    expect(out[4].kalan).toBe(0); // cf: 150 ordered - 0 remaining = 150 consumed → 0 kalan
+    // sağlayıcı/cf-slug/cipher SIZMAMALI
+    expect(JSON.stringify(out)).not.toMatch(/cf_api_slug|cf_rc_key|provider_base_url|cipher/i);
+  });
+
+  it("setEntitlementPaused — sahiplik: satır dönerse true, dönmezse false", async () => {
+    const okMock = makeDbSqlMock([{ id: "ent-x" }]);
+    vi.doMock("./db/client.js", () => ({ db: {}, dbSql: okMock }));
+    vi.doMock("./db/schema.js", () => ({ usageRecords: {} }));
+    const mod = await import("./services/entitlement-service.js");
+    expect(await mod.setEntitlementPaused("user-1", "ent-x", true)).toBe(true);
+
+    vi.resetModules();
+    const emptyMock = makeDbSqlMock([]); // başkasının paketi / yok
+    vi.doMock("./db/client.js", () => ({ db: {}, dbSql: emptyMock }));
+    vi.doMock("./db/schema.js", () => ({ usageRecords: {} }));
+    const mod2 = await import("./services/entitlement-service.js");
+    expect(await mod2.setEntitlementPaused("user-1", "ent-foreign", true)).toBe(false);
   });
 });
