@@ -6,6 +6,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { dbSql, db } from "../db/client.js";
 import { users } from "../db/schema.js";
 import { purchasePackageWithBalance } from "../services/package-purchase-service.js";
+import { listUserPurchaseHistory } from "../services/entitlement-service.js";
 
 const UID = "b0000041-0000-0000-0000-0000000000a1";
 const PKG = "test-ref-paid-itest";
@@ -50,5 +51,30 @@ describe("paket alımı → purchase_ref + package_id", () => {
     expect(after.length).toBe(before.length + 1);
     const refs = after.map((r) => r.purchase_ref);
     expect(new Set(refs).size).toBe(refs.length);
+  });
+});
+
+describe("listUserPurchaseHistory", () => {
+  it("kullanıcının paket alımlarını ref + paket adı + tutar + tarihle döndürür", async () => {
+    const hist = await listUserPurchaseHistory(UID);
+    expect(hist.length).toBeGreaterThanOrEqual(1);
+    const h = hist[0];
+    expect(h.ref).toMatch(/^YZK-\d{6}-[A-Z2-9]{4}$/);
+    expect(h.paketAdi).toBe("Ref Paid");
+    expect(h.tutarTL).toBe(100);
+    expect(typeof h.tarih).toBe("string");
+  });
+});
+
+describe("admin ref arama (purchase_ref → user)", () => {
+  it("var olan ref user_id'ye çözülür", async () => {
+    const one = await dbSql<{ purchase_ref: string }[]>`
+      SELECT purchase_ref FROM transactions WHERE user_id=${UID}::uuid AND tip='paket_satin_alma' LIMIT 1
+    `;
+    const ref = one[0].purchase_ref;
+    const found = await dbSql<{ user_id: string }[]>`
+      SELECT user_id FROM transactions WHERE purchase_ref = ${ref} LIMIT 1
+    `;
+    expect(found[0].user_id).toBe(UID);
   });
 });

@@ -13,7 +13,7 @@ import {
 } from "../services/report-service.js";
 import { extractUsageBreakdown } from "../services/usage-breakdown.js";
 import { getUserUsageStats, type UsageStatsWindow } from "../services/user-usage-stats-service.js";
-import { listUserEntitlements, listUserPackagesForPanel, setEntitlementPaused } from "../services/entitlement-service.js";
+import { listUserEntitlements, listUserPackagesForPanel, setEntitlementPaused, listUserPurchaseHistory } from "../services/entitlement-service.js";
 import { purchasePackageWithBalance, renewEntitlement } from "../services/package-purchase-service.js";
 import { packagesFeatureEnabled } from "../services/package-service.js";
 import { redeemCode } from "../services/redeem-code-service.js";
@@ -139,6 +139,15 @@ router.get("/entitlements", async (req, res, next) => {
 router.get("/packages", async (req, res, next) => {
   try {
     res.json(await listUserPackagesForPanel(req.user!.id));
+  } catch (e) {
+    next(e);
+  }
+});
+
+// "Paketlerim" → Satın alma geçmişi: her ödeme olayı (ref + paket + tutar + tarih)
+router.get("/purchase-history", async (req, res, next) => {
+  try {
+    res.json(await listUserPurchaseHistory(req.user!.id));
   } catch (e) {
     next(e);
   }

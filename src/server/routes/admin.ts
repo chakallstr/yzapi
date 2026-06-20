@@ -622,6 +622,24 @@ router.delete("/model-overrides/:modelId", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Referans ile satın alma bul: müşteri WhatsApp'tan "YZK-260620-7K3F" deyince admin tek aramada bulur.
+router.get("/purchase/:ref", async (req, res, next) => {
+  try {
+    const ref = String(req.params.ref || "").trim().toUpperCase();
+    const rows = await dbSql<any[]>`
+      SELECT t.id, t.user_id, t.user_email, t.package_id, t.miktar_tl, t.timestamp, t.aciklama, p.ad AS paket_adi
+      FROM transactions t
+      LEFT JOIN packages p ON p.id = t.package_id
+      WHERE t.purchase_ref = ${ref}
+      LIMIT 1
+    `;
+    if (!rows.length) return res.status(404).json({ error: "Referans bulunamadı" });
+    res.json(rows[0]);
+  } catch (e) {
+    next(e);
+  }
+});
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 router.get("/users", async (req, res, next) => {
   try {

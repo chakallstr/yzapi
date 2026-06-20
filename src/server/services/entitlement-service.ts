@@ -422,3 +422,35 @@ export async function setEntitlementPaused(userId: string, entitlementId: string
 export async function setUserPaygMode(userId: string, on: boolean): Promise<void> {
   await dbSql`UPDATE users SET payg_mode = ${on}, updated_at = now() WHERE id = ${userId}::uuid`;
 }
+
+export interface PurchaseHistoryItem {
+  /** YZK-YYMMDD-XXXX; backfill öncesi eski alımlarda null. */
+  ref: string | null;
+  packageId: string | null;
+  /** packages.ad çözülürse o, yoksa aciklama'daki "Paket: <ad>" metni. */
+  paketAdi: string;
+  tutarTL: number;
+  tarih: string;
+}
+
+/**
+ * Müşterinin paket satın alma geçmişi (ödeme olayları). Kota/entitlement'tan
+ * BAĞIMSIZ; transactions'tan okunur. Sağlayıcı/maliyet sızmaz.
+ */
+export async function listUserPurchaseHistory(userId: string): Promise<PurchaseHistoryItem[]> {
+  const rows = await dbSql<any[]>`
+    SELECT t.purchase_ref, t.package_id, t.miktar_tl, t.timestamp, t.aciklama, p.ad AS paket_adi
+    FROM transactions t
+    LEFT JOIN packages p ON p.id = t.package_id
+    WHERE t.user_id = ${userId}::uuid AND t.tip = 'paket_satin_alma'
+    ORDER BY t.timestamp DESC
+    LIMIT 200
+  `;
+  return rows.map((r) => ({
+    ref: r.purchase_ref ?? null,
+    packageId: r.package_id ?? null,
+    paketAdi: r.paket_adi ?? (String(r.aciklama || "").replace(/^Paket:\s*/, "").trim() || "Paket"),
+    tutarTL: Math.abs(Number(r.miktar_tl) || 0),
+    tarih: r.timestamp,
+  }));
+}
