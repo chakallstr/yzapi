@@ -4,6 +4,7 @@
    ============================================ */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CATALOG_PRICES, computeCatalogDiff } from './catalog-pricing.js';
 
 // --- Icon factory ---------------------------------------------------
 const Icon = ({ d, paths, size = 16, stroke = 'currentColor', fill = 'none', strokeWidth = 1.6, style, className }) => (
@@ -191,6 +192,15 @@ const usdToTL = (usd, rate) => usd * rate;
 // Eski API uyumluluğu — ModelsTab hâlâ bunu çağırıyor.
 const computeTLPrice = (usdPrice, type, { rate, textMul, mediaMul }) => {
   return usdToTL(computeOurUsd(usdPrice, type, { textMul, mediaMul }), rate);
+};
+
+// --- Katalog (üretici resmi liste) fiyatları -----------------------
+// Saf çekirdek catalog-pricing.js'te (React'siz, testli). Burada re-export +
+// provider etiketi (PROVIDERS'a bağlı olduğu için burada).
+// "Anthropic fiyatı" / "OpenAI fiyatı" / "Google fiyatı" — modeli üreten şirketin adı.
+const providerLabelFor = (model) => {
+  const prov = PROVIDERS[(model && model.provider) || ''];
+  return (prov ? prov.label : 'Üretici') + ' fiyatı';
 };
 
 // --- Token eşdeğeri (referans: ortalama Opus 4.8) ------------------
@@ -480,6 +490,7 @@ export {
   PROVIDERS, MODELS, MODELS_BY_ID, MODEL_KEYS, modelMeta,
   modelsByType, modelsByProvider, ctxFor,
   computeOurUsd, usdToTL, computeTLPrice, fmt,
+  CATALOG_PRICES, providerLabelFor, computeCatalogDiff,
   OPUS48_USD_PER_1M, OPUS48_LABEL, usdToOpusTokens,
   mockLogs, promptPool,
   useCountUp, useLogStream, nowTime,

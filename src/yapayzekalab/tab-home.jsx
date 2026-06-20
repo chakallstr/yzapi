@@ -3,7 +3,7 @@ import {
   I, Card, Chip, Caption, PulseDot, Dot,
   PROVIDERS, MODELS, MODELS_BY_ID, MODEL_KEYS, modelMeta,
   modelsByType, modelsByProvider, ctxFor,
-  computeOurUsd, usdToTL, computeTLPrice, fmt,
+  computeOurUsd, usdToTL, computeTLPrice, fmt, computeCatalogDiff, providerLabelFor,
   mockLogs, promptPool, useCountUp, useLogStream, nowTime,
   mockUsers, mockUsageRecords, mockPayments, mockAnnouncements,
   mockAuditLogs, mockKurHistory, mockProviderStatus,
@@ -975,6 +975,91 @@ const CLIShowcase = () => {
   );
 };
 
+// === PriceComparison — üretici fiyatı vs YapayZekaLab (6 model) =====
+const CMP_FEATURED_IDS = [
+  'claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001',
+  'gpt-5.5', 'gpt-5-mini', 'gemini-3-pro-preview',
+];
+
+const CmpCell = ({ m, diff, t }) => {
+  const ourWidth = Math.max((diff.ourTotal / diff.catTotal) * 100, 3);
+  return (
+    <div style={{
+      border: '1px solid var(--border)', borderRadius: 12, padding: '15px 16px',
+      background: 'var(--surface)', boxShadow: 'var(--sh-1)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', letterSpacing: -0.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.id}</span>
+        <span style={{ flexShrink: 0, fontSize: 14, fontWeight: 800, fontFamily: 'var(--font-mono)', color: '#fff', background: 'var(--ok)', borderRadius: 999, padding: '3px 10px', letterSpacing: -0.4 }} className="tnum">{t('home.cmp.off', { pct: diff.pct })}</span>
+      </div>
+      {/* Üretici (katalog) fiyatı — kırmızı */}
+      <div style={{ marginBottom: 9 }}>
+        <div style={{ fontSize: 9.5, fontFamily: 'var(--font-mono)', letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 700, color: '#dc2626', marginBottom: 4 }}>{providerLabelFor(m)}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px', alignItems: 'center', gap: 10 }}>
+          <div style={{ height: 13, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 999, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: '100%', borderRadius: 999, background: 'linear-gradient(90deg,#fca5a5,#ef4444)' }} />
+          </div>
+          <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: 700, color: '#dc2626' }} className="tnum">{fmt.usdPer(diff.catTotal)}</span>
+        </div>
+      </div>
+      {/* YapayZekaLab fiyatı — yeşil */}
+      <div>
+        <div style={{ fontSize: 9.5, fontFamily: 'var(--font-mono)', letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 700, color: 'var(--ok-ink)', marginBottom: 4 }}>{t('home.cmp.legendYzl')}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px', alignItems: 'center', gap: 10 }}>
+          <div style={{ height: 13, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 999, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: ourWidth + '%', borderRadius: 999, background: 'linear-gradient(90deg,#34d399,#10b981)' }} />
+          </div>
+          <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: 700, color: 'var(--ok-ink)' }} className="tnum">{fmt.usdPer(diff.ourTotal)}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PriceComparison = ({ onTab }) => {
+  const { t } = useT();
+  const rows = useMemo(() => CMP_FEATURED_IDS
+    .map((id) => MODELS_BY_ID[id])
+    .filter(Boolean)
+    .map((m) => ({ m, diff: computeCatalogDiff(m) }))
+    .filter((r) => r.diff), []);
+  if (rows.length === 0) return null;
+  const avg = Math.round(rows.reduce((s, r) => s + r.diff.pct, 0) / rows.length);
+
+  return (
+    <Card pad={26}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-mono)', letterSpacing: 0.7, color: 'var(--ok-ink)', textTransform: 'uppercase' }}>
+        <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--ok)', boxShadow: '0 0 0 3px var(--ok-bg)' }} />
+        {t('home.cmp.eyebrow')}
+      </span>
+      <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: -1, lineHeight: 1.12, margin: '14px 0 6px' }}>
+        {t('home.cmp.title', { pct: avg })}
+      </div>
+      <div style={{ fontSize: 13.5, color: 'var(--ink-3)', lineHeight: 1.5, maxWidth: 580 }}>{t('home.cmp.sub')}</div>
+
+      <div style={{ display: 'flex', gap: 18, margin: '20px 0 16px', fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-3)', flexWrap: 'wrap' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><i style={{ width: 22, height: 7, borderRadius: 3, background: '#ef4444' }} />{t('home.cmp.legendProvider')}</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><i style={{ width: 22, height: 7, borderRadius: 3, background: 'var(--ok)' }} />{t('home.cmp.legendYzl')}</span>
+        <span style={{ marginLeft: 'auto', color: 'var(--ink-4)' }}>{t('home.cmp.unit')}</span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '18px 24px' }}>
+        {rows.map((r) => <CmpCell key={r.m.id} m={r.m} diff={r.diff} t={t} />)}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginTop: 22, paddingTop: 18, borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11.5, color: 'var(--ink-4)', lineHeight: 1.5, fontFamily: 'var(--font-mono)' }}>{t('home.cmp.foot')}</span>
+        <button onClick={() => onTab?.('models')} style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700,
+          color: '#fff', background: 'var(--ink)', border: 'none', borderRadius: 11, padding: '12px 20px', cursor: 'pointer', whiteSpace: 'nowrap',
+        }}>
+          {t('home.cmp.cta')} <I.Arrow size={14} stroke="#fff" />
+        </button>
+      </div>
+    </Card>
+  );
+};
+
 // === HomeTab =======================================================
 const HomeTab = ({ ctx, onTab, onAction }) => {
   const { t } = useT();
@@ -1053,6 +1138,9 @@ const HomeTab = ({ ctx, onTab, onAction }) => {
 
       {/* ===== VALUE BANNER ===== */}
       <ValueBanner tweaks={tweaks} onAction={onAction} />
+
+      {/* ===== FİYAT KARŞILAŞTIRMASI (üretici vs YapayZekaLab) ===== */}
+      <PriceComparison onTab={onTab} />
 
       {/* ===== 3 FEATURE CARDS ===== */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>

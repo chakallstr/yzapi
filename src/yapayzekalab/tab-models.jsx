@@ -3,7 +3,7 @@ import {
   I, Card, Chip, Caption, PulseDot, Dot,
   PROVIDERS, MODELS, MODELS_BY_ID, MODEL_KEYS, modelMeta,
   modelsByType, modelsByProvider, ctxFor,
-  computeOurUsd, usdToTL, computeTLPrice, fmt,
+  computeOurUsd, usdToTL, computeTLPrice, fmt, computeCatalogDiff,
   mockLogs, promptPool, useCountUp, useLogStream, nowTime,
   mockUsers, mockUsageRecords, mockPayments, mockAnnouncements,
   mockAuditLogs, mockKurHistory, mockProviderStatus,
@@ -54,6 +54,8 @@ const ModelRow = ({ m, tweaks, onToggleCompare, compareOn }) => {
   // USD birincil. TL sadece bilgi amaçlı.
   const inputUsd  = m.type === 'text'  ? computeOurUsd(m.input, 'text', { textMul, mediaMul }) : null;
   const outputUsd = m.type === 'text'  ? computeOurUsd(m.output,'text', { textMul, mediaMul }) : null;
+  // Üretici (katalog) resmi fiyatı + indirim. Yoksa/ucuz değilsek null.
+  const diff = m.type === 'text' ? computeCatalogDiff(m) : null;
 
   return (
     <div style={{
@@ -80,20 +82,32 @@ const ModelRow = ({ m, tweaks, onToggleCompare, compareOn }) => {
       </div>
       {/* Provider */}
       <div><ProviderBadge provider={m.provider} /></div>
-      {/* Catalog USD price */}
+      {/* Üretici (katalog) resmi fiyatı — kırmızı, üzeri çizili. Yoksa "—". */}
       <div style={{ textAlign: 'right' }}>
-        {m.type === 'text'  && (
-          <div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-2)' }} className="tnum">{fmt.usdPer(m.input)} · {fmt.usdPer(m.output)}</div>
-            <div style={{ fontSize: 9.5, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)', marginTop: 2, letterSpacing: 0.3 }}>in / out · USD/1M</div>
-          </div>
+        {m.type === 'text' && (
+          diff ? (
+            <div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: '#dc2626', textDecoration: 'line-through', textDecorationColor: '#dc2626' }} className="tnum">{fmt.usdPer(diff.catIn)} · {fmt.usdPer(diff.catOut)}</div>
+              <div style={{ fontSize: 9.5, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)', marginTop: 2, letterSpacing: 0.3 }}>in / out · USD/1M</div>
+            </div>
+          ) : (
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-4)' }}>—</div>
+          )
         )}
       </div>
-      {/* YapayZekaLab USD price (TL bilgi olarak küçük) */}
+      {/* YapayZekaLab USD price (+ indirim rozeti, TL bilgi olarak küçük) */}
       <div style={{ textAlign: 'right' }}>
         {m.type === 'text' && (
           <div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--accent-ink)' }} className="tnum">{fmt.usdPer(inputUsd)} · {fmt.usdPer(outputUsd)}</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+              {diff && (
+                <span style={{
+                  fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', letterSpacing: -0.2,
+                  color: '#fff', background: 'var(--ok)', borderRadius: 999, padding: '2px 7px', whiteSpace: 'nowrap',
+                }} className="tnum">−%{diff.pct}</span>
+              )}
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--accent-ink)' }} className="tnum">{fmt.usdPer(inputUsd)} · {fmt.usdPer(outputUsd)}</span>
+            </div>
             <div style={{ fontSize: 9.5, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)', marginTop: 2, letterSpacing: 0.3 }}>in / out · USD/1M · ≈ ₺{(inputUsd*rate).toFixed(2)} / ₺{(outputUsd*rate).toFixed(2)}</div>
           </div>
         )}

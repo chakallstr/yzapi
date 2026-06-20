@@ -40,6 +40,15 @@ export default {
     'home.quick.answeredBy': 'Yanıtlayan:',
 
     // — FeatureCard (rendered from HomeTab) —
+    'home.cmp.eyebrow': 'Gerçek fiyat karşılaştırması',
+    'home.cmp.title': 'Aynı modeller, ortalama %{pct} daha ucuz',
+    'home.cmp.sub': 'Çoğu kişi modellerin gerçek API fiyatını bilmez. Modeli üreten şirketin fiyatıyla bizimkini yan yana koyduk — abonelik yok, kota yok.',
+    'home.cmp.legendProvider': 'Modeli üreten şirketin fiyatı',
+    'home.cmp.legendYzl': 'YapayZekaLab fiyatı',
+    'home.cmp.unit': '1M token (girdi + çıktı)',
+    'home.cmp.foot': 'Fiyatlar, modeli üreten şirketin resmi API ücretidir — 1M token. Tüm modeller canlı listede.',
+    'home.cmp.cta': 'Tüm fiyatları gör',
+    'home.cmp.off': '−%{pct}',
     'home.feature.modelsTitle': 'Claude Model Ailesi',
     'home.feature.modelsBody': 'Claude Opus 4.8/4.7/4.6, Sonnet 4.6 ve Haiku 4.5 metin modelleri. Tek API key, tek bakiye, sıfır karmaşıklık.',
     'home.feature.pricingTitle': 'Saydam Fiyatlama',
@@ -193,6 +202,15 @@ export default {
     'home.quick.preparing': 'preparing sample response…',
     'home.quick.answeredBy': 'Answered by:',
 
+    'home.cmp.eyebrow': 'Real price comparison',
+    'home.cmp.title': 'Same models, on average {pct}% cheaper',
+    'home.cmp.sub': 'Most people don’t know what these models really cost on the official API. We put the model maker’s price next to ours — no subscription, no quota.',
+    'home.cmp.legendProvider': 'Model maker’s price',
+    'home.cmp.legendYzl': 'YapayZekaLab price',
+    'home.cmp.unit': '1M tokens (input + output)',
+    'home.cmp.foot': 'Prices are the model maker’s official API rate — per 1M tokens. All models are in the live list.',
+    'home.cmp.cta': 'See all prices',
+    'home.cmp.off': '−{pct}%',
     // — FeatureCard (rendered from HomeTab) —
     'home.feature.modelsTitle': 'Claude Model Family',
     'home.feature.modelsBody': 'Claude Opus 4.8/4.7/4.6, Sonnet 4.6 and Haiku 4.5 text models. One API key, one balance, zero complexity.',
