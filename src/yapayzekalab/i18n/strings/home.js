@@ -40,6 +40,8 @@ export default {
     'home.quick.answeredBy': 'Yanıtlayan:',
 
     // — FeatureCard (rendered from HomeTab) —
+    'home.hero.cheaperBig': '%97’ye varan daha ucuz',
+    'home.hero.cheaperSub': 'üreticinin resmi API fiyatına göre',
     'home.cmp.eyebrow': 'Gerçek fiyat karşılaştırması',
     'home.cmp.title': 'Aynı modeller, ortalama %{pct} daha ucuz',
     'home.cmp.sub': 'Çoğu kişi modellerin gerçek API fiyatını bilmez. Modeli üreten şirketin fiyatıyla bizimkini yan yana koyduk — abonelik yok, kota yok.',
@@ -202,6 +204,8 @@ export default {
     'home.quick.preparing': 'preparing sample response…',
     'home.quick.answeredBy': 'Answered by:',
 
+    'home.hero.cheaperBig': 'Up to 97% cheaper',
+    'home.hero.cheaperSub': 'than the provider’s official API price',
     'home.cmp.eyebrow': 'Real price comparison',
     'home.cmp.title': 'Same models, on average {pct}% cheaper',
     'home.cmp.sub': 'Most people don’t know what these models really cost on the official API. We put the model maker’s price next to ours — no subscription, no quota.',

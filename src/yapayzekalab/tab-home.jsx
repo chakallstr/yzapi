@@ -1210,6 +1210,10 @@ const HomeTab = ({ ctx, onTab, onAction }) => {
               }}>
                 {t('home.hero.leadPrefix')}<strong>{t('home.hero.leadStrong')}</strong>{t('home.hero.leadSuffix')}
               </p>
+              <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8, marginTop: 14, padding: '8px 14px', borderRadius: 10, background: 'var(--ok-bg)', border: '1px solid #a7f3d0' }}>
+                <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.8, color: 'var(--ok-ink)' }} className="tnum">{t('home.hero.cheaperBig')}</span>
+                <span style={{ fontSize: 12, color: 'var(--ok-ink)', fontWeight: 600 }}>{t('home.hero.cheaperSub')}</span>
+              </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 18, flexWrap: 'wrap' }}>
                 <button onClick={() => onTab('account')} style={{
                   background: 'var(--accent)', color: '#fff',
