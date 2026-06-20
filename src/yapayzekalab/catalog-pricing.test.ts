@@ -2,17 +2,20 @@ import { describe, expect, it } from "vitest";
 import { CATALOG_PRICES, CATALOG_TIERS, computeCatalogDiff } from "./catalog-pricing.js";
 
 describe("catalog-pricing", () => {
-  it("maps Anthropic Opus to the real $5/$25 catalog price", () => {
-    expect(CATALOG_PRICES["claude-opus-4-7"]).toEqual({ in: 5, out: 25 });
+  it("maps Anthropic Opus 4.7/4.6 to official Fast-mode $30/$150", () => {
+    expect(CATALOG_PRICES["claude-opus-4-7"]).toEqual({ in: 30, out: 150 });
+    expect(CATALOG_PRICES["claude-opus-4-6"]).toEqual({ in: 30, out: 150 });
   });
 
-  it("maps OpenAI GPT-5 family to $1.25/$10", () => {
-    expect(CATALOG_PRICES["gpt-5.5"]).toEqual({ in: 1.25, out: 10 });
+  it("maps OpenAI GPT-5.5 to official $5/$30 and GPT-5 base to $1.25/$10", () => {
+    expect(CATALOG_PRICES["gpt-5.5"]).toEqual({ in: 5, out: 30 });
+    expect(CATALOG_PRICES["gpt-5.4"]).toEqual({ in: 2.5, out: 15 });
     expect(CATALOG_PRICES["gpt-5"]).toEqual({ in: 1.25, out: 10 });
   });
 
-  it("maps Google Gemini Pro to $2/$12", () => {
+  it("maps Google Gemini Pro to $2/$12 and Flash to $0.50/$3", () => {
     expect(CATALOG_PRICES["gemini-3-pro-preview"]).toEqual({ in: 2, out: 12 });
+    expect(CATALOG_PRICES["gemini-3-flash-preview"]).toEqual({ in: 0.5, out: 3 });
   });
 
   it("no duplicate ids across tiers", () => {
@@ -20,13 +23,13 @@ describe("catalog-pricing", () => {
     expect(new Set(all).size).toBe(all.length);
   });
 
-  it("computes a positive discount when we are cheaper (opus)", () => {
-    // catalog total 30, our flat 1.25/1.25 = 2.5 -> ~92%
+  it("computes a positive discount when we are cheaper (opus, Fast mode catalog)", () => {
+    // catalog total 180 (30+150 Fast mode), our flat 1.25/1.25 = 2.5 -> ~99%
     const diff = computeCatalogDiff({ id: "claude-opus-4-7", input: 1.25, output: 1.25 });
     expect(diff).not.toBeNull();
-    expect(diff!.pct).toBe(92);
-    expect(diff!.catIn).toBe(5);
-    expect(diff!.catOut).toBe(25);
+    expect(diff!.pct).toBe(99);
+    expect(diff!.catIn).toBe(30);
+    expect(diff!.catOut).toBe(150);
     expect(diff!.ourTotal).toBe(2.5);
   });
 
@@ -36,7 +39,7 @@ describe("catalog-pricing", () => {
   });
 
   it("returns null for a model with no catalog entry", () => {
-    expect(computeCatalogDiff({ id: "claude-opus-4.8", input: 1.1, output: 1.1 })).toBeNull();
+    expect(computeCatalogDiff({ id: "some-unknown-model-xyz", input: 1.1, output: 1.1 })).toBeNull();
   });
 
   it("returns null for non-finite / missing prices", () => {

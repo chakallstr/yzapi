@@ -7,18 +7,36 @@
 // İleri-sürüm isimli modeller üreticinin amiral-sınıf resmi fiyatına eşlenir.
 // Burada OLMAYAN (veya bizden ucuz olan) model → karşılaştırma GÖSTERİLMEZ.
 
+// Kaynaklar (resmi sayfalar, 2026-06-20 doğrulandı):
+//   Anthropic: docs.claude.com/en/docs/about-claude/pricing  (Opus Fast mode + standart)
+//   OpenAI:    openai.com/api/pricing
+//   Google:    ai.google.dev/gemini-api/docs/pricing
 export const CATALOG_TIERS = [
-  { price: { in: 5,    out: 25   }, ids: ['claude-opus-4-7', 'claude-opus-4-6', 'claude-opus-4-5-20251101', 'claude-opus-4-1-20250805'] },
+  // --- Anthropic ---
+  // Opus 4.7/4.6 → FAST MODE resmi fiyatı ($30/$150). Opus 4.8 Fast mode $10/$50.
+  // Eski Opus (4.5/4.1) Fast mode yok → standart $5/$25.
+  { price: { in: 30,   out: 150  }, ids: ['claude-opus-4-7', 'claude-opus-4-6'] },
+  { price: { in: 10,   out: 50   }, ids: ['claude-opus-4.8', 'claude-opus-4-8'] },
+  { price: { in: 5,    out: 25   }, ids: ['claude-opus-4-5-20251101', 'claude-opus-4-1-20250805'] },
   { price: { in: 3,    out: 15   }, ids: ['claude-sonnet-4-6', 'claude-sonnet-4-5-20250929', 'claude-sonnet-4-20250514'] },
   { price: { in: 1,    out: 5    }, ids: ['claude-haiku-4-5-20251001'] },
-  { price: { in: 1.25, out: 10   }, ids: ['gpt-5.5', 'gpt-5.5-2026-04-23', 'gpt-5.4', 'gpt-5.4-2026-03-05', 'gpt-5.3-chat-latest', 'gpt-5.2', 'gpt-5.2-2025-12-11', 'gpt-5.2-chat-latest', 'gpt-5.1', 'gpt-5.1-2025-11-13', 'gpt-5.1-chat-latest', 'gpt-5', 'gpt-5-2025-08-07', 'gpt-5-chat-latest', 'gpt-5-search-api', 'gpt-5-search-api-2025-10-14'] },
-  { price: { in: 0.25, out: 2    }, ids: ['gpt-5.4-mini', 'gpt-5.4-mini-2026-03-17', 'gpt-5-mini', 'gpt-5-mini-2025-08-07'] },
+  // --- OpenAI (resmi) ---
+  { price: { in: 5,    out: 30   }, ids: ['gpt-5.5', 'gpt-5.5-2026-04-23'] },
+  { price: { in: 2.5,  out: 15   }, ids: ['gpt-5.4', 'gpt-5.4-2026-03-05'] },
+  { price: { in: 0.75, out: 4.5  }, ids: ['gpt-5.4-mini', 'gpt-5.4-mini-2026-03-17'] },
+  { price: { in: 1.25, out: 10   }, ids: ['gpt-5.3-chat-latest', 'gpt-5.2', 'gpt-5.2-2025-12-11', 'gpt-5.2-chat-latest', 'gpt-5.1', 'gpt-5.1-2025-11-13', 'gpt-5.1-chat-latest', 'gpt-5', 'gpt-5-2025-08-07', 'gpt-5-chat-latest', 'gpt-5-search-api', 'gpt-5-search-api-2025-10-14'] },
+  { price: { in: 0.25, out: 2    }, ids: ['gpt-5-mini', 'gpt-5-mini-2025-08-07'] },
   { price: { in: 0.05, out: 0.40 }, ids: ['gpt-5.4-nano', 'gpt-5.4-nano-2026-03-17', 'gpt-5-nano', 'gpt-5-nano-2025-08-07'] },
   { price: { in: 2,    out: 8    }, ids: ['o3', 'o3-2025-04-16'] },
   { price: { in: 1.10, out: 4.40 }, ids: ['o4-mini', 'o4-mini-2025-04-16', 'o3-mini', 'o3-mini-2025-01-31'] },
+  // --- Google (resmi) ---
   { price: { in: 2,    out: 12   }, ids: ['gemini-3.1-pro-preview', 'gemini-3.1-pro-preview-customtools', 'gemini-3-pro-preview'] },
-  { price: { in: 0.30, out: 2.50 }, ids: ['gemini-3-flash-preview'] },
+  { price: { in: 0.50, out: 3    }, ids: ['gemini-3-flash-preview'] },
 ];
+
+// Fiyatı "Fast mode" (premium) resmi tarifesinden alınan modeller — etikette
+// "(Fast mode)" ibaresi gösterilir (dürüstlük: standart tarife daha düşüktür).
+export const FAST_MODE_IDS = new Set(['claude-opus-4-7', 'claude-opus-4-6', 'claude-opus-4.8', 'claude-opus-4-8']);
 
 /** @type {Record<string, { in: number, out: number }>} */
 export const CATALOG_PRICES = {};

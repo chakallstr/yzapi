@@ -4,7 +4,7 @@
    ============================================ */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CATALOG_PRICES, computeCatalogDiff } from './catalog-pricing.js';
+import { CATALOG_PRICES, computeCatalogDiff, FAST_MODE_IDS } from './catalog-pricing.js';
 
 // --- Icon factory ---------------------------------------------------
 const Icon = ({ d, paths, size = 16, stroke = 'currentColor', fill = 'none', strokeWidth = 1.6, style, className }) => (
@@ -62,6 +62,7 @@ const PROVIDERS = {
   anthropic:  { label: 'Anthropic',  short: 'Anthropic',  color: '#c2693a', bg: '#fef3ec', ink: '#7a3a18' },
   openai:     { label: 'OpenAI',     short: 'OpenAI',     color: '#10a37f', bg: '#ecfdf5', ink: '#047857' },
   google:     { label: 'Google',     short: 'Google',     color: '#4285f4', bg: '#eff6ff', ink: '#1d4ed8' },
+  yapayzekalab: { label: 'YapayZekaLab', short: 'YapayZekaLab', color: '#6d28d9', bg: '#f5f3ff', ink: '#5b21b6' },
 };
 
 // --- Models catalog -----------------------------------------------
@@ -490,7 +491,7 @@ export {
   PROVIDERS, MODELS, MODELS_BY_ID, MODEL_KEYS, modelMeta,
   modelsByType, modelsByProvider, ctxFor,
   computeOurUsd, usdToTL, computeTLPrice, fmt,
-  CATALOG_PRICES, providerLabelFor, computeCatalogDiff,
+  CATALOG_PRICES, providerLabelFor, computeCatalogDiff, FAST_MODE_IDS,
   OPUS48_USD_PER_1M, OPUS48_LABEL, usdToOpusTokens,
   mockLogs, promptPool,
   useCountUp, useLogStream, nowTime,
