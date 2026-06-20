@@ -173,6 +173,8 @@ describe("admin traffic analytics service", () => {
           metod: "iban",
           timestamp: new Date("2026-05-29T06:00:00.000Z"),
           idempotencyKey: null,
+          purchaseRef: null,
+          packageId: null,
         },
         {
           id: "t2",
@@ -186,6 +188,8 @@ describe("admin traffic analytics service", () => {
           metod: null,
           timestamp: new Date("2026-05-29T07:00:00.000Z"),
           idempotencyKey: null,
+          purchaseRef: null,
+          packageId: null,
         },
       ],
     });

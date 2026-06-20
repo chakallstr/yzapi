@@ -298,8 +298,15 @@ export const transactions = pgTable(
     metod: text("metod"),
     timestamp: timestamp("timestamp", { withTimezone: true }).notNull().default(sql`now()`),
     idempotencyKey: text("idempotency_key").unique(),
+    // Paket satın alma takip no'su (YZK-YYMMDD-XXXX). Yalnız tip='paket_satin_alma' satırlarında dolu.
+    purchaseRef: text("purchase_ref"),
+    // Satın alınan paket (geçmiş/silinmiş pakette NULL olabilir; gruplama/arama için).
+    packageId: text("package_id"),
   },
-  (t) => [index("transactions_user_ts_idx").on(t.userId, t.timestamp)]
+  (t) => [
+    index("transactions_user_ts_idx").on(t.userId, t.timestamp),
+    uniqueIndex("transactions_purchase_ref_uidx").on(t.purchaseRef).where(sql`${t.purchaseRef} IS NOT NULL`),
+  ]
 );
 
 // ── signup_bonus_grants (yeni üye deneme bonusu, hesap başına TAM 1 kez) ─────────
