@@ -36,6 +36,7 @@ describe("purchasePackageWithBalance", () => {
       .mockResolvedValueOnce([PKG]); // package lookup
     mockTxSql
       .mockResolvedValueOnce([{ bakiye_tl: "60", email: "u@x.com" }]) // debit
+      .mockResolvedValueOnce([]) // purchase_ref collision-check: boş = çakışma yok
       .mockResolvedValueOnce([{ id: "tx1" }]) // transactions insert
       .mockResolvedValueOnce([]) // existing entitlement: none
       .mockResolvedValueOnce([{ id: "ent1" }]); // insert entitlement
@@ -50,6 +51,7 @@ describe("purchasePackageWithBalance", () => {
       .mockResolvedValueOnce([{ ...PKG, tip: "account_delivery" }]); // package lookup
     mockTxSql
       .mockResolvedValueOnce([{ bakiye_tl: "60", email: "u@x.com" }]) // debit
+      .mockResolvedValueOnce([]) // purchase_ref collision-check: boş = çakışma yok
       .mockResolvedValueOnce([{ id: "tx1" }]) // transactions insert
       .mockResolvedValueOnce([{ id: "ord1" }]); // delivery order insert
     const { purchasePackageWithBalance } = await import("./package-purchase-service.js");
