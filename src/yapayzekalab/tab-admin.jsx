@@ -416,6 +416,22 @@ const AdminUsers = ({ users, token, refresh, meRole = '', focusUserId = '', focu
     await refresh();
   };
 
+  const [refQ, setRefQ] = useState('');
+  const findByRef = async () => {
+    const ref = refQ.trim().toUpperCase();
+    if (!ref) return;
+    try {
+      const r = await adminRequest(`/api/admin/purchase/${encodeURIComponent(ref)}`, token);
+      if (r?.user_id) {
+        setQ(r.user_email || '');
+        setOpenUserId(r.user_id);
+        await loadDetail(r.user_id, true);
+      }
+    } catch {
+      alert('Referans bulunamadı');
+    }
+  };
+
   useEffect(() => {
     if (!focusUserId) return;
     const user = users.find((row) => row.id === focusUserId);
@@ -440,6 +456,21 @@ const AdminUsers = ({ users, token, refresh, meRole = '', focusUserId = '', focu
               ))}
             </select>
           </label>
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
+          <input
+            value={refQ}
+            onChange={(e) => setRefQ(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') findByRef(); }}
+            placeholder="YZK-260620-7K3F"
+            style={{ ...inputStyle, flex: '0 1 220px' }}
+          />
+          <button
+            onClick={findByRef}
+            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 12, background: 'var(--surface)', color: 'var(--ink)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            Referans ile bul
+          </button>
         </div>
       </Card>
       <Card pad={0} style={{ overflow: 'hidden' }}>
@@ -619,7 +650,12 @@ const AdminUsers = ({ users, token, refresh, meRole = '', focusUserId = '', focu
                               <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '90px 90px 1fr 110px', gap: 10, padding: '10px 14px', borderBottom: index < Math.min(detail.transactions.length, 12) - 1 ? '1px solid var(--border)' : 'none', fontSize: 11.5 }}>
                                 <div className="tnum" style={{ fontWeight: 600, color: Number(row.miktarTL || 0) >= 0 ? '#047857' : '#b91c1c' }}>{money(row.miktarTL || 0)}</div>
                                 <div className="tnum">{money(row.sonrakiBakiye || 0)}</div>
-                                <div>{row.aciklama || row.tip}</div>
+                                <div>
+                                  {row.aciklama || row.tip}
+                                  {row.tip === 'paket_satin_alma' && row.purchaseRef && (
+                                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', marginLeft: 8 }}>{row.purchaseRef}</span>
+                                  )}
+                                </div>
                                 <div style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{safeDate(row.timestamp)}</div>
                               </div>
                             ))}
