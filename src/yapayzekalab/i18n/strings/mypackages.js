@@ -36,6 +36,9 @@ export default {
     'mypackages.payg.balance': 'Bakiyen: ₺{bal}',
     'mypackages.payg.zeroWarn': 'Bakiyen yok — bu modda istekler 402 ile durur. Önce bakiye yükle.',
     'mypackages.payg.activeWarn': 'Kullandığın kadar öde AÇIK — paketlerin şu an kullanılmıyor, istekler bakiyenden düşüyor.',
+    'mypackages.historyTitle': 'Satın alma geçmişi',
+    'mypackages.historyEmpty': 'Henüz satın alma yok',
+    'mypackages.historyRefCol': 'Takip no',
   },
   en: {
     'mypackages.title': 'My Packages',
@@ -73,5 +76,8 @@ export default {
     'mypackages.payg.balance': 'Balance: ₺{bal}',
     'mypackages.payg.zeroWarn': 'No balance — in this mode requests stop with 402. Top up first.',
     'mypackages.payg.activeWarn': 'Pay-as-you-go is ON — your packages are not in use right now, requests draw from your balance.',
+    'mypackages.historyTitle': 'Purchase history',
+    'mypackages.historyEmpty': 'No purchases yet',
+    'mypackages.historyRefCol': 'Ref',
   },
 };

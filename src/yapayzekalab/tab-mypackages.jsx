@@ -30,15 +30,18 @@ export function MyPackagesTab() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(''); // entitlement id veya 'payg'
   const [notice, setNotice] = useState(null); // { type: 'ok'|'err', msg }
+  const [purchaseHistory, setPurchaseHistory] = useState([]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [pkgs, meRes] = await Promise.all([
+    const [pkgs, meRes, phRes] = await Promise.all([
       apiJson('/api/user/packages').catch(() => []),
       apiJson('/api/user/me').catch(() => null),
+      apiJson('/api/user/purchase-history').catch(() => []),
     ]);
     setPackages(Array.isArray(pkgs) ? pkgs : []);
     setMe(meRes);
+    setPurchaseHistory(Array.isArray(phRes) ? phRes : []);
     setLoading(false);
   }, []);
 
@@ -270,6 +273,28 @@ export function MyPackagesTab() {
             </Card>
           )}
         </>
+      )}
+      {purchaseHistory.length > 0 && (
+        <Card style={{ marginTop: 16, padding: '12px 14px' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t('mypackages.historyTitle')}</div>
+          {Object.entries(
+            purchaseHistory.reduce((acc, it) => {
+              (acc[it.paketAdi] = acc[it.paketAdi] || []).push(it);
+              return acc;
+            }, {})
+          ).map(([paket, items]) => (
+            <div key={paket} style={{ marginBottom: 10 }}>
+              <Caption style={{ fontWeight: 700 }}>{paket}</Caption>
+              {items.map((it, i) => (
+                <div key={(it.ref || 'noref') + i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', fontFamily: 'var(--font-mono)' }}>
+                  <span style={{ fontWeight: 700 }}>{it.ref || '—'}</span>
+                  <span style={{ color: 'var(--ink-3)' }}>{safeDate(it.tarih)}</span>
+                  <span>{fmt.num(it.tutarTL)} TL</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </Card>
       )}
     </div>
   );
