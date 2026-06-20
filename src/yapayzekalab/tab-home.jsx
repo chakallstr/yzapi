@@ -977,12 +977,19 @@ const CLIShowcase = () => {
 
 // === PriceComparison — üretici fiyatı vs YapayZekaLab (6 model, animasyonlu) =====
 const CMP_FEATURED_IDS = [
-  'claude-opus-4-7', 'gpt-5.5', 'claude-sonnet-4-6',
+  'claude-opus-4.8', 'gpt-5.5', 'claude-sonnet-4-6',
   'gpt-5.4', 'gemini-3-pro-preview', 'claude-haiku-4-5-20251001',
 ];
 
 const CMP_REDUCE = typeof window !== 'undefined' && window.matchMedia
   ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+
+// Karşılaştırmada öne çıkarılan ama statik MODELS 42-kilidinde OLMAYAN modeller
+// (added_models katmanı). Fiyat = sistemin kendi referansı (opus-4.8 ≈ $1.10/1M).
+const CMP_SYNTHETIC = {
+  'claude-opus-4.8': { id: 'claude-opus-4.8', label: 'Claude Opus 4.8', provider: 'anthropic', type: 'text', input: 1.10, output: 1.10, ctx: '1M' },
+};
+const cmpModel = (id) => MODELS_BY_ID[id] || CMP_SYNTHETIC[id] || null;
 
 const CmpCell = ({ m, diff, t, index }) => {
   const ourWidth = Math.max((diff.ourTotal / diff.catTotal) * 100, 3);
@@ -1037,7 +1044,7 @@ const CmpCell = ({ m, diff, t, index }) => {
 const PriceComparison = ({ onTab }) => {
   const { t } = useT();
   const rows = useMemo(() => CMP_FEATURED_IDS
-    .map((id) => MODELS_BY_ID[id])
+    .map((id) => cmpModel(id))
     .filter(Boolean)
     .map((m) => ({ m, diff: computeCatalogDiff(m) }))
     .filter((r) => r.diff), []);
@@ -1078,6 +1085,97 @@ const PriceComparison = ({ onTab }) => {
   );
 };
 
+// === RouteFlowPrices — hero akış diyagramı, model düğümleri = fiyat kartı ====
+const FLOW_FEATURED_IDS = ['claude-opus-4.8', 'gpt-5.5', 'claude-sonnet-4-6', 'gemini-3-pro-preview'];
+
+const FlowCard = ({ m, diff, index, h, t }) => {
+  const ourWidth = Math.max((diff.ourTotal / diff.catTotal) * 100, 3);
+  const [shown, setShown] = useState(CMP_REDUCE);
+  useEffect(() => {
+    if (CMP_REDUCE) return undefined;
+    const tm = setTimeout(() => setShown(true), 200 + index * 140);
+    return () => clearTimeout(tm);
+  }, [index]);
+  const prov = PROVIDERS[m.provider] || {};
+  const label = providerLabelFor(m) + (FAST_MODE_IDS.has(m.id) ? ' (Fast mode)' : '');
+  const shortName = m.id.replace(/^claude-/, '').replace(/-20\d{6}$/, '');
+  return (
+    <div style={{
+      height: h, boxSizing: 'border-box', border: '1px solid var(--border)', borderRadius: 11,
+      background: 'var(--surface)', boxShadow: 'var(--sh-1)', padding: '8px 11px',
+      opacity: shown ? 1 : 0, transform: shown ? 'none' : 'translateX(10px)',
+      transition: 'opacity .5s ease, transform .5s cubic-bezier(.22,1,.36,1)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+        <span style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shortName}</span>
+        <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 800, fontFamily: 'var(--font-mono)', color: '#fff', background: 'var(--ok)', borderRadius: 999, padding: '1px 7px', letterSpacing: -0.3,
+          transform: shown ? 'scale(1)' : 'scale(0.6)', opacity: shown ? 1 : 0,
+          transition: 'transform .4s cubic-bezier(.34,1.56,.64,1) .3s, opacity .3s ease .3s' }} className="tnum">{t('home.cmp.off', { pct: diff.pct })}</span>
+      </div>
+      <div style={{ fontSize: 7.5, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: 0.4, color: prov.ink || 'var(--ink-3)', margin: '4px 0 5px', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+      <div style={{ height: 9, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 999, overflow: 'hidden', position: 'relative' }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,#fca5a5,#ef4444)', opacity: 0.9 }} />
+        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: shown ? ourWidth + '%' : '0%', background: 'linear-gradient(90deg,#34d399,#10b981)', borderRadius: 999, transition: 'width .7s cubic-bezier(.22,1,.36,1) .3s' }} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 5, fontFamily: 'var(--font-mono)' }} className="tnum">
+        <span style={{ fontSize: 9.5, color: 'var(--cat-ink)', textDecoration: 'line-through', textDecorationColor: 'var(--cat-ink)' }}>{fmt.usdPer(diff.catTotal)}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ok-ink)' }}>{fmt.usdPer(diff.ourTotal)}</span>
+      </div>
+    </div>
+  );
+};
+
+const RouteFlowPrices = () => {
+  const { t } = useT();
+  const rows = useMemo(() => FLOW_FEATURED_IDS
+    .map((id) => cmpModel(id))
+    .filter(Boolean)
+    .map((m) => ({ m, diff: computeCatalogDiff(m) }))
+    .filter((r) => r.diff), []);
+  if (rows.length === 0) return null;
+
+  const CARD_H = 78;
+  const GAP = 12;
+  const RAIL = 148;
+  const H = rows.length * CARD_H + (rows.length - 1) * GAP;
+  const centers = rows.map((_, i) => i * (CARD_H + GAP) + CARD_H / 2);
+  const hubY = H / 2;
+  const dur = 3.6;
+  const pathFor = (cy) => `M126,${hubY} C138,${hubY} 138,${cy} ${RAIL},${cy}`;
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: H }}>
+      <svg viewBox={`0 0 ${RAIL} ${H}`} width={RAIL} height={H} style={{ position: 'absolute', left: 0, top: 0 }} aria-hidden="true">
+        <defs><filter id="rfpGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.1" /></filter></defs>
+        {rows.map((r, i) => <path key={`g${i}`} d={pathFor(centers[i])} fill="none" stroke="var(--ink-3)" strokeWidth="0.8" strokeDasharray="2 4" opacity="0.22" />)}
+        <path d={`M48,${hubY} L52,${hubY}`} stroke="var(--ink-3)" strokeWidth="0.8" strokeDasharray="2 4" opacity="0.22" fill="none" />
+        <rect x="50" y={hubY - 31} width="78" height="62" rx="15" fill="none" stroke="var(--accent)" strokeWidth="1.2" opacity="0.22">
+          <animate attributeName="opacity" values="0.1;0.32;0.1" dur="2.4s" repeatCount="indefinite" />
+        </rect>
+        <rect x="2" y={hubY - 18} width="44" height="36" rx="9" fill="var(--surface)" stroke="var(--border-st)" strokeWidth="1" />
+        <text x="24" y={hubY - 22} textAnchor="middle" fontSize="7.5" fontFamily="var(--font-mono)" fill="var(--ink-3)" letterSpacing="0.4">API KEY</text>
+        <text x="24" y={hubY + 4} textAnchor="middle" fontSize="9" fontFamily="var(--font-mono)" fill="var(--ink-2)">{t('home.routeLblInput')}</text>
+        <rect x="52" y={hubY - 29} width="74" height="58" rx="13" fill="var(--accent)" />
+        <text x="89" y={hubY - 4} textAnchor="middle" fontSize="8" fontFamily="var(--font-sans)" fontWeight="700" fill="#fff" letterSpacing="0.5">YAPAYZEKALAB</text>
+        <text x="89" y={hubY + 10} textAnchor="middle" fontSize="7.5" fontFamily="var(--font-mono)" fill="rgba(255,255,255,0.72)">api · v1</text>
+        {rows.map((r, i) => {
+          const color = (PROVIDERS[r.m.provider] || {}).color || 'var(--accent)';
+          const d = pathFor(centers[i]);
+          return [0, 1, 2, 3].map((k) => (
+            <circle key={`d${i}-${k}`} r="3" fill={color} filter="url(#rfpGlow)">
+              <animateMotion dur={`${dur}s`} repeatCount="indefinite" begin={`-${(k * dur) / 4}s`} path={d} />
+              <animate attributeName="opacity" values="0;1;1;1;0" keyTimes="0;0.06;0.4;0.94;1" dur={`${dur}s`} repeatCount="indefinite" begin={`-${(k * dur) / 4}s`} />
+            </circle>
+          ));
+        })}
+      </svg>
+      <div style={{ position: 'absolute', left: RAIL, top: 0, right: 0, display: 'flex', flexDirection: 'column', gap: GAP }}>
+        {rows.map((r, i) => <FlowCard key={r.m.id} m={r.m} diff={r.diff} index={i} h={CARD_H} t={t} />)}
+      </div>
+    </div>
+  );
+};
+
 // === HomeTab =======================================================
 const HomeTab = ({ ctx, onTab, onAction }) => {
   const { t } = useT();
@@ -1092,7 +1190,7 @@ const HomeTab = ({ ctx, onTab, onAction }) => {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 18 }}>
         {/* Hero card */}
         <Card pad={28} style={{ position: 'relative', overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24, alignItems: 'center' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 24, alignItems: 'center' }}>
             <div style={{ position: 'relative', minWidth: 0 }}>
               <Chip tone="accent" style={{ fontSize: 9.5, fontFamily: 'var(--font-mono)', letterSpacing: 0.8 }}>
                 <I.Sparkle size={11} stroke="var(--accent)" className={tweaks.sparkleSpin === false ? '' : 'spin-slow'} />
@@ -1132,7 +1230,7 @@ const HomeTab = ({ ctx, onTab, onAction }) => {
             </div>
 
             <div style={{ position: 'relative' }}>
-              <RouteFlow tweaks={tweaks} />
+              <RouteFlowPrices />
             </div>
           </div>
         </Card>
