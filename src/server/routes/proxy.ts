@@ -13,7 +13,9 @@ import {
   updateCfRemaining,
   consumeTpmOrDeny,
   hasActivePackageForModel,
+  listUserEntitlements,
 } from "../services/entitlement-service.js";
+import { buildUsagePayload } from "../services/usage-payload.js";
 import { chargeImage } from "../services/image-billing-service.js";
 import { withImageSlot } from "../services/image-queue.js";
 import { resolveActiveCatalogModel } from "../services/added-model-service.js";
@@ -812,6 +814,24 @@ router.get("/balance", async (req: Request, res: Response, next: NextFunction) =
         kur: snapshot.kur > 0 ? snapshot.kur.toFixed(6) : null,
       },
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /v1/usage — müşteri-görünür kota / kalan istek (API-key authlı). requests_today
+// paneldeki ile AYNI hesaptan (listUserEntitlements) türetilir; sağlayıcı/CF/maliyet SIZMAZ.
+router.get("/usage", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const runtimeConfig = await getRuntimeApiConfig();
+    if (runtimeConfig.maintenanceModeForApi) {
+      throw new AppError(503, runtimeConfig.maintenanceMessage);
+    }
+    const [entitlements, snapshot] = await Promise.all([
+      listUserEntitlements(req.user!.id),
+      getUserBalanceSnapshot(req.user!.id),
+    ]);
+    res.json(buildUsagePayload(entitlements, snapshot));
   } catch (err) {
     next(err);
   }

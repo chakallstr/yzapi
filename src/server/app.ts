@@ -170,6 +170,7 @@ export function createApp(): express.Express {
   app.use("/v1", (req, res, next) => {
     const knownRoutes = [
       /^\/balance$/,
+      /^\/usage$/,
       /^\/chat\/completions$/,
       /^\/responses$/,
       /^\/messages$/,
