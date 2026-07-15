@@ -60,6 +60,8 @@ export interface ProviderContext {
     baseUrl: "model_profile" | "active_profile" | "db" | "env";
     apiKey: "model_profile" | "active_profile" | "db" | "env" | "none";
   };
+  /** Upstream'e eklenen sağlayıcı-özel header'lar (ör. CF claude-api claude-cli UA). */
+  extraHeaders?: Record<string, string>;
 }
 
 // The active provider profile, parsed safely from provider_profiles. Used by the

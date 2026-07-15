@@ -86,6 +86,25 @@ export function cfModelMapForSlug(slug: string): Record<string, string> {
  * (paket-override'a / normal routing'e düşülür). Tek sağlayıcı — failover YOK.
  * modelMap slug'a göre yzapi-canonical → CF-wire çevirir (claude tire↔nokta).
  */
+// CF claude-api proxy'si isteğin gerçek Claude Code CLI'dan geldiğini doğrular:
+// eksik User-Agent / x-app / anthropic-beta → 400 "Unsupported Claude Code version"
+// veya "Invalid request". Bu header'ları CF claude-api slug'ı için zorunlu ekleriz.
+// (cf-claude-proxy/8319'daki buildHeaders ile birebir — tek kaynak olarak buraya taşındı.)
+const CF_CLAUDE_API_HEADERS: Record<string, string> = {
+  "user-agent": "claude-cli/2.1.191 (external, sdk-cli)",
+  "x-app": "cli",
+  "anthropic-beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,advisor-tool-2026-03-01",
+  "anthropic-dangerous-direct-browser-access": "true",
+  "x-stainless-arch": "arm64",
+  "x-stainless-lang": "js",
+  "x-stainless-os": "MacOS",
+  "x-stainless-package-version": "0.94.0",
+  "x-stainless-retry-count": "0",
+  "x-stainless-runtime": "node",
+  "x-stainless-runtime-version": "v22.0.0",
+  "x-stainless-timeout": "600",
+};
+
 export function entitlementOverrideChain(slot: EntitlementProviderSlot, base: string): ProviderChain | null {
   const slug = (slot.cfApiSlug ?? "").trim();
   const cipher = (slot.cfRcKeyCipher ?? "").trim();
@@ -104,6 +123,7 @@ export function entitlementOverrideChain(slot: EntitlementProviderSlot, base: st
       apiKey,
       modelMap: cfModelMapForSlug(slug),
       source: { baseUrl: "db", apiKey: "db" },
+      extraHeaders: slug === "claude-api" ? CF_CLAUDE_API_HEADERS : undefined,
     },
     fallback: null,
   };

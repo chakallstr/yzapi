@@ -31,6 +31,13 @@ export interface ChatUsage {
   // yakalanır → entitlement.cf_remaining'e yazılır → panel/gate CF ile BİREBİR senkron.
   // CF dışı sağlayıcıda header yok → null (yazılmaz). Faturalamayı ETKİLEMEZ.
   cfRemaining?: number | null;
+  // DENETİM İZİ (opsiyonel, billing'i ETKİLEMEZ): upstream cevabı NEDEN bitirdi —
+  // chat finish_reason ("stop"/"length"/"tool_calls"), Anthropic stop_reason
+  // ("end_turn"/"max_tokens"), Responses incomplete_details.reason ("max_output_tokens").
+  // "length"/"max_tokens"/"max_output_tokens" = çıktı bütçesinde KESİLDİ (reasoning
+  // düşünmesi token'ı yedi). Yalnız usage_records.raw_usage_json'a yazılır; faturalamaya
+  // GİRMEZ. CF-Brain bunu okuyup "kesilme" sağlık-bulgusu üretir (eski kör nokta).
+  finishReason?: string;
 }
 
 export interface ImageUsage {
@@ -234,7 +241,13 @@ async function readProviderJson(res: globalThis.Response): Promise<Record<string
   if (contentType.includes("text/event-stream") || text.trimStart().startsWith("data: ")) {
     return parseSseCompletion(text);
   }
-  return JSON.parse(text) as Record<string, unknown>;
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    // Upstream JSON değil döndürdü (HTML maintenance/error page gibi). Ham içeriği
+    // error nesnesine göm; çağıran res.ok=false ise bunu upstream hata gövdesi olarak işler.
+    return { error: { message: `upstream non-JSON response (status ${res.status}): ${text.slice(0, 300)}` } };
+  }
 }
 
 /** CF reseller proxy `x-codefast-remaining` header'ı → kalan ünite (yoksa/parse edilemezse null). */
@@ -243,6 +256,21 @@ function cfRemainingHeader(res: globalThis.Response): number | null {
   if (raw == null || raw === "") return null;
   const n = Number(raw);
   return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+
+// Upstream cevabının NEDEN bittiğini (finish/stop reason) non-stream JSON'dan çıkarır.
+// Şekle göre dener: chat/completions + coalesced (choices[].finish_reason), Anthropic
+// /v1/messages (stop_reason), OpenAI /v1/responses (incomplete_details.reason / status).
+// Faturalamaya GİRMEZ — yalnız denetim izi (raw_usage_json.finishReason). Asla throw etmez.
+function extractFinishReason(json: unknown): string | undefined {
+  if (!json || typeof json !== "object") return undefined;
+  const j = json as Record<string, any>;
+  const choiceReason = j.choices?.[0]?.finish_reason;
+  if (choiceReason) return String(choiceReason);
+  if (j.stop_reason) return String(j.stop_reason); // Anthropic /v1/messages
+  if (j.incomplete_details?.reason) return String(j.incomplete_details.reason); // /v1/responses
+  if (j.status && j.status !== "completed") return String(j.status);
+  return undefined;
 }
 
 function baseHeaders(apiKey: string | undefined): Record<string, string> {
@@ -338,7 +366,7 @@ export async function forwardChat(
 
   const res = await fetchWithRuntimeTimeout(url, {
     method: "POST",
-    headers: baseHeaders(ctx.apiKey),
+    headers: { ...baseHeaders(ctx.apiKey), ...ctx.extraHeaders },
     body: JSON.stringify(providerBody),
   }, attempt?.timeoutMs ?? runtimeConfig.defaultRequestTimeoutMs, attempt?.maxAttempts ?? 3);
 
@@ -356,7 +384,7 @@ export async function forwardChat(
 
   return {
     raw: json,
-    usage: { ...estimateUsageFromPayload(providerBody, json), cfRemaining: cfRemainingHeader(res) },
+    usage: { ...estimateUsageFromPayload(providerBody, json), cfRemaining: cfRemainingHeader(res), finishReason: extractFinishReason(json) },
   };
 }
 
@@ -365,6 +393,7 @@ export async function forwardTextEndpoint(
   body: TextRequest,
   ctx: ProviderContext,
   attempt?: AttemptOptions,
+  upstreamHeaders?: Record<string, string>,
 ): Promise<{ raw: unknown; usage: ChatUsage }> {
   const start = Date.now();
   const baseUrl = ctx.baseUrl;
@@ -378,7 +407,7 @@ export async function forwardTextEndpoint(
 
   const res = await fetchWithRuntimeTimeout(url, {
     method: "POST",
-    headers: baseHeaders(ctx.apiKey),
+    headers: { ...baseHeaders(ctx.apiKey), ...ctx.extraHeaders, ...upstreamHeaders },
     body: JSON.stringify(providerBody),
   }, attempt?.timeoutMs ?? runtimeConfig.defaultRequestTimeoutMs, attempt?.maxAttempts ?? 3);
 
@@ -394,7 +423,7 @@ export async function forwardTextEndpoint(
     throw err;
   }
 
-  return { raw: json, usage: { ...estimateUsageFromPayload(providerBody, json), cfRemaining: cfRemainingHeader(res) } };
+  return { raw: json, usage: { ...estimateUsageFromPayload(providerBody, json), cfRemaining: cfRemainingHeader(res), finishReason: extractFinishReason(json) } };
 }
 
 // İlk içerik token'ı için kısa bütçe (time-to-first-token). Upstream header döndükten
@@ -430,7 +459,7 @@ export async function forwardChatStream(
 
   const upstream = await fetchWithRuntimeTimeout(url, {
     method: "POST",
-    headers: { ...baseHeaders(ctx.apiKey), Accept: "text/event-stream" },
+    headers: { ...baseHeaders(ctx.apiKey), ...ctx.extraHeaders, Accept: "text/event-stream" },
     body: JSON.stringify(providerBody),
   }, attempt?.timeoutMs ?? runtimeConfig.defaultStreamTimeoutMs, attempt?.maxAttempts ?? 3);
 
@@ -543,6 +572,8 @@ export async function forwardChatStream(
             usage.providerRaw = parsed.usage;
           }
           const choice = (parsed.choices as Array<Record<string, unknown>> | undefined)?.[0];
+          // Kesilme denetim izi: son non-null finish_reason kazanır ("length" = çıktı kesildi).
+          if (choice?.finish_reason) usage.finishReason = String(choice.finish_reason);
           const delta = choice?.delta as Record<string, unknown> | undefined;
           const message = choice?.message as Record<string, unknown> | undefined;
           assistantText += String(delta?.content ?? message?.content ?? "");
@@ -603,7 +634,7 @@ export async function forwardChatStreamAsResponses(
 
   const upstream = await fetchWithRuntimeTimeout(url, {
     method: "POST",
-    headers: { ...baseHeaders(ctx.apiKey), Accept: "text/event-stream" },
+    headers: { ...baseHeaders(ctx.apiKey), ...ctx.extraHeaders, Accept: "text/event-stream" },
     body: JSON.stringify(providerBody),
   }, attempt?.timeoutMs ?? runtimeConfig.defaultStreamTimeoutMs, attempt?.maxAttempts ?? 3);
 
@@ -704,6 +735,8 @@ export async function forwardChatStreamAsResponses(
             usage.providerRaw = parsed.usage;
           }
           const choice = (parsed.choices as Array<Record<string, unknown>> | undefined)?.[0];
+          // Kesilme denetim izi: son non-null finish_reason kazanır ("length" = çıktı kesildi).
+          if (choice?.finish_reason) usage.finishReason = String(choice.finish_reason);
           const delta = choice?.delta as Record<string, unknown> | undefined;
           assistantText += String(delta?.content ?? "");
           writeEvents(translator.pushChatChunk(parsed));
