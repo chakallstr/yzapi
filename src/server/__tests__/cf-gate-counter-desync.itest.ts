@@ -110,6 +110,24 @@ describe("CF package gate counter-desync (real PG)", () => {
     expect((await tryReservePackageSlot(UID, MODEL)).covered).toBe(true);
   });
 
+  it("DEADLOCK FIX: cf_remaining=0 FRESH but cf_units_ordered < daily_limit (UNORDERED HEADROOM) → COVERED", async () => {
+    // bbbnull (2026-06-21): mirror Math.trunc(0.5)→0 + TAZE cf_remaining_at, 350 ödenmiş ünite
+    // henüz CF'den alınmamışken (cf_ord=150 < cap=500). Eski gate hem reddediyor hem 10-dk supap
+    // taze damga yüzünden hiç tetiklenmiyordu = kalıcı kilit. Headroom koşulu kapıyı AÇIK tutmalı
+    // (top-up settleBilling'de tetiklensin). cf_remaining'e BAĞIMSIZ → kilit olanaksız.
+    await insertEnt({ pkg: PKG_CF, dailyLimit: 500, requestsToday: 0, cfUnitsOrdered: 150, cfRemaining: 0, cfRemainingAtMinutesAgo: 1 });
+    expect(await checkPackageCoverage(UID, MODEL)).toBe(true);
+    expect((await tryReservePackageSlot(UID, MODEL)).covered).toBe(true);
+  });
+
+  it("DEADLOCK FIX selectivity: cf_remaining=0 FRESH AND cf_units_ordered = daily_limit (NO headroom) → NOT covered", async () => {
+    // Gerçekten tükenmiş hediye paketleri: cf_ord = cap → sipariş edilmemiş kota YOK → bloklu kalmalı
+    // (headroom koşulu bunlara dokunmaz, yalnızca kilitli-ama-ödenmiş paketleri açar).
+    await insertEnt({ pkg: PKG_CF, dailyLimit: 150, requestsToday: 9, cfUnitsOrdered: 150, cfRemaining: 0, cfRemainingAtMinutesAgo: 1 });
+    expect(await checkPackageCoverage(UID, MODEL)).toBe(false);
+    expect((await tryReservePackageSlot(UID, MODEL)).covered).toBe(false);
+  });
+
   it("tryReservePackageSlot still increments requests_today for the unlocked CF package (telemetry)", async () => {
     const id = await insertEnt({ pkg: PKG_CF, dailyLimit: 120, requestsToday: 120, cfUnitsOrdered: 120, cfRemaining: 30 });
     const res = await tryReservePackageSlot(UID, MODEL);

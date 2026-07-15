@@ -1052,7 +1052,7 @@ X-YZ-Request-Id: req_123456789`,
     label: "Codex masaüstü kurulumu",
     title: "Codex masaüstü uygulaması — adım adım kurulum",
     intro:
-      "OpenAI'nin **Codex masaüstü uygulamasını** YapayZekaLab ile kullanabilirsin — kendi `yzk_live_` anahtarınla. Codex, özel bir sağlayıcıya bağlanmayı resmî olarak destekler: ayar dosyasında adresi `https://yapayzekalab.org/v1` yaparsın, uygulamada da anahtarınla giriş yaparsın. Codex isteklerini OpenAI **Responses API** biçiminde gönderir; YapayZekaLab bu ucu (`/v1/responses`) doğrudan karşılar. Aşağıdaki 5 adımı sırayla yap.",
+      "OpenAI'nin **Codex masaüstü uygulamasını** YapayZekaLab ile kullanabilirsin — kendi `yzk_live_` anahtarınla. Codex, özel bir sağlayıcıya bağlanmayı resmî olarak destekler: `~/.codex/config.toml` dosyasında adresi `https://yapayzekalab.org/v1` yaparsın, anahtarını da `~/.codex/auth.json` dosyasına yazarsın — GUI'de ayrı bir giriş ekranı gerekmez. Codex isteklerini OpenAI **Responses API** biçiminde gönderir; YapayZekaLab bu ucu (`/v1/responses`) doğrudan karşılar. Aşağıdaki adımları sırayla yap.",
     annotatedSteps: [
       {
         title: "Codex masaüstü uygulamasını indir ve kur",
@@ -1065,23 +1065,32 @@ X-YZ-Request-Id: req_123456789`,
       },
       {
         title: "Ayar dosyasını oluştur: ~/.codex/config.toml",
-        body: "Codex ayarlarını `~/.codex/config.toml` dosyasından okur (Windows'ta `C:\\Users\\<kullanıcı>\\.codex\\config.toml`). Bu dosya yoksa oluştur ve aşağıdaki üç satırı içine yapıştır. Tek yaptıkları: adresi YapayZekaLab yapmak, modeli `gpt-5.5` seçmek ve girişi API-anahtarına kilitlemek. Gizli bilgi içermez — anahtarı bir sonraki adımda uygulamadan gireceksin.",
-        code: `openai_base_url = "https://yapayzekalab.org/v1"
-model = "gpt-5.5"
-forced_login_method = "api"`,
+        body: "Codex ayarlarını `~/.codex/config.toml` dosyasından okur (Windows'ta `C:\\Users\\<kullanıcı>\\.codex\\config.toml`). Bu dosya yoksa oluştur ve aşağıdaki satırları içine yapıştır. Yaptıkları: YapayZekaLab'i özel sağlayıcı olarak tanıtmak, modeli `gpt-5.5` seçmek ve anahtarı `auth.json` dosyasından okumaya kilitlemek. Gizli bilgi içermez — anahtarı bir sonraki adımda `auth.json` dosyasına yazacaksın.",
+        code: `model = "gpt-5.5"
+model_provider = "yapayzekalab"
+
+[model_providers.yapayzekalab]
+name = "YapayZekaLab"
+base_url = "https://yapayzekalab.org/v1"
+wire_api = "responses"
+requires_openai_auth = true`,
         callouts: [
           "Adres MUTLAKA `https://` ile başlar ve `/v1` ile biter",
           "model: `gpt-5.5` (en güçlü) veya `gpt-5.4` (ekonomik)",
-          "`forced_login_method = \"api\"` → uygulama ChatGPT yerine senin API anahtarını kullanır (5. adımdaki tuzağı baştan kapatır)",
+          "`requires_openai_auth = true` → uygulama ChatGPT yerine `auth.json`'daki anahtarını kullanır (masaüstü uygulaması için ŞART)",
         ],
       },
       {
-        title: "Uygulamayı aç → API anahtarıyla giriş yap",
-        body: "Codex masaüstü uygulamasını aç. Giriş ekranında «ChatGPT ile gir» DEĞİL, «Sign in with an API key / API anahtarıyla gir» seçeneğini tıkla. Açılan kutuya YapayZekaLab anahtarını (`yzk_live_…`) yapıştır ve onayla.",
+        title: "API anahtarını yaz: ~/.codex/auth.json",
+        body: "Codex anahtarını `~/.codex/auth.json` dosyasından okur (Windows'ta `C:\\Users\\<kullanıcı>\\.codex\\auth.json`). Bu dosyayı oluştur ve aşağıdaki içeriği yapıştır; `yzk_live_YOUR_KEY` yerine kendi anahtarını koy. GUI'de giriş ekranı kullanmana gerek yok — `requires_openai_auth = true` sayesinde uygulama anahtarı bu dosyadan alır.",
+        code: `{
+  "auth_mode": "apikey",
+  "OPENAI_API_KEY": "yzk_live_YOUR_KEY"
+}`,
         callouts: [
           "Anahtarın yoksa: panelde Hesap → API Anahtarları → Yeni Anahtar",
-          "`yzk_live_` ile başlayan anahtarı yapıştır",
-          "ChatGPT ile GİRME — ikisi birden açıkken uygulama yanlış anahtarı gönderir (OpenAI codex #24457)",
+          "`OPENAI_API_KEY` alanına `yzk_live_` ile başlayan anahtarını yaz",
+          "ChatGPT ile GİRME — uygulama anahtarı bu dosyadan kullanır",
         ],
       },
       {
@@ -1096,9 +1105,10 @@ forced_login_method = "api"`,
         title: "Sık karşılaşılan hatalar",
         body: "Bir sorun çıkarsa neredeyse her zaman bunlardan biridir:",
         callouts: [
-          "401 / yetki hatası → Hem ChatGPT hem API key ile girmişsin. ChatGPT'den çıkış yap, yalnız API key ile gir (config'teki `forced_login_method = \"api\"` bunu zorlar).",
-          "404 / model bulunamadı → Adres yanlış. `openai_base_url` tam olarak `https://yapayzekalab.org/v1` olmalı.",
-          "Anahtar reddedildi → Anahtar `yzk_live_` ile başlamalı, panelde aktif olmalı ve bakiyen yeterli olmalı.",
+          "401 / yetki hatası → `~/.codex/auth.json` içindeki anahtar yanlış/eksik. `yzk_live_` ile başlamalı, panelde aktif olmalı ve bakiyen yeterli olmalı. ChatGPT ile giriş yapma.",
+          "404 / model bulunamadı → Adres yanlış. `config.toml`'daki `base_url` tam olarak `https://yapayzekalab.org/v1` olmalı.",
+          "WebSocket / bağlanamıyor → Eski `openai_base_url` ayarını KULLANMA; `model_provider = \"yapayzekalab\"` + `wire_api = \"responses\"` + `requires_openai_auth = true` olmalı.",
+          "ChatGPT giriş ekranı çıkıyor → `config.toml`'a `requires_openai_auth = true` ekli olmalı; o zaman uygulama `auth.json`'daki anahtarı kullanır.",
         ],
       },
     ],
@@ -1273,7 +1283,7 @@ export const CLIENT_GUIDES = [
       },
       {
         title: "Codex masaüstü uygulamasını indir ve kur",
-        body: "Tarayıcında **developers.openai.com/codex** adresine git, işletim sistemine uygun **indir** butonuna bas. İnen dosyayı kur ve uygulamayı bir kez aç — ama **henüz giriş yapma**, önce ayar dosyasını yazacağız.",
+        body: "Tarayıcında **developers.openai.com/codex** adresine git, işletim sistemine uygun **indir** butonuna bas. İnen dosyayı kur ve uygulamayı bir kez aç — ama **henüz giriş yapma**, önce iki ayar dosyasını (`config.toml` + `auth.json`) yazacağız.",
         callouts: [
           "macOS: inen dosyayı aç → uygulamayı Applications'a sürükle",
           "Windows: kurulum sihirbazını çalıştır",
@@ -1291,57 +1301,73 @@ export const CLIENT_GUIDES = [
         },
       },
       {
-        title: "Ayar dosyasını oluştur: ~/.codex/config.toml",
-        body: "Codex ayarlarını `~/.codex/config.toml` dosyasından okur. **İşletim sistemini seç** (macOS/Linux veya Windows), aşağıdaki bloğun tamamını kopyala, terminale (Windows'ta **PowerShell**) yapıştır ve Enter'a bas — blok dosyayı senin için oluşturur. Tek yaptığı: adresi YapayZekaLab yapmak, modeli `gpt-5.5` seçmek, girişi API-anahtarına kilitlemek.",
+        title: "Ayar dosyası 1/2: ~/.codex/config.toml (adres + sağlayıcı)",
+        body: "Codex, adresi ve anahtarı `~/.codex` klasöründeki **iki dosyadan** okur — bu adımda 1. dosyayı (`config.toml`) yazıyoruz (Windows'ta `C:\\Users\\<kullanıcı>\\.codex\\config.toml`). **İşletim sistemini seç**, bloğun tamamını kopyala, terminale (Windows'ta **PowerShell**) yapıştır, Enter'a bas — blok dosyayı senin için oluşturur. Yaptığı tek şey: YapayZekaLab'i özel bir sağlayıcı olarak tanıtmak, modeli `gpt-5.5` seçmek ve anahtarı `auth.json` dosyasından okumaya kilitlemek. Gizli bilgi içermez — anahtarı 2. dosyada (sonraki adım) yazacaksın.",
         osVariants: {
           macos: {
-            code: "mkdir -p ~/.codex\n# Eski ayar/anahtarları .bak olarak yedekle, aktiflerini temizle\n[ -f ~/.codex/config.toml ] && mv ~/.codex/config.toml ~/.codex/config.toml.bak\n[ -f ~/.codex/auth.json ] && mv ~/.codex/auth.json ~/.codex/auth.json.bak\n# Yeni temiz ayarı yaz\ncat > ~/.codex/config.toml << 'EOF'\nopenai_base_url = \"https://yapayzekalab.org/v1\"\nmodel = \"gpt-5.5\"\nforced_login_method = \"api\"\nEOF\necho \"Tamam: ~/.codex temizlendi ve yeni ayar yazildi.\"",
+            code: "mkdir -p ~/.codex\n# Varsa eski config'i .bak olarak yedekle (temiz başlangıç)\n[ -f ~/.codex/config.toml ] && cp ~/.codex/config.toml ~/.codex/config.toml.bak\n# YapayZekaLab sağlayıcısını yaz\ncat > ~/.codex/config.toml << 'EOF'\nmodel = \"gpt-5.5\"\nmodel_provider = \"yapayzekalab\"\n\n[model_providers.yapayzekalab]\nname = \"YapayZekaLab\"\nbase_url = \"https://yapayzekalab.org/v1\"\nwire_api = \"responses\"\nrequires_openai_auth = true\nEOF\necho \"Tamam: ~/.codex/config.toml yazildi.\"",
           },
           windows: {
-            code: "New-Item -ItemType Directory -Force -Path \"$env:USERPROFILE\\.codex\" | Out-Null\n# Eski ayar/anahtarlari .bak olarak yedekle, aktiflerini temizle\nif (Test-Path \"$env:USERPROFILE\\.codex\\config.toml\") { Move-Item \"$env:USERPROFILE\\.codex\\config.toml\" \"$env:USERPROFILE\\.codex\\config.toml.bak\" -Force }\nif (Test-Path \"$env:USERPROFILE\\.codex\\auth.json\") { Move-Item \"$env:USERPROFILE\\.codex\\auth.json\" \"$env:USERPROFILE\\.codex\\auth.json.bak\" -Force }\n# Yeni temiz ayari yaz\n@'\nopenai_base_url = \"https://yapayzekalab.org/v1\"\nmodel = \"gpt-5.5\"\nforced_login_method = \"api\"\n'@ | Set-Content -Encoding ascii \"$env:USERPROFILE\\.codex\\config.toml\"\nWrite-Host \"Tamam: .codex temizlendi ve yeni ayar yazildi.\"",
+            code: "$cfg = \"$env:USERPROFILE\\.codex\"\nNew-Item -ItemType Directory -Force -Path $cfg | Out-Null\nif (Test-Path \"$cfg\\config.toml\") { Copy-Item \"$cfg\\config.toml\" \"$cfg\\config.toml.bak\" -Force }\n@'\nmodel = \"gpt-5.5\"\nmodel_provider = \"yapayzekalab\"\n\n[model_providers.yapayzekalab]\nname = \"YapayZekaLab\"\nbase_url = \"https://yapayzekalab.org/v1\"\nwire_api = \"responses\"\nrequires_openai_auth = true\n'@ | Set-Content -Encoding ascii \"$cfg\\config.toml\"\nWrite-Host \"OK: config.toml yazildi.\"",
           },
         },
         callouts: [
           "macOS/Linux: Terminal · Windows: PowerShell (blok her ikisinde de dosyayı oluşturur)",
-          "Eski `config.toml`/`auth.json` (eski anahtar/oturum) `.bak` olarak yedeklenir, aktifleri temizlenir → temiz başlangıç",
+          "Eski `config.toml` varsa `.bak` olarak yedeklenir → temiz başlangıç",
           "Adres MUTLAKA `https://` ile başlar ve `/v1` ile biter",
+          "`requires_openai_auth = true` → Codex anahtarı GUI giriş ekranından değil `auth.json` dosyasından okur (masaüstü uygulaması için ŞART)",
           "model: `gpt-5.5` (en güçlü) veya `gpt-5.4` (ekonomik)",
-          "Gizli bilgi yok — anahtarı bir sonraki adımda uygulamadan gireceksin",
         ],
         visual: {
           type: "file",
           path: "~/.codex/config.toml",
           lines: [
-            'openai_base_url = "https://yapayzekalab.org/v1"',
             'model = "gpt-5.5"',
-            'forced_login_method = "api"',
+            'model_provider = "yapayzekalab"',
+            '',
+            '[model_providers.yapayzekalab]',
+            'name = "YapayZekaLab"',
+            'base_url = "https://yapayzekalab.org/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = true',
           ],
         },
       },
       {
-        title: "Uygulamayı aç → API anahtarı ile giriş yap",
+        title: "Ayar dosyası 2/2: ~/.codex/auth.json (API anahtarın)",
         showKeyBox: true,
-        body: "Codex'i aç. Giriş ekranında **«ChatGPT ile giriş»i DEĞİL**, **«API anahtarı ile giriş»i** seç. Açılan kutuya az önce kopyaladığın `yzk_live_…` anahtarını yapıştır ve onayla.",
+        body: "Şimdi 2. dosyayı yazıyoruz: `~/.codex/auth.json` — Codex senin `yzk_live_…` anahtarını **buradan** okur, **GUI'de giriş ekranı YOK**. **İşletim sistemini seç**, aşağıdaki bloğu kopyala, terminale yapıştır, Enter'a bas. Giriş yaptıysan anahtarın blokta otomatik gömülür; değilse `yzk_live_YOUR_KEY` yazan yeri kendi anahtarınla değiştir.",
+        osVariants: {
+          macos: {
+            code: "cat > ~/.codex/auth.json << 'EOF'\n{\n  \"auth_mode\": \"apikey\",\n  \"OPENAI_API_KEY\": \"yzk_live_YOUR_KEY\"\n}\nEOF\necho \"Tamam: ~/.codex/auth.json yazildi — anahtar kaydedildi.\"",
+          },
+          windows: {
+            code: "@'\n{\n  \"auth_mode\": \"apikey\",\n  \"OPENAI_API_KEY\": \"yzk_live_YOUR_KEY\"\n}\n'@ | Set-Content -Encoding ascii \"$env:USERPROFILE\\.codex\\auth.json\"\nWrite-Host \"OK: auth.json yazildi.\"",
+          },
+        },
         callouts: [
-          "ChatGPT ile GİRME — ikisi birden açıkken uygulama yanlış anahtarı gönderir",
-          "Kutuya `yzk_live_` ile başlayan anahtarını yapıştır",
+          "Anahtar `~/.codex/auth.json` içine `OPENAI_API_KEY` olarak yazılır — Codex'in beklediği biçim budur",
+          "`yzk_live_` ile başlayan anahtarını kullan (panel: Hesap → API Anahtarları)",
+          "ChatGPT ile GİRME — bu dosya sayesinde uygulama doğrudan senin anahtarınla bağlanır",
         ],
         visual: {
-          type: "app",
-          title: "Codex — Giriş",
-          rows: [
-            { kind: "button", text: "ChatGPT ile giriş yap", muted: true, note: "BUNU DEĞİL" },
-            { kind: "button", text: "API anahtarı ile giriş yap", highlight: true, note: "✓ bunu seç" },
-            { kind: "input", label: "API Key", value: "yzk_live_••••••••", highlight: true, note: "anahtarını yapıştır" },
-            { kind: "button", text: "Devam et", primary: true },
+          type: "file",
+          path: "~/.codex/auth.json",
+          lines: [
+            '{',
+            '  "auth_mode": "apikey",',
+            '  "OPENAI_API_KEY": "yzk_live_••••••••"',
+            '}',
           ],
         },
       },
       {
-        title: "Modeli seç ve ilk isteğini gönder",
-        body: "Uygulama açıldığında model **gpt-5.5** görünmeli (config'ten gelir). Alttaki kutuya bir şey yaz — örn. «merhaba, çalışıyor musun?» — ve gönder. Yanıt geldiyse kurulum tamamdır. Kullandığın token kadar YapayZekaLab bakiyenden düşülür.",
+        title: "Codex'i aç — giriş ekranı YOK, doğrudan bağlanır",
+        body: "Hazır! İki dosya (`config.toml` + `auth.json`) yazıldığı için Codex açılışta bunları okur ve doğrudan YapayZekaLab'e bağlanır — **ayrı bir giriş ekranı yok**. Üstte model **gpt-5.5** görünmeli. Alttaki kutuya bir şey yaz — örn. «merhaba, çalışıyor musun?» — ve gönder. Yanıt geldiyse kurulum tamam; kullandığın token kadar YapayZekaLab bakiyenden düşülür.",
         callouts: [
-          "Modeli sonra config.toml'daki `model` satırından değiştirebilirsin (gpt-5.5 ↔ gpt-5.4)",
+          "Karşına yine de ChatGPT giriş ekranı gelirse: giriş YAPMA, kapat — anahtarın zaten `auth.json`'da",
+          "Modeli sonra `~/.codex/config.toml`'daki `model` satırından değiştir (gpt-5.5 ↔ gpt-5.4)",
+          "Değişiklik görünmezse Codex'i tamamen kapatıp yeniden aç (dosyalar açılışta okunur)",
           "Ücret: kullandığın token kadar, panel bakiyenden",
         ],
         visual: {
@@ -1359,9 +1385,10 @@ export const CLIENT_GUIDES = [
         visual: {
           type: "errors",
           items: [
-            { code: "401", cause: "Hem ChatGPT hem API key ile girilmiş", fix: "ChatGPT'den çık, yalnız API key ile gir (config'teki forced_login_method=\"api\" bunu zorlar)." },
-            { code: "404", cause: "Adres yanlış", fix: "openai_base_url tam olarak https://yapayzekalab.org/v1 olmalı." },
-            { code: "Anahtar reddedildi", cause: "Anahtar / bakiye sorunu", fix: "Anahtar yzk_live_ ile başlamalı, panelde aktif olmalı ve bakiyen yeterli olmalı." },
+            { code: "401", cause: "Anahtar yanlış/eksik", fix: "~/.codex/auth.json içindeki OPENAI_API_KEY senin yzk_live_ anahtarın olmalı; panelde aktif ve bakiyen yeterli olmalı. ChatGPT ile giriş yapma." },
+            { code: "404", cause: "Adres yanlış", fix: "config.toml'daki base_url tam olarak https://yapayzekalab.org/v1 olmalı." },
+            { code: "WebSocket / bağlanamıyor", cause: "Eski/yanlış config", fix: "config.toml'da model_provider=\"yapayzekalab\" + wire_api=\"responses\" + requires_openai_auth=true olmalı (openai_base_url KULLANMA). Sonra Codex'i kapatıp aç." },
+            { code: "ChatGPT ekranı", cause: "requires_openai_auth eksik", fix: "config.toml'a requires_openai_auth = true ekli olmalı; o zaman uygulama auth.json'daki anahtarı kullanır." },
           ],
         },
       },
@@ -1496,6 +1523,125 @@ export const CLIENT_GUIDES = [
             { code: "404", cause: "Adres yanlış", fix: "Gateway base URL = https://yapayzekalab.org olmalı (kök). Yol /v1/v1/messages görünürse fazladan /v1 yazmışsındır." },
             { code: "Model bulunamadı", cause: "Model ID yanlış", fix: "Add Model'e tam kimliği yaz: claude-opus-4-8 (görünen ad değil)." },
             { code: "Seçenek görünmüyor", cause: "Developer Mode kapalı", fix: "Help ▸ Troubleshooting ▸ Enable Developer Mode'u aç; app'i tamamen kapatıp yeniden aç." },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "windsurf-kimi",
+    name: "Windsurf + Kimi K2.7",
+    icon: "🌊",
+    tagline: "Windsurf editörünü Kimi K2.7 Code ile kullan",
+    forWhom: "Windsurf IDE kullananlar ve Kimi K2.7 Code'un güçlü kodlama + agentic yeteneklerini editörleriyle birlikte kullanmak isteyenler.",
+    badge: "Editör eklentisi",
+    steps: [
+      {
+        title: "Önce API anahtarını al",
+        showKeyBox: true,
+        body: "YapayZekaLab panelinde **Hesap → API Anahtarları → Yeni Anahtar**'a bas. `yzk_live_` ile başlayan anahtarı **Kopyala** — birazdan Windsurf'e yapıştıracağız. Kimi K2.7 Code paketleri de bu anahtarla çalışır.",
+        callouts: [
+          "Anahtar bir kez tam görünür; kopyalamayı unutma",
+          "Hesabında bakiye veya aktif Kimi paketi olsun",
+        ],
+        visual: {
+          type: "app",
+          title: "YapayZekaLab — Hesap › API Anahtarları",
+          rows: [
+            { kind: "button", text: "+ Yeni Anahtar", primary: true, note: "1) buna bas" },
+            { kind: "input", label: "Anahtarın", value: "yzk_live_••••••••", highlight: true, note: "2) oluşan anahtar" },
+            { kind: "button", text: "Kopyala", highlight: true, note: "3) kopyala" },
+          ],
+        },
+      },
+      {
+        title: "Windsurf'ü indir ve kur",
+        body: "Tarayıcında **windsurf.com** adresine git, **Download** butonuna bas, işletim sistemine uygun paketi kur. Kurulum tamamlandıktan sonra Windsurf'ü bir kez aç — Anthropic veya başka bir hesapla giriş yapma, anahtarı kendimiz gireceğiz.",
+        callouts: [
+          "macOS: .dmg dosyasını aç → uygulamayı Applications'a sürükle",
+          "Windows: kurulum sihirbazını çalıştır",
+          "Linux: .deb veya .AppImage desteklenir",
+        ],
+        visual: {
+          type: "browser",
+          url: "windsurf.com",
+          heading: "Windsurf",
+          sub: "AI-native kod editörü — Codeium tarafından",
+          buttons: [
+            { text: "Download", primary: true, note: "→ işletim sistemine göre indir" },
+          ],
+        },
+      },
+      {
+        title: "Cascade panelinde model seçiciyi aç",
+        body: "Windsurf açıldığında sağ tarafta **Cascade** paneli görünür (AI sohbet + kod asistanı). Panelin üstündeki mevcut model adına tıkla — açılır menüde modeller listelenir. En altta **'Add Model'** veya **'+ Özel model'** seçeneğine bas.",
+        callouts: [
+          "Cascade paneli yoksa sağ kenar çubuğundaki sohbet ikonuna tıkla",
+          "Model adı genellikle 'Claude 3.5 Sonnet' ya da 'GPT-4o' gibi bir şey yazar",
+          "Menünün altında 'Add Model' / 'Custom' / '+' seçeneği olmalı",
+        ],
+        visual: {
+          type: "app",
+          title: "Windsurf — Cascade Paneli › Model Seçici",
+          rows: [
+            { kind: "label", text: "Aktif model: Claude 3.5 Sonnet ▾", note: "buraya tıkla" },
+            { kind: "separator" },
+            { kind: "label", text: "claude-opus-4-8" },
+            { kind: "label", text: "gpt-4o" },
+            { kind: "separator" },
+            { kind: "button", text: "+ Add Model / Özel model ekle", primary: true, note: "bunu seç" },
+          ],
+        },
+      },
+      {
+        title: "YapayZekaLab bağlantısını gir",
+        showKeyBox: true,
+        body: "Açılan ekrana şu bilgileri gir:\n\n- **Provider / Tür**: `OpenAI Compatible`\n- **Base URL**: `https://yapayzekalab.org/v1`\n- **API Key**: `yzk_live_` ile başlayan anahtarın\n- **Model ID**: `kimi-k2.7-code`\n\nGiriş yaptıysan anahtarın burada otomatik gömülür. **Save / Kaydet**'e bas.",
+        callouts: [
+          "Adres MUTLAKA `https://` ile başlamalı — `http://` yazma, anahtar düşer",
+          "Model ID tam olarak `kimi-k2.7-code` olmalı (büyük harf, boşluk yok)",
+          "Hızlı versiyon için: `kimi-k2.7-code-highspeed`",
+        ],
+        visual: {
+          type: "app",
+          title: "Windsurf — Özel Model Ayarları",
+          rows: [
+            { kind: "input", label: "Provider Type", value: "OpenAI Compatible" },
+            { kind: "input", label: "Base URL", value: "https://yapayzekalab.org/v1", highlight: true },
+            { kind: "input", label: "API Key", value: "yzk_live_••••••••", highlight: true, note: "kendi anahtarın" },
+            { kind: "input", label: "Model ID", value: "kimi-k2.7-code", highlight: true },
+            { kind: "button", text: "Kaydet / Save", primary: true },
+          ],
+        },
+      },
+      {
+        title: "Test et — Cascade'de bir şey sor",
+        body: "Model listesinde artık **kimi-k2.7-code** görünmeli. Seç ve Cascade kutusuna bir mesaj yaz — örn. bir kod dosyası aç, birkaç satır seç, sağ tıkla → **Explain with Cascade** ya da kutuya doğrudan yaz. Yanıt geldiyse kurulum tamamdır.",
+        callouts: [
+          "Kimi K2.7 Code özellikle uzun dosyalarda ve çok adımlı agentic görevlerde güçlüdür",
+          "Thinking (derin düşünme) modu varsayılan açık — karmaşık sorularda daha yavaş ama çok daha doğru",
+          "temperature ve top_p değerlerini değiştirme — Kimi K2.7 bunları sabit tutar, farklı değer hata verir",
+          "Ücret: her istekten (Kimi paketi aldıysan paketten, yoksa bakiyenden) düşülür",
+        ],
+        visual: {
+          type: "chat",
+          app: "Windsurf — Cascade",
+          model: "kimi-k2.7-code",
+          user: "Bu fonksiyondaki hatayı bul ve düzelt",
+          assistant: "Kodu inceliyorum... 42. satırda null kontrolü eksik. Güvenli versiyonu şu şekilde:",
+          note: "Bu yanıt geldiyse Windsurf, YapayZekaLab üzerinden Kimi K2.7 Code'a bağlandı.",
+        },
+      },
+      {
+        title: "Bir şey ters giderse (sık hatalar)",
+        body: "Sorun çıkarsa neredeyse her zaman bunlardan biridir — kontrol et:",
+        visual: {
+          type: "errors",
+          items: [
+            { code: "401 Unauthorized", cause: "Anahtar yanlış veya eksik", fix: "API Key alanında tam `yzk_live_…` anahtarın olmalı. Panelden yeni anahtar oluşturup yapıştır; bakiyeni de kontrol et." },
+            { code: "404 Not Found", cause: "Adres veya model yanlış", fix: "Base URL tam olarak `https://yapayzekalab.org/v1` olmalı. Model ID: `kimi-k2.7-code` (boşluk, büyük harf yok)." },
+            { code: "Model bulunamıyor", cause: "Yanlış model ID girilmiş", fix: "`kimi-k2.7-code` yaz. Hızlı için `kimi-k2.7-code-highspeed`. Boşluk veya büyük harf olmamalı." },
+            { code: "Bağlanamıyor / timeout", cause: "`http://` kullanılmış", fix: "Base URL `https://` ile başlamalı. `http://` yazılırsa anahtar yönlendirmede düşer." },
           ],
         },
       },

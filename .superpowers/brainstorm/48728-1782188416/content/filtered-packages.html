@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paket Sayfası — Filtrelemeli</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; color: #0f172a; min-height: 100vh; }
+
+.page { max-width: 960px; margin: 0 auto; padding: 24px 20px 48px; display: flex; flex-direction: column; gap: 18px; }
+
+/* ── Başlık ── */
+.header { }
+.header h1 { font-size: 24px; font-weight: 900; letter-spacing: -0.6px; }
+.header p { font-size: 13.5px; color: #64748b; margin-top: 4px; }
+
+/* ── Tasarruf şeridi ── */
+.savings-bar {
+  background: linear-gradient(135deg, #1e1b4b 0%, #3730a3 60%, #4f46e5 100%);
+  border-radius: 14px; padding: 14px 20px;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.sb-text { flex: 1; }
+.sb-text .t { font-size: 13px; color: rgba(255,255,255,0.65); }
+.sb-text .h { font-size: 16px; font-weight: 800; color: white; margin-top: 2px; }
+.sb-pills { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.sb-pill { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; padding: 7px 14px; text-align: center; }
+.sb-pill .name { font-size: 10px; color: rgba(255,255,255,0.6); }
+.sb-pill .price { font-size: 14px; font-weight: 800; color: #fca5a5; text-decoration: line-through; }
+.sb-pill.us .price { color: #86efac; text-decoration: none; }
+.sb-arrow { color: rgba(255,255,255,0.4); font-size: 16px; }
+.sb-badge { background: #16a34a; border-radius: 10px; padding: 10px 14px; text-align: center; flex-shrink: 0; }
+.sb-badge .pct { font-size: 24px; font-weight: 900; color: white; line-height: 1; }
+.sb-badge .lbl { font-size: 10px; color: rgba(255,255,255,0.85); }
+
+/* ── Filtre paneli ── */
+.filter-panel { background: white; border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+
+.filter-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.filter-label { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; width: 64px; flex-shrink: 0; }
+
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  padding: 6px 14px; border-radius: 99px; font-size: 12px; font-weight: 600;
+  border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b;
+  cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.chip:hover { border-color: #818cf8; color: #4338ca; background: #eef2ff; }
+.chip.active { background: #4f46e5; border-color: #4f46e5; color: white; }
+.chip.active.green { background: #16a34a; border-color: #16a34a; }
+.chip.active.blue { background: #0284c7; border-color: #0284c7; }
+.chip.active.amber { background: #d97706; border-color: #d97706; }
+
+.filter-divider { height: 1px; background: #f1f5f9; }
+
+.sort-row { display: flex; align-items: center; justify-content: space-between; }
+.results-count { font-size: 12.5px; color: #64748b; }
+.results-count strong { color: #0f172a; }
+.sort-select {
+  padding: 6px 12px; border-radius: 8px; border: 1.5px solid #e2e8f0;
+  font-size: 12px; font-weight: 600; color: #374151; background: white; cursor: pointer;
+}
+
+/* ── Hızlı senaryo ── */
+.scenario-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.scenario-row::-webkit-scrollbar { display: none; }
+.sc-pill {
+  display: flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 12px;
+  border: 2px solid #e2e8f0; background: white; cursor: pointer; white-space: nowrap;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.sc-pill:hover { border-color: #818cf8; }
+.sc-pill.active { border-color: #4f46e5; background: #eef2ff; }
+.sc-pill .sc-icon { font-size: 16px; }
+.sc-pill .sc-name { font-size: 12.5px; font-weight: 700; color: #374151; }
+.sc-pill.active .sc-name { color: #4338ca; }
+.sc-pill .sc-count { font-size: 10px; color: #94a3b8; background: #f1f5f9; border-radius: 99px; padding: 1px 6px; }
+.sc-pill.active .sc-count { background: #c7d2fe; color: #4338ca; }
+
+/* ── Grid ── */
+.pkg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 700px) { .pkg-grid { grid-template-columns: 1fr 1fr; } }
+
+/* ── Paket Kartı ── */
+.pkg-card {
+  background: white; border-radius: 14px; border: 2px solid #e2e8f0;
+  overflow: hidden; display: flex; flex-direction: column; transition: all 0.18s;
+  position: relative;
+}
+.pkg-card:hover { border-color: #818cf8; box-shadow: 0 6px 20px rgba(99,102,241,0.12); transform: translateY(-2px); }
+.pkg-card.pop { border-color: #4f46e5; }
+.pkg-card.best-val { border-color: #16a34a; }
+.pkg-card.hidden { display: none; }
+
+.card-ribbon {
+  position: absolute; top: 0; right: 0;
+  font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px;
+  padding: 4px 10px; border-radius: 0 12px 0 8px; color: white;
+}
+.card-ribbon.pop { background: #4f46e5; }
+.card-ribbon.best { background: #16a34a; }
+.card-ribbon.new { background: #f59e0b; }
+.card-ribbon.trial { background: #0284c7; }
+
+.card-top { padding: 14px 16px 10px; }
+.cat-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px; margin-bottom: 8px;
+}
+.card-name { font-size: 14.5px; font-weight: 800; color: #0f172a; line-height: 1.2; }
+.card-desc { font-size: 11.5px; color: #64748b; margin-top: 3px; line-height: 1.4; }
+
+.card-specs { padding: 0 16px 10px; display: flex; flex-wrap: wrap; gap: 5px; }
+.spec-chip {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; color: #475569; background: #f8fafc; border: 1px solid #e2e8f0;
+  border-radius: 6px; padding: 3px 8px;
+}
+
+.card-price-block { padding: 10px 16px 0; margin-top: auto; }
+.compare-price { font-size: 11px; color: #ef4444; text-decoration: line-through; }
+.price-row { display: flex; align-items: baseline; gap: 5px; }
+.price-main { font-size: 28px; font-weight: 900; letter-spacing: -1px; color: #0f172a; }
+.price-per { font-size: 12px; color: #94a3b8; }
+.savings-badge { display: inline-flex; align-items: center; gap: 3px; background: #f0fdf4; color: #16a34a; border-radius: 5px; padding: 2px 7px; font-size: 10px; font-weight: 700; margin-top: 3px; }
+
+.card-footer { padding: 12px 14px 14px; }
+.buy-btn {
+  width: 100%; padding: 10px; border-radius: 10px; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 700; transition: opacity 0.15s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.buy-btn:hover { opacity: 0.88; }
+.buy-btn.default { background: #0f172a; color: white; }
+.buy-btn.pop { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; }
+.buy-btn.best { background: linear-gradient(135deg, #16a34a, #059669); color: white; }
+.buy-btn.trial { background: linear-gradient(135deg, #0284c7, #0369a1); color: white; }
+.disclaimer { font-size: 10px; color: #94a3b8; text-align: center; margin-top: 6px; }
+.disclaimer strong { color: #64748b; }
+
+/* ── Boş state ── */
+.empty-state { text-align: center; padding: 48px 20px; background: white; border-radius: 14px; }
+.empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+.empty-state h3 { font-size: 16px; font-weight: 700; color: #374151; }
+.empty-state p { font-size: 13px; color: #94a3b8; margin-top: 6px; }
+
+/* ── Alt politika notu ── */
+.policy-note {
+  background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px;
+  padding: 14px 18px; display: flex; gap: 10px; align-items: flex-start;
+}
+.policy-note .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.policy-note p { font-size: 12px; color: #78350f; line-height: 1.5; }
+.policy-note strong { font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Başlık -->
+  <div class="header">
+    <h1>Yapay Zeka Paketleri</h1>
+    <p>Dünya'nın en iyi modellerine en uygun fiyatla eriş</p>
+  </div>
+
+  <!-- Tasarruf şeridi -->
+  <div class="savings-bar">
+    <div class="sb-text">
+      <div class="t">Neden YapayZekaLab?</div>
+      <div class="h">ChatGPT Plus'ın onda biri fiyatına, daha fazla model</div>
+    </div>
+    <div class="sb-pills">
+      <div class="sb-pill">
+        <div class="name">ChatGPT Plus</div>
+        <div class="price">~₺720/ay</div>
+      </div>
+      <div class="sb-arrow">→</div>
+      <div class="sb-pill">
+        <div class="name">Claude Pro</div>
+        <div class="price">~₺720/ay</div>
+      </div>
+      <div class="sb-arrow">→</div>
+      <div class="sb-pill us">
+        <div class="name">YapayZekaLab</div>
+        <div class="price">₺49'dan</div>
+      </div>
+    </div>
+    <div class="sb-badge">
+      <div class="pct">%93</div>
+      <div class="lbl">tasarruf</div>
+    </div>
+  </div>
+
+  <!-- Hızlı senaryo seçimi -->
+  <div class="scenario-row" id="scenarioRow">
+    <div class="sc-pill active" data-scenario="all" onclick="setScenario(this,'all')">
+      <span class="sc-icon">🗂️</span>
+      <span class="sc-name">Tüm Paketler</span>
+      <span class="sc-count" id="cnt-all">10</span>
+    </div>
+    <div class="sc-pill" data-scenario="chat" onclick="setScenario(this,'chat')">
+      <span class="sc-icon">💬</span>
+      <span class="sc-name">Günlük Sohbet</span>
+      <span class="sc-count" id="cnt-chat">3</span>
+    </div>
+    <div class="sc-pill" data-scenario="dev" onclick="setScenario(this,'dev')">
+      <span class="sc-icon">💻</span>
+      <span class="sc-name">Kodlama & API</span>
+      <span class="sc-count" id="cnt-dev">3</span>
+    </div>
+    <div class="sc-pill" data-scenario="heavy" onclick="setScenario(this,'heavy')">
+      <span class="sc-icon">🚀</span>
+      <span class="sc-name">Yoğun Kullanım</span>
+      <span class="sc-count" id="cnt-heavy">2</span>
+    </div>
+    <div class="sc-pill" data-scenario="trial" onclick="setScenario(this,'trial')">
+      <span class="sc-icon">🎯</span>
+      <span class="sc-name">Deneme</span>
+      <span class="sc-count" id="cnt-trial">2</span>
+    </div>
+  </div>
+
+  <!-- Filtre paneli -->
+  <div class="filter-panel">
+    <div class="filter-row">
+      <span class="filter-label">Model</span>
+      <div class="chips" id="modelChips">
+        <div class="chip active" data-model="all" onclick="setModel(this,'all')">Tümü</div>
+        <div class="chip" data-model="claude" onclick="setModel(this,'claude')">🤖 Claude</div>
+        <div class="chip" data-model="gpt" onclick="setModel(this,'gpt')">⚡ GPT</div>
+        <div class="chip" data-model="gemini" onclick="setModel(this,'gemini')">✨ Gemini</div>
+        <div class="chip" data-model="mixed" onclick="setModel(this,'mixed')">🌐 Hepsi</div>
+      </div>
+    </div>
+    <div class="filter-divider"></div>
+    <div class="filter-row">
+      <span class="filter-label">Bütçe</span>
+      <div class="chips" id="budgetChips">
+        <div class="chip active" data-budget="all" onclick="setBudget(this,'all')">Tümü</div>
+        <div class="chip" data-budget="low" onclick="setBudget(this,'low')">₺0 – 99</div>
+        <div class="chip" data-budget="mid" onclick="setBudget(this,'mid')">₺100 – 199</div>
+        <div class="chip" data-budget="high" onclick="setBudget(this,'high')">₺200+</div>
+      </div>
+    </div>
+    <div class="filter-divider"></div>
+    <div class="sort-row">
+      <span class="results-count"><strong id="resultCount">10</strong> paket gösteriliyor</span>
+      <select class="sort-select" onchange="setSort(this.value)">
+        <option value="recommended">Önerilen sıra</option>
+        <option value="price-asc">Fiyat: düşükten yükseğe</option>
+        <option value="price-desc">Fiyat: yüksekten düşüğe</option>
+        <option value="requests">Günlük istek: fazladan aza</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Paket Grid -->
+  <div class="pkg-grid" id="pkgGrid"></div>
+
+  <!-- Boş state -->
+  <div class="empty-state" id="emptyState" style="display:none">
+    <div class="icon">🔍</div>
+    <h3>Filtre sonucu bulunamadı</h3>
+    <p>Farklı bir senaryo veya bütçe aralığı dene</p>
+  </div>
+
+  <!-- Politika notu -->
+  <div class="policy-note">
+    <div class="icon">⚠️</div>
+    <p>
+      <strong>Satın Alma Politikası:</strong> Paketler satın alındığı anda havuzdan hesabınıza tanımlanır ve hemen aktif olur.
+      Bu nedenle <strong>iade yapılmamaktadır.</strong>
+      Sistemi test etmek için önce <strong>Deneme Paketi</strong> (₺9) almanızı öneririz.
+    </p>
+  </div>
+
+</div>
+
+<script>
+// ── Paket verisi (gerçek DB'den gelecek) ──
+const PACKAGES = [
+  {
+    id: 'trial-mini',
+    name: 'Hızlı Deneme',
+    desc: 'Taahhütsüz sistemi keşfet',
+    cat: 'Deneme', catColor: '#0284c7', catBg: '#e0f2fe',
+    scenarios: ['trial'],
+    model: 'mixed',
+    price: 9, comparePrice: null, savings: null,
+    specs: [{ i: '⚡', t: '100 istek' }, { i: '📅', t: '3 gün' }, { i: '🌐', t: 'Tüm modeller' }],
+    ribbon: 'trial', ribbonText: '🎯 Dene',
+    sort: 0,
+  },
+  {
+    id: 'trial-full',
+    name: 'Tam Deneme',
+    desc: '5 gün tüm modellere tam erişim',
+    cat: 'Deneme', catColor: '#0284c7', catBg: '#e0f2fe',
+    scenarios: ['trial'],
+    model: 'mixed',
+    price: 19, comparePrice: null, savings: null,
+    specs: [{ i: '⚡', t: '200 istek' }, { i: '📅', t: '5 gün' }, { i: '🌐', t: 'Tüm modeller' }],
+    ribbon: null,
+    sort: 1,
+  },
+  {
+    id: 'claude-start',
+    name: 'Claude Başlangıç',
+    desc: 'Günlük sohbet ve metin görevleri',
+    cat: 'Claude', catColor: '#7c3aed', catBg: '#ede9fe',
+    scenarios: ['chat'],
+    model: 'claude',
+    price: 49, comparePrice: '~₺720', savings: '%93',
+    specs: [{ i: '⚡', t: '500 istek/gün' }, { i: '📅', t: '30 gün' }, { i: '🤖', t: 'Claude Sonnet' }],
+    ribbon: null,
+    sort: 2,
+  },
+  {
+    id: 'gpt-start',
+    name: 'GPT Başlangıç',
+    desc: 'GPT-5 ile sohbet ve üretkenlik',
+    cat: 'GPT', catColor: '#0369a1', catBg: '#e0f2fe',
+    scenarios: ['chat'],
+    model: 'gpt',
+    price: 49, comparePrice: '~₺720', savings: '%93',
+    specs: [{ i: '⚡', t: '500 istek/gün' }, { i: '📅', t: '30 gün' }, { i: '⚡', t: 'GPT-5' }],
+    ribbon: null,
+    sort: 3,
+  },
+  {
+    id: 'mixed-start',
+    name: 'Çoklu Model Başlangıç',
+    desc: 'Claude + GPT + Gemini hepsi dahil',
+    cat: 'Tüm Modeller', catColor: '#059669', catBg: '#d1fae5',
+    scenarios: ['chat'],
+    model: 'mixed',
+    price: 79, comparePrice: '~₺1.440', savings: '%94',
+    specs: [{ i: '⚡', t: '500 istek/gün' }, { i: '📅', t: '30 gün' }, { i: '🌐', t: 'Claude + GPT + Gemini' }],
+    ribbon: 'best', ribbonText: '🏆 En İyi Değer',
+    sort: 4,
+  },
+  {
+    id: 'dev-claude',
+    name: 'Kodlama — Claude',
+    desc: 'Cline, Cursor veya Claude Code ile',
+    cat: 'Claude', catColor: '#7c3aed', catBg: '#ede9fe',
+    scenarios: ['dev'],
+    model: 'claude',
+    price: 99, comparePrice: '~₺720', savings: '%86',
+    specs: [{ i: '⚡', t: '1.000 istek/gün' }, { i: '📅', t: '30 gün' }, { i: '🤖', t: 'Claude Opus dahil' }],
+    ribbon: 'pop', ribbonText: '⭐ Popüler',
+    sort: 5,
+  },
+  {
+    id: 'dev-gpt',
+    name: 'Kodlama — GPT',
+    desc: 'Codex, Cursor GPT ile yoğun geliştirme',
+    cat: 'GPT', catColor: '#0369a1', catBg: '#e0f2fe',
+    scenarios: ['dev'],
+    model: 'gpt',
+    price: 99, comparePrice: '~₺360', savings: '%72',
+    specs: [{ i: '⚡', t: '1.000 istek/gün' }, { i: '📅', t: '30 gün' }, { i: '⚡', t: 'GPT-5 + o3' }],
+    ribbon: null,
+    sort: 6,
+  },
+  {
+    id: 'dev-pro',
+    name: 'Kodlama Pro',
+    desc: 'Yüksek limit, tüm AI araçları destekli',
+    cat: 'Tüm Modeller', catColor: '#059669', catBg: '#d1fae5',
+    scenarios: ['dev'],
+    model: 'mixed',
+    price: 149, comparePrice: '~₺720', savings: '%79',
+    specs: [{ i: '⚡', t: '2.000 istek/gün' }, { i: '📅', t: '30 gün' }, { i: '🌐', t: 'Opus + GPT-5 + o3' }],
+    ribbon: null,
+    sort: 7,
+  },
+  {
+    id: 'heavy-pro',
+    name: 'İş Paketi',
+    desc: 'Otomasyon ve ajans iş akışları için',
+    cat: 'Tüm Modeller', catColor: '#059669', catBg: '#d1fae5',
+    scenarios: ['heavy'],
+    model: 'mixed',
+    price: 299, comparePrice: '~₺5.400', savings: '%94',
+    specs: [{ i: '⚡', t: '5.000 istek/gün' }, { i: '📅', t: '30 gün' }, { i: '🚀', t: 'Öncelikli erişim' }],
+    ribbon: null,
+    sort: 8,
+  },
+  {
+    id: 'heavy-agency',
+    name: 'Ajans Paketi',
+    desc: 'Büyük ekipler ve yüksek hacimli otomasyon',
+    cat: 'Tüm Modeller', catColor: '#059669', catBg: '#d1fae5',
+    scenarios: ['heavy'],
+    model: 'mixed',
+    price: 499, comparePrice: '~₺10.800', savings: '%95',
+    specs: [{ i: '⚡', t: '10.000 istek/gün' }, { i: '📅', t: '30 gün' }, { i: '🚀', t: 'Öncelikli kuyruk' }],
+    ribbon: null,
+    sort: 9,
+  },
+];
+
+// ── State ──
+let activeScenario = 'all';
+let activeModel = 'all';
+let activeBudget = 'all';
+let activeSort = 'recommended';
+
+function getFiltered() {
+  let list = [...PACKAGES];
+
+  if (activeScenario !== 'all') list = list.filter(p => p.scenarios.includes(activeScenario));
+  if (activeModel !== 'all')    list = list.filter(p => p.model === activeModel);
+  if (activeBudget === 'low')   list = list.filter(p => p.price < 100);
+  if (activeBudget === 'mid')   list = list.filter(p => p.price >= 100 && p.price < 200);
+  if (activeBudget === 'high')  list = list.filter(p => p.price >= 200);
+
+  if (activeSort === 'price-asc')  list.sort((a,b) => a.price - b.price);
+  if (activeSort === 'price-desc') list.sort((a,b) => b.price - a.price);
+  if (activeSort === 'requests')   list.sort((a,b) => {
+    const ra = parseInt(a.specs[0].t.replace(/\./g,'')) || 0;
+    const rb = parseInt(b.specs[0].t.replace(/\./g,'')) || 0;
+    return rb - ra;
+  });
+  if (activeSort === 'recommended') list.sort((a,b) => a.sort - b.sort);
+
+  return list;
+}
+
+function btnClass(p) {
+  if (p.ribbon === 'pop') return 'pop';
+  if (p.ribbon === 'best') return 'best';
+  if (p.ribbon === 'trial') return 'trial';
+  return 'default';
+}
+
+function renderCard(p) {
+  return `
+    <div class="pkg-card ${p.ribbon === 'pop' ? 'pop' : p.ribbon === 'best' ? 'best-val' : ''}" data-model="${p.model}" data-scenario="${p.scenarios.join(',')}">
+      ${p.ribbon ? `<div class="card-ribbon ${p.ribbon}">${p.ribbonText}</div>` : ''}
+      <div class="card-top">
+        <div class="cat-badge" style="color:${p.catColor};background:${p.catBg}">${p.cat}</div>
+        <div class="card-name">${p.name}</div>
+        <div class="card-desc">${p.desc}</div>
+      </div>
+      <div class="card-specs">
+        ${p.specs.map(s => `<div class="spec-chip"><span>${s.i}</span>${s.t}</div>`).join('')}
+      </div>
+      <div class="card-price-block">
+        ${p.comparePrice ? `<div class="compare-price">${p.comparePrice}/ay</div>` : '<div style="height:14px"></div>'}
+        <div class="price-row">
+          <span class="price-main">₺${p.price}</span>
+          <span class="price-per">${p.scenarios.includes('trial') ? '· tek seferlik' : '/ay'}</span>
+        </div>
+        ${p.savings ? `<div class="savings-badge">⚡ Direkt'ten ${p.savings} ucuz</div>` : ''}
+      </div>
+      <div class="card-footer">
+        <button class="buy-btn ${btnClass(p)}">⚡ Bakiye ile al</button>
+        <div class="disclaimer">Anında aktif · <strong>İade edilmez</strong></div>
+      </div>
+    </div>
+  `;
+}
+
+function render() {
+  const list = getFiltered();
+  const grid = document.getElementById('pkgGrid');
+  const empty = document.getElementById('emptyState');
+  document.getElementById('resultCount').textContent = list.length;
+
+  if (list.length === 0) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+  } else {
+    grid.innerHTML = list.map(renderCard).join('');
+    empty.style.display = 'none';
+  }
+
+  // Scenario sayaçları
+  const scenarios = ['all','chat','dev','heavy','trial'];
+  scenarios.forEach(sc => {
+    let base = sc === 'all' ? PACKAGES : PACKAGES.filter(p => p.scenarios.includes(sc));
+    if (activeModel !== 'all') base = base.filter(p => p.model === activeModel);
+    if (activeBudget === 'low') base = base.filter(p => p.price < 100);
+    if (activeBudget === 'mid') base = base.filter(p => p.price >= 100 && p.price < 200);
+    if (activeBudget === 'high') base = base.filter(p => p.price >= 200);
+    const el = document.getElementById('cnt-' + sc);
+    if (el) el.textContent = base.length;
+  });
+}
+
+function setScenario(el, val) {
+  activeScenario = val;
+  document.querySelectorAll('.sc-pill').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+function setModel(el, val) {
+  activeModel = val;
+  document.querySelectorAll('#modelChips .chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+function setBudget(el, val) {
+  activeBudget = val;
+  document.querySelectorAll('#budgetChips .chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+function setSort(val) { activeSort = val; render(); }
+
+render();
+</script>
+</body>
+</html>

@@ -4,11 +4,13 @@ import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { InsufficientBalanceError } from "../lib/errors.js";
 import { buildPricingConfig, applyOverride, computePrice } from "./pricing-service.js";
+import { resolveTokenSplit } from "./usage-breakdown.js";
 import type { MasterModel } from "../../master-models.js";
 
 export interface UsageInfo {
   promptTokens?: number;
   completionTokens?: number;
+  cacheReadTokens?: number;
   imageCount?: number;
   videoSeconds?: number;
   videoResolution?: "480p" | "720p" | "1080p" | "default";
@@ -23,6 +25,28 @@ export interface ChargeResult {
 type ChargeStatus = "success" | "error" | "stream_missing_usage";
 const TOKEN_PRICE_UNIT = 1e6;
 
+// Cache-read (prompt-cache hit) tokens are billed at a FLAT rate instead of the
+// model's full input price. Anthropic/OpenAI charge cache reads at a fraction of
+// base input, so charging them at 1.0× overbilled customers on large cached
+// prompts. This flat rate applies to the cache-read subset only; cache-creation
+// (write) tokens stay folded into base input at the model's input price.
+const CACHE_READ_USD_PER_M = 0.06;
+
+// Convert the flat USD/1M cache-read rate into the requested currency. For TL we
+// reuse THIS model's own USD→TL conversion (input.tl / input.usd = kur*carpan),
+// so cache-read margin tracks the same FX + markup as base input. If the model
+// has no USD input price (free/seat model), cache reads are not charged.
+function cacheReadRate(
+  pricingCfg: ReturnType<typeof computePrice>,
+  currency: "tl" | "usd",
+): number {
+  if (currency === "usd") return CACHE_READ_USD_PER_M;
+  const inUsd = pricingCfg.input?.usd ?? 0;
+  const inTl = pricingCfg.input?.tl ?? 0;
+  if (inUsd > 0 && inTl > 0) return CACHE_READ_USD_PER_M * (inTl / inUsd);
+  return 0;
+}
+
 function computeCost(
   model: MasterModel,
   usage: UsageInfo,
@@ -34,7 +58,15 @@ function computeCost(
     const output = pricingCfg.output?.[currency] ?? 0;
     const prompt = usage.promptTokens ?? 0;
     const completion = usage.completionTokens ?? 0;
-    return (prompt / TOKEN_PRICE_UNIT) * input + (completion / TOKEN_PRICE_UNIT) * output;
+    // promptTokens already INCLUDES cache-read tokens (closerouter normalize).
+    // Carve cache-read out and bill it at the flat rate; the rest at input price.
+    const cacheRead = Math.max(0, Math.min(usage.cacheReadTokens ?? 0, prompt));
+    const baseInput = prompt - cacheRead;
+    return (
+      (baseInput / TOKEN_PRICE_UNIT) * input +
+      (cacheRead / TOKEN_PRICE_UNIT) * cacheReadRate(pricingCfg, currency) +
+      (completion / TOKEN_PRICE_UNIT) * output
+    );
   }
 
   if (model.type === "Görsel") {
@@ -109,8 +141,31 @@ function buildUsageChargeMeta(
   pricingCfg: ReturnType<typeof computePrice>,
   rawUsageJson?: unknown,
 ) {
-  const rawCostTL = computeCost(model, usage, pricingCfg, "tl");
-  const rawCostUsd = computeCost(model, usage, pricingCfg, "usd");
+  // Carve the cache-read subset out of the billed prompt so computeCost can
+  // price it at the flat cache rate. Only text models expose a cache breakdown;
+  // at reserve time (no rawUsageJson) this is 0 → full input rate reserve (safe,
+  // refunded/re-settled at settle). resolveTokenSplit clamps cache <= prompt.
+  //
+  // LIVE SHAPE: proxy passes the normalized ChatUsage object as rawUsageJson,
+  // whose provider cache fields (cache_read_input_tokens / prompt_tokens_details
+  // .cached_tokens) live under `.providerRaw` — the top level only has
+  // promptTokens/completionTokens. Unwrap providerRaw so the split sees the real
+  // cache tokens; fall back to the object itself (unit tests + any path that
+  // passes raw upstream JSON directly).
+  const rawForSplit = (() => {
+    if (rawUsageJson && typeof rawUsageJson === "object") {
+      const pr = (rawUsageJson as { providerRaw?: unknown }).providerRaw;
+      if (pr != null) return pr;
+    }
+    return rawUsageJson ?? usage;
+  })();
+  const cacheReadTokens =
+    model.type === "Metin"
+      ? resolveTokenSplit(usage.promptTokens ?? 0, rawForSplit).cacheReadTokens
+      : 0;
+  const usageForCost: UsageInfo = { ...usage, cacheReadTokens };
+  const rawCostTL = computeCost(model, usageForCost, pricingCfg, "tl");
+  const rawCostUsd = computeCost(model, usageForCost, pricingCfg, "usd");
   const costTL = round4(rawCostTL);
   const costUsd = round8(rawCostUsd);
   const pricingSnapshot = buildPricingSnapshot(model, pricingCfg);

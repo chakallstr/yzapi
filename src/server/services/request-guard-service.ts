@@ -3,6 +3,23 @@ import { BadRequestError } from "../lib/errors.js";
 export const MAX_OPERATION_CONTEXT_TOKENS = 1_000_000;
 export const DEFAULT_OUTPUT_RESERVE_TOKENS = 4_096;
 
+// char/4 context tahmini (estimateRequestContextTokens) gerçek token sayısını DEĞİL,
+// JSON-stringify edilmiş gövdenin BAYT'ını ölçer → sarmalayıcı anahtarlar + escape + tool_result
+// yapısı yüzünden gerçek token'ın ~3-6 KATINA şişer (aynı dosyadaki resolveBilledPromptTokens
+// notu 3-4× der; canlı ölçüm 2026-06-27: gpt-5.5 Claude-Code oturumu ~186k GERÇEK input token'da
+// 1M guard'ını tetikledi → ~5.4×). Hard-reject'i bu şişmiş değerle HAM limitte yaparsak müşteri
+// gerçekte pencerenin ~1/5-1/6'sında "1M context limit" 400'ü alır VE istemcinin auto-compact'i
+// (tüm konuşmayı yollar) AYNI şişmeyle reddedilir → çıkışsız döngü ("compact'ta da böyle /
+// context dolunca sıfırlanmıyor"). Bu yüzden reject eşiğini en kötü şişme faktörüyle gevşet:
+// guard yalnız istek GERÇEKTEN pencereyi aşınca devreye girsin; asıl token tavanını zaten upstream
+// tokenizer'ı (1M) + express.json 10mb gövde limiti uygular. Billing'e DOKUNMAZ —
+// guard.contextTokens ham tahmin olarak aynen döner (resolveBilledPromptTokens floor'u değişmez);
+// yalnız hard-reject karşılaştırması etkilenir. Değer 8: gözlenen 5.4× ve belgelenen ≤6× şişmenin
+// üstüne pay bırakır — "fazla gevşek" zararsızdır (gerçek tavanı upstream reddeder + K1 ile 0 tahsil),
+// "fazla sıkı" ise düzeltilen müşteri kesintisidir. (1M penceresi için 10mb gövde tavanı ~2.6M
+// tahminde zaten kesişir → eşik pratikte yalnız küçük-pencere modellerde/paket limitinde ısırır.)
+export const CONTEXT_GUARD_ESTIMATE_INFLATION = 8;
+
 type GuardEndpoint = "chat" | "messages" | "responses";
 
 interface GuardModel {
@@ -26,6 +43,10 @@ interface BuildRequestGuardOptions {
   // true → temperature/top_p/top_k upstream'e GÖNDERİLMEDEN strip edilir (Opus 4.7/4.8/Fable
   // bunları reddeder). Bu durumda aralık doğrulaması da atlanır (parametre nasılsa silinecek).
   rejectsSamplingParams?: boolean;
+  // >0 ise reasoning modeli için max_tokens TABANI: istemci daha düşük bir max_tokens
+  // (responses'ta max_output_tokens) gönderirse buna yükseltilir. Model tavanı cap'inden
+  // ÖNCE uygulanır → tavanı aşmaz. Reasoning'in düşünmesinin cevabı yarıda kesmesini önler.
+  reasoningOutputFloor?: number;
 }
 
 export interface RequestGuardResult {
@@ -109,6 +130,7 @@ function resolveRequestedOutputTokens(
   body: Record<string, unknown>,
   outputReserveTokens: number,
   maxTokensPerRequest: number | undefined,
+  reasoningOutputFloor: number | undefined,
 ) {
   const explicit = endpoint === "responses"
     ? numericOrNull(body.max_output_tokens)
@@ -119,7 +141,12 @@ function resolveRequestedOutputTokens(
     : null;
 
   const requested = explicit ?? outputReserveTokens;
-  const cappedByModel = maxModelOutput ? Math.min(requested, maxModelOutput) : requested;
+  // Reasoning modeli tabanı: istemcinin küçük max_tokens'ı düşünmeyi yarıda kesmesin
+  // diye yükselt. Cap'lerden ÖNCE → model tavanını (maxModelOutput) asla aşamaz.
+  const floored = reasoningOutputFloor && reasoningOutputFloor > 0
+    ? Math.max(requested, reasoningOutputFloor)
+    : requested;
+  const cappedByModel = maxModelOutput ? Math.min(floored, maxModelOutput) : floored;
   const capped = maxTokensPerRequest && maxTokensPerRequest > 0
     ? Math.min(cappedByModel, Math.floor(maxTokensPerRequest))
     : cappedByModel;
@@ -179,7 +206,9 @@ export function buildRequestGuard(opts: BuildRequestGuardOptions): RequestGuardR
   const contextLimitTokens = opts.contextLimitTokens && opts.contextLimitTokens > 0
     ? Math.floor(opts.contextLimitTokens)
     : MAX_OPERATION_CONTEXT_TOKENS;
-  if (contextTokens > contextLimitTokens) {
+  // Şişmiş char/4 tahminini HAM limitte değil, en kötü şişme-faktörüyle gevşetilmiş eşikte kes
+  // (yukarıdaki CONTEXT_GUARD_ESTIMATE_INFLATION notu). guard.contextTokens AYNEN döner (billing).
+  if (contextTokens > contextLimitTokens * CONTEXT_GUARD_ESTIMATE_INFLATION) {
     throw new BadRequestError(`Bu işlem ${contextLimitTokens} maksimum context limitini aşıyor. Lütfen girdiyi kısaltın veya parçalar halinde gönderin.`);
   }
 
@@ -192,11 +221,26 @@ export function buildRequestGuard(opts: BuildRequestGuardOptions): RequestGuardR
     opts.body,
     outputReserveTokens,
     opts.maxTokensPerRequest,
+    opts.reasoningOutputFloor,
   );
   const guardedBody = { ...opts.body };
   for (const key of STRIP_BEFORE_UPSTREAM) delete guardedBody[key];
   if (opts.rejectsSamplingParams) {
     for (const key of SAMPLING_PARAMS) delete guardedBody[key];
+  }
+
+  // thinking.budget_tokens Anthropic API'de zorunludur (type:"enabled" olduğunda).
+  // İstemci bunu göndermeden thinking açarsa upstream Pydantic hatası döner.
+  // Eksikse güvenli bir varsayılan enjekte et: max_tokens-1 ile 8000'in küçüğü (≥1024).
+  const thinking = guardedBody.thinking;
+  if (
+    thinking !== null &&
+    typeof thinking === "object" &&
+    (thinking as Record<string, unknown>).type === "enabled" &&
+    (thinking as Record<string, unknown>).budget_tokens == null
+  ) {
+    const defaultBudget = Math.max(1024, Math.min(8000, reservedCompletionTokens - 1));
+    guardedBody.thinking = { ...(thinking as Record<string, unknown>), budget_tokens: defaultBudget };
   }
 
   if (opts.endpoint === "responses") {

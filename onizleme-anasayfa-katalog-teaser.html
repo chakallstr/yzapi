@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anasayfa fiyat karşılaştırması — 6 model</title>
+<style>
+  :root{
+    --ink:#0f172a; --ink-2:#334155; --ink-3:#64748b; --ink-4:#94a3b8; --ink-5:#cbd5e1;
+    --bg:#f8fafc; --surface:#ffffff; --surface-2:#f8fafc;
+    --border:rgba(15,23,42,.08); --border-st:rgba(15,23,42,.14);
+    --accent:#3b82f6; --accent-bg:#eff6ff; --accent-ink:#1d4ed8; --accent-border:#bfdbfe;
+    --ok:#10b981; --ok-bg:#ecfdf5; --ok-ink:#047857;
+    --t-teal-bg:#f0fdfa; --t-indigo-bg:#eef2ff; --t-purple-bg:#faf5ff;
+    --cat:#ef4444; --cat-ink:#dc2626;
+    --r-md:12px; --r-lg:16px;
+    --sh-1:0 1px 2px rgba(15,23,42,.05);
+    --sh-2:0 4px 14px -4px rgba(15,23,42,.08),0 2px 4px -2px rgba(15,23,42,.06);
+    --sh-3:0 12px 32px -8px rgba(15,23,42,.12);
+    --font-sans:'Geist',-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;
+    --font-mono:'Geist Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);font-family:var(--font-sans);color:var(--ink);padding:44px 20px;-webkit-font-smoothing:antialiased}
+  .tnum{font-variant-numeric:tabular-nums}
+  .wrap{max-width:1000px;margin:0 auto}
+  .note{font-size:12px;color:var(--ink-3);font-family:var(--font-mono);letter-spacing:.3px;margin:0 0 10px}
+  .newpill{display:inline-block;font-size:10px;font-weight:600;font-family:var(--font-mono);letter-spacing:.5px;color:var(--accent-ink);background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:999px;padding:3px 10px;margin-bottom:16px}
+  .ghost{opacity:.4;pointer-events:none}
+  .ghostrow{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:8px}
+  .ghostcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:22px;height:92px}
+  .ghosticon{width:36px;height:36px;border-radius:11px;margin-bottom:12px}
+  .ghosttitle{height:10px;width:55%;background:var(--ink-5);border-radius:4px;margin-bottom:9px}
+  .ghostline{height:7px;width:90%;background:#e2e8f0;border-radius:4px;margin-bottom:6px}
+  .ghostline.s{width:70%}
+  .highlight{outline:2px dashed var(--accent);outline-offset:7px;border-radius:var(--r-lg)}
+  .section-gap{height:38px}
+  h2.h{font-size:12px;color:var(--ink-3);font-weight:600;margin:0 0 16px;font-family:var(--font-mono);letter-spacing:.4px}
+  svg{display:block}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-2)}
+  .teaser{padding:28px 30px 24px}
+  .eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:600;font-family:var(--font-mono);letter-spacing:.7px;color:var(--ok-ink);text-transform:uppercase}
+  .eyebrow .dot{width:6px;height:6px;border-radius:999px;background:var(--ok);box-shadow:0 0 0 3px var(--ok-bg)}
+  .headline{font-size:28px;font-weight:700;letter-spacing:-1px;line-height:1.12;margin:14px 0 6px}
+  .headline em{font-style:normal;color:var(--ok-ink)}
+  .subhead{font-size:13.5px;color:var(--ink-3);line-height:1.5;max-width:580px}
+  .legend{display:flex;gap:18px;margin:22px 0 18px;font-family:var(--font-mono);font-size:10.5px;color:var(--ink-3);letter-spacing:.3px;flex-wrap:wrap}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .legend i{width:22px;height:7px;border-radius:3px;display:inline-block}
+  .legend i.c{background:var(--cat)}
+  .legend i.o{background:var(--ok)}
+
+  /* 6 model — 2 sütun grid */
+  .grid6{display:grid;grid-template-columns:1fr 1fr;gap:18px 26px}
+  .cell{border:1px solid var(--border);border-radius:var(--r-md);padding:15px 16px;background:var(--surface);box-shadow:var(--sh-1)}
+  .cell .ch{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+  .cell .nm{font-size:13px;font-weight:700;font-family:var(--font-mono);letter-spacing:-.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pc{flex-shrink:0;font-size:14px;font-weight:800;font-family:var(--font-mono);color:#fff;background:var(--ok);border-radius:999px;padding:3px 10px;letter-spacing:-.4px}
+
+  .bar{display:flex;flex-direction:column;gap:4px}
+  .bar + .bar{margin-top:9px}
+  .bar .blbl{font-size:9.5px;font-family:var(--font-mono);letter-spacing:.6px;text-transform:uppercase;font-weight:700}
+  .bar.c .blbl{color:var(--cat-ink)}
+  .bar.o .blbl{color:var(--ok-ink)}
+  .brow{display:grid;grid-template-columns:1fr 64px;align-items:center;gap:10px}
+  .track{height:13px;background:var(--surface-2);border:1px solid var(--border);border-radius:999px;overflow:hidden}
+  .fill{height:100%;border-radius:999px;width:0;transition:width .9s cubic-bezier(.22,1,.36,1)}
+  .fill.c{background:linear-gradient(90deg,#fca5a5,#ef4444)}
+  .fill.o{background:linear-gradient(90deg,#34d399,#10b981)}
+  .amt{font-size:12px;font-family:var(--font-mono);text-align:right;letter-spacing:-.2px}
+  .bar.c .amt{color:var(--cat-ink);font-weight:700}
+  .bar.o .amt{color:var(--ok-ink);font-weight:700}
+
+  .foot{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:22px;padding-top:18px;border-top:1px solid var(--border)}
+  .fnote{font-size:11.5px;color:var(--ink-4);line-height:1.5;font-family:var(--font-mono)}
+  .cta{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#fff;background:var(--ink);border:none;border-radius:11px;padding:12px 20px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:transform .15s ease, box-shadow .15s ease}
+  .cta:hover{transform:translateY(-1px);box-shadow:var(--sh-3)}
+
+  @media (prefers-reduced-motion: reduce){ .fill{transition:none} }
+  @media (max-width:760px){ .grid6{grid-template-columns:1fr} .headline{font-size:23px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="newpill">ÖNİZLEME · 6 model · gerçek panel token'larıyla · sayılar örnek/temsilîdir</div>
+
+  <p class="note">↑ mevcut anasayfa: Değer Banner (bunun hemen ALTINA gelecek)</p>
+  <div class="ghost ghostrow">
+    <div class="ghostcard"><div class="ghosticon" style="background:var(--t-teal-bg)"></div><div class="ghosttitle"></div><div class="ghostline"></div><div class="ghostline s"></div></div>
+    <div class="ghostcard"><div class="ghosticon" style="background:var(--t-indigo-bg)"></div><div class="ghosttitle"></div><div class="ghostline"></div><div class="ghostline s"></div></div>
+    <div class="ghostcard"><div class="ghosticon" style="background:var(--t-purple-bg)"></div><div class="ghosttitle"></div><div class="ghostline"></div><div class="ghostline s"></div></div>
+  </div>
+
+  <div class="section-gap"></div>
+  <div class="highlight">
+  <div class="card teaser">
+    <span class="eyebrow"><span class="dot"></span>Gerçek fiyat karşılaştırması</span>
+    <div class="headline">Aynı modeller, <em>ortalama %88 daha ucuz</em></div>
+    <div class="subhead">Çoğu kişi modellerin gerçek API fiyatını bilmez. Modeli üreten şirketin (Anthropic, OpenAI, Google) fiyatıyla bizimkini yan yana koyduk — abonelik yok, kota yok.</div>
+
+    <div class="legend">
+      <span><i class="c"></i>Modeli üreten şirketin fiyatı</span>
+      <span><i class="o"></i>YapayZekaLab fiyatı</span>
+      <span style="margin-left:auto;color:var(--ink-4)">1M token (girdi + çıktı)</span>
+    </div>
+
+    <div class="grid6">
+
+      <!-- 1 opus -->
+      <div class="cell">
+        <div class="ch"><span class="nm">claude-opus-4-7</span><span class="pc">−94%</span></div>
+        <div class="bar c"><span class="blbl">Anthropic fiyatı</span><div class="brow"><div class="track"><div class="fill c" data-w="100"></div></div><span class="amt">$30.00</span></div></div>
+        <div class="bar o"><span class="blbl">YapayZekaLab fiyatı</span><div class="brow"><div class="track"><div class="fill o" data-w="6"></div></div><span class="amt">$1.80</span></div></div>
+      </div>
+
+      <!-- 2 sonnet -->
+      <div class="cell">
+        <div class="ch"><span class="nm">claude-sonnet-4-6</span><span class="pc">−93%</span></div>
+        <div class="bar c"><span class="blbl">Anthropic fiyatı</span><div class="brow"><div class="track"><div class="fill c" data-w="100"></div></div><span class="amt">$18.00</span></div></div>
+        <div class="bar o"><span class="blbl">YapayZekaLab fiyatı</span><div class="brow"><div class="track"><div class="fill o" data-w="6.7"></div></div><span class="amt">$1.20</span></div></div>
+      </div>
+
+      <!-- 3 gpt-5.5 -->
+      <div class="cell">
+        <div class="ch"><span class="nm">gpt-5.5</span><span class="pc">−86%</span></div>
+        <div class="bar c"><span class="blbl">OpenAI fiyatı</span><div class="brow"><div class="track"><div class="fill c" data-w="100"></div></div><span class="amt">$11.25</span></div></div>
+        <div class="bar o"><span class="blbl">YapayZekaLab fiyatı</span><div class="brow"><div class="track"><div class="fill o" data-w="14.2"></div></div><span class="amt">$1.60</span></div></div>
+      </div>
+
+      <!-- 4 gemini -->
+      <div class="cell">
+        <div class="ch"><span class="nm">gemini-2.5-pro</span><span class="pc">−82%</span></div>
+        <div class="bar c"><span class="blbl">Google fiyatı</span><div class="brow"><div class="track"><div class="fill c" data-w="100"></div></div><span class="amt">$11.25</span></div></div>
+        <div class="bar o"><span class="blbl">YapayZekaLab fiyatı</span><div class="brow"><div class="track"><div class="fill o" data-w="17.8"></div></div><span class="amt">$2.00</span></div></div>
+      </div>
+
+      <!-- 5 haiku -->
+      <div class="cell">
+        <div class="ch"><span class="nm">claude-haiku-4-5</span><span class="pc">−92%</span></div>
+        <div class="bar c"><span class="blbl">Anthropic fiyatı</span><div class="brow"><div class="track"><div class="fill c" data-w="100"></div></div><span class="amt">$4.80</span></div></div>
+        <div class="bar o"><span class="blbl">YapayZekaLab fiyatı</span><div class="brow"><div class="track"><div class="fill o" data-w="8.3"></div></div><span class="amt">$0.40</span></div></div>
+      </div>
+
+      <!-- 6 gpt-5-mini -->
+      <div class="cell">
+        <div class="ch"><span class="nm">gpt-5-mini</span><span class="pc">−78%</span></div>
+        <div class="bar c"><span class="blbl">OpenAI fiyatı</span><div class="brow"><div class="track"><div class="fill c" data-w="100"></div></div><span class="amt">$2.25</span></div></div>
+        <div class="bar o"><span class="blbl">YapayZekaLab fiyatı</span><div class="brow"><div class="track"><div class="fill o" data-w="22.2"></div></div><span class="amt">$0.50</span></div></div>
+      </div>
+
+    </div>
+
+    <div class="foot">
+      <span class="fnote">Fiyatlar, modeli üreten şirketin resmi API ücretidir — 1M token. Tüm modeller canlı listede.</span>
+      <a class="cta" href="#">Tüm fiyatları gör
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </a>
+    </div>
+  </div>
+  </div>
+
+  <div class="section-gap"></div>
+  <p class="note">↓ devamında mevcut Özellik Kartları / Nasıl Çalışır / Cost Calculator bölümleri gelir (değişmez)</p>
+
+</div>
+
+<script>
+  window.addEventListener('load', function(){
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.querySelectorAll('.fill').forEach(function(f, i){
+      var w = f.getAttribute('data-w') + '%';
+      if (reduce){ f.style.width = w; return; }
+      setTimeout(function(){ f.style.width = w; }, 100 + i*55);
+    });
+  });
+</script>
+</body>
+</html>

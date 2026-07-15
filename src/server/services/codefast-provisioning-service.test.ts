@@ -149,4 +149,27 @@ describe("codefast-provisioning-service", () => {
     const { attachManualCustomerKey } = await import("./codefast-provisioning-service.js");
     await expect(attachManualCustomerKey("e1", "bad_key")).rejects.toThrow();
   });
+
+  it("top-up: ısınmış pakette 50'şer artış order'lar (ilk order 150 AYNI, lazy/maliyet kuralı)", async () => {
+    const { cfCreateOrder } = await import("./codefast-reseller-service.js");
+    (cfCreateOrder as any).mockResolvedValue({ order: { id: "tu1", status: "fulfilled" } });
+    const { dbSql } = await import("../db/client.js");
+    // 1. çağrı = entitlement SELECT (ısınmış: ordered=150<cap=500, remaining=10<eşik75); 2. çağrı = UPDATE
+    (dbSql as any).mockResolvedValueOnce([{
+      cf_customer_id: "u1", cf_status: "provisioned", cf_remaining: 10,
+      cf_units_ordered: 150, cap: 500, cf_catalog_id: "c1",
+      expires_at: new Date(Date.now() + 5 * 86_400_000).toISOString(),
+    }]);
+    const { topUpCfIfNeeded } = await import("./codefast-provisioning-service.js");
+    await topUpCfIfNeeded("e1");
+    expect(cfCreateOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        external_customer_id: "u1",
+        external_order_id: "topup-e1-b150",
+        create_customer_api_key: false,
+        items: [{ catalog_id: "c1", limit_amount: 50, duration_days: expect.any(Number) }],
+      }),
+      "topup-e1-b150",
+    );
+  });
 });

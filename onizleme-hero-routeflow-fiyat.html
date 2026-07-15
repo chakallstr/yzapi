@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Önizleme — RouteFlow + fiyat karşılaştırması (animasyonlu, tam uyumlu)</title>
+<style>
+  :root{
+    --ink:#0f172a; --ink-2:#334155; --ink-3:#64748b; --ink-4:#94a3b8; --ink-5:#cbd5e1;
+    --bg:#f8fafc; --surface:#ffffff; --surface-2:#f8fafc;
+    --border:rgba(15,23,42,.08); --border-st:rgba(15,23,42,.14);
+    --accent:#3b82f6; --accent-bg:#eff6ff; --accent-ink:#1d4ed8; --accent-border:#bfdbfe;
+    --ok:#10b981; --ok-bg:#ecfdf5; --ok-ink:#047857;
+    --cat:#ef4444; --cat-ink:#dc2626;
+    --anth:#c2693a; --anth-bg:#fef3ec; --anth-ink:#7a3a18;
+    --r-md:12px; --r-lg:16px;
+    --sh-1:0 1px 2px rgba(15,23,42,.05);
+    --sh-2:0 4px 14px -4px rgba(15,23,42,.08),0 2px 4px -2px rgba(15,23,42,.06);
+    --sh-3:0 12px 32px -8px rgba(15,23,42,.12);
+    --font-sans:'Geist',-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;
+    --font-serif:'Instrument Serif','Times New Roman',serif;
+    --font-mono:'Geist Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);font-family:var(--font-sans);color:var(--ink);padding:34px 20px;-webkit-font-smoothing:antialiased}
+  .tnum{font-variant-numeric:tabular-nums}
+  .wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+  .newpill{display:inline-block;font-size:10px;font-weight:600;font-family:var(--font-mono);letter-spacing:.5px;color:var(--accent-ink);background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:999px;padding:3px 10px;align-self:flex-start}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-2)}
+
+  .outer{display:grid;grid-template-columns:2fr 1fr;gap:18px}
+  .hero{padding:28px}
+  .heroIn{display:grid;grid-template-columns:1fr 440px;gap:22px;align-items:center}
+
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:9.5px;font-family:var(--font-mono);letter-spacing:.8px;color:var(--accent-ink);background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:999px;padding:4px 9px}
+  h1{font-size:33px;line-height:1.08;letter-spacing:-1.3px;font-weight:600;margin:14px 0 10px}
+  h1 em{font-family:var(--font-serif);font-style:italic;font-weight:400}
+  .tag{font-size:14px;color:var(--ink-2);font-style:italic;font-family:var(--font-serif);margin-bottom:10px}
+  .lead{font-size:13px;line-height:1.6;color:var(--ink-2)}
+  .heroBtns{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
+  .btnA{background:var(--accent);color:#fff;padding:10px 18px;border-radius:9px;font-size:12.5px;font-weight:500;border:none;display:inline-flex;align-items:center;gap:7px;box-shadow:var(--sh-1)}
+  .btnB{background:var(--surface);color:var(--ink);padding:10px 18px;border-radius:9px;font-size:12.5px;font-weight:500;border:1px solid var(--border-st)}
+
+  /* ===== FLOW ZONE (RouteFlow + fiyat kartları) ===== */
+  .flow{position:relative;width:440px;height:300px}
+  .flow svg{position:absolute;inset:0;width:440px;height:300px;pointer-events:none}
+  .istek{position:absolute;left:2px;top:128px;width:56px;height:38px;border-radius:10px;background:var(--surface);border:1px solid var(--border-st);display:grid;place-items:center;font-family:var(--font-mono);font-size:10.5px;color:var(--ink-2);font-weight:500}
+  .istek::before{content:'API KEY';position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-size:8px;color:var(--ink-3);letter-spacing:.5px;font-family:var(--font-mono);white-space:nowrap}
+  .hub{position:absolute;left:84px;top:118px;width:86px;height:58px;border-radius:14px;background:var(--accent);display:grid;place-items:center;text-align:center;box-shadow:0 8px 18px -6px rgba(59,130,246,.5)}
+  .hub b{color:#fff;font-size:9.5px;font-weight:700;letter-spacing:.8px}
+  .hub span{color:rgba(255,255,255,.72);font-size:8.5px;font-family:var(--font-mono)}
+
+  .pcard{position:absolute;right:2px;width:166px;border-radius:11px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--sh-1);padding:8px 10px;
+         opacity:0;transform:translateX(12px);transition:opacity .5s ease, transform .5s cubic-bezier(.22,1,.36,1)}
+  .pcard.in{opacity:1;transform:none}
+  .pcard .prov{font-size:7.5px;font-family:var(--font-mono);letter-spacing:.5px;color:var(--anth-ink);opacity:.8;font-weight:700}
+  .pcard .mname{font-size:11px;font-family:var(--font-mono);font-weight:700;color:var(--ink);margin:1px 0 5px}
+  .pline{display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .pcat{font-size:10px;font-family:var(--font-mono);color:var(--cat-ink);text-decoration:line-through;text-decoration-color:var(--cat-ink)}
+  .pour{font-size:13px;font-family:var(--font-mono);font-weight:700;color:var(--ok-ink)}
+  .poff{position:absolute;top:-9px;right:8px;font-size:11px;font-weight:800;font-family:var(--font-mono);color:#fff;background:var(--ok);border-radius:999px;padding:2px 8px;letter-spacing:-.3px;
+        transform:scale(.5);opacity:0;transition:transform .4s cubic-bezier(.34,1.56,.64,1),opacity .3s}
+  .pcard.in .poff{transform:scale(1);opacity:1;transition-delay:.5s}
+
+  /* ===== API AKTİVİTESİ kartı (ekran görüntüsüne uygun) ===== */
+  .act{padding:16px}
+  .actHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .actHead .cap{font-size:11px;color:var(--ink-3);font-family:var(--font-mono);letter-spacing:.4px}
+  .actHead .live{font-size:9.5px;color:var(--accent-ink);background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:999px;padding:3px 8px;display:inline-flex;gap:5px;align-items:center}
+  .arow{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);border-left:3px solid var(--anth);margin-bottom:8px}
+  .arow.g{border-left-color:#6d28d9}
+  .arow .ai{flex:1;min-width:0}
+  .arow .an{font-size:12.5px;font-weight:700}
+  .arow .am{font-size:10px;color:var(--ink-3);font-family:var(--font-mono);margin-top:2px}
+  .chk{width:18px;height:18px;border-radius:999px;background:var(--ok-bg);display:grid;place-items:center;flex-shrink:0}
+
+  @media (max-width:1080px){.outer{grid-template-columns:1fr}.heroIn{grid-template-columns:1fr}.flow{margin:0 auto}}
+  @media (prefers-reduced-motion:reduce){.pcard,.poff{opacity:1;transform:none;transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="newpill">ÖNİZLEME · mevcut hero RouteFlow'a fiyat karşılaştırması işlendi · animasyonlu · Opus Fast mode · resmi fiyatlar</span>
+
+  <div class="outer">
+    <!-- HERO: pitch + flow -->
+    <div class="card hero">
+      <div class="heroIn">
+        <div>
+          <span class="chip">✦ yapayzekalab.org/v1</span>
+          <h1>Türkiye'nin <em>Yapay Zekâ</em> API Geçidi</h1>
+          <div class="tag">Kota yok. Gizli limit yok. Aylık abonelik yok.</div>
+          <p class="lead">Claude (Opus/Sonnet/Haiku) metin modelleri — hepsi <strong>tek API key</strong> ile. Üreticinin resmi fiyatına göre <strong>ortalama %91 daha ucuz.</strong></p>
+          <div class="heroBtns">
+            <button class="btnA">Kayıt Ol →</button>
+            <button class="btnB">Fiyat Listesi</button>
+          </div>
+        </div>
+
+        <!-- FLOW ZONE -->
+        <div class="flow" id="flow">
+          <svg viewBox="0 0 440 300">
+            <defs><filter id="g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.1"/></filter></defs>
+            <!-- guide paths hub(170,147) -> card-left(270, y) -->
+            <g fill="none" stroke="var(--ink-3)" stroke-width="0.8" stroke-dasharray="2 4" opacity="0.22">
+              <path d="M58,147 L84,147"/>
+              <path id="p1" d="M170,147 C225,147 225,40  270,40"/>
+              <path id="p2" d="M170,147 C225,147 225,113 270,113"/>
+              <path id="p3" d="M170,147 C225,147 225,187 270,187"/>
+              <path id="p4" d="M170,147 C225,147 225,260 270,260"/>
+            </g>
+            <!-- pulsing ring around hub -->
+            <rect x="82" y="116" width="90" height="62" rx="15" fill="none" stroke="var(--accent)" stroke-width="1.2" opacity="0.22">
+              <animate attributeName="opacity" values="0.1;0.32;0.1" dur="2.4s" repeatCount="indefinite"/>
+            </rect>
+            <!-- animated dots (orange = anthropic) -->
+            <g fill="var(--anth)" filter="url(#g)">
+              <circle r="3.2"><animateMotion dur="3.6s" repeatCount="indefinite" begin="0s"   path="M170,147 C225,147 225,40 270,40"/><animate attributeName="opacity" values="0;1;1;1;0" keyTimes="0;.06;.4;.94;1" dur="3.6s" repeatCount="indefinite"/></circle>
+              <circle r="3.2"><animateMotion dur="3.6s" repeatCount="indefinite" begin="-0.9s" path="M170,147 C225,147 225,113 270,113"/><animate attributeName="opacity" values="0;1;1;1;0" keyTimes="0;.06;.4;.94;1" dur="3.6s" repeatCount="indefinite"/></circle>
+              <circle r="3.2"><animateMotion dur="3.6s" repeatCount="indefinite" begin="-1.8s" path="M170,147 C225,147 225,187 270,187"/><animate attributeName="opacity" values="0;1;1;1;0" keyTimes="0;.06;.4;.94;1" dur="3.6s" repeatCount="indefinite"/></circle>
+              <circle r="3.2"><animateMotion dur="3.6s" repeatCount="indefinite" begin="-2.7s" path="M170,147 C225,147 225,260 270,260"/><animate attributeName="opacity" values="0;1;1;1;0" keyTimes="0;.06;.4;.94;1" dur="3.6s" repeatCount="indefinite"/></circle>
+            </g>
+          </svg>
+
+          <div class="istek">İstek</div>
+          <div class="hub"><div><b>YAPAYZEKALAB</b><br><span>api · v1</span></div></div>
+
+          <!-- fiyat kartları (model düğümleri) -->
+          <div class="pcard" style="top:13px"  data-d="0">
+            <div class="poff">−99%</div>
+            <div class="prov">ANTHROPIC · FAST MODE</div>
+            <div class="mname">Opus 4.6</div>
+            <div class="pline"><span class="pcat">$180</span><span class="pour">$2.10</span></div>
+          </div>
+          <div class="pcard" style="top:86px" data-d="1">
+            <div class="poff">−99%</div>
+            <div class="prov">ANTHROPIC · FAST MODE</div>
+            <div class="mname">Opus 4.7</div>
+            <div class="pline"><span class="pcat">$180</span><span class="pour">$2.50</span></div>
+          </div>
+          <div class="pcard" style="top:160px" data-d="2">
+            <div class="poff">−91%</div>
+            <div class="prov">ANTHROPIC</div>
+            <div class="mname">Sonnet 4.6</div>
+            <div class="pline"><span class="pcat">$18</span><span class="pour">$1.56</span></div>
+          </div>
+          <div class="pcard" style="top:234px" data-d="3">
+            <div class="poff">−77%</div>
+            <div class="prov">ANTHROPIC</div>
+            <div class="mname">Haiku 4.5</div>
+            <div class="pline"><span class="pcat">$6</span><span class="pour">$1.40</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- API AKTİVİTESİ -->
+    <div class="card act">
+      <div class="actHead"><span class="cap">API AKTİVİTESİ</span><span class="live">● Canlı</span></div>
+      <div class="arow"><div class="ai"><div class="an">o3</div><div class="am">200K ctx · 4.421 token · 2180ms</div></div><div class="chk">✓</div></div>
+      <div class="arow"><div class="ai"><div class="an">o3</div><div class="am">200K ctx · 4.279 token · 1969ms</div></div><div class="chk">✓</div></div>
+      <div class="arow"><div class="ai"><div class="an">o4-mini</div><div class="am">200K ctx · 4.714 token · 1209ms</div></div><div class="chk">✓</div></div>
+      <div class="arow g"><div class="ai"><div class="an">Gemini 3 Pro Preview</div><div class="am">1M ctx · 5.395 token · 1819ms</div></div><div class="chk">✓</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function run(){
+    document.querySelectorAll('#flow .pcard').forEach(function(c){
+      var d = parseInt(c.getAttribute('data-d'))||0;
+      setTimeout(function(){ c.classList.add('in'); }, reduce?0:(200+d*150));
+    });
+  }
+  var io = new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){run();io.disconnect();}});},{threshold:.3});
+  io.observe(document.getElementById('flow'));
+</script>
+</body>
+</html>

@@ -162,6 +162,127 @@ describe("chargeUsage — billing service", () => {
     expect(mockTxSql).toHaveBeenCalledTimes(3);
   });
 
+  it("prices cache-read tokens at flat $0.06/1M instead of the full input rate", async () => {
+    // Mock input price: 750 TL / $15 per 1M => kur*carpan ratio = 50.
+    // Flat cache-read = $0.06/1M => 0.06 * 50 = 3.0 TL/1M.
+    // 1000 prompt tokens, ALL cache-read => billable base = 0.
+    //   cost = (0/1e6)*750 + (1000/1e6)*3.0 = 0.003 TL   (was 0.75 TL at full rate)
+    mockSelectLimit.mockResolvedValueOnce([]);
+    mockTxSql
+      .mockResolvedValueOnce([{ bakiye_tl: "99.9975", email: "user@test.com" }])
+      .mockResolvedValueOnce([{ id: "tx-cache-1" }])
+      .mockResolvedValueOnce([]);
+
+    const { chargeUsage } = await import("./billing-service.js");
+
+    const model = {
+      id: "claude-opus-4-8",
+      name: "Claude Opus 4.8",
+      provider: "anthropic",
+      type: "Metin" as const,
+      context: "1M",
+      endpoints: ["messages"] as string[],
+      providerInputUsd: 5,
+      providerOutputUsd: 25,
+    };
+
+    const result = await chargeUsage({
+      userId: "00000000-0000-0000-0000-000000000001",
+      apiKeyId: "00000000-0000-0000-0000-000000000002",
+      model,
+      usage: { promptTokens: 1000, completionTokens: 0 },
+      responseMs: 200,
+      status: "success",
+      requestId: "req-cache-1",
+      rawUsageJson: { input_tokens: 0, cache_read_input_tokens: 1000, output_tokens: 0 },
+    });
+
+    // Cache-read discount applied: 0.003 TL, NOT the 0.75 TL full-rate charge.
+    expect(result.costTL).toBe(0.003);
+    expect(mockDbSqlBegin).toHaveBeenCalledTimes(1);
+  });
+
+  it("splits mixed base+cache-read prompt: base at full rate, cache-read at $0.06/1M", async () => {
+    // 1000 prompt total, 800 cache-read => 200 base.
+    //   TL = (200/1e6)*750 + (800/1e6)*3.0 = 0.15 + 0.0024 = 0.1524
+    mockSelectLimit.mockResolvedValueOnce([]);
+    mockTxSql
+      .mockResolvedValueOnce([{ bakiye_tl: "99.8480", email: "user@test.com" }])
+      .mockResolvedValueOnce([{ id: "tx-cache-2" }])
+      .mockResolvedValueOnce([]);
+
+    const { chargeUsage } = await import("./billing-service.js");
+
+    const model = {
+      id: "claude-opus-4-8",
+      name: "Claude Opus 4.8",
+      provider: "anthropic",
+      type: "Metin" as const,
+      context: "1M",
+      endpoints: ["messages"] as string[],
+      providerInputUsd: 5,
+      providerOutputUsd: 25,
+    };
+
+    const result = await chargeUsage({
+      userId: "00000000-0000-0000-0000-000000000001",
+      apiKeyId: "00000000-0000-0000-0000-000000000002",
+      model,
+      usage: { promptTokens: 1000, completionTokens: 0 },
+      responseMs: 200,
+      status: "success",
+      requestId: "req-cache-2",
+      rawUsageJson: { input_tokens: 200, cache_read_input_tokens: 800, output_tokens: 0 },
+    });
+
+    expect(result.costTL).toBe(0.1524);
+    expect(mockDbSqlBegin).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies the cache-read discount from the LIVE ChatUsage shape (cache under .providerRaw)", async () => {
+    // Production path: proxy passes the normalized ChatUsage object as
+    // rawUsageJson; the raw provider usage (with cache_read_input_tokens) lives
+    // under `.providerRaw`, NOT at the top level. Billing must unwrap it.
+    // 1000 prompt, all cache-read => 0.003 TL (same as the direct-raw case).
+    mockSelectLimit.mockResolvedValueOnce([]);
+    mockTxSql
+      .mockResolvedValueOnce([{ bakiye_tl: "99.9975", email: "user@test.com" }])
+      .mockResolvedValueOnce([{ id: "tx-cache-live-1" }])
+      .mockResolvedValueOnce([]);
+
+    const { chargeUsage } = await import("./billing-service.js");
+
+    const model = {
+      id: "claude-opus-4-8",
+      name: "Claude Opus 4.8",
+      provider: "anthropic",
+      type: "Metin" as const,
+      context: "1M",
+      endpoints: ["messages"] as string[],
+      providerInputUsd: 5,
+      providerOutputUsd: 25,
+    };
+
+    const result = await chargeUsage({
+      userId: "00000000-0000-0000-0000-000000000001",
+      apiKeyId: "00000000-0000-0000-0000-000000000002",
+      model,
+      usage: { promptTokens: 1000, completionTokens: 0 },
+      responseMs: 200,
+      status: "success",
+      requestId: "req-cache-live-1",
+      // LIVE shape: top-level has normalized tokens; cache is under providerRaw.
+      rawUsageJson: {
+        promptTokens: 1000,
+        completionTokens: 0,
+        providerRaw: { input_tokens: 0, cache_read_input_tokens: 1000, output_tokens: 0 },
+      },
+    });
+
+    expect(result.costTL).toBe(0.003);
+    expect(mockDbSqlBegin).toHaveBeenCalledTimes(1);
+  });
+
   it("returns existing request charge and does not deduct twice", async () => {
     mockSelectLimit.mockResolvedValue([{ costTL: "2.2500", remainingTL: "95.7500", status: "success" }]);
 

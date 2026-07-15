@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paket Mini Sayfalar</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; min-height: 100vh; }
+
+/* ── Wrapper ── */
+.app { max-width: 860px; margin: 0 auto; padding: 24px; }
+
+/* ── EKRAN 1: Ana seçim ── */
+#screen-main { display: flex; flex-direction: column; gap: 20px; }
+
+.page-hero { text-align: center; padding: 12px 0 4px; }
+.page-hero h1 { font-size: 26px; font-weight: 900; color: #0f172a; letter-spacing: -0.8px; }
+.page-hero p { font-size: 14px; color: #64748b; margin-top: 6px; }
+
+/* Üst karşılaştırma şerit */
+.top-strip {
+  background: linear-gradient(135deg, #1e1b4b, #4338ca);
+  border-radius: 14px; padding: 16px 20px;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; color: white;
+}
+.ts-main { flex: 1; }
+.ts-main .label { font-size: 11px; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.5px; }
+.ts-main .tagline { font-size: 16px; font-weight: 800; margin-top: 4px; }
+.ts-comparisons { display: flex; gap: 8px; flex-wrap: wrap; }
+.ts-item { text-align: center; }
+.ts-item .name { font-size: 10px; opacity: 0.65; }
+.ts-item .price { font-size: 15px; font-weight: 800; }
+.ts-item.them .price { color: #fca5a5; text-decoration: line-through; }
+.ts-item.us .price { color: #86efac; }
+.ts-arrow { font-size: 18px; opacity: 0.5; align-self: center; }
+.ts-badge {
+  background: #16a34a; border-radius: 10px; padding: 10px 16px; text-align: center; flex-shrink: 0;
+}
+.ts-badge .pct { font-size: 26px; font-weight: 900; line-height: 1; }
+.ts-badge .sub { font-size: 10px; opacity: 0.85; margin-top: 2px; }
+
+/* Senaryo grid */
+.scenario-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.sc-btn {
+  background: white; border: 2px solid #e2e8f0; border-radius: 16px;
+  padding: 0; cursor: pointer; text-align: left; transition: all 0.18s;
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.sc-btn:hover { border-color: #818cf8; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(99,102,241,0.13); }
+.sc-btn.featured { border-color: #6366f1; }
+
+.sc-top { padding: 18px 20px 14px; display: flex; align-items: flex-start; justify-content: space-between; }
+.sc-icon { font-size: 32px; display: block; margin-bottom: 10px; }
+.sc-name { font-size: 17px; font-weight: 800; color: #0f172a; }
+.sc-tagline { font-size: 12px; color: #64748b; margin-top: 3px; line-height: 1.4; }
+.sc-pop { background: #6366f1; color: white; font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
+
+.sc-bottom { padding: 12px 20px 16px; border-top: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
+.sc-price { font-size: 22px; font-weight: 900; color: #0f172a; letter-spacing: -0.5px; }
+.sc-price span { font-size: 12px; font-weight: 500; color: #94a3b8; margin-left: 2px; }
+.sc-save { font-size: 11px; font-weight: 700; color: #16a34a; background: #f0fdf4; padding: 4px 9px; border-radius: 6px; }
+.sc-arrow { font-size: 18px; color: #94a3b8; }
+
+
+/* ── EKRAN 2: Mini Sayfa ── */
+#screen-detail { display: none; flex-direction: column; gap: 18px; }
+
+.detail-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: white; border: 1px solid #e2e8f0; border-radius: 9px; padding: 8px 14px;
+  font-size: 13px; font-weight: 600; color: #374151; cursor: pointer;
+  width: fit-content; transition: background 0.15s;
+}
+.detail-back:hover { background: #f8fafc; }
+
+.detail-hero {
+  background: white; border-radius: 16px; padding: 24px;
+  display: flex; gap: 16px; align-items: flex-start;
+}
+.dh-icon { font-size: 48px; flex-shrink: 0; }
+.dh-text h2 { font-size: 22px; font-weight: 900; color: #0f172a; letter-spacing: -0.5px; }
+.dh-text p { font-size: 14px; color: #64748b; margin-top: 5px; line-height: 1.5; }
+
+/* İstek eğitim kutusu */
+.request-explainer {
+  background: #fffbeb; border: 1px solid #fde68a; border-radius: 14px; padding: 18px 20px;
+}
+.re-title { font-size: 13px; font-weight: 800; color: #92400e; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+.re-examples { display: flex; flex-direction: column; gap: 8px; }
+.re-row { display: flex; align-items: center; gap: 10px; }
+.re-action { display: flex; align-items: center; gap: 8px; background: white; border: 1px solid #fde68a; border-radius: 8px; padding: 8px 12px; flex: 1; font-size: 12.5px; color: #1e293b; }
+.re-count { font-size: 13px; font-weight: 800; color: #16a34a; background: #f0fdf4; border-radius: 7px; padding: 6px 12px; white-space: nowrap; }
+.re-note { margin-top: 10px; font-size: 11.5px; color: #92400e; line-height: 1.5; }
+
+/* Paket seçenekleri */
+.packages-title { font-size: 15px; font-weight: 800; color: #0f172a; }
+
+.packages-list { display: flex; flex-direction: column; gap: 10px; }
+
+.pkg-option {
+  background: white; border: 2px solid #e2e8f0; border-radius: 14px;
+  padding: 0; overflow: hidden; cursor: pointer; transition: all 0.15s;
+  display: flex; flex-direction: column;
+}
+.pkg-option.recommended { border-color: #6366f1; }
+.pkg-option:hover { border-color: #818cf8; box-shadow: 0 4px 16px rgba(99,102,241,0.1); }
+
+.pkg-row { display: flex; align-items: center; padding: 16px 20px; gap: 16px; }
+.pkg-left { flex: 1; }
+.pkg-badge-rec { display: inline-flex; align-items: center; gap: 4px; background: #6366f1; color: white; font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 5px; margin-bottom: 6px; text-transform: uppercase; }
+.pkg-name { font-size: 15px; font-weight: 800; color: #0f172a; }
+.pkg-specs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 5px; }
+.pkg-spec { font-size: 11px; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 2px 8px; }
+.pkg-right { text-align: right; flex-shrink: 0; }
+.pkg-price { font-size: 26px; font-weight: 900; color: #0f172a; letter-spacing: -0.8px; line-height: 1; }
+.pkg-period { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+.pkg-compare { font-size: 10px; color: #ef4444; text-decoration: line-through; }
+.pkg-savings { font-size: 10px; font-weight: 700; color: #16a34a; }
+
+.pkg-buy-row { padding: 0 16px 14px; }
+.pkg-buy {
+  width: 100%; padding: 11px; border-radius: 10px; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: opacity 0.15s;
+}
+.pkg-buy:hover { opacity: 0.87; }
+.pkg-buy.primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; }
+.pkg-buy.default { background: #0f172a; color: white; }
+.pkg-disclaimer { font-size: 10.5px; color: #94a3b8; text-align: center; margin-top: 7px; }
+.pkg-disclaimer span { color: #64748b; font-weight: 600; }
+
+/* Karşılaştırma kutusu */
+.competitor-box {
+  background: white; border-radius: 14px; padding: 18px 20px;
+}
+.cb-title { font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 12px; }
+.cb-rows { display: flex; flex-direction: column; gap: 0; }
+.cb-row { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f5f9; gap: 10px; }
+.cb-row:last-child { border-bottom: none; }
+.cb-logo { font-size: 16px; width: 28px; text-align: center; flex-shrink: 0; }
+.cb-name { font-size: 13px; color: #374151; flex: 1; }
+.cb-price { font-size: 14px; font-weight: 700; }
+.cb-price.them { color: #ef4444; }
+.cb-price.us { color: #16a34a; font-size: 15px; }
+.cb-tag { font-size: 10px; font-weight: 700; background: #dcfce7; color: #15803d; padding: 2px 7px; border-radius: 5px; }
+.cb-tag.ours { background: #6366f1; color: white; }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ═══ EKRAN 1: ANA SAYFA ═══ -->
+<div id="screen-main">
+
+  <div class="page-hero">
+    <h1>Yapay Zeka Paketleri</h1>
+    <p>Dünya'nın en iyi modellerine en uygun fiyatla eriş</p>
+  </div>
+
+  <div class="top-strip">
+    <div class="ts-main">
+      <div class="label">Neden YapayZekaLab?</div>
+      <div class="tagline">ChatGPT Plus'ın onda biri fiyatına,<br>daha fazla model ve limit.</div>
+    </div>
+    <div class="ts-comparisons">
+      <div class="ts-item them">
+        <div class="name">ChatGPT Plus</div>
+        <div class="price">~₺720/ay</div>
+      </div>
+      <div class="ts-arrow">→</div>
+      <div class="ts-item them">
+        <div class="name">Claude Pro</div>
+        <div class="price">~₺720/ay</div>
+      </div>
+      <div class="ts-arrow">→</div>
+      <div class="ts-item us">
+        <div class="name">YapayZekaLab</div>
+        <div class="price">₺49'dan</div>
+      </div>
+    </div>
+    <div class="ts-badge">
+      <div class="pct">%93</div>
+      <div class="sub">tasarruf</div>
+    </div>
+  </div>
+
+  <div class="scenario-grid">
+
+    <div class="sc-btn" onclick="openDetail('chat')">
+      <div class="sc-top">
+        <div>
+          <span class="sc-icon">💬</span>
+          <div class="sc-name">Günlük Sohbet</div>
+          <div class="sc-tagline">Claude veya GPT ile her gün yazışma, özet, çeviri</div>
+        </div>
+      </div>
+      <div class="sc-bottom">
+        <div class="sc-price">₺49 <span>/ ay'dan</span></div>
+        <div class="sc-save">%93 tasarruf</div>
+        <div class="sc-arrow">›</div>
+      </div>
+    </div>
+
+    <div class="sc-btn featured" onclick="openDetail('dev')">
+      <div class="sc-top">
+        <div>
+          <span class="sc-icon">💻</span>
+          <div class="sc-name">Kodlama & API</div>
+          <div class="sc-tagline">Cursor, Cline, Claude Code ile kod yazdır</div>
+        </div>
+        <div class="sc-pop">⭐ Popüler</div>
+      </div>
+      <div class="sc-bottom">
+        <div class="sc-price">₺99 <span>/ ay'dan</span></div>
+        <div class="sc-save">%86 tasarruf</div>
+        <div class="sc-arrow">›</div>
+      </div>
+    </div>
+
+    <div class="sc-btn" onclick="openDetail('heavy')">
+      <div class="sc-top">
+        <div>
+          <span class="sc-icon">🚀</span>
+          <div class="sc-name">Yoğun Kullanım</div>
+          <div class="sc-tagline">Ajans, ekip veya otomatik iş akışları için</div>
+        </div>
+      </div>
+      <div class="sc-bottom">
+        <div class="sc-price">₺299 <span>/ ay'dan</span></div>
+        <div class="sc-save">%92 tasarruf</div>
+        <div class="sc-arrow">›</div>
+      </div>
+    </div>
+
+    <div class="sc-btn" onclick="openDetail('trial')">
+      <div class="sc-top">
+        <div>
+          <span class="sc-icon">🎯</span>
+          <div class="sc-name">Önce Dene</div>
+          <div class="sc-tagline">Taahhütsüz 5 gün, tüm modeller açık</div>
+        </div>
+      </div>
+      <div class="sc-bottom">
+        <div class="sc-price">₺9 <span>· tek seferlik</span></div>
+        <div class="sc-save">Risksiz dene</div>
+        <div class="sc-arrow">›</div>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /screen-main -->
+
+
+<!-- ═══ EKRAN 2: MİNİ SAYFA ═══ -->
+<div id="screen-detail">
+
+  <button class="detail-back" onclick="goBack()">← Geri dön</button>
+
+  <!-- Hero (JS ile doldurulur) -->
+  <div class="detail-hero" id="detail-hero">
+    <div class="dh-icon" id="detail-icon"></div>
+    <div class="dh-text">
+      <h2 id="detail-title"></h2>
+      <p id="detail-desc"></p>
+    </div>
+  </div>
+
+  <!-- Paket seçenekleri -->
+  <div>
+    <div class="packages-title" style="margin-bottom:10px" id="packages-title">Paket seç</div>
+    <div class="packages-list" id="packages-list"></div>
+  </div>
+
+  <!-- İade politikası notu -->
+  <div style="background:#fefce8;border:1px solid #fde68a;border-radius:12px;padding:14px 18px;display:flex;gap:10px;align-items:flex-start">
+    <div style="font-size:18px;flex-shrink:0">⚠️</div>
+    <div>
+      <div style="font-size:12.5px;font-weight:700;color:#92400e;margin-bottom:3px">Satın Alma Politikası</div>
+      <div style="font-size:12px;color:#78350f;line-height:1.5">
+        Paketler satın alındığı anda havuzdan hesabınıza tanımlanır ve hemen aktif olur.
+        Bu nedenle <strong>iade yapılmamaktadır</strong>. Önce <strong>Deneme Paketi</strong> (₺9) alarak sistemi test etmenizi öneririz.
+      </div>
+    </div>
+  </div>
+
+  <!-- Rakip karşılaştırma -->
+  <div class="competitor-box" id="competitor-box">
+    <div class="cb-title">📊 Alternatiflerle karşılaştır</div>
+    <div class="cb-rows" id="competitor-rows"></div>
+  </div>
+
+</div><!-- /screen-detail -->
+
+</div><!-- /app -->
+
+<script>
+const DATA = {
+  chat: {
+    icon: '💬', title: 'Günlük Sohbet',
+    desc: 'Claude, GPT veya Gemini ile her gün yazışmak, metin yazdırmak, özetlemek veya çeviri yapmak için. Herhangi bir uygulama kurmanıza gerek yok — tarayıcıdan direkt kullanın.',
+    requestExplain: {
+      label: 'Sohbet modunda 1 istek nedir?',
+      examples: [
+        { action: '📝  "Bu metni özetle" yazıp gönderdin', count: '1 istek' },
+        { action: '💬  Yapay zeka cevap verdi, sen tekrar sordu', count: '1 istek' },
+        { action: '🖼️  Bir görsel yükleyip "Ne görüyorsun?" dedin', count: '1 istek' },
+      ],
+      note: '⌨️ Enter\'a kaç kez bastığın önemli değil — gönder tuşuna bastığında 1 istek sayılır. 500 istek/gün = günde 500 soru-cevap yapabilirsin.'
+    },
+    packages: [
+      { id: 'chat-starter', name: 'Başlangıç', recommended: false, price: '₺49', period: '/ay', specs: ['500 istek / gün', '30 gün', 'Claude + GPT + Gemini'], comparePrice: '~₺720', savings: '%93 ucuz' },
+      { id: 'chat-pro',     name: 'Pro',       recommended: true,  price: '₺99', period: '/ay', specs: ['1.500 istek / gün', '30 gün', 'Tüm modeller'], comparePrice: '~₺720', savings: '%86 ucuz' },
+    ],
+    competitors: [
+      { logo: '🤖', name: 'ChatGPT Plus (OpenAI)', price: '~₺720/ay', them: true },
+      { logo: '🔵', name: 'Claude Pro (Anthropic)', price: '~₺720/ay', them: true },
+      { logo: '✅', name: 'YapayZekaLab — Pro', price: '₺99/ay', them: false },
+    ]
+  },
+  dev: {
+    icon: '💻', title: 'Kodlama & API',
+    desc: 'Cursor, Cline, Claude Code veya Codex gibi AI kodlama araçlarını kendi API anahtarınla kullanmak için. Araçlara YapayZekaLab API anahtarını giriyorsunuz, modellere sınırsız denecek kadar erişiyorsunuz.',
+    requestExplain: {
+      label: 'Kodlama araçlarında 1 istek nedir?',
+      examples: [
+        { action: '💡  "Bu fonksiyonu refactor et" dedin', count: '1 istek' },
+        { action: '🐛  Hata mesajını yapıştırıp "Düzelt" dedin', count: '1 istek' },
+        { action: '📄  100 satır kod analiz ettirdin', count: '1 istek' },
+      ],
+      note: '⌨️ Cursor veya Cline\'da "kabul et / reddet" tıklamak istek DEĞİLDİR. Yalnızca yapay zekaya yeni bir şey göndermek 1 istek sayılır. 2.000 istek/gün = günde 2.000 kod talebi yapabilirsin.'
+    },
+    packages: [
+      { id: 'dev-starter', name: 'Başlangıç',    recommended: false, price: '₺99',  period: '/ay', specs: ['1.000 istek / gün', '30 gün', 'Claude + GPT + o3'], comparePrice: '~₺360', savings: '%72 ucuz' },
+      { id: 'dev-pro',     name: 'Pro',           recommended: true,  price: '₺149', period: '/ay', specs: ['2.000 istek / gün', '30 gün', 'Opus dahil tüm modeller'], comparePrice: '~₺720', savings: '%79 ucuz' },
+      { id: 'dev-heavy',   name: 'Yoğun Kodlama', recommended: false, price: '₺249', period: '/ay', specs: ['5.000 istek / gün', '30 gün', 'Öncelikli erişim'], comparePrice: '~₺1.800', savings: '%86 ucuz' },
+    ],
+    competitors: [
+      { logo: '🐙', name: 'GitHub Copilot Pro',  price: '~₺360/ay',   them: true },
+      { logo: '⚡', name: 'Cursor Pro',           price: '~₺720/ay',   them: true },
+      { logo: '🔵', name: 'Anthropic API direkt (1M token/ay)', price: '~₺2.000/ay', them: true },
+      { logo: '✅', name: 'YapayZekaLab — Pro',  price: '₺149/ay',    them: false },
+    ]
+  },
+  heavy: {
+    icon: '🚀', title: 'Yoğun Kullanım',
+    desc: 'Otomasyon, ajans iş akışları veya ekip kullanımı için. Binlerce istekten oluşan batchler, raporlama sistemleri veya müşteri hizmetleri botları için idealdir.',
+    requestExplain: {
+      label: 'Otomasyon senaryosunda 1 istek nedir?',
+      examples: [
+        { action: '📧  E-posta sınıflandırma: 1 e-posta işlendi', count: '1 istek' },
+        { action: '📝  1 müşteri yorumu analiz edildi', count: '1 istek' },
+        { action: '🔄  API entegrasyonunda 1 çağrı yapıldı', count: '1 istek' },
+      ],
+      note: '🔌 API entegrasyonunda her HTTP isteği = 1 istek. Günde 5.000 istek ile küçük-orta ölçekli otomasyonlarınızı rahatlıkla karşılayabilirsiniz.'
+    },
+    packages: [
+      { id: 'heavy-base',   name: 'İş Paketi',   recommended: false, price: '₺299', period: '/ay', specs: ['5.000 istek / gün', '30 gün', 'Tüm modeller'], comparePrice: '~₺5.400', savings: '%94 ucuz' },
+      { id: 'heavy-agency', name: 'Ajans Paketi', recommended: true,  price: '₺499', period: '/ay', specs: ['10.000 istek / gün', '30 gün', 'Öncelikli kuyruğu'], comparePrice: '~₺10.800', savings: '%95 ucuz' },
+    ],
+    competitors: [
+      { logo: '🔵', name: 'Anthropic API direkt (5k istek/gün)', price: '~₺5.400/ay', them: true },
+      { logo: '🟢', name: 'OpenAI API direkt (5k istek/gün)',    price: '~₺3.600/ay', them: true },
+      { logo: '✅', name: 'YapayZekaLab — İş Paketi',           price: '₺299/ay',    them: false },
+    ]
+  },
+  trial: {
+    icon: '🎯', title: 'Önce Dene',
+    desc: '5 gün boyunca tüm modellere tam erişim. Hangi modelin sana uyduğuna karar ver, sonra aylık pakete geç. Taahhüt yok, otomatik yenileme yok.',
+    requestExplain: {
+      label: 'Deneme paketinde 1 istek nedir?',
+      examples: [
+        { action: '💬  Claude\'a bir soru sordum', count: '1 istek' },
+        { action: '⚡  GPT-5 ile bir metin yazdırdım', count: '1 istek' },
+        { action: '🖼️  Bir görsel analiz ettirdim', count: '1 istek' },
+      ],
+      note: '🎯 200 istek = 5 günde yaklaşık 40 soru/gün. Modelleri karşılaştırmak, farklı görevleri denemek için fazlasıyla yeter. Memnun kalırsan aylık pakete geç.'
+    },
+    packages: [
+      { id: 'trial', name: 'Deneme Paketi', recommended: true, price: '₺9', period: '· 5 gün', specs: ['200 istek toplam', '5 gün geçerli', 'GPT + Claude + Gemini'], comparePrice: null, savings: null },
+    ],
+    competitors: [
+      { logo: '🤖', name: 'ChatGPT Ücretsiz (kısıtlı GPT-4o)', price: 'Ücretsiz ama sınırlı', them: true },
+      { logo: '⏳', name: 'Anthropic ücretsiz (mesaj limiti)', price: 'Hızlı doluyor',       them: true },
+      { logo: '✅', name: 'YapayZekaLab Deneme (tüm modeller tam erişim)', price: '₺9 · 5 gün', them: false },
+    ]
+  }
+};
+
+function openDetail(key) {
+  const d = DATA[key];
+  document.getElementById('screen-main').style.display = 'none';
+  const det = document.getElementById('screen-detail');
+  det.style.display = 'flex';
+
+  document.getElementById('detail-icon').textContent = d.icon;
+  document.getElementById('detail-title').textContent = d.title;
+  document.getElementById('detail-desc').textContent = d.desc;
+
+  // Paketler
+  document.getElementById('packages-title').textContent = d.packages.length > 1 ? 'İhtiyacına göre bir paket seç' : 'Paket';
+  document.getElementById('packages-list').innerHTML = d.packages.map(p => `
+    <div class="pkg-option ${p.recommended ? 'recommended' : ''}">
+      <div class="pkg-row">
+        <div class="pkg-left">
+          ${p.recommended ? '<div class="pkg-badge-rec">⭐ Önerilen</div>' : ''}
+          <div class="pkg-name">${p.name}</div>
+          <div class="pkg-specs">${p.specs.map(s => `<span class="pkg-spec">${s}</span>`).join('')}</div>
+        </div>
+        <div class="pkg-right">
+          ${p.comparePrice ? `<div class="pkg-compare">${p.comparePrice}</div>` : ''}
+          <div class="pkg-price">${p.price}</div>
+          <div class="pkg-period">${p.period}</div>
+          ${p.savings ? `<div class="pkg-savings">${p.savings}</div>` : ''}
+        </div>
+      </div>
+      <div class="pkg-buy-row">
+        <button class="pkg-buy ${p.recommended ? 'primary' : 'default'}">⚡ Bakiye ile al</button>
+        <div class="pkg-disclaimer">⚡ Satın alındığı anda hesabına tanımlanır &nbsp;·&nbsp; <span>İade edilmez</span></div>
+      </div>
+    </div>
+  `).join('');
+
+  // Rakip kutu
+  document.getElementById('competitor-rows').innerHTML = d.competitors.map(c => `
+    <div class="cb-row">
+      <div class="cb-logo">${c.logo}</div>
+      <div class="cb-name">${c.name}</div>
+      <div class="cb-price ${c.them ? 'them' : 'us'}">${c.price}</div>
+      ${!c.them ? '<div class="cb-tag ours">Biziz 👋</div>' : ''}
+    </div>
+  `).join('');
+
+  window.scrollTo(0, 0);
+}
+
+function goBack() {
+  document.getElementById('screen-detail').style.display = 'none';
+  document.getElementById('screen-main').style.display = 'flex';
+  window.scrollTo(0, 0);
+}
+</script>
+</body>
+</html>

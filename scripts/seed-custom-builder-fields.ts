@@ -24,7 +24,9 @@ interface Tmpl {
 // clone = kopyalanacak mevcut base paket id'si (allowed_models/cf_catalog_id/cf_api_slug/kategori ondan gelir)
 // adBase = builder şablon adı (açıkça verilir; regex edge-case'i yok). Ad = adBase + " — Kendin Yap".
 const TEMPLATES: Tmpl[] = [
-  { id: "cf-codex-builder",        clone: "cf-codex",         adBase: "Codex (GPT-5.5/5.4)",      unitCost: 0.069, birim: "istek",    maxLimit: 5000, maxDays: 90 },
+  // unitCost 0.080 = FİYAT KOLU (gerçek CF maliyeti ~0.069). 1-günlük builder'ın sabit "1 Günlük 500/99₺"
+  // paketinin altını oymaması için yükseltildi (2026-06-21): 600/1g 100→120₺, 500/1g 90→100₺. Geri alma.
+  { id: "cf-codex-builder",        clone: "cf-codex",         adBase: "Codex (GPT-5.5/5.4)",      unitCost: 0.080, birim: "istek",    maxLimit: 5000, maxDays: 90 },
   { id: "cf-gemini-builder",       clone: "cf-gemini",        adBase: "Gemini (3.1 Pro / 3 Flash)", unitCost: 0.030, birim: "istek",  maxLimit: 5000, maxDays: 90 },
   { id: "cf-grok-builder",         clone: "cf-grok",          adBase: "Grok (4.3 / 4.20 / 3-mini)", unitCost: 0.030, birim: "istek",  maxLimit: 5000, maxDays: 90 },
   { id: "cf-composer-builder",     clone: "cf-composer",      adBase: "Composer 2.5 Fast",        unitCost: 0.090, birim: "istek",    maxLimit: 5000, maxDays: 90 },

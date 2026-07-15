@@ -1,0 +1,208 @@
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .q { font-size: 20px; font-weight: 700; margin-bottom: 6px; color: #0f172a; }
+  .qs { font-size: 14px; color: #64748b; margin-bottom: 28px; }
+  .options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .option { border: 2px solid #e2e8f0; border-radius: 16px; overflow: hidden; cursor: pointer; transition: all 0.2s; background: #fff; }
+  .option:hover { border-color: #6366f1; box-shadow: 0 8px 24px rgba(99,102,241,0.15); transform: translateY(-2px); }
+  .option.selected { border-color: #6366f1; box-shadow: 0 0 0 4px rgba(99,102,241,0.12); }
+  .opt-label { background: #f8fafc; padding: 10px 16px; font-size: 11px; font-weight: 700; letter-spacing: 1px; color: #94a3b8; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+  .opt-label .letter { width: 22px; height: 22px; background: #6366f1; color: white; border-radius: 6px; font-size: 11px; display: grid; place-items: center; }
+  .mock { padding: 16px; }
+
+  /* Seçenek A — Karşılaştırma Bandı */
+  .savings-banner { background: linear-gradient(135deg, #0ea5e9, #6366f1); border-radius: 10px; padding: 12px 14px; color: white; margin-bottom: 12px; }
+  .savings-banner .sb-title { font-size: 11px; opacity: 0.85; margin-bottom: 4px; }
+  .savings-row { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+  .sb-cross { color: #fca5a5; font-size: 11px; }
+  .sb-green { color: #86efac; }
+  .sb-tag { background: rgba(255,255,255,0.2); border-radius: 4px; padding: 2px 6px; font-size: 10px; }
+  .mini-cats { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .mini-cat { padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; cursor: pointer; }
+  .mini-cat.act { background: #6366f1; color: white; }
+  .mini-cat:not(.act) { background: #f1f5f9; color: #64748b; }
+  .pkg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pkg-card { border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+  .pkg-top { height: 36px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: white; }
+  .pkg-body { padding: 8px 10px; }
+  .pkg-name { font-size: 11px; font-weight: 600; color: #1e293b; }
+  .pkg-price { font-size: 16px; font-weight: 800; color: #1e293b; margin: 3px 0 1px; }
+  .pkg-sub { font-size: 9px; color: #94a3b8; }
+  .pkg-badge { display: inline-flex; align-items: center; gap: 3px; background: #f0fdf4; color: #16a34a; border-radius: 4px; padding: 2px 5px; font-size: 9px; font-weight: 700; margin-top: 3px; }
+
+  /* Seçenek B — Kullanım Senaryoları */
+  .scenario-hero { background: #f8fafc; border-radius: 10px; padding: 12px; text-align: center; margin-bottom: 12px; }
+  .sc-h { font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 3px; }
+  .sc-s { font-size: 10px; color: #64748b; }
+  .sc-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .sc-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; }
+  .sc-icon { font-size: 20px; margin-bottom: 4px; }
+  .sc-title { font-size: 11px; font-weight: 700; color: #1e293b; }
+  .sc-desc { font-size: 9.5px; color: #64748b; margin: 2px 0; }
+  .sc-price { font-size: 14px; font-weight: 800; color: #6366f1; }
+  .sc-from { font-size: 9px; color: #94a3b8; }
+
+  /* Seçenek C — Temiz Grid + Tasarruf Badge */
+  .clean-filter { display: flex; gap: 4px; margin-bottom: 10px; }
+  .cf-btn { padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 600; border: 1px solid #e2e8f0; background: white; color: #64748b; cursor: pointer; }
+  .cf-btn.act { background: #0f172a; color: white; border-color: #0f172a; }
+  .clean-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cg-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; position: relative; overflow: hidden; }
+  .cg-card.pop { border-color: #6366f1; }
+  .cg-pop-tag { position: absolute; top: 0; right: 0; background: #6366f1; color: white; font-size: 8px; font-weight: 800; padding: 3px 8px; border-radius: 0 10px 0 6px; }
+  .cg-icon { font-size: 18px; margin-bottom: 6px; }
+  .cg-name { font-size: 11px; font-weight: 700; color: #1e293b; }
+  .cg-spec { font-size: 9.5px; color: #64748b; margin: 2px 0 5px; }
+  .cg-price { font-size: 18px; font-weight: 800; color: #1e293b; }
+  .cg-save { display: inline-flex; align-items: center; gap: 3px; background: #fef9c3; color: #854d0e; border-radius: 4px; padding: 2px 6px; font-size: 9px; font-weight: 700; }
+  .cg-btn { margin-top: 8px; width: 100%; padding: 6px; border-radius: 7px; background: #0f172a; color: white; font-size: 10px; font-weight: 700; border: none; cursor: pointer; }
+  .cg-card.pop .cg-btn { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+</style>
+
+<div class="q">Paket sayfasının ana yönü ne olsun?</div>
+<div class="qs">Üç farklı yaklaşım — hangisi müşterilere en iyi "değeri" anlatır?</div>
+
+<div class="options">
+
+  <!-- SEÇENEK A -->
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="opt-label">
+      <span>A — Karşılaştırma Bandı</span>
+      <div class="letter">A</div>
+    </div>
+    <div class="mock">
+      <div class="savings-banner">
+        <div class="sb-title">Aynı yapay zeka — çok daha ucuz</div>
+        <div class="savings-row">
+          <span class="sb-cross">✕ Anthropic'ten direkt: $30/M</span>
+        </div>
+        <div class="savings-row" style="margin-top:3px">
+          <span class="sb-green">✓ YapayZekaLab'dan: $2.4/M</span>
+          <span class="sb-tag">%92 tasarruf</span>
+        </div>
+      </div>
+      <div class="mini-cats">
+        <div class="mini-cat act">Tümü</div>
+        <div class="mini-cat">Claude</div>
+        <div class="mini-cat">GPT</div>
+        <div class="mini-cat">Deneme</div>
+      </div>
+      <div class="pkg-grid">
+        <div class="pkg-card">
+          <div class="pkg-top" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)">Claude</div>
+          <div class="pkg-body">
+            <div class="pkg-name">Başlangıç Paketi</div>
+            <div class="pkg-price">₺49</div>
+            <div class="pkg-sub">500 istek / gün · 30 gün</div>
+            <div class="pkg-badge">🟢 %87 ucuz</div>
+          </div>
+        </div>
+        <div class="pkg-card">
+          <div class="pkg-top" style="background:linear-gradient(135deg,#0ea5e9,#0284c7)">GPT</div>
+          <div class="pkg-body">
+            <div class="pkg-name">Pro Paket</div>
+            <div class="pkg-price">₺99</div>
+            <div class="pkg-sub">1.000 istek / gün · 30 gün</div>
+            <div class="pkg-badge">🟢 %79 ucuz</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEÇENEK B -->
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="opt-label">
+      <span>B — Kullanım Senaryoları</span>
+      <div class="letter">B</div>
+    </div>
+    <div class="mock">
+      <div class="scenario-hero">
+        <div class="sc-h">Ne yapmak istiyorsun?</div>
+        <div class="sc-s">Sana en uygun paketi biz seçelim</div>
+      </div>
+      <div class="sc-cards">
+        <div class="sc-card">
+          <div class="sc-icon">💬</div>
+          <div class="sc-title">Günlük Sohbet</div>
+          <div class="sc-desc">Claude veya GPT ile her gün konuşma</div>
+          <div class="sc-price">₺49<span style="font-size:9px;color:#94a3b8">/ay</span></div>
+          <div class="sc-from">500 istek / gün</div>
+        </div>
+        <div class="sc-card" style="border-color:#6366f1">
+          <div class="sc-icon">💻</div>
+          <div class="sc-title">Kodlama & API</div>
+          <div class="sc-desc">Codex, Cline, Cursor için yüksek limit</div>
+          <div class="sc-price">₺149<span style="font-size:9px;color:#94a3b8">/ay</span></div>
+          <div class="sc-from">2.000 istek / gün</div>
+        </div>
+        <div class="sc-card">
+          <div class="sc-icon">🎯</div>
+          <div class="sc-title">Deneyin Bakalım</div>
+          <div class="sc-desc">5 gün, sınırsız model erişimi</div>
+          <div class="sc-price">₺9</div>
+          <div class="sc-from">Tek seferlik · 200 istek</div>
+        </div>
+        <div class="sc-card">
+          <div class="sc-icon">🚀</div>
+          <div class="sc-title">Ağır Kullanım</div>
+          <div class="sc-desc">Sınırsız, yüksek hız, öncelikli erişim</div>
+          <div class="sc-price">₺299<span style="font-size:9px;color:#94a3b8">/ay</span></div>
+          <div class="sc-from">5.000 istek / gün</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEÇENEK C -->
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="opt-label">
+      <span>C — Temiz Grid + Tasarruf</span>
+      <div class="letter">C</div>
+    </div>
+    <div class="mock">
+      <div class="clean-filter">
+        <div class="cf-btn act">Tümü</div>
+        <div class="cf-btn">🤖 Claude</div>
+        <div class="cf-btn">⚡ GPT</div>
+        <div class="cf-btn">🔑 Deneme</div>
+      </div>
+      <div class="clean-grid">
+        <div class="cg-card">
+          <div class="cg-icon">🤖</div>
+          <div class="cg-name">Claude Başlangıç</div>
+          <div class="cg-spec">500 istek/gün · 30 gün</div>
+          <div class="cg-price">₺49</div>
+          <div class="cg-save">⚡ Direkt'ten %87 ucuz</div>
+          <button class="cg-btn">Bakiye ile al</button>
+        </div>
+        <div class="cg-card pop">
+          <div class="cg-pop-tag">⭐ EN POPÜLER</div>
+          <div class="cg-icon">🤖</div>
+          <div class="cg-name">Claude Pro</div>
+          <div class="cg-spec">1.000 istek/gün · 30 gün</div>
+          <div class="cg-price">₺99</div>
+          <div class="cg-save">⚡ Direkt'ten %87 ucuz</div>
+          <button class="cg-btn">Bakiye ile al</button>
+        </div>
+        <div class="cg-card">
+          <div class="cg-icon">⚡</div>
+          <div class="cg-name">GPT Başlangıç</div>
+          <div class="cg-spec">500 istek/gün · 30 gün</div>
+          <div class="cg-price">₺39</div>
+          <div class="cg-save">⚡ Direkt'ten %79 ucuz</div>
+          <button class="cg-btn">Bakiye ile al</button>
+        </div>
+        <div class="cg-card">
+          <div class="cg-icon">🔑</div>
+          <div class="cg-name">Deneme Paketi</div>
+          <div class="cg-spec">200 istek · 5 gün</div>
+          <div class="cg-price">₺9</div>
+          <div style="height:14px"></div>
+          <button class="cg-btn">Bakiye ile al</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

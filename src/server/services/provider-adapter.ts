@@ -23,7 +23,7 @@ export interface ProviderAdapter {
   // Responses API streaming köprüsü: upstream'i chat olarak sürer, res'e Responses event'leri yazar.
   forwardResponsesStream(body: ChatRequest, res: Response, ctx: ProviderContext, meta: ResponsesStreamMeta, attempt?: AttemptOptions): Promise<ChatUsage>;
   forwardResponses(body: TextRequest, ctx: ProviderContext, attempt?: AttemptOptions): Promise<{ raw: unknown; usage: ChatUsage }>;
-  forwardMessages(body: TextRequest, ctx: ProviderContext, attempt?: AttemptOptions): Promise<{ raw: unknown; usage: ChatUsage }>;
+  forwardMessages(body: TextRequest, ctx: ProviderContext, attempt?: AttemptOptions, upstreamHeaders?: Record<string, string>): Promise<{ raw: unknown; usage: ChatUsage }>;
   forwardImage(
     endpoint: "generations" | "edits",
     body: Record<string, unknown>,
@@ -52,8 +52,8 @@ export class CloseRouterAdapter implements ProviderAdapter {
     return forwardTextEndpoint("responses", body, ctx, attempt);
   }
 
-  forwardMessages(body: TextRequest, ctx: ProviderContext, attempt?: AttemptOptions): Promise<{ raw: unknown; usage: ChatUsage }> {
-    return forwardTextEndpoint("messages", body, ctx, attempt);
+  forwardMessages(body: TextRequest, ctx: ProviderContext, attempt?: AttemptOptions, upstreamHeaders?: Record<string, string>): Promise<{ raw: unknown; usage: ChatUsage }> {
+    return forwardTextEndpoint("messages", body, ctx, attempt, upstreamHeaders);
   }
 
   forwardImage(

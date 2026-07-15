@@ -23,6 +23,16 @@ import { cfCreateOrder, cfGetOrder, extractCustomerKey, CodefastError } from "./
  */
 export const CF_INITIAL_BATCH_UNITS = 150;
 
+/**
+ * Top-up (lazy artış) batch boyutu — İLK order'dan AYRI ve daha KÜÇÜK.
+ * İlk order 150 kalır (soğuk-başlangıç 403 koruması, yukarıdaki yorum). Ama paket
+ * ısındıktan SONRA buffer'ı küçük artışlarla doldur: müşteri kullandıkça 50'şer al,
+ * böylece kullanılmayan üniteye CF'ye peşin para verilmez (paket süresi bitince
+ * almadığımız ünite zarar yazmaz). Eşik (CF_TOPUP_THRESHOLD_UNITS) AYNI kaldığı için
+ * ongoing burst-403 riski artmaz — yalnız peşin alım azalır.
+ */
+export const CF_TOPUP_BATCH_UNITS = 50;
+
 export interface CfPkgMeta {
   cfCatalogId: string;
   cfApiSlug: string;
@@ -153,7 +163,7 @@ export async function topUpCfIfNeeded(entitlementId: string): Promise<void> {
     const remaining = e.cf_remaining == null ? 0 : Number(e.cf_remaining);
     if (remaining >= CF_TOPUP_THRESHOLD_UNITS) return; // buffer yeterli
     if (!e.cf_customer_id || !e.cf_catalog_id) return;
-    const batch = Math.min(CF_INITIAL_BATCH_UNITS, cap - ordered);
+    const batch = Math.min(CF_TOPUP_BATCH_UNITS, cap - ordered);
     if (batch <= 0) return;
     // Süre = entitlement'ın KALAN ömrü (gün), p.sure_gun DEĞİL. Configurable ("Kendin Yap")
     // pakette p.sure_gun = şablon tavanı (90) → CF reseller policy "duration above" ile 400 REDDEDER

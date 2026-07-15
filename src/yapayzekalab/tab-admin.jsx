@@ -2515,6 +2515,8 @@ const AdminPaymentSettings = ({ config, token, refresh }) => {
   const [pendingError, setPendingError] = useState('');
   const [actionId, setActionId] = useState('');
   const [rejectNotes, setRejectNotes] = useState({});
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const loadPending = useCallback(async () => {
     setPendingLoading(true);
@@ -2522,7 +2524,11 @@ const AdminPaymentSettings = ({ config, token, refresh }) => {
     try {
       const rows = await adminRequest('/api/payments/admin/pending-iban', token);
       const list = Array.isArray(rows) ? rows : [];
-      setPendingIban(list.filter((r) => r.durum === 'bekliyor'));
+      const bekleyenler = list.filter((r) => r.durum === 'bekliyor');
+      setPendingIban(bekleyenler);
+      // Yeniden yükleyince bayat seçimleri düşür (silinmiş id'ler seçili kalmasın).
+      const validIds = new Set(bekleyenler.map((r) => r.id));
+      setSelectedIds((cur) => new Set([...cur].filter((id) => validIds.has(id))));
     } catch (e) {
       setPendingError(e?.message || 'Bekleyen havaleler alınamadı.');
     } finally {
@@ -2566,6 +2572,48 @@ const AdminPaymentSettings = ({ config, token, refresh }) => {
       setPendingError(e?.message || 'Reddetme başarısız.');
     } finally {
       setActionId('');
+    }
+  };
+
+  const visibleIds = pendingIban.map((r) => r.id);
+  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+
+  const toggleOne = (id) => {
+    setSelectedIds((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    setSelectedIds((cur) => {
+      const all = visibleIds.length > 0 && visibleIds.every((id) => cur.has(id));
+      return all ? new Set() : new Set(visibleIds);
+    });
+  };
+
+  const deleteSelected = async () => {
+    const ids = pendingIban.map((r) => r.id).filter((id) => selectedIds.has(id));
+    if (!ids.length) return;
+    if (!window.confirm(`${ids.length} bekleyen havale bildirimi silinecek. Bu işlem geri alınamaz. (Onaylı / bakiyesi yüklenmiş kayıtlar korunur.) Emin misiniz?`)) return;
+    setBulkDeleting(true);
+    setPendingError('');
+    try {
+      const res = await adminRequest('/api/payments/admin/pending-iban/bulk-delete', token, {
+        method: 'POST',
+        body: { ids },
+      });
+      setSelectedIds(new Set());
+      await loadPending();
+      await refresh();
+      if (res && res.blocked) {
+        setPendingError(`${res.deleted} kayıt silindi · ${res.blocked} onaylı kayıt korundu (silinemez).`);
+      }
+    } catch (e) {
+      setPendingError(e?.message || 'Toplu silme başarısız.');
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -2615,6 +2663,33 @@ const AdminPaymentSettings = ({ config, token, refresh }) => {
           </button>
         </div>
 
+        {pendingIban.length > 0 && (
+          <div style={{
+            padding: '10px 20px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+              Tümünü seç
+              <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}>({selectedIds.size}/{pendingIban.length} seçili)</span>
+            </label>
+            <button
+              onClick={deleteSelected}
+              disabled={bulkDeleting || selectedIds.size === 0}
+              title="Seçili bekleyen bildirimleri sil (onaylı kayıtlar korunur)"
+              style={{
+                padding: '8px 14px', borderRadius: 9, border: '1px solid #fecaca',
+                background: selectedIds.size === 0 ? 'var(--surface)' : '#fef2f2', color: '#b91c1c',
+                fontSize: 12, fontWeight: 700,
+                opacity: (bulkDeleting || selectedIds.size === 0) ? 0.5 : 1,
+                cursor: (bulkDeleting || selectedIds.size === 0) ? 'default' : 'pointer',
+              }}
+            >
+              {bulkDeleting ? 'Siliniyor…' : `Seçilenleri sil${selectedIds.size ? ` (${selectedIds.size})` : ''}`}
+            </button>
+          </div>
+        )}
+
         {pendingError && (
           <div style={{ margin: '12px 20px 0', fontSize: 11.5, color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 9, padding: '8px 10px' }}>
             {pendingError}
@@ -2631,8 +2706,15 @@ const AdminPaymentSettings = ({ config, token, refresh }) => {
           <div key={row.id} style={{
             padding: '14px 20px',
             borderBottom: i < pendingIban.length - 1 ? '1px solid var(--border)' : 'none',
-            display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'center',
+            display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 12, alignItems: 'center',
+            background: selectedIds.has(row.id) ? 'rgba(185,28,28,0.045)' : 'transparent',
           }}>
+            <input
+              type="checkbox"
+              checked={selectedIds.has(row.id)}
+              onChange={() => toggleOne(row.id)}
+              style={{ width: 16, height: 16, cursor: 'pointer' }}
+            />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div style={{ fontSize: 14, fontWeight: 600 }}>
                 {money(row.creditTL ?? row.miktarTL)}

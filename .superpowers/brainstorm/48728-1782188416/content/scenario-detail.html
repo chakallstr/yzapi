@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paket Sayfası Detay Mockup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; min-height: 100vh; padding: 24px; }
+
+  .page { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── Başlık ── */
+  .page-header { }
+  .page-header h1 { font-size: 24px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; }
+  .page-header p { font-size: 14px; color: #64748b; margin-top: 4px; }
+
+  /* ── Karşılaştırma Banner ── */
+  .compare-banner {
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
+    border-radius: 16px; padding: 20px 24px; color: white;
+    display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+  }
+  .cb-left { }
+  .cb-title { font-size: 12px; font-weight: 600; opacity: 0.7; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px; }
+  .cb-main { font-size: 17px; font-weight: 700; }
+  .cb-sub { font-size: 12px; opacity: 0.7; margin-top: 3px; }
+  .cb-pills { display: flex; gap: 10px; flex-wrap: wrap; }
+  .cb-pill {
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 10px; padding: 10px 16px; min-width: 140px; text-align: center;
+  }
+  .cb-pill .service { font-size: 11px; opacity: 0.7; margin-bottom: 4px; }
+  .cb-pill .price { font-size: 20px; font-weight: 800; }
+  .cb-pill .sub { font-size: 10px; opacity: 0.6; }
+  .cb-pill.ours { background: rgba(134,239,172,0.15); border-color: rgba(134,239,172,0.4); }
+  .cb-pill.ours .price { color: #86efac; }
+  .cb-pill.theirs .price { color: #fca5a5; text-decoration: line-through; text-decoration-color: #f87171; }
+  .cb-vs { font-size: 18px; font-weight: 800; opacity: 0.4; align-self: center; }
+  .cb-save-badge {
+    background: #16a34a; border-radius: 10px; padding: 10px 16px; text-align: center;
+  }
+  .cb-save-badge .pct { font-size: 28px; font-weight: 900; }
+  .cb-save-badge .lbl { font-size: 10px; opacity: 0.85; }
+
+  /* ── Soru satırı ── */
+  .question-bar {
+    background: white; border-radius: 14px; padding: 18px 22px;
+    display: flex; align-items: center; gap: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .qb-icon { font-size: 28px; }
+  .qb-text h2 { font-size: 17px; font-weight: 700; color: #0f172a; }
+  .qb-text p { font-size: 13px; color: #64748b; margin-top: 2px; }
+
+  /* ── Senaryo Kartları ── */
+  .scenario-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  .sc-card {
+    background: white; border-radius: 16px; padding: 0; overflow: hidden;
+    border: 2px solid #e2e8f0; cursor: pointer; transition: all 0.2s;
+    display: flex; flex-direction: column;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .sc-card:hover { border-color: #818cf8; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(99,102,241,0.14); }
+  .sc-card.featured { border-color: #6366f1; }
+
+  .sc-header {
+    padding: 18px 20px 14px; display: flex; align-items: flex-start; justify-content: space-between;
+  }
+  .sc-icon-wrap { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-size: 22px; flex-shrink: 0; }
+  .sc-featured-tag {
+    background: #6366f1; color: white; font-size: 9px; font-weight: 800;
+    padding: 3px 8px; border-radius: 6px; letter-spacing: 0.5px; text-transform: uppercase;
+  }
+  .sc-body { padding: 0 20px 16px; flex: 1; display: flex; flex-direction: column; gap: 10px; }
+  .sc-title { font-size: 16px; font-weight: 800; color: #0f172a; }
+  .sc-desc { font-size: 12.5px; color: #64748b; line-height: 1.5; }
+
+  /* Kıyaslama tablosu */
+  .compare-table { background: #f8fafc; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; }
+  .ct-row { display: flex; align-items: center; padding: 7px 12px; gap: 8px; border-bottom: 1px solid #f1f5f9; }
+  .ct-row:last-child { border-bottom: none; }
+  .ct-service { font-size: 11px; color: #64748b; flex: 1; font-weight: 500; }
+  .ct-price { font-size: 13px; font-weight: 700; }
+  .ct-price.them { color: #ef4444; }
+  .ct-price.us { color: #16a34a; }
+  .ct-badge { font-size: 9px; font-weight: 700; background: #dcfce7; color: #15803d; padding: 2px 6px; border-radius: 4px; }
+
+  /* Özellikler */
+  .features { display: flex; flex-direction: column; gap: 5px; }
+  .feat { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #374151; }
+  .feat .dot { width: 16px; height: 16px; border-radius: 5px; display: grid; place-items: center; font-size: 9px; flex-shrink: 0; }
+
+  /* Fiyat + Buton */
+  .sc-footer { padding: 14px 20px 18px; border-top: 1px solid #f1f5f9; }
+  .price-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 10px; }
+  .price-main { font-size: 30px; font-weight: 900; color: #0f172a; letter-spacing: -1px; }
+  .price-sub { font-size: 12px; color: #94a3b8; }
+  .price-note { font-size: 11px; color: #64748b; }
+  .buy-btn {
+    width: 100%; padding: 11px; border-radius: 10px; border: none; cursor: pointer;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.2px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: opacity 0.15s;
+  }
+  .buy-btn:hover { opacity: 0.88; }
+  .buy-btn.primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; }
+  .buy-btn.default { background: #0f172a; color: white; }
+  .buy-btn.trial { background: #f1f5f9; color: #374151; border: 1px solid #e2e8f0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Başlık -->
+  <div class="page-header">
+    <h1>Yapay Zeka Paketleri</h1>
+    <p>Dünya'nın en iyi modellerine Türkiye'nin en uygun fiyatıyla eriş</p>
+  </div>
+
+  <!-- Karşılaştırma Bandı -->
+  <div class="compare-banner">
+    <div class="cb-left">
+      <div class="cb-title">Neden YapayZekaLab?</div>
+      <div class="cb-main">Aynı modeller, çok daha az ödeyerek</div>
+      <div class="cb-sub">ChatGPT Plus veya Claude Pro almak zorunda değilsin</div>
+    </div>
+    <div class="cb-pills">
+      <div class="cb-pill theirs">
+        <div class="service">ChatGPT Plus</div>
+        <div class="price">$20</div>
+        <div class="sub">/ ay · GPT-4 sınırlı</div>
+      </div>
+      <div class="cb-vs">→</div>
+      <div class="cb-pill ours">
+        <div class="service">YapayZekaLab</div>
+        <div class="price">₺49</div>
+        <div class="sub">/ ay · GPT + Claude + Gemini</div>
+      </div>
+    </div>
+    <div class="cb-save-badge">
+      <div class="pct">%87</div>
+      <div class="lbl">tasarruf</div>
+    </div>
+  </div>
+
+  <!-- Soru Satırı -->
+  <div class="question-bar">
+    <div class="qb-icon">🎯</div>
+    <div class="qb-text">
+      <h2>Ne yapmak istiyorsun?</h2>
+      <p>Kullanım amacına göre en uygun paketi seç — tüm paketlerde GPT, Claude ve Gemini mevcut</p>
+    </div>
+  </div>
+
+  <!-- Senaryo Kartları -->
+  <div class="scenario-grid">
+
+    <!-- Kart 1: Günlük Sohbet -->
+    <div class="sc-card">
+      <div class="sc-header">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div class="sc-icon-wrap" style="background:#eff6ff">💬</div>
+          <div class="sc-title">Günlük Sohbet</div>
+        </div>
+      </div>
+      <div class="sc-body">
+        <div class="sc-desc">Her gün Claude veya GPT ile sohbet, özet, çeviri ve yazma görevleri için.</div>
+        <div class="compare-table">
+          <div class="ct-row">
+            <div class="ct-service">ChatGPT Plus</div>
+            <div class="ct-price them">~₺720/ay</div>
+          </div>
+          <div class="ct-row">
+            <div class="ct-service">Claude Pro</div>
+            <div class="ct-price them">~₺720/ay</div>
+          </div>
+          <div class="ct-row" style="background:#f0fdf4">
+            <div class="ct-service" style="font-weight:700;color:#15803d">✓ YapayZekaLab</div>
+            <div class="ct-price us">₺49/ay</div>
+            <div class="ct-badge">%93 ucuz</div>
+          </div>
+        </div>
+        <div class="features">
+          <div class="feat"><div class="dot" style="background:#dbeafe;color:#1d4ed8">⚡</div>500 istek / gün</div>
+          <div class="feat"><div class="dot" style="background:#dbeafe;color:#1d4ed8">🤖</div>GPT-5, Claude Sonnet, Gemini</div>
+          <div class="feat"><div class="dot" style="background:#dbeafe;color:#1d4ed8">📅</div>30 gün geçerli</div>
+        </div>
+      </div>
+      <div class="sc-footer">
+        <div class="price-row">
+          <div class="price-main">₺49</div>
+          <div class="price-sub">/ ay</div>
+        </div>
+        <button class="buy-btn default">⚡ Bakiye ile al</button>
+      </div>
+    </div>
+
+    <!-- Kart 2: Kodlama & Geliştirici (EN POPÜLER) -->
+    <div class="sc-card featured">
+      <div class="sc-header">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div class="sc-icon-wrap" style="background:#f5f3ff">💻</div>
+          <div class="sc-title">Kodlama & Geliştirici</div>
+        </div>
+        <div class="sc-featured-tag">⭐ En Popüler</div>
+      </div>
+      <div class="sc-body">
+        <div class="sc-desc">Cursor, Cline, Claude Code veya Codex ile kod yazdır. Yüksek istek limiti şart.</div>
+        <div class="compare-table">
+          <div class="ct-row">
+            <div class="ct-service">GitHub Copilot Pro</div>
+            <div class="ct-price them">~₺360/ay</div>
+          </div>
+          <div class="ct-row">
+            <div class="ct-service">Cursor Pro</div>
+            <div class="ct-price them">~₺720/ay</div>
+          </div>
+          <div class="ct-row" style="background:#f0fdf4">
+            <div class="ct-service" style="font-weight:700;color:#15803d">✓ YapayZekaLab</div>
+            <div class="ct-price us">₺149/ay</div>
+            <div class="ct-badge">%79 ucuz</div>
+          </div>
+        </div>
+        <div class="features">
+          <div class="feat"><div class="dot" style="background:#ede9fe;color:#7c3aed">⚡</div>2.000 istek / gün</div>
+          <div class="feat"><div class="dot" style="background:#ede9fe;color:#7c3aed">🤖</div>Claude Opus, GPT-5, o3</div>
+          <div class="feat"><div class="dot" style="background:#ede9fe;color:#7c3aed">🔑</div>API anahtarı ile direkt bağlan</div>
+        </div>
+      </div>
+      <div class="sc-footer">
+        <div class="price-row">
+          <div class="price-main">₺149</div>
+          <div class="price-sub">/ ay</div>
+        </div>
+        <button class="buy-btn primary">⚡ Bakiye ile al</button>
+      </div>
+    </div>
+
+    <!-- Kart 3: Ağır Kullanım -->
+    <div class="sc-card">
+      <div class="sc-header">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div class="sc-icon-wrap" style="background:#fff7ed">🚀</div>
+          <div class="sc-title">Yoğun & Profesyonel</div>
+        </div>
+      </div>
+      <div class="sc-body">
+        <div class="sc-desc">Ajans, şirket veya ağır otomatik iş akışları için sınırsız denecek kadar yüksek limit.</div>
+        <div class="compare-table">
+          <div class="ct-row">
+            <div class="ct-service">Anthropic API direkt</div>
+            <div class="ct-price them">~₺5.400/ay</div>
+          </div>
+          <div class="ct-row">
+            <div class="ct-service">OpenAI API direkt</div>
+            <div class="ct-price them">~₺3.600/ay</div>
+          </div>
+          <div class="ct-row" style="background:#f0fdf4">
+            <div class="ct-service" style="font-weight:700;color:#15803d">✓ YapayZekaLab</div>
+            <div class="ct-price us">₺299/ay</div>
+            <div class="ct-badge">%92 ucuz</div>
+          </div>
+        </div>
+        <div class="features">
+          <div class="feat"><div class="dot" style="background:#ffedd5;color:#c2410c">⚡</div>5.000 istek / gün</div>
+          <div class="feat"><div class="dot" style="background:#ffedd5;color:#c2410c">🤖</div>Tüm modeller • Öncelikli sıra</div>
+          <div class="feat"><div class="dot" style="background:#ffedd5;color:#c2410c">📅</div>30 gün geçerli</div>
+        </div>
+      </div>
+      <div class="sc-footer">
+        <div class="price-row">
+          <div class="price-main">₺299</div>
+          <div class="price-sub">/ ay</div>
+        </div>
+        <button class="buy-btn default">⚡ Bakiye ile al</button>
+      </div>
+    </div>
+
+    <!-- Kart 4: Deneyin Bakalım -->
+    <div class="sc-card">
+      <div class="sc-header">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div class="sc-icon-wrap" style="background:#f0fdf4">🎯</div>
+          <div class="sc-title">Deneyin Bakalım</div>
+        </div>
+      </div>
+      <div class="sc-body">
+        <div class="sc-desc">Taahhüt olmadan test et. Aylık paket almadan önce sistemi dene.</div>
+        <div class="compare-table">
+          <div class="ct-row">
+            <div class="ct-service">ChatGPT ücretsiz (GPT-4o mini)</div>
+            <div class="ct-price" style="color:#f59e0b">Kısıtlı</div>
+          </div>
+          <div class="ct-row" style="background:#f0fdf4">
+            <div class="ct-service" style="font-weight:700;color:#15803d">✓ YapayZekaLab Deneme</div>
+            <div class="ct-price us">₺9</div>
+            <div class="ct-badge">Tam erişim</div>
+          </div>
+        </div>
+        <div class="features">
+          <div class="feat"><div class="dot" style="background:#dcfce7;color:#15803d">⚡</div>200 istek · 5 gün</div>
+          <div class="feat"><div class="dot" style="background:#dcfce7;color:#15803d">🤖</div>GPT-5, Claude, Gemini — hepsi</div>
+          <div class="feat"><div class="dot" style="background:#dcfce7;color:#15803d">🔒</div>Tek seferlik ödeme, sürpriz yok</div>
+        </div>
+      </div>
+      <div class="sc-footer">
+        <div class="price-row">
+          <div class="price-main">₺9</div>
+          <div class="price-sub">· tek seferlik</div>
+        </div>
+        <button class="buy-btn trial">🎯 Deneme paketini al</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Alt not -->
+  <div style="text-align:center;padding:8px 0 4px;font-size:12px;color:#94a3b8">
+    🎁 Hediye kodun var mı? · 💳 Bakiye yükle, istediğin zaman satın al · 🔑 API anahtarı anında teslim
+  </div>
+
+</div>
+</body>
+</html>

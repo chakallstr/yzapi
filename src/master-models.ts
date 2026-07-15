@@ -181,7 +181,12 @@ export const MASTER_MODELS: MasterModel[] = [
   textModel({ id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000 }),
   textModel({ id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000 }),
   textModel({ id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", provider: "Anthropic", providerSlug: "anthropic", context: "200K", contextTokens: 200000, aliases: ["anthropic/claude-haiku-4.5", "anthropic/claude-haiku-4-5", "anthropic/claude-haiku-4-5-20251001"] }),
-  textModel({ id: "gpt-5.5", name: "GPT-5.5", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000 }),
+  // codex-auto-review: Codex CLI, onay/auto-review modunda riskli komuttan önce
+  // bu id ile küçük bir "komut güvenli mi?" çağrısı atar. Upstream'lerde böyle bir
+  // model yok → 404. gpt-5.5'e ALIAS olarak bağlanır: koltuk-servisli gpt-5.5'e
+  // çözülür, müşterinin gpt-5.5 paketi/key'i coverage'ı kapsar (402 olmaz). Alias
+  // 42-kilidi BOZMAZ (entry sayısı/id değişmez) ve /v1/models'te GÖRÜNMEZ.
+  textModel({ id: "gpt-5.5", name: "GPT-5.5", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000, aliases: ["codex-auto-review"] }),
   textModel({ id: "gpt-5.5-2026-04-23", name: "GPT-5.5 2026-04-23", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000 }),
   textModel({ id: "gpt-5.4", name: "GPT-5.4", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000, aliases: ["openai/gpt-5.4"] }),
   textModel({ id: "gpt-5.4-2026-03-05", name: "GPT-5.4 2026-03-05", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000 }),
@@ -273,4 +278,34 @@ export function modelRejectsSamplingParams(modelId: string | undefined): boolean
   // Kanonik id'ler karışık biçimde (opus-4.8 NOKTA, opus-4-7 TİRE) — tireye normalize et.
   const dash = canonical.replace(/\./g, "-");
   return SAMPLING_PARAM_REJECTING_MODELS.has(dash);
+}
+
+// Reasoning ("düşünme") modelleri: gizli reasoning token'ları ÇIKTI bütçesini yer.
+// Codex/Cline/Roo gibi istemciler çok düşük bir max_tokens (veya max_completion/
+// max_output_tokens) gönderirse düşünme o küçük bütçeyi tüketir ve cevap YARIDA
+// KESİLİR ("düşünmeler yarıda kesiliyor"). Bu yüzden gateway bu modeller için
+// max_tokens'a bir TABAN (floor) uygular (request-guard'da Math.max ile, model
+// tavanı cap'inden ÖNCE → tavanı asla aşmaz). modelRejectsSamplingParams ile
+// AYNI normalize deseni. Set DAR: yalnız reasoning modelleri; -mini/-nano/
+// -chat-latest gibi varyantlara dokunma. Yeni reasoning modeli gelince ekle.
+const REASONING_OUTPUT_FLOOR_TOKENS = 12000;
+const REASONING_OUTPUT_FLOOR_MODELS = new Set<string>([
+  "gpt-5-5",
+  "gpt-5-5-2026-04-23",
+  "gpt-5-4",
+  "gpt-5-4-2026-03-05",
+  "o3",
+  "o3-2025-04-16",
+  "o3-mini",
+  "o3-mini-2025-01-31",
+  "o4-mini",
+  "o4-mini-2025-04-16",
+]);
+
+// Reasoning modelinde uygulanacak çıktı tabanı (token); reasoning değilse 0.
+export function modelReasoningOutputFloor(modelId: string | undefined): number {
+  if (!modelId) return 0;
+  const canonical = canonicalizeModelId(modelId) ?? modelId;
+  const dash = canonical.replace(/\./g, "-");
+  return REASONING_OUTPUT_FLOOR_MODELS.has(dash) ? REASONING_OUTPUT_FLOOR_TOKENS : 0;
 }

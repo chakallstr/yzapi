@@ -10,10 +10,47 @@ export interface GoogleProfile {
   picture: string;
 }
 
+// Google JWKS fetch'i, 2026-07-06'da CANLIDA kanıtlanan aralıklı ağ-stall'ına karşı sertleştirildi:
+// sağlıklı fetch <1s tamamlanır; nadir bir kuyruk (~%1) bağlantıyı black-hole eder ve >5s askıda kalır.
+// Kısa timeout + retry = hızlı başarısız ol, TAZE bağlantıyla tekrar dene. jose başarısız reload sonrası
+// cooldown'a GİRMEZ (#jwksTimestamp yalnız başarıda set edilir) → retry gerçekten yeni bir fetch tetikler.
+const JWKS_TIMEOUT_MS = 3000;
+const TOKEN_FETCH_TIMEOUT_MS = 8000;
+const AUTH_MAX_ATTEMPTS = 3; // 1 deneme + 2 retry
+
 const GOOGLE_JWKS = createRemoteJWKSet(
-  new URL("https://www.googleapis.com/oauth2/v3/certs")
+  new URL("https://www.googleapis.com/oauth2/v3/certs"),
+  { timeoutDuration: JWKS_TIMEOUT_MS }
 );
 const OAUTH_STATE_TTL_MS = 5 * 60 * 1000;
+
+function isTransientNetworkError(e: unknown): boolean {
+  const err = e as { code?: string; name?: string } | undefined;
+  return (
+    err?.code === "ERR_JWKS_TIMEOUT" ||
+    err?.name === "JWKSTimeout" ||
+    err?.name === "TimeoutError" ||
+    err?.name === "AbortError" ||
+    err?.code === "UND_ERR_CONNECT_TIMEOUT" ||
+    err?.code === "UND_ERR_HEADERS_TIMEOUT" ||
+    err?.code === "ECONNRESET" ||
+    err?.code === "ETIMEDOUT"
+  );
+}
+
+// Yalnız GEÇİCİ ağ hatalarında retry eder; imza/audience/issuer gibi kalıcı hatalar hemen fırlatılır.
+async function retryTransient<T>(fn: () => Promise<T>, attempts = AUTH_MAX_ATTEMPTS): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      if (!isTransientNetworkError(e) || i === attempts - 1) throw e;
+    }
+  }
+  throw lastErr;
+}
 
 export function isGoogleConfigured(): boolean {
   return !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
@@ -81,6 +118,8 @@ export async function exchangeCode(
       redirect_uri: env.GOOGLE_REDIRECT_URI,
       grant_type: "authorization_code",
     }),
+    // Bounded timeout: token endpoint stall'ında sonsuz askıda kalmayı önler (auth code single-use → retry YOK).
+    signal: AbortSignal.timeout(TOKEN_FETCH_TIMEOUT_MS),
   });
 
   if (!res.ok) throw new Error(`Token exchange failed: ${await res.text()}`);
@@ -92,10 +131,13 @@ export async function exchangeCode(
 export async function verifyIdToken(idToken: string): Promise<GoogleProfile> {
   if (!isGoogleConfigured()) throw new Error("google oauth not configured");
 
-  const { payload } = await jwtVerify(idToken, GOOGLE_JWKS, {
-    issuer: "https://accounts.google.com",
-    audience: env.GOOGLE_CLIENT_ID!,
-  });
+  // Geçici JWKS fetch timeout'unda retry (kanıtlanan kök neden). Kalıcı hatalar retry'lanmaz.
+  const { payload } = await retryTransient(() =>
+    jwtVerify(idToken, GOOGLE_JWKS, {
+      issuer: "https://accounts.google.com",
+      audience: env.GOOGLE_CLIENT_ID!,
+    })
+  );
 
   return {
     sub: payload.sub as string,

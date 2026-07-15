@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kendin Yap Builder</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; min-height: 100vh; padding: 28px 20px; }
+
+.page { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+/* Başlık notu */
+.context-note { font-size: 12px; color: #94a3b8; text-align: center; padding: 4px 0; }
+
+/* ── ANA BUILDER KARTI ── */
+.builder-card {
+  background: white; border-radius: 20px; overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 0 0 2px #e0e7ff;
+}
+
+/* Üst gradient başlık */
+.builder-header {
+  background: linear-gradient(135deg, #1e1b4b 0%, #3730a3 50%, #6366f1 100%);
+  padding: 22px 28px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.bh-left { }
+.bh-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 99px; padding: 3px 10px; font-size: 10px; font-weight: 800;
+  color: white; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+}
+.bh-title { font-size: 22px; font-weight: 900; color: white; letter-spacing: -0.5px; }
+.bh-sub { font-size: 13px; color: rgba(255,255,255,0.65); margin-top: 4px; }
+.bh-right { text-align: right; flex-shrink: 0; }
+.bh-models { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.bh-model-chip {
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px; padding: 5px 10px; font-size: 11px; font-weight: 600; color: white;
+}
+
+/* İçerik: sol config + sağ özet */
+.builder-body { display: grid; grid-template-columns: 1fr 300px; min-height: 340px; }
+
+/* ── SOL: Konfigürasyon ── */
+.config-side { padding: 24px 28px; border-right: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 22px; }
+
+.step-block { }
+.step-label {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+}
+.step-num {
+  width: 22px; height: 22px; border-radius: 99px; background: #6366f1; color: white;
+  font-size: 11px; font-weight: 800; display: grid; place-items: center; flex-shrink: 0;
+}
+.step-title { font-size: 13.5px; font-weight: 700; color: #0f172a; }
+.step-hint { font-size: 11px; color: #94a3b8; margin-left: auto; }
+
+.preset-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+.preset-chip {
+  padding: 8px 16px; border-radius: 10px; border: 2px solid #e2e8f0;
+  background: #f8fafc; cursor: pointer; transition: all 0.15s; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.preset-chip:hover { border-color: #818cf8; background: #eef2ff; }
+.preset-chip.selected { border-color: #6366f1; background: #eef2ff; }
+.preset-chip .pc-val { font-size: 14px; font-weight: 800; color: #0f172a; }
+.preset-chip.selected .pc-val { color: #4f46e5; }
+.preset-chip .pc-sub { font-size: 9.5px; color: #94a3b8; font-weight: 500; }
+.preset-chip.selected .pc-sub { color: #818cf8; }
+.preset-chip .pc-badge {
+  font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 4px;
+  background: #dcfce7; color: #16a34a;
+}
+
+/* Gün chip'leri */
+.day-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+.day-chip {
+  padding: 8px 20px; border-radius: 10px; border: 2px solid #e2e8f0;
+  background: #f8fafc; cursor: pointer; transition: all 0.15s; text-align: center;
+}
+.day-chip:hover { border-color: #818cf8; background: #eef2ff; }
+.day-chip.selected { border-color: #6366f1; background: #eef2ff; }
+.day-chip .dc-val { font-size: 14px; font-weight: 800; color: #0f172a; }
+.day-chip.selected .dc-val { color: #4f46e5; }
+.day-chip .dc-sub { font-size: 9.5px; color: #94a3b8; }
+.day-chip.selected .dc-sub { color: #818cf8; }
+
+/* Özet bar */
+.config-summary {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+}
+.cs-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #374151; }
+.cs-icon { font-size: 14px; }
+.cs-sep { color: #cbd5e1; }
+
+/* ── SAĞ: Fiyat özeti ── */
+.price-side {
+  padding: 24px 22px; background: #fafafa;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.ps-title { font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Fiyat */
+.price-display { }
+.pd-main { font-size: 42px; font-weight: 900; color: #0f172a; letter-spacing: -2px; line-height: 1; }
+.pd-period { font-size: 14px; color: #94a3b8; font-weight: 500; }
+.pd-usd { font-size: 12px; color: #94a3b8; margin-top: 3px; }
+
+/* İndirim kutusu */
+.discount-box {
+  background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 10px 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.db-icon { font-size: 18px; }
+.db-text .db-main { font-size: 12px; font-weight: 800; color: #15803d; }
+.db-text .db-sub { font-size: 10.5px; color: #4ade80; color: #16a34a; margin-top: 1px; }
+
+/* Breakdown */
+.breakdown { display: flex; flex-direction: column; gap: 6px; }
+.br-row { display: flex; justify-content: space-between; align-items: center; }
+.br-label { font-size: 11.5px; color: #64748b; }
+.br-val { font-size: 11.5px; font-weight: 600; color: #374151; }
+.br-divider { height: 1px; background: #e2e8f0; margin: 2px 0; }
+.br-total { font-size: 13px; font-weight: 800; color: #0f172a; }
+
+/* Buy buton */
+.buy-btn {
+  width: 100%; padding: 13px; border-radius: 12px; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white;
+  font-size: 14px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 7px;
+  transition: opacity 0.15s; letter-spacing: -0.2px;
+}
+.buy-btn:hover { opacity: 0.88; }
+.buy-disclaimer { font-size: 10.5px; color: #94a3b8; text-align: center; }
+.buy-disclaimer strong { color: #64748b; }
+
+/* Karşılaştır chip'i */
+.compare-note {
+  font-size: 11px; color: #64748b; text-align: center;
+  background: #f1f5f9; border-radius: 8px; padding: 7px 10px; line-height: 1.4;
+}
+.compare-note .them { color: #ef4444; text-decoration: line-through; }
+.compare-note .us { color: #16a34a; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="context-note">Kendin Yap — paket grid'inin altında tam genişlikte gösterilir</div>
+
+  <!-- BUILDER KARTI -->
+  <div class="builder-card">
+
+    <!-- Üst başlık -->
+    <div class="builder-header">
+      <div class="bh-left">
+        <div class="bh-tag">🛠️ Kendin Yap</div>
+        <div class="bh-title">Kendi paketini oluştur</div>
+        <div class="bh-sub">Günlük ihtiyacına göre limit ve süre seç, fiyatı anında gör</div>
+      </div>
+      <div class="bh-right">
+        <div class="bh-models">
+          <div class="bh-model-chip">🤖 Claude</div>
+          <div class="bh-model-chip">⚡ GPT</div>
+          <div class="bh-model-chip">✨ Gemini</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gövde: config + fiyat -->
+    <div class="builder-body">
+
+      <!-- SOL: Konfigürasyon -->
+      <div class="config-side">
+
+        <!-- Adım 1: Günlük limit -->
+        <div class="step-block">
+          <div class="step-label">
+            <div class="step-num">1</div>
+            <div class="step-title">Günlük kaç istek?</div>
+            <div class="step-hint">Ne kadar fazla → o kadar ucuz/istek</div>
+          </div>
+          <div class="preset-grid" id="limitGrid">
+            <div class="preset-chip" onclick="selectLimit(this, 100)">
+              <div class="pc-val">100</div>
+              <div class="pc-sub">istek/gün</div>
+            </div>
+            <div class="preset-chip" onclick="selectLimit(this, 250)">
+              <div class="pc-val">250</div>
+              <div class="pc-sub">istek/gün</div>
+            </div>
+            <div class="preset-chip selected" onclick="selectLimit(this, 500)">
+              <div class="pc-val">500</div>
+              <div class="pc-sub">istek/gün</div>
+            </div>
+            <div class="preset-chip" onclick="selectLimit(this, 1000)">
+              <div class="pc-val">1.000</div>
+              <div class="pc-sub">istek/gün</div>
+              <div class="pc-badge">%10 indirim</div>
+            </div>
+            <div class="preset-chip" onclick="selectLimit(this, 2000)">
+              <div class="pc-val">2.000</div>
+              <div class="pc-sub">istek/gün</div>
+              <div class="pc-badge">%20 indirim</div>
+            </div>
+            <div class="preset-chip" onclick="selectLimit(this, 5000)">
+              <div class="pc-val">5.000</div>
+              <div class="pc-sub">istek/gün</div>
+              <div class="pc-badge">%30 indirim</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Adım 2: Süre -->
+        <div class="step-block">
+          <div class="step-label">
+            <div class="step-num">2</div>
+            <div class="step-title">Kaç gün geçerli?</div>
+          </div>
+          <div class="day-grid" id="dayGrid">
+            <div class="day-chip" onclick="selectDays(this, 7)">
+              <div class="dc-val">7</div>
+              <div class="dc-sub">gün</div>
+            </div>
+            <div class="day-chip" onclick="selectDays(this, 15)">
+              <div class="dc-val">15</div>
+              <div class="dc-sub">gün</div>
+            </div>
+            <div class="day-chip selected" onclick="selectDays(this, 30)">
+              <div class="dc-val">30</div>
+              <div class="dc-sub">gün</div>
+            </div>
+            <div class="day-chip" onclick="selectDays(this, 60)">
+              <div class="dc-val">60</div>
+              <div class="dc-sub">gün</div>
+            </div>
+            <div class="day-chip" onclick="selectDays(this, 90)">
+              <div class="dc-val">90</div>
+              <div class="dc-sub">gün</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Özet -->
+        <div class="config-summary" id="configSummary">
+          <div class="cs-item"><span class="cs-icon">⚡</span><strong id="s-limit">500</strong> istek/gün</div>
+          <div class="cs-sep">·</div>
+          <div class="cs-item"><span class="cs-icon">📅</span><strong id="s-days">30</strong> gün geçerli</div>
+          <div class="cs-sep">·</div>
+          <div class="cs-item"><span class="cs-icon">📦</span>Toplam <strong id="s-total">15.000</strong> istek</div>
+        </div>
+
+      </div><!-- /config-side -->
+
+      <!-- SAĞ: Fiyat özeti -->
+      <div class="price-side">
+        <div class="ps-title">Fiyat özeti</div>
+
+        <!-- Ana fiyat -->
+        <div class="price-display">
+          <div class="pd-main" id="priceTL">₺74</div>
+          <div class="pd-usd" id="priceUSD">≈ $2.10</div>
+        </div>
+
+        <!-- İndirim kutusu (yalnız yüksek limitte göster) -->
+        <div class="discount-box" id="discountBox" style="display:none">
+          <div class="db-icon">🏷️</div>
+          <div class="db-text">
+            <div class="db-main" id="discountMain">Hacim indirimi: %20</div>
+            <div class="db-sub" id="discountSub">500 istek/gün fiyatından %20 daha ucuz</div>
+          </div>
+        </div>
+
+        <!-- Kıyaslama notu -->
+        <div class="compare-note" id="compareNote">
+          ChatGPT Plus: <span class="them">~₺720/ay</span><br>
+          Bu paket: <span class="us">₺74/ay</span> — %90 daha ucuz
+        </div>
+
+        <!-- Breakdown -->
+        <div class="breakdown">
+          <div class="br-row">
+            <span class="br-label">İstek başına maliyet</span>
+            <span class="br-val" id="perReq">₺0.148</span>
+          </div>
+          <div class="br-row">
+            <span class="br-label">Günlük limit</span>
+            <span class="br-val" id="bLimit">500 istek</span>
+          </div>
+          <div class="br-row">
+            <span class="br-label">Geçerlilik</span>
+            <span class="br-val" id="bDays">30 gün</span>
+          </div>
+          <div class="br-divider"></div>
+          <div class="br-row">
+            <span class="br-label" style="font-weight:700;color:#0f172a">Toplam</span>
+            <span class="br-val br-total" id="bTotal">₺74</span>
+          </div>
+        </div>
+
+        <button class="buy-btn">⚡ Bakiye ile al</button>
+        <div class="buy-disclaimer">Anında hesabına tanımlanır · <strong>İade edilmez</strong></div>
+
+      </div><!-- /price-side -->
+    </div><!-- /builder-body -->
+  </div><!-- /builder-card -->
+
+</div>
+
+<script>
+// Basit fiyat simülasyonu (gerçekte /api/packages/:id/price-preview çağrılır)
+const BASE_PER_REQ_TL = 0.148; // 500/gün referans
+const VOLUME_DISCOUNTS = { 100: 0, 250: 0, 500: 0, 1000: 0.10, 2000: 0.20, 5000: 0.30 };
+const USD_RATE = 35;
+
+let selectedLimit = 500;
+let selectedDays  = 30;
+
+function calcPrice(limit, days) {
+  const disc = VOLUME_DISCOUNTS[limit] ?? 0;
+  const perReq = BASE_PER_REQ_TL * (1 - disc);
+  const total = Math.round(perReq * limit * days);
+  return { total, perReq: perReq.toFixed(3), disc, usd: (total / USD_RATE).toFixed(2) };
+}
+
+function updateUI() {
+  const { total, perReq, disc, usd } = calcPrice(selectedLimit, selectedDays);
+
+  document.getElementById('priceTL').textContent = `₺${total.toLocaleString('tr-TR')}`;
+  document.getElementById('priceUSD').textContent = `≈ $${usd}`;
+  document.getElementById('perReq').textContent = `₺${perReq}`;
+  document.getElementById('bLimit').textContent = `${selectedLimit.toLocaleString('tr-TR')} istek`;
+  document.getElementById('bDays').textContent = `${selectedDays} gün`;
+  document.getElementById('bTotal').textContent = `₺${total.toLocaleString('tr-TR')}`;
+
+  // Özet satırı
+  document.getElementById('s-limit').textContent = selectedLimit.toLocaleString('tr-TR');
+  document.getElementById('s-days').textContent = selectedDays;
+  document.getElementById('s-total').textContent = (selectedLimit * selectedDays).toLocaleString('tr-TR');
+
+  // İndirim kutusu
+  const discBox = document.getElementById('discountBox');
+  if (disc > 0) {
+    discBox.style.display = 'flex';
+    document.getElementById('discountMain').textContent = `Hacim indirimi: %${Math.round(disc*100)}`;
+    document.getElementById('discountSub').textContent = `500 istek/gün fiyatından %${Math.round(disc*100)} daha ucuz`;
+  } else {
+    discBox.style.display = 'none';
+  }
+
+  // Kıyaslama
+  const saving = Math.round((1 - total / 720) * 100);
+  document.getElementById('compareNote').innerHTML =
+    `ChatGPT Plus: <span class="them">~₺720/ay</span><br>Bu paket: <span class="us">₺${total.toLocaleString('tr-TR')}/${selectedDays} gün</span>${saving > 0 ? ` — %${saving} daha ucuz` : ''}`;
+}
+
+function selectLimit(el, val) {
+  document.querySelectorAll('#limitGrid .preset-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedLimit = val;
+  updateUI();
+}
+
+function selectDays(el, val) {
+  document.querySelectorAll('#dayGrid .day-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedDays = val;
+  updateUI();
+}
+
+updateUI();
+</script>
+</body>
+</html>

@@ -17,7 +17,9 @@ import { useT } from './i18n/index.jsx';
 const payMethods = (t) => [
   { id: 'iban',    label: t('account.payMethod.ibanLabel'),    sub: t('account.payMethod.ibanSub'),    Ico: I.Database, time: t('account.payMethod.ibanTime') },
   { id: 'shopier', label: t('account.payMethod.shopierLabel'), sub: t('account.payMethod.shopierSub'), Ico: I.Wallet,   time: t('account.payMethod.shopierTime') },
-  { id: 'crypto',  label: t('account.payMethod.cryptoLabel'),  sub: t('account.payMethod.cryptoSub'),  Ico: I.Coin,     time: t('account.payMethod.cryptoTime') },
+  // Kripto ödeme yöntemi müşteri arayüzünden kaldırıldı (sorunlu — 2026-06-21).
+  // Backend crypto/cryptomus altyapısı (payments.ts, schema, contract testleri) DOKUNULMADAN bırakıldı;
+  // bu satır geri eklenerek seçenek tekrar açılabilir.
 ];
 
 const mockKeys = [

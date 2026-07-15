@@ -1,46 +1,33 @@
 import { describe, it, expect } from "vitest";
-import { volumeMarkup, roundClean, computeCustomPrice, limitStepError } from "./custom-package-pricing.js";
+import { BUILDER_MARKUP, roundClean, computeCustomPrice, limitStepError } from "./custom-package-pricing.js";
 
-describe("limitStepError — adım kuralı (min50, <500 5'er, ≥500 50'şer)", () => {
+describe("limitStepError — adım kuralı (min600, 50'şer)", () => {
   it("geçerli değerler null döner", () => {
-    expect(limitStepError(50)).toBeNull();
-    expect(limitStepError(55)).toBeNull();
-    expect(limitStepError(495)).toBeNull();
-    expect(limitStepError(500)).toBeNull();
-    expect(limitStepError(550)).toBeNull();
+    expect(limitStepError(600)).toBeNull();
+    expect(limitStepError(650)).toBeNull();
+    expect(limitStepError(1000)).toBeNull();
     expect(limitStepError(2000)).toBeNull();
+    expect(limitStepError(5000)).toBeNull();
   });
-  it("min altı reddedilir", () => {
-    expect(limitStepError(45)).not.toBeNull();
+  it("600 altı reddedilir", () => {
+    expect(limitStepError(50)).not.toBeNull();
+    expect(limitStepError(500)).not.toBeNull();
+    expect(limitStepError(599)).not.toBeNull();
     expect(limitStepError(0)).not.toBeNull();
   });
-  it("<500 5'in katı değilse reddedilir", () => {
-    expect(limitStepError(52)).not.toBeNull();
-    expect(limitStepError(123)).not.toBeNull();
-  });
-  it("≥500 50'nin katı değilse reddedilir", () => {
-    expect(limitStepError(525)).not.toBeNull();
+  it("50'nin katı değilse reddedilir", () => {
+    expect(limitStepError(625)).not.toBeNull();
     expect(limitStepError(1001)).not.toBeNull();
+    expect(limitStepError(601)).not.toBeNull();
   });
 });
 
-describe("volumeMarkup(L) — hacim-kademeli marj", () => {
-  it("L ≤ 500 → 2.5", () => {
-    expect(volumeMarkup(50)).toBe(2.5);
-    expect(volumeMarkup(500)).toBe(2.5);
+describe("BUILDER_MARKUP — sabit 2.5× (139 TL / 500 istek çıpası)", () => {
+  it("sabit 2.5 döner", () => {
+    expect(BUILDER_MARKUP).toBe(2.5);
   });
-  it("500–1000 lineer 2.5→2.0", () => {
-    expect(volumeMarkup(750)).toBeCloseTo(2.25, 5);
-    expect(volumeMarkup(1000)).toBe(2.0);
-  });
-  it("1000–2000 lineer 2.0→1.7", () => {
-    expect(volumeMarkup(1500)).toBeCloseTo(1.85, 5);
-    expect(volumeMarkup(2000)).toBeCloseTo(1.7, 5);
-  });
-  it("L > 2000 → düşer ama taban 1.5", () => {
-    expect(volumeMarkup(3000)).toBeCloseTo(1.6, 5);
-    expect(volumeMarkup(4000)).toBe(1.5);
-    expect(volumeMarkup(10000)).toBe(1.5);
+  it("Codex çıpası: 0.1112×500×1×2.5 = 139", () => {
+    expect(roundClean(0.1112 * 500 * 1 * BUILDER_MARKUP)).toBe(140);
   });
 });
 
@@ -55,9 +42,9 @@ describe("computeCustomPrice", () => {
     // geliş = 0.069×500×30 = 1035; marj(500)=2.5; 2587.5 → 2600
     expect(computeCustomPrice({ unitCostTl: 0.069, limit: 500, days: 30, birimTipi: "istek" }).fiyatTL).toBe(2600);
   });
-  it("istek: 1000 limit düşük marj (2.0×)", () => {
-    // 0.030×1000×30=900; marj(1000)=2.0; 1800
-    expect(computeCustomPrice({ unitCostTl: 0.030, limit: 1000, days: 30, birimTipi: "istek" }).fiyatTL).toBe(1800);
+  it("istek: 1000 limit sabit 2.5× (hacim indirimi yok)", () => {
+    // 0.030×1000×30=900; 2.5×; 2250 → 2250
+    expect(computeCustomPrice({ unitCostTl: 0.030, limit: 1000, days: 30, birimTipi: "istek" }).fiyatTL).toBe(2250);
   });
   it("lifetime: gün çarpanı YOK", () => {
     // 0.9×500=450; marj(500)=2.5; 1125
@@ -71,9 +58,9 @@ describe("computeCustomPrice", () => {
     // gpt-image-2: 0.45×80×30=1080; marj(80)=2.5; 2700
     expect(computeCustomPrice({ unitCostTl: 0.45, limit: 80, days: 30, birimTipi: "kredi" }).fiyatTL).toBe(2700);
   });
-  it("küçük 1 günlük paket min fiyat", () => {
-    // 0.069×50×1=3.45; marj 2.5; 8.6 → 10
-    expect(computeCustomPrice({ unitCostTl: 0.069, limit: 50, days: 1, birimTipi: "istek" }).fiyatTL).toBe(10);
+  it("küçük paket (geçerli min 600/1g codex)", () => {
+    // 0.069×600×1=41.4; marj(600)=2.4; 99.36 → 100
+    expect(computeCustomPrice({ unitCostTl: 0.069, limit: 600, days: 1, birimTipi: "istek" }).fiyatTL).toBe(100);
   });
   it("sabit'te override yoksa 0 (güvenli)", () => {
     expect(computeCustomPrice({ unitCostTl: 0, limit: 1000, days: 30, birimTipi: "sabit" }).fiyatTL).toBe(0);

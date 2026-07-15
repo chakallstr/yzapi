@@ -2,7 +2,7 @@ import { Router, Response } from "express";
 import express from "express";
 import { db } from "../db/client.js";
 import { payments, pendingIbanPayments, systemConfig, users, transactions, shopierOsbDeadLetters } from "../db/schema.js";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, inArray } from "drizzle-orm";
 import { env } from "../lib/env.js";
 import { userAuth } from "../middleware/user-auth.js";
 import { requireWhatsappVerified } from "../middleware/whatsapp-verified.js";
@@ -12,6 +12,7 @@ import { buildCheckoutForm, verifyCallback, verifyOsbNotification, isOsbTestOrde
 import { grantOsbPackageEntitlement, loadPackageForGrantDb, grantEntitlementDb } from "../services/shopier-osb-package-service.js";
 import { createInvoice, verifyWebhook } from "../services/cryptomus-service.js";
 import { writeAudit } from "../services/audit-service.js";
+import { partitionIbanBulkDelete, IBAN_DELETABLE_STATUSES } from "../services/iban-bulk-delete.js";
 import { logger } from "../lib/logger.js";
 import { isIbanConfigured, validatePaymentAmount } from "../services/payment-guards.js";
 import { adminPaymentNotificationEmail } from "../services/email-service.js";
@@ -1338,6 +1339,52 @@ router.post("/admin/pending-iban/:id/reject", adminAuth, async (req, res, next) 
 
     const updated = await db.select().from(pendingIbanPayments).where(eq(pendingIbanPayments.id, id)).limit(1);
     res.json(serializeIban(updated[0]));
+  } catch (e) { next(e); }
+});
+
+// ── Admin: POST /api/payments/admin/pending-iban/bulk-delete ─────────────────
+// Bekleyen/reddedilen havale BİLDİRİMLERİNİ toplu siler (panelde tikle-sil).
+// PARA GÜVENLİĞİ: yalnız IBAN_DELETABLE_STATUSES ('bekliyor'/'reddedildi' — bakiye
+// YÜKLENMEMİŞ) satırlar silinir; 'onaylandi' (kredilenmiş) ve bilinmeyen durumlar
+// ASLA silinmez. İki katmanlı koruma: (1) partitionIbanBulkDelete allowlist,
+// (2) DELETE WHERE durum IN (allowlist) — select↔delete arası durum yarışına karşı.
+// Owner-only: PARTNER_RULES'da tanımlı DEĞİL → requiredRoleFor fail-closed 'owner' döner.
+router.post("/admin/pending-iban/bulk-delete", adminAuth, async (req, res, next) => {
+  try {
+    const ids = (req.body as { ids?: unknown }).ids;
+    if (!Array.isArray(ids) || ids.length === 0 || !ids.every((x) => typeof x === "string" && x.length > 0)) {
+      res.status(400).json({ error: "Silinecek en az bir geçerli kayıt kimliği gerekli." });
+      return;
+    }
+    if (ids.length > 2000) {
+      res.status(400).json({ error: "Tek seferde en fazla 2000 kayıt silinebilir." });
+      return;
+    }
+
+    const rows = await db
+      .select({ id: pendingIbanPayments.id, durum: pendingIbanPayments.durum })
+      .from(pendingIbanPayments)
+      .where(inArray(pendingIbanPayments.id, ids));
+
+    const { deletableIds, blocked } = partitionIbanBulkDelete(rows);
+
+    if (deletableIds.length) {
+      await db.delete(pendingIbanPayments).where(
+        and(
+          inArray(pendingIbanPayments.id, deletableIds),
+          inArray(pendingIbanPayments.durum, [...IBAN_DELETABLE_STATUSES]),
+        ),
+      );
+    }
+
+    await writeAudit(
+      "iban_bulk_delete",
+      req.admin?.sub ?? "admin",
+      `Toplu havale bildirimi silme: istenen=${ids.length}, silinen=${deletableIds.length}, korunan=${blocked}`,
+      req.admin?.sub,
+    );
+
+    res.json({ requested: ids.length, deleted: deletableIds.length, blocked });
   } catch (e) { next(e); }
 });
 

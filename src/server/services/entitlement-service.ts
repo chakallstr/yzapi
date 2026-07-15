@@ -65,13 +65,17 @@ export async function checkPackageCoverage(userId: string, modelId: string): Pro
            OR e.requests_today < e.daily_limit_snapshot)
       -- CF lazy gate (CF hesabı bazlı, deadlock-güvenli): cf_units_ordered=0 → lazy değil (eski yol);
       -- cf_remaining NULL → mirror henüz kurulmadı, geçir (ilk istek kurar); >0 → CF'de ünite var, geçir;
-      -- =0 & taze → CF tükendi, BLOKLA; =0 ama 10dk'dan eski "stale-0" → güvenlik supabı, geçir (CF/günlük
-      -- reset gerçeği konuşsun; manuel rescue'yu kalıcı gereksiz kılar). Eski "ordered-remaining<cap"
-      -- formülü, top-up cf_remaining'i bumplamadığında cap'te kalıcı kilitleniyordu.
+      -- =0 & taze → CF tükendi, BLOKLA. DEADLOCK FIX (2026-06-21): cf_units_ordered < daily_limit_snapshot
+      -- → paketin SİPARİŞ EDİLMEMİŞ kotası var (ödendi ama CF'den henüz alınmadı) → geçir ki top-up
+      -- (settleBilling'de) tetiklenebilsin. cf_units_ordered=cap (tüm kota alınmış) → headroom yok →
+      -- BLOKLA; CF kendi bakiyesini kapıladığından over-serve olmaz.
+      -- NOT (2026-06-23): eski "stale-0 supabı" (cf_remaining_at < now()-10min) KALDIRILDI. Supabının tek
+      -- anlamlı senaryosu headroom olan paket (=DEADLOCK FIX zaten geçirir); headroom yoksa CF'den yeni
+      -- ünite gelemiyor, supabı yalnız over-serve cap 402 döngüsüne yol açıyordu.
       AND (e.cf_units_ordered = 0
            OR e.cf_remaining IS NULL
            OR e.cf_remaining > 0
-           OR e.cf_remaining_at < now() - interval '10 minutes')
+           OR e.cf_units_ordered < e.daily_limit_snapshot)
     LIMIT 1
   `;
   return rows.length > 0;
@@ -100,10 +104,11 @@ export async function tryReservePackageSlot(userId: string, modelId: string): Pr
                OR e.last_reset_date < CURRENT_DATE
                OR e.requests_today < e.daily_limit_snapshot)
           -- CF lazy gate (checkPackageCoverage ile AYNI semantik — ikisi senkron kalmalı): bkz oradaki açıklama.
+          -- Stale-0 supabı KALDIRILDI (2026-06-23) — bkz checkPackageCoverage açıklaması.
           AND (e.cf_units_ordered = 0
                OR e.cf_remaining IS NULL
                OR e.cf_remaining > 0
-               OR e.cf_remaining_at < now() - interval '10 minutes')
+               OR e.cf_units_ordered < e.daily_limit_snapshot)
         -- Düşükten büyüğe tüketim: önce KÜÇÜK paket (daily_limit) bitirilir, sonra büyüğe geçilir
         -- (eşit boyutta önce erken biten). Böylece küçük paketler büyük paketin altında kaybolmaz.
         ORDER BY e.daily_limit_snapshot ASC, e.expires_at ASC
@@ -168,6 +173,7 @@ export async function recordPackageUsage(opts: {
   requestId: string;
   upstreamRequestId?: string;
   errorCode?: string;
+  rawUsageJson?: unknown;
 }): Promise<void> {
   await db.insert(usageRecords).values({
     userId: opts.userId,
@@ -185,6 +191,7 @@ export async function recordPackageUsage(opts: {
     status: opts.status,
     billedVia: "package",
     entitlementId: opts.entitlementId,
+    rawUsageJson: opts.rawUsageJson ?? null,
   }).onConflictDoNothing();
 }
 
