@@ -86,8 +86,8 @@ export default {
     'home.faq.a5': 'Minimum yükleme 5 USD. Üst limit yok. Bakiye USD bazında tutulur.',
     'home.faq.q6': 'Hangi ödeme yöntemleri var?',
     'home.faq.a6': 'IBAN banka havalesi (komisyonsuz), Shopier ile kredi/banka kartı, Cryptomus ile USDT (TRC20). Yatırılan TL anlık kurdan USD\'ye çevrilip bakiyene eklenir.',
-    'home.faq.q7': 'Görsel ve video API aktif mi?',
-    'home.faq.a7': 'Hayır. Bu geçişte aktif katalog yalnızca metin modelleridir; görsel/video endpointleri 501 döner ve ücretlendirilmez.',
+    'home.faq.q7': 'Görsel gönderebilir miyim, görsel/video üretimi var mı?',
+    'home.faq.a7': 'Görsel OKUMA (vision) açıktır: /v1/models yanıtında input_modalities içinde image yazan modellere mesaj içinde görsel gönderebilirsin. Görsel/video ÜRETİMİ ise yok: aktif katalog yalnızca metin modelleridir; görsel/video endpointleri 501 döner ve ücretlendirilmez.',
     'home.faq.q8': 'Veri gizliliği nasıl sağlanıyor?',
     'home.faq.a8': 'İstekler yalnızca ilgili sağlayıcıya iletilir ve loglanmaz. KVKK kapsamında kişisel veriler Türkiye\'de barındırılır.',
 
@@ -251,8 +251,8 @@ export default {
     'home.faq.a5': 'Minimum top-up is 5 USD. There is no upper limit. The balance is kept in USD.',
     'home.faq.q6': 'Which payment methods are available?',
     'home.faq.a6': 'IBAN bank transfer (no commission), credit/debit card via Shopier, USDT (TRC20) via Cryptomus. Deposited TL is converted to USD at the current rate and added to your balance.',
-    'home.faq.q7': 'Are the image and video APIs active?',
-    'home.faq.a7': 'No. In this transition the active catalog is text models only; image/video endpoints return 501 and are not billed.',
+    'home.faq.q7': 'Can I send images, and is image/video generation available?',
+    'home.faq.a7': 'Image INPUT (vision) is open: you can send images in the message content to any model whose input_modalities include image in the /v1/models response. Image/video GENERATION is not available: the active catalog is text models only; image/video endpoints return 501 and are not billed.',
     'home.faq.q8': 'How is data privacy ensured?',
     'home.faq.a8': 'Requests are forwarded only to the relevant provider and are not logged. Under KVKK, personal data is hosted in Turkey.',
 

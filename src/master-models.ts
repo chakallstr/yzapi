@@ -37,6 +37,17 @@ export interface MasterModel {
   };
 }
 
+// Görsel (vision) GİRDİ desteği: modelin `messages[].content` içinde image bloğu
+// (OpenAI `image_url`, Anthropic `image`+base64, Responses `input_image`) kabul ettiği
+// anlamına gelir — görsel ÜRETİMİ değil (o uçlar hâlâ 501). Gateway image bloklarını
+// strip etmez, upstream'e aynen iletir; bu liste yalnız /v1/models `architecture.
+// input_modalities` beyanını doğru tutar (istemciler görsel yükleme düğmesini buna göre
+// açar: Cline/Roo/OpenCode/Cherry Studio). Kaynak: pricing/ altındaki 2026-05-24
+// upstream katalog taraması (models-pricing CSV) → `image|text` işaretli id'ler.
+// Tarama yalnız 33 model kapsıyordu; BEYAN EDİLMEYEN model text-only bırakıldı (yanlış
+// beyan müşteri tarafında 400'e yol açar). Yeni tarama geldiğinde buraya ekle.
+const VISION_INPUT: ModelModality[] = ["text", "image"];
+
 const CHAT_PARAMS = ["model", "messages", "max_tokens", "temperature", "top_p", "stream", "stop", "tools", "tool_choice"];
 const MESSAGE_PARAMS = ["model", "messages", "max_tokens", "system", "temperature", "top_p", "stream", "stop_sequences", "tools", "tool_choice"];
 const TEXT_ENDPOINT_DETAILS: MasterModelEndpoint[] = [
@@ -174,25 +185,25 @@ function textModel(opts: {
 }
 
 export const MASTER_MODELS: MasterModel[] = [
-  textModel({ id: "claude-opus-4-7", name: "Claude Opus 4.7", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000, aliases: ["anthropic/claude-opus-4.7", "anthropic/claude-opus-4-7", "claude-opus-4.7"] }),
-  textModel({ id: "claude-opus-4-6", name: "Claude Opus 4.6", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000, aliases: ["anthropic/claude-opus-4.6", "anthropic/claude-opus-4-6", "claude-opus-4.6"] }),
+  textModel({ id: "claude-opus-4-7", name: "Claude Opus 4.7", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000, aliases: ["anthropic/claude-opus-4.7", "anthropic/claude-opus-4-7", "claude-opus-4.7"], inputModalities: VISION_INPUT }),
+  textModel({ id: "claude-opus-4-6", name: "Claude Opus 4.6", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000, aliases: ["anthropic/claude-opus-4.6", "anthropic/claude-opus-4-6", "claude-opus-4.6"], inputModalities: VISION_INPUT }),
   textModel({ id: "claude-opus-4-5-20251101", name: "Claude Opus 4.5", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000 }),
   textModel({ id: "claude-opus-4-1-20250805", name: "Claude Opus 4.1", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000 }),
-  textModel({ id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000, aliases: ["anthropic/claude-sonnet-4.6", "anthropic/claude-sonnet-4-6", "claude-sonnet-4.6"], inputModalities: ["text", "image"] }),
+  textModel({ id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000, aliases: ["anthropic/claude-sonnet-4.6", "anthropic/claude-sonnet-4-6", "claude-sonnet-4.6"], inputModalities: VISION_INPUT }),
   textModel({ id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000 }),
   textModel({ id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000 }),
-  textModel({ id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", provider: "Anthropic", providerSlug: "anthropic", context: "200K", contextTokens: 200000, aliases: ["anthropic/claude-haiku-4.5", "anthropic/claude-haiku-4-5", "anthropic/claude-haiku-4-5-20251001"] }),
+  textModel({ id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", provider: "Anthropic", providerSlug: "anthropic", context: "200K", contextTokens: 200000, aliases: ["anthropic/claude-haiku-4.5", "anthropic/claude-haiku-4-5", "anthropic/claude-haiku-4-5-20251001"], inputModalities: VISION_INPUT }),
   // codex-auto-review: Codex CLI, onay/auto-review modunda riskli komuttan önce
   // bu id ile küçük bir "komut güvenli mi?" çağrısı atar. Upstream'lerde böyle bir
   // model yok → 404. gpt-5.5'e ALIAS olarak bağlanır: koltuk-servisli gpt-5.5'e
   // çözülür, müşterinin gpt-5.5 paketi/key'i coverage'ı kapsar (402 olmaz). Alias
   // 42-kilidi BOZMAZ (entry sayısı/id değişmez) ve /v1/models'te GÖRÜNMEZ.
-  textModel({ id: "gpt-5.5", name: "GPT-5.5", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000, aliases: ["codex-auto-review"] }),
-  textModel({ id: "gpt-5.5-2026-04-23", name: "GPT-5.5 2026-04-23", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000 }),
-  textModel({ id: "gpt-5.4", name: "GPT-5.4", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000, aliases: ["openai/gpt-5.4"] }),
-  textModel({ id: "gpt-5.4-2026-03-05", name: "GPT-5.4 2026-03-05", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000 }),
-  textModel({ id: "gpt-5.4-mini", name: "GPT-5.4 mini", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000, aliases: ["openai/gpt-5.4-mini"] }),
-  textModel({ id: "gpt-5.4-mini-2026-03-17", name: "GPT-5.4 mini 2026-03-17", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000 }),
+  textModel({ id: "gpt-5.5", name: "GPT-5.5", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000, aliases: ["codex-auto-review"], inputModalities: VISION_INPUT }),
+  textModel({ id: "gpt-5.5-2026-04-23", name: "GPT-5.5 2026-04-23", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000, inputModalities: VISION_INPUT }),
+  textModel({ id: "gpt-5.4", name: "GPT-5.4", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000, aliases: ["openai/gpt-5.4"], inputModalities: VISION_INPUT }),
+  textModel({ id: "gpt-5.4-2026-03-05", name: "GPT-5.4 2026-03-05", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000, inputModalities: VISION_INPUT }),
+  textModel({ id: "gpt-5.4-mini", name: "GPT-5.4 mini", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000, aliases: ["openai/gpt-5.4-mini"], inputModalities: VISION_INPUT }),
+  textModel({ id: "gpt-5.4-mini-2026-03-17", name: "GPT-5.4 mini 2026-03-17", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000, inputModalities: VISION_INPUT }),
   textModel({ id: "gpt-5.4-nano", name: "GPT-5.4 nano", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000 }),
   textModel({ id: "gpt-5.4-nano-2026-03-17", name: "GPT-5.4 nano 2026-03-17", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000 }),
   textModel({ id: "gpt-5.3-chat-latest", name: "GPT-5.3 Chat Latest", provider: "OpenAI", providerSlug: "openai", context: "1M", contextTokens: 1000000 }),
@@ -217,8 +228,8 @@ export const MASTER_MODELS: MasterModel[] = [
   textModel({ id: "o3-2025-04-16", name: "o3 2025-04-16", provider: "OpenAI", providerSlug: "openai", context: "200K", contextTokens: 200000 }),
   textModel({ id: "o3-mini", name: "o3-mini", provider: "OpenAI", providerSlug: "openai", context: "200K", contextTokens: 200000 }),
   textModel({ id: "o3-mini-2025-01-31", name: "o3-mini 2025-01-31", provider: "OpenAI", providerSlug: "openai", context: "200K", contextTokens: 200000 }),
-  textModel({ id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", provider: "Google", providerSlug: "google", context: "1M", contextTokens: 1000000, aliases: ["google/gemini-3.1-pro-preview"] }),
-  textModel({ id: "gemini-3.1-pro-preview-customtools", name: "Gemini 3.1 Pro Preview Custom Tools", provider: "Google", providerSlug: "google", context: "1M", contextTokens: 1000000 }),
+  textModel({ id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", provider: "Google", providerSlug: "google", context: "1M", contextTokens: 1000000, aliases: ["google/gemini-3.1-pro-preview"], inputModalities: VISION_INPUT }),
+  textModel({ id: "gemini-3.1-pro-preview-customtools", name: "Gemini 3.1 Pro Preview Custom Tools", provider: "Google", providerSlug: "google", context: "1M", contextTokens: 1000000, inputModalities: VISION_INPUT }),
   textModel({ id: "gemini-3-pro-preview", name: "Gemini 3 Pro Preview", provider: "Google", providerSlug: "google", context: "1M", contextTokens: 1000000 }),
   textModel({ id: "gemini-3-flash-preview", name: "Gemini 3 Flash Preview", provider: "Google", providerSlug: "google", context: "1M", contextTokens: 1000000 }),
 ].sort((a, b) => (MODEL_DISPLAY_INDEX.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (MODEL_DISPLAY_INDEX.get(b.id) ?? Number.MAX_SAFE_INTEGER));

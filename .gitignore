@@ -34,3 +34,8 @@ agent-team/research-marathon/test-code-*/
 test-results/
 playwright-report/
 .playwright/
+
+# Kiro oturum artıkları — üretim diskine gitmesin (sync-deploy rsync .kiro'yu hariç tutmuyor)
+.kiro/tmp-*
+.kiro/maint/
+.kiro/musteri-mac-kurulum.sh

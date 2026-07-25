@@ -38,6 +38,10 @@ RSYNC_EXCLUDES=(
   --exclude='*.tar.gz' --exclude='tmp-account-deploy' --exclude='migration-audit'
   --exclude='.pgdata' --exclude='.DS_Store' --exclude='.claude' --exclude='*.rvf'
   --exclude='*.rvf.lock' --exclude='ruvector.db' --exclude='agentdb.rvf'
+  # Ajan/oturum artiklari: uretim diskinde isi yok. rsync .gitignore OKUMAZ, bu yuzden
+  # burada aciken haric tutulur. Calisma zamaninda hicbir kod .kiro/.codex-backups
+  # okumuyor (yalniz yorum/test referansi) — deploy davranisi degismez.
+  --exclude='.kiro' --exclude='.codex-backups'
 )
 
 echo "==> 1/8 rsync source -> ${SSH_HOST}:${REMOTE_APP} (--delete YOK)"

@@ -34,6 +34,31 @@ describe("MASTER_MODELS — Claude Popusk text catalog", () => {
     expect(MASTER_MODELS.every((model) => model.endpoints.includes("chat"))).toBe(true);
   });
 
+  it("declares image input only on upstream-confirmed vision models", () => {
+    // Kaynak: pricing/ altındaki 2026-05-24 upstream katalog taraması → `image|text`.
+    // Taramada image beyanı OLMAYAN model text-only kalmalı: yanlış beyan istemciye
+    // görsel yükleme düğmesi açtırır, istek upstream'de 400 alır.
+    const visionIds = MASTER_MODELS
+      .filter((model) => model.inputModalities?.includes("image"))
+      .map((model) => model.id)
+      .sort();
+
+    expect(visionIds).toEqual([
+      "claude-haiku-4-5-20251001",
+      "claude-opus-4-6",
+      "claude-opus-4-7",
+      "claude-sonnet-4-6",
+      "gemini-3.1-pro-preview",
+      "gemini-3.1-pro-preview-customtools",
+      "gpt-5.4",
+      "gpt-5.4-2026-03-05",
+      "gpt-5.4-mini",
+      "gpt-5.4-mini-2026-03-17",
+      "gpt-5.5",
+      "gpt-5.5-2026-04-23",
+    ]);
+  });
+
   it("keeps canonical public ids unprefixed while accepting legacy aliases", () => {
     expect(MASTER_MODELS.map((model) => model.id).join("\n")).not.toMatch(/\//);
     expect(canonicalizeModelId("anthropic/claude-opus-4.7")).toBe("claude-opus-4-7");

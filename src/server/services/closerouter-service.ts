@@ -712,12 +712,69 @@ function parseToolArguments(args: unknown): unknown {
   try { return JSON.parse(args); } catch { return { input: args }; }
 }
 
+// ── Görsel (vision) girdi çevirisi ──────────────────────────────────────────
+//
+// NEDEN: Sonnet 4.6 "sınırsız" paketleri Bedrock inference-profile lane'ine düşüyor.
+// Bedrock invoke gövdesi ANTHROPIC şeklindedir: görsel bloğu
+// {type:"image", source:{type:"base64", media_type, data}}. OpenAI-şekilli istemciler
+// (Cline / Roo / Cherry Studio / OpenAI SDK → /v1/chat/completions ve /v1/responses)
+// görseli {type:"image_url", image_url:{url:"data:image/png;base64,..."}} olarak yollar.
+// Araç şeması çevrilirken bu part çevrilmiyordu → Bedrock ValidationException, yani aynı
+// istek koltuk lane'inde çalışıp sınırsız pakette patlıyordu. Burada çeviriyoruz.
+// Anthropic-native gövde (/v1/messages, Claude Code) zaten doğru şekilde geliyor ve
+// bu fonksiyondan DEĞİŞMEDEN geçer (referans kimliği korunur → golden korpus bit-bit).
+const DATA_URL_BASE64_RE = /^data:([a-z0-9][a-z0-9.+/-]*);base64,([\s\S]*)$/i;
+
+function bedrockImageBlock(part: Record<string, unknown>): Record<string, unknown> | undefined {
+  const raw = part.image_url;
+  const url = typeof raw === "string"
+    ? raw
+    : raw && typeof raw === "object" && typeof (raw as Record<string, unknown>).url === "string"
+      ? (raw as Record<string, string>).url
+      : undefined;
+  if (!url) return undefined;
+  const trimmed = url.trim();
+  const dataUrl = DATA_URL_BASE64_RE.exec(trimmed);
+  if (dataUrl) {
+    const mediaType = dataUrl[1].toLowerCase();
+    // Yalnız görsel MIME'ı image bloğuna çevrilir; pdf/audio farklı blok tipleri
+    // gerektirir (bugün kapsam dışı) → part'a DOKUNMA, davranış bugünküyle aynı kalsın.
+    if (!mediaType.startsWith("image/")) return undefined;
+    return { type: "image", source: { type: "base64", media_type: mediaType, data: dataUrl[2] } };
+  }
+  // Uzak URL: sunucu tarafında indirmiyoruz (dış ağ çağrısı + gecikme). Anthropic'in
+  // url kaynağını geçiyoruz; sağlayıcı desteklemezse sonuç bugünküyle aynı (hata),
+  // destekliyorsa görsel çalışır → regresyon riski yok.
+  if (/^https?:\/\//i.test(trimmed)) return { type: "image", source: { type: "url", url: trimmed } };
+  return undefined;
+}
+
+/**
+ * İçerik dizisindeki OpenAI-şekilli görsel part'larını Anthropic görsel bloğuna çevirir.
+ * Çevrilecek part yoksa GİRDİYİ AYNEN (aynı referans) döndürür.
+ */
+export function bedrockContentFromRequest(content: unknown): unknown {
+  if (!Array.isArray(content)) return content;
+  let changed = false;
+  const mapped = content.map((raw) => {
+    if (!raw || typeof raw !== "object") return raw;
+    const part = raw as Record<string, unknown>;
+    if (part.type !== "image_url" && part.type !== "input_image") return raw;
+    const block = bedrockImageBlock(part);
+    if (!block) return raw;
+    changed = true;
+    return block;
+  });
+  return changed ? mapped : content;
+}
+
 /**
  * Mesaj dizisini Anthropic şekline getirir. System mesajları `systemParts`'a taşınır.
  * OpenAI-şekilli araç turları (assistant.tool_calls / role:"tool") içerik bloklarına
- * çevrilir; diğer her mesajın `content`'i DEĞİŞTİRİLMEDEN geçer (Anthropic blokları korunur).
+ * ve OpenAI-şekilli görsel part'ları Anthropic image bloğuna çevrilir; geri kalan her
+ * `content` DEĞİŞTİRİLMEDEN geçer (Anthropic blokları korunur).
  */
-function bedrockMessagesFromRequest(
+export function bedrockMessagesFromRequest(
   rawMessages: unknown[],
   systemParts: unknown[],
 ): Array<{ role: string; content: unknown }> {
@@ -758,7 +815,7 @@ function bedrockMessagesFromRequest(
       if (typeof m.content === "string" && m.content.trim()) {
         blocks.push({ type: "text", text: m.content });
       } else if (Array.isArray(m.content)) {
-        for (const blk of m.content) blocks.push(blk);
+        for (const blk of bedrockContentFromRequest(m.content) as unknown[]) blocks.push(blk);
       }
       for (const call of m.tool_calls) {
         if (!call || typeof call !== "object") continue;
@@ -777,14 +834,17 @@ function bedrockMessagesFromRequest(
       continue;
     }
 
-    out.push({ role: role === "assistant" ? "assistant" : "user", content: m.content ?? "" });
+    out.push({
+      role: role === "assistant" ? "assistant" : "user",
+      content: m.content === undefined || m.content === null ? "" : bedrockContentFromRequest(m.content),
+    });
   }
 
   return out;
 }
 
 /** Bedrock Anthropic yanıtından metin + araç çağrılarını ayrıştırır. */
-function partsFromBedrockAnthropic(json: Record<string, unknown>): {
+export function partsFromBedrockAnthropic(json: Record<string, unknown>): {
   text: string;
   toolCalls: Array<Record<string, unknown>>;
 } {
@@ -811,7 +871,7 @@ function partsFromBedrockAnthropic(json: Record<string, unknown>): {
 }
 
 /** Anthropic stop_reason → OpenAI finish_reason. */
-function bedrockFinishReason(json: Record<string, unknown>, hasToolCalls: boolean): string {
+export function bedrockFinishReason(json: Record<string, unknown>, hasToolCalls: boolean): string {
   const raw = extractFinishReason(json) ?? "stop";
   if (raw === "tool_use") return "tool_calls";
   if (raw === "end_turn" || raw === "stop_sequence") return "stop";
@@ -914,7 +974,7 @@ function firstChatFinishReason(raw: unknown): string {
 }
 
 /** Chat completion gövdesindeki araç çağrıları (Bedrock SSE köprüsü için). */
-function firstChatToolCalls(raw: unknown): Array<Record<string, unknown>> {
+export function firstChatToolCalls(raw: unknown): Array<Record<string, unknown>> {
   const message = firstChatChoice(raw).message;
   if (!message || typeof message !== "object") return [];
   const calls = (message as Record<string, unknown>).tool_calls;
