@@ -201,6 +201,22 @@ Kanıt: canlı journal'da 48 saatte scheduled job listesi 8 job içeriyor ve bu 
 
 Deploy, bu blocker bir karara bağlanmadan yapılmayacak. Seçenekler görev 7 notunda.
 
+## Görev 7 — Üçüncü Tur (2026-07-25, kullanıcı onaylı: "jobs/index.ts'i canlıyla eşitleyip deploy")
+
+| Kontrol | Sonuç |
+|---------|-------|
+| **CF cron blocker** | **KAPANDI — kendiliğinden.** Lokal ve canlı `src/server/jobs/index.ts` md5 = `97dea45da6a1cbaf2ecb1ff118d70281` → **byte-özdeş** (`sync-20260725T103130Z-095b468` deploy'u dosyayı çoktan taşımış). Checksum'lı rsync dry-run'da dosya listede YOK. Deploy job davranışını sıfır değiştirir → env kapısı EKLENMEDİ |
+| 4 CF job'unun canlı durumu (12:42 restart journal'ı) | `cf-ledger-job` skipped (CF key yok) · `cf-reconcile-job` skipped (CF key yok) · `cf-mirror-sync` disabled (`CF_MIRROR_SYNC_ENABLED=false`) · `cf-served-refresh-job` **scheduled** `*/15 * * * *` (kendi env kapısı yok, zaten canlıda dönüyor) |
+| Neden `CF_JOBS_ENABLED` kapısı eklenmedi | Varsayılanı-kapalı kapı, canlıda ŞU AN çalışan `cf-served-refresh-job`'ı susturacaktı → `cf_served` snapshot bayatlar, over-serve cap etkilenir = CF sayaç yolunda davranış değişikliği. "Canlı davranış birebir aynı kalsın" kuralıyla çelişti; kullanıcı "kapıyı ekleme, olduğu gibi deploy et" dedi. GAP-10 sözleşmesi (`missing-unit-coverage.test.ts`, 14 starter + kendi-kendini koruyan tarama) hiç riske girmedi |
+| Migration | Lokal `0037`→`0046` ile canlı **birebir aynı** (`diff` boş) → `db:migrate` yeni migration uygulamaz |
+| `package.json` | Canlıyla byte-özdeş (`1a5bf4084acccf2a5510b543515073ba`) |
+| **İkinci beklenmedik fark** | `src/server/services/claude-cloak-route.ts` — canlıda lokalde OLMAYAN `KIRO OVERRIDE` bloğu var (`kiro`/`cf-claude` profili + key varsa Vexly cloak'a sapmadan doğrudan geç). Kanıt: canlı dosya mtime 12:42:09 UTC, `dist/server.js` 12:42:26, yanında `dist/server.js.bak-kiro-20260725` (12:37:35), `.deploy/releases`'te 10:31'den sonra manifest YOK → sunucuda **elle** yama. rsync bunu ezip Claude yönlendirmesini sessizce geri alacaktı → blok kullanıcı onayıyla repoya alındı (`defb61e`), lokal artık canlıyla byte-özdeş, `claude-cloak-route.test.ts` 10/10 yeşil |
+| Lokal tam kapı | `npm run lint` temiz · `npm test` **144 dosya / 1235 test yeşil** · `npm run build` başarılı · `npm run scan:public` `{"scanned":3,"hits":[]}` · dist imzaları: `emittedToolItems`, `mappedToolCount`, `responses tool call outcome`, `suspicious success`, `model_catalog_override.json` mevcut |
+| Commit'ler | `90c2cde` (görev 8 telemetrisi, 7 dosya +961/−23) · `defb61e` (canlı KIRO OVERRIDE yaması, 1 dosya +6). Branch `fix/responses-tool-contract`; `main`/`master` dokunulmadı, `git push` YAPILMADI |
+| **DEPLOY DURUMU: YAPILMADI** | `sync-deploy.sh` clean-tree guard'ı abort etti: `M src/server/services/closerouter-service.ts` — Bedrock Anthropic araç çeviri katmanı (~180 satır, `bedrockToolsFromRequest` / `bedrockToolChoiceFromRequest`). Bu spec'e ait DEĞİL ve **aktif yazılıyor** (mtime 16:08:10 → 25sn sonra 16:08:28). `sync-deploy.sh` tüm ağacı rsync'lediği için deploy, başka bir oturumun yarı bitmiş provider kodunu canlıya taşırdı. Kullanıcı kararı: **DUR, diğer oturum bitince deploy** |
+
+Sonraki oturum için deploy ön koşulu: `git status --porcelain` boş olmalı (yalnız `closerouter-service.ts` bekliyor). Temizlendiğinde `bash scripts/sync-deploy.sh` yeterli — diğer tüm ön kontroller (migration, package.json, jobs/index.ts, claude-cloak-route.ts) bu turda doğrulandı.
+
 ## Kapsam Uyarısı — Dört Hata Sınıfı
 
 Kullanıcının tarif ettiği "hiçbir tool çağrısı yazmıyor/değiştirmiyor/silmiyor" belirtisi dört farklı kök nedenden gelebilir ve bu spec yalnız birini düzeltir:
