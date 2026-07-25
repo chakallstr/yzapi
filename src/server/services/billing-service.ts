@@ -32,6 +32,19 @@ const TOKEN_PRICE_UNIT = 1e6;
 // (write) tokens stay folded into base input at the model's input price.
 const CACHE_READ_USD_PER_M = 0.06;
 
+export function usdWalletEnabled(): boolean {
+  return false;
+}
+
+export async function currentSellKur(): Promise<number> {
+  const rows = await dbSql<{ live_kur: string; kur_buffer: string }[]>`
+    SELECT live_kur, kur_buffer FROM system_config WHERE id = 1 LIMIT 1
+  `;
+  const liveKur = Number(rows[0]?.live_kur ?? 0);
+  const kurBuffer = Number(rows[0]?.kur_buffer ?? 0.03);
+  return liveKur * (1 + kurBuffer);
+}
+
 // Convert the flat USD/1M cache-read rate into the requested currency. For TL we
 // reuse THIS model's own USD→TL conversion (input.tl / input.usd = kur*carpan),
 // so cache-read margin tracks the same FX + markup as base input. If the model

@@ -656,7 +656,7 @@ opencode`,
     intro:
       "Bakiye yüklemek için birkaç yöntem var. Önemli: ödeme alanı, iade politikasını okuyup onaylamadan açılmaz (bulanık/kilitli kalır).",
     paymentMethods: [
-      { icon: "🏦", name: "IBAN / Havale", sub: "Açıklamaya referans kodunu yaz", tag: "Manuel onay" },
+      { icon: "🏦", name: "IBAN / Havale", sub: "Açıklama kısmını boş bırak", tag: "Manuel onay" },
       { icon: "💳", name: "Shopier (kart)", sub: "Kredi / banka kartı", tag: "Otomatik" },
       { icon: "🪙", name: "Cryptomus (USDT)", sub: "Kripto ile yükleme", tag: "Otomatik" },
       { icon: "✈️", name: "Telegram", sub: "Telegram üzerinden", tag: "Otomatik" },

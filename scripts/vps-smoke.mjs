@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const baseUrl = process.env.SMOKE_BASE_URL || "http://127.0.0.1:4567";
 const expectedModelCount = Number(process.env.SMOKE_EXPECTED_MODEL_COUNT || "33");
+const expectedApiModelCount = Number(process.env.SMOKE_EXPECTED_API_MODEL_COUNT || expectedModelCount);
 const optionalApiKey = process.env.SMOKE_API_KEY;
 const optionalChatModel = process.env.SMOKE_CHAT_MODEL || "anthropic/claude-haiku-4.5";
 const optionalLowBalanceApiKey = process.env.SMOKE_LOW_BALANCE_API_KEY;
@@ -45,7 +46,7 @@ async function main() {
   const modelsJson = await readJson(models);
   if (!models.ok) throw new Error(`/api/models status ${models.status}`);
   const count = Array.isArray(modelsJson) ? modelsJson.length : (modelsJson.models?.length ?? modelsJson.count);
-  if (count !== expectedModelCount) throw new Error(`/api/models expected ${expectedModelCount}, got ${count}`);
+  if (count !== expectedApiModelCount) throw new Error(`/api/models expected ${expectedApiModelCount}, got ${count}`);
   console.log("/api/models:", count);
 
   const unauth = await fetch(`${baseUrl}/v1/chat/completions`, {

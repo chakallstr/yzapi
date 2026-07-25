@@ -87,7 +87,7 @@ Dokunulan dosyalar: `src/server/services/responses-translation.ts`, `src/server/
   - Sonuçları kanıt olarak özetle; herhangi biri kırmızıysa DEVAM ETME
   - _Requirements: 3.10, 3.11, 3.12_
 
-- [ ] 7. Commit ve deploy (açık kullanıcı onayı şart)
+- [~] 7. Commit ve deploy (commit YAPILDI; deploy BLOKE)
   - ÖN KOŞUL: lokal ağaç kirli (84 dosya, HEAD `b6f6197`) → `sync-deploy.sh` clean-tree guard'ı abort eder. Yalnız bu spec kapsamındaki dosyaları ayıklayıp commit et; ilgisiz 84 dosyayı bu commit'e KARIŞTIRMA
   - Deploy: `bash scripts/sync-deploy.sh --dry-run` sonra kullanıcı onayıyla gerçek deploy
   - Deploy sonrası doğrulama: `curl -s http://127.0.0.1:4568/health` (sunucuda), `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`
@@ -142,3 +142,23 @@ _(Notlar)_
 ## Kontaminasyon Uyarısı (görev 7 için)
 
 `git diff --stat` bu iki dosyada ~1200 satır gösteriyor; bunların **büyük kısmı bu bugfix'e ait DEĞİL** — `proxy.ts` ve `responses-translation.ts` çalışma başlamadan önce de kirliydi (84 dosyalık kirli ağaç). `git add src/server/routes/proxy.ts` demek, bu spec'e ait olmayan ~800 satırı da commit'e sokar (CLAUDE.md'deki kontaminasyon tuzağı). Görev 7'de dosya-bazlı değil **hunk-bazlı** (`git add -p`) ayıklama şart.
+
+## Görev 7 Durumu: Commit YAPILDI, Deploy BLOKE (2026-07-25)
+
+Commit: `179c8fa` — branch `fix/responses-tool-contract` (main'e/master'a dokunulmadı, push YAPILMADI).
+Index, çalışma öncesi hâline geri yüklendi (önceden staged olan 11 dosya yeniden staged edildi).
+
+**Deploy neden durdu (kullanıcı kararı gerekiyor):**
+
+`scripts/sync-deploy.sh` (a) tüm çalışma ağacının temiz olmasını ister, (b) temizse **tüm ağacı** rsync'ler. Yani bu fix'i deploy etmek, commit edilmemiş diğer işleri de canlıya taşır. Risk yarıçapı ölçüldü — 65 kirli kod dosyasının md5'i canlıyla karşılaştırıldı:
+
+- 62 dosya canlıyla **byte-özdeş** (deploy hiçbir şey değiştirmez)
+- 2 dosya yalnız test (`cf-gate-counter-desync.itest.ts`, `provider-config-service.test.ts`) — çalışma zamanına etkisiz
+- **1 dosya çalışma zamanı: `src/server/jobs/index.ts`** — lokal sürüm canlıda BULUNMAYAN 4 CF cron job'unu başlatıyor: `startCfLedgerJob`, `startCfReconcileJob`, `startCfServedRefreshJob`, `startCfMirrorSyncJob`
+
+Kanıt: canlı journal'da 48 saatte scheduled job listesi 8 job içeriyor ve bu 4'ü **yok** (CF job izi: 0 satır). Yani deploy, para/CF sayaçlarına dokunan 4 arka plan job'unu üretimde **yeni** başlatır. CLAUDE.md'deki ~675 TL over-order olayı da tam bu sınıfta bir job boşluğundan çıkmıştı. Bu yüzden otomatik deploy YAPILMADI.
+
+**Seçenekler:**
+1. `jobs/index.ts`'i canlı hâliyle eşitleyip (4 CF job import'unu ayırıp) sonra deploy — CF jobları kapalı kalır, yalnız bu fix gider.
+2. 4 CF job'unun canlıda çalışması bilinçli bir karar ise, önce onlar ayrı ve gözetimli deploy edilir, sonra bu fix.
+3. Hedefli rsync (yalnız 3 dosya) + build + restart — sunucu-taraflı gate'i atlar, CLAUDE.md bunu tuzak olarak işaretliyor; önerilmez.

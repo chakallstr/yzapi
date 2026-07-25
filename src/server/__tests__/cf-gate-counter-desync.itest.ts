@@ -9,11 +9,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { db, dbSql } from "../db/client.js";
 import { users } from "../db/schema.js";
-import { checkPackageCoverage, tryReservePackageSlot, listUserPackagesForPanel } from "../services/entitlement-service.js";
+import { checkPackageCoverage, tryReservePackageSlot, listUserEntitlements, listUserPackagesForPanel } from "../services/entitlement-service.js";
 
 const UID = "44444444-4444-4444-4444-444444444444";
 const PKG_CF = "cf-gate-itest-cf";
 const PKG_PLAIN = "cf-gate-itest-plain";
+const PKG_DEVREDEN = "cf-gate-itest-devreden";
 const MODEL = "gpt-5.5";
 
 type EntOpts = {
@@ -43,6 +44,23 @@ async function insertEnt(o: EntOpts): Promise<string> {
   return rows[0].id;
 }
 
+async function insertDevredenEnt(): Promise<string> {
+  const rows = await dbSql<{ id: string }[]>`
+    WITH win AS (
+      SELECT date_trunc('day', now()) AS current_window_start
+    )
+    INSERT INTO user_package_entitlements
+      (user_id, package_id, daily_limit_snapshot, allowed_models_snapshot, activated_at, expires_at,
+       status, requests_today, last_reset_date, daily_quota, rollover_balance, day_window_start)
+    SELECT ${UID}::uuid, ${PKG_DEVREDEN}, 5250, ${JSON.stringify([MODEL])}::jsonb,
+           win.current_window_start - interval '10 days', now() + interval '7 days',
+           'active', 318, CURRENT_DATE - 3, 500, 1000, win.current_window_start - interval '3 days'
+    FROM win
+    RETURNING id
+  `;
+  return rows[0].id;
+}
+
 async function reqToday(id: string): Promise<number> {
   const r = await dbSql<{ requests_today: number }[]>`SELECT requests_today FROM user_package_entitlements WHERE id = ${id}::uuid`;
   return Number(r[0].requests_today);
@@ -60,10 +78,20 @@ async function insertUsage(entId: string, status: string, n: number) {
   }
 }
 
+async function panelFor(entId: string) {
+  const all = await listUserPackagesForPanel(UID);
+  return all.find((p) => p.id === entId)!;
+}
+
+async function activeFor(entId: string) {
+  const all = await listUserEntitlements(UID);
+  return all.find((p) => p.id === entId)!;
+}
+
 beforeAll(async () => {
   await clearEnts();
   await dbSql`DELETE FROM users WHERE id = ${UID}::uuid`;
-  await dbSql`DELETE FROM packages WHERE id IN (${PKG_CF}, ${PKG_PLAIN})`;
+  await dbSql`DELETE FROM packages WHERE id IN (${PKG_CF}, ${PKG_PLAIN}, ${PKG_DEVREDEN})`;
   await db.insert(users).values({ id: UID, email: "cf-gate-itest@test.local", adSoyad: "CF Gate Itest", bakiyeTL: "0.0000", durum: "aktif", paygMode: false } as any);
   await dbSql`
     INSERT INTO packages (id, ad, kategori, aciklama, tip, gunluk_istek_limiti, sure_gun, allowed_models, fiyat_tl, enabled, satista, cf_catalog_id, cf_api_slug, cf_manual)
@@ -73,12 +101,16 @@ beforeAll(async () => {
     INSERT INTO packages (id, ad, kategori, aciklama, tip, gunluk_istek_limiti, sure_gun, allowed_models, fiyat_tl, enabled, satista)
     VALUES (${PKG_PLAIN}, 'Plain Daily', 'GPT', '', 'request_limit', 50, 7, ${JSON.stringify([MODEL])}::jsonb, 40, true, true)
   `;
+  await dbSql`
+    INSERT INTO packages (id, ad, kategori, aciklama, tip, gunluk_istek_limiti, sure_gun, allowed_models, fiyat_tl, enabled, satista, devreden)
+    VALUES (${PKG_DEVREDEN}, 'Devreden Daily', 'GPT', '', 'request_limit', 500, 7, ${JSON.stringify([MODEL])}::jsonb, 40, true, true, true)
+  `;
 });
 
 afterAll(async () => {
   await clearEnts();
   await dbSql`DELETE FROM users WHERE id = ${UID}::uuid`;
-  await dbSql`DELETE FROM packages WHERE id IN (${PKG_CF}, ${PKG_PLAIN})`;
+  await dbSql`DELETE FROM packages WHERE id IN (${PKG_CF}, ${PKG_PLAIN}, ${PKG_DEVREDEN})`;
 });
 
 beforeEach(clearEnts);
@@ -104,10 +136,10 @@ describe("CF package gate counter-desync (real PG)", () => {
     expect((await tryReservePackageSlot(UID, MODEL)).covered).toBe(false);
   });
 
-  it("CF package: cf_remaining=0 STALE (>10min) → COVERED (self-heal supap preserved)", async () => {
+  it("CF package: cf_remaining=0 STALE with no unordered headroom → NOT covered", async () => {
     await insertEnt({ pkg: PKG_CF, dailyLimit: 120, requestsToday: 5, cfUnitsOrdered: 120, cfRemaining: 0, cfRemainingAtMinutesAgo: 20 });
-    expect(await checkPackageCoverage(UID, MODEL)).toBe(true);
-    expect((await tryReservePackageSlot(UID, MODEL)).covered).toBe(true);
+    expect(await checkPackageCoverage(UID, MODEL)).toBe(false);
+    expect((await tryReservePackageSlot(UID, MODEL)).covered).toBe(false);
   });
 
   it("DEADLOCK FIX: cf_remaining=0 FRESH but cf_units_ordered < daily_limit (UNORDERED HEADROOM) → COVERED", async () => {
@@ -138,11 +170,6 @@ describe("CF package gate counter-desync (real PG)", () => {
 });
 
 describe("CF panel display reflects real usage when mirror is stale (real PG)", () => {
-  async function panelFor(entId: string) {
-    const all = await listUserPackagesForPanel(UID);
-    return all.find((p) => p.id === entId)!;
-  }
-
   it("stale mirror (cf_remaining==cf_units_ordered → cfConsumed=0) + 40 success → kullanilan=40, NOT 0", async () => {
     const id = await insertEnt({ pkg: PKG_CF, dailyLimit: 120, requestsToday: 3, cfUnitsOrdered: 120, cfRemaining: 120 });
     await insertUsage(id, "success", 40);
@@ -152,12 +179,12 @@ describe("CF panel display reflects real usage when mirror is stale (real PG)", 
     expect(p.kalan).toBe(80);
   });
 
-  it("successes exceed limit → kullanilan clamped to limit, kalan=0", async () => {
+  it("successes exceed display cap but CF mirror still has units → leaves one visible slot", async () => {
     const id = await insertEnt({ pkg: PKG_CF, dailyLimit: 120, requestsToday: 0, cfUnitsOrdered: 120, cfRemaining: 120 });
     await insertUsage(id, "success", 200);
     const p = await panelFor(id);
-    expect(p.kullanilan).toBe(120);
-    expect(p.kalan).toBe(0);
+    expect(p.kullanilan).toBe(119);
+    expect(p.kalan).toBe(1);
   });
 
   it("fresh mirror with CF-consumption > successes → trusts CF mirror", async () => {
@@ -173,5 +200,26 @@ describe("CF panel display reflects real usage when mirror is stale (real PG)", 
     const p = await panelFor(id);
     expect(p.kullanilan).toBe(0);
     expect(p.kalan).toBe(100);
+  });
+});
+
+describe("Devreden panel display uses current-day virtual reset (real PG)", () => {
+  it("stale day window with no success today shows bugun kullanilan=0 and accrued carryover", async () => {
+    const id = await insertDevredenEnt();
+    const p = await panelFor(id);
+    expect(p.kullanilan).toBe(0);
+    expect(p.kalan).toBe(2650);
+    expect(p.gunlukLimit).toBe(2650);
+    expect(p.bugunKullanilan).toBe(0);
+    expect(p.bugunKullanilabilir).toBe(2650);
+    expect(p.devirBakiyesi).toBe(2150);
+  });
+
+  it("active entitlement summary also uses the current-day virtual reset", async () => {
+    const id = await insertDevredenEnt();
+    const ent = await activeFor(id);
+    expect(ent.kullanilanBugun).toBe(0);
+    expect(ent.gunlukLimit).toBe(2650);
+    expect(ent.kalanBugun).toBe(2650);
   });
 });

@@ -62,6 +62,12 @@ export interface ProviderContext {
   };
   /** Upstream'e eklenen sağlayıcı-özel header'lar (ör. CF claude-api claude-cli UA). */
   extraHeaders?: Record<string, string>;
+  /** Upstream kimlik açıklaması override'ı; CF/spark map'lerinde müşteri görünen model adını korur. */
+  relabelResponseTo?: string;
+  /** Relabel'in kaynağı; native /responses degrade kararında spark ve identity ayrılır. */
+  relabelSource?: "identity" | "spark";
+  supportedModelIds?: string[];
+  fallbackProviderId?: string | null;
 }
 
 // The active provider profile, parsed safely from provider_profiles. Used by the
@@ -116,13 +122,18 @@ let cache: CacheEntry | null = null;
 
 // Parsed view of an enabled provider_profiles row, used by the per-model router.
 // Holds the decrypted key in memory only; never logged.
-interface ParsedProfile {
+export interface ParsedProfile {
   id: string;
   baseUrl: string;
   apiKey: string | undefined;
   supportedModelIds: string[];
   modelMap: Record<string, string>;
   fallbackProviderId: string | null;
+  // Lane scheduler (0042): NULL = lane değil
+  laneModel: string | null;     // 'sonnet' | 'opus' | 'haiku' | null
+  laneRegion: string | null;    // 'geo' | 'global' | 'spillover' | null
+  rpmLimit: number | null;      // RPM limit (null = sınırsız)
+  lanePriority: number | null;  // dispatch önceliği (1 = en yüksek, null = lane değil)
 }
 
 // All-enabled-profiles cache (per-model routing + UNION catalog). Shares the
@@ -230,7 +241,7 @@ function addSupportedModelIdAliases(target: Set<string>, modelId: string): void 
   if (canonical && canonical.trim()) target.add(canonical);
 }
 
-function providerSupportsModelId(supportedModelIds: string[], canonicalModelId: string): boolean {
+export function providerSupportsModelId(supportedModelIds: string[], canonicalModelId: string): boolean {
   const canonicalTarget = canonicalizeModelId(canonicalModelId) ?? canonicalModelId;
   const aliases = new Set<string>();
   addSupportedModelIdAliases(aliases, canonicalModelId);
@@ -255,7 +266,7 @@ function providerSupportsModelId(supportedModelIds: string[], canonicalModelId: 
 // so first-match is normally unambiguous). Returns [] when provider_profiles is
 // unreachable (pre-migration 0013 / unit tests without a live DB), which keeps
 // the catalog + routing on the existing system_api_config → env path.
-async function readAllEnabledProfiles(): Promise<ParsedProfile[]> {
+export async function readAllEnabledProfiles(): Promise<ParsedProfile[]> {
   if (profilesCache && Date.now() - profilesCache.at < CACHE_TTL_MS) {
     return profilesCache.profiles;
   }
@@ -270,12 +281,14 @@ async function readAllEnabledProfiles(): Promise<ParsedProfile[]> {
     .map((r) => ({
       id: r.id,
       baseUrl: r.baseUrl,
-      // Decrypt with the rotation fallback order; an undecryptable cipher yields
-      // undefined so the router falls back rather than forwarding a broken key.
       apiKey: isNonEmptyString(r.apiKeyCipher) ? (decryptApiKey(r.apiKeyCipher) ?? undefined) : undefined,
       supportedModelIds: parseStringArray(r.supportedModelIds),
       modelMap: parseStringRecord(r.modelMap),
       fallbackProviderId: isNonEmptyString(r.fallbackProviderId) ? r.fallbackProviderId : null,
+      laneModel: isNonEmptyString(r.laneModel) ? r.laneModel : null,
+      laneRegion: isNonEmptyString(r.laneRegion) ? r.laneRegion : null,
+      rpmLimit: typeof r.rpmLimit === "number" ? r.rpmLimit : null,
+      lanePriority: typeof r.lanePriority === "number" ? r.lanePriority : null,
     }))
     .sort((a, b) => a.id.localeCompare(b.id));
   profilesCache = { profiles, at: Date.now() };
@@ -410,6 +423,38 @@ export interface ProviderChain {
   fallback: ProviderContext | null;
 }
 
+export function nativeResponsesCapable(ctx: ProviderContext): boolean {
+  const profileId = ctx.profileId ?? "";
+  if (profileId === "sub-codex") return true;
+  if (profileId.startsWith("cf:")) return true;
+
+  try {
+    const host = new URL(ctx.baseUrl).hostname.toLowerCase();
+    return host === "api.openai.com";
+  } catch {
+    return false;
+  }
+}
+
+function profileToProviderContext(profile: ParsedProfile): ProviderContext {
+  return {
+    profileId: profile.id,
+    baseUrl: profile.baseUrl,
+    apiKey: profile.apiKey,
+    modelMap: profile.modelMap,
+    source: { baseUrl: "model_profile", apiKey: "model_profile" },
+    supportedModelIds: profile.supportedModelIds,
+    fallbackProviderId: profile.fallbackProviderId,
+  };
+}
+
+export async function resolveProfileById(profileId: string): Promise<ProviderContext | null> {
+  const profiles = await readAllEnabledProfiles();
+  const profile = profiles.find((p) => p.id === profileId);
+  if (!profile?.apiKey) return null;
+  return profileToProviderContext(profile);
+}
+
 // Resolves the primary provider for a model AND its optional failover target.
 // The primary is exactly the legacy resolveProviderForModel result. The fallback is
 // the matched PINNED profile's fallback_provider_id resolved to a ProviderContext —
@@ -424,24 +469,12 @@ export async function resolveProviderChainForModel(canonicalModelId: string): Pr
   const match = profiles.find((p) => providerSupportsModelId(p.supportedModelIds, canonicalModelId));
 
   if (match && match.apiKey) {
-    const primary: ProviderContext = {
-      profileId: match.id,
-      baseUrl: match.baseUrl,
-      apiKey: match.apiKey,
-      modelMap: match.modelMap,
-      source: { baseUrl: "model_profile", apiKey: "model_profile" },
-    };
+    const primary = profileToProviderContext(match);
     let fallback: ProviderContext | null = null;
     if (match.fallbackProviderId) {
       const fb = profiles.find((p) => p.id === match.fallbackProviderId);
       if (fb && fb.apiKey) {
-        fallback = {
-          profileId: fb.id,
-          baseUrl: fb.baseUrl,
-          apiKey: fb.apiKey,
-          modelMap: fb.modelMap,
-          source: { baseUrl: "model_profile", apiKey: "model_profile" },
-        };
+        fallback = profileToProviderContext(fb);
       }
     }
     return { primary, fallback };

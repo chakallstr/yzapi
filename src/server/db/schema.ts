@@ -155,6 +155,8 @@ export const systemApiConfig = pgTable("system_api_config", {
   defaultContextLimitTokens: integer("default_context_limit_tokens").notNull().default(1_000_000),
   defaultOutputReserveTokens: integer("default_output_reserve_tokens").notNull().default(4_096),
   defaultPerKeyPerMinute: integer("default_per_key_per_minute").notNull().default(60),
+  defaultConcurrentSessionsPerKey: integer("default_concurrent_sessions_per_key").notNull().default(2),
+  defaultConcurrentRequestsPerKey: integer("default_concurrent_requests_per_key").notNull().default(10),
   defaultPerUserPerMinute: integer("default_per_user_per_minute").notNull().default(120),
   defaultPerIpPerMinute: integer("default_per_ip_per_minute").notNull().default(240),
   defaultRequestTimeoutMs: integer("default_request_timeout_ms").notNull().default(180_000),
@@ -204,7 +206,7 @@ export const addedModels = pgTable("added_models", {
 
 // ── provider_profiles (multi-provider switch: metro ⇄ closerouter) ────────────
 export const providerProfiles = pgTable("provider_profiles", {
-  id: text("id").primaryKey(), // e.g. "metro", "closerouter"
+  id: text("id").primaryKey(), // e.g. "metro", "closerouter", "bedrock-sonnet-geo"
   label: text("label").notNull().default(""),
   baseUrl: text("base_url").notNull().default(""),
   apiKeyCipher: text("api_key_cipher"), // AES-GCM ciphertext, nullable
@@ -212,6 +214,13 @@ export const providerProfiles = pgTable("provider_profiles", {
   supportedModelIds: jsonb("supported_model_ids").notNull().default(sql`'[]'::jsonb`),
   modelMap: jsonb("model_map").notNull().default(sql`'{}'::jsonb`), // catalog id -> upstream id
   fallbackProviderId: text("fallback_provider_id"), // soft ref: failover target profile id, nullable
+  // ── Lane scheduler (0042): Bedrock inference profile lane'leri ──
+  // NULL = lane DEĞİL (mevcut profiller etkilenmez). Lane profilleri için:
+  // lane_model='sonnet', lane_region='geo', rpm_limit=10, lane_priority=1
+  laneModel: text("lane_model"), // 'sonnet' | 'opus' | 'haiku' | NULL
+  laneRegion: text("lane_region"), // 'geo' | 'global' | 'spillover' | NULL
+  rpmLimit: integer("rpm_limit"), // RPM limit (NULL = sınırsız)
+  lanePriority: integer("lane_priority"), // dispatch önceliği (1 = en yüksek, NULL = lane değil)
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });

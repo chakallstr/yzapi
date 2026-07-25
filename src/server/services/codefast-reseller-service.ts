@@ -34,8 +34,8 @@ async function cf<T>(method: string, path: string, body?: unknown, idempotencyKe
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new CodefastError(res.status, `CodeFast ${method} ${path} → ${res.status}: ${t.slice(0, 300)}`);
+    await res.text().catch(() => "");
+    throw new CodefastError(res.status, `CodeFast ${method} ${path} failed with status ${res.status}`);
   }
   const j = (await res.json()) as { success?: boolean; data?: T };
   if (j.success === false) throw new CodefastError(502, `CodeFast ${path} returned success:false`);
@@ -115,6 +115,21 @@ export interface CfOrderResult {
   customer_api_key?: { api_key: string; record?: { id: string; key_prefix?: string } };
 }
 
+export interface CfUsageResponse {
+  customer?: { id?: string };
+  events?: Array<{
+    id?: string;
+    customer_id?: string | null;
+    customer_api_key_id?: string | null;
+    request_id?: string | null;
+    result?: { api_slug?: string | null } | null;
+    status?: string | null;
+    cost_units?: number | string | null;
+    remaining?: number | string | null;
+    created_at?: string | null;
+  }>;
+}
+
 /** Extract the cf_rc_live_ string from an order result (null if absent / idempotent replay). */
 export function extractCustomerKey(o: CfOrderResult): string | null {
   return o.customer_api_key?.api_key ?? null;
@@ -136,4 +151,5 @@ export const cfCreateOrder = (b: CfOrderReq, idempotencyKey: string) =>
 export const cfGetOrder = (id: string) => cf<CfOrderResult>("GET", `/v1/orders/${encodeURIComponent(id)}`);
 export const cfRevokeOrder = (id: string) =>
   cf<{ id: string; status: string }>("POST", `/v1/orders/${encodeURIComponent(id)}/revoke`);
-export const cfUsage = (extId: string) => cf<unknown>("GET", `/v1/customers/${encodeURIComponent(extId)}/usage`);
+export const cfUsage = (extId: string) =>
+  cf<CfUsageResponse>("GET", `/v1/customers/${encodeURIComponent(extId)}/usage`);

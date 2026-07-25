@@ -58,6 +58,37 @@ describe("packageOverrideChain", () => {
   });
 });
 
+describe("seatPrimaryPackageChain", () => {
+  it("never adds CodeFast as a fallback for a Codex seat", async () => {
+    const { seatPrimaryPackageChain } = await import("./package-provider-override.js");
+    const seat = {
+      primary: {
+        profileId: "sub-codex",
+        baseUrl: "http://127.0.0.1:8318/v1",
+        apiKey: "seat-key",
+        modelMap: {},
+        source: { baseUrl: "db" as const, apiKey: "db" as const },
+      },
+      fallback: null,
+    };
+    const cf = {
+      primary: {
+        profileId: "cf:e1",
+        baseUrl: "https://reseller-api.codefast.app/proxy/codex-api/v1",
+        apiKey: "cf-key",
+        modelMap: {},
+        source: { baseUrl: "db" as const, apiKey: "db" as const },
+      },
+      fallback: null,
+    };
+
+    expect(seatPrimaryPackageChain(seat, cf)).toEqual({
+      primary: seat.primary,
+      fallback: null,
+    });
+  });
+});
+
 describe("entitlementOverrideChain (CodeFast reseller)", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -99,6 +130,38 @@ describe("entitlementOverrideChain (CodeFast reseller)", () => {
       },
       fallback: null,
     });
+  });
+});
+
+describe("requiresCfKeyReady", () => {
+  it("returns false for codex-api even when no chain (koltuk fallback var → 409 atma)", async () => {
+    const { requiresCfKeyReady } = await import("./package-provider-override.js");
+    expect(requiresCfKeyReady("codex-api", null)).toBe(false);
+    expect(requiresCfKeyReady({ cfApiSlug: "codex-api" }, null)).toBe(false);
+    expect(requiresCfKeyReady({ cfApiSlug: "codex-api", entitlementId: "e1" }, null)).toBe(false);
+  });
+
+  it("returns false when a chain exists (key ready — regardless of slug)", async () => {
+    const { requiresCfKeyReady } = await import("./package-provider-override.js");
+    const chain = { primary: { profileId: "cf:e1", baseUrl: "x", apiKey: "k", modelMap: {}, source: { baseUrl: "db" as const, apiKey: "db" as const } }, fallback: null };
+    expect(requiresCfKeyReady("codex-api", chain)).toBe(false);
+    expect(requiresCfKeyReady("glm-api", chain)).toBe(false);
+  });
+
+  it("returns true for non-codex CF slug without a chain (koltuk fallback YOK → 409 korunur)", async () => {
+    const { requiresCfKeyReady } = await import("./package-provider-override.js");
+    expect(requiresCfKeyReady("glm-api", null)).toBe(true);
+    expect(requiresCfKeyReady("composer-api", null)).toBe(true);
+    expect(requiresCfKeyReady({ cfApiSlug: "glm-api" }, null)).toBe(true);
+  });
+
+  it("returns false when slug is empty/null (no CF package → gate atlanır)", async () => {
+    const { requiresCfKeyReady } = await import("./package-provider-override.js");
+    expect(requiresCfKeyReady("", null)).toBe(false);
+    expect(requiresCfKeyReady(null, null)).toBe(false);
+    expect(requiresCfKeyReady(undefined, null)).toBe(false);
+    expect(requiresCfKeyReady({ cfApiSlug: undefined }, null)).toBe(false);
+    expect(requiresCfKeyReady("   ", null)).toBe(false);
   });
 });
 

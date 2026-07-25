@@ -348,12 +348,37 @@ const ApiKeyBox = ({ apiKey }) => {
 };
 
 // Hub — "Hangi aracı kullanıyorsun?" araç seçim ekranı.
-const DocsHub = ({ guides, onPick, onClassic }) => (
+const DocsHub = ({ guides, onPick, onClassic }) => {
+  const quickGuides = [
+    { label: 'Claude kurulumu', guide: guides.find((g) => g.id === 'claude-desktop' || /claude/i.test(g.name)) },
+    { label: 'Codex kurulumu', guide: guides.find((g) => g.id === 'codex-desktop' || /codex/i.test(g.name)) },
+  ].filter((x) => x.guide);
+  return (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
     <div>
       <div style={{ fontSize: 18, fontWeight: 700 }}>Hangi aracı kullanıyorsun?</div>
       <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 4 }}>Aracına tıkla — sadece onun adım adım, görselli kurulum rehberi açılır.</div>
     </div>
+    {quickGuides.length ? (
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        {quickGuides.map(({ label, guide }) => (
+          <button
+            key={guide.id}
+            type="button"
+            onClick={() => onPick(guide.id)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              border: '1px solid var(--accent-border)', background: 'var(--ink)', color: '#fff',
+              borderRadius: 10, padding: '10px 14px', fontSize: 12.5, fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            <span>{guide.icon}</span>
+            {label}
+          </button>
+        ))}
+      </div>
+    ) : null}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))', gap: 12 }}>
       {guides.map((g) => (
         <button
@@ -400,7 +425,8 @@ const DocsHub = ({ guides, onPick, onClassic }) => (
       </div>
     </div>
   </div>
-);
+  );
+};
 
 // Tek aracın kendi sayfası: geri-dön + başlık + her adım görselli.
 const ClientGuidePage = ({ guide, onBack, renderInline, apiKey }) => {
@@ -700,7 +726,7 @@ const DocumentsTab = () => {
 
       {view === 'hub' ? (
         <>
-          <ApiKeysPanel onKeysChanged={refreshDocKey} />
+          {hasKey ? <ApiKeyBox apiKey={myKey} /> : <ApiKeysPanel onKeysChanged={refreshDocKey} />}
           <DocsHub
             guides={CLIENT_GUIDES}
             onPick={(id) => { setView(id); window.scrollTo({ top: 0 }); }}

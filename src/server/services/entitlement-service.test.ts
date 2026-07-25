@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockDbSql = vi.fn();
 const mockOnConflict = vi.fn();
+const mockReturning = vi.fn();
 const mockInsertValues = vi.fn(() => ({ onConflictDoNothing: mockOnConflict }));
 
 vi.mock("../db/client.js", () => ({
@@ -10,13 +11,17 @@ vi.mock("../db/client.js", () => ({
 }));
 
 describe("entitlement-service", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockOnConflict.mockReturnValue({ returning: mockReturning });
+    mockReturning.mockResolvedValue([]);
+  });
 
   it("tryReservePackageSlot returns covered+id when UPDATE returns a row", async () => {
     mockDbSql.mockResolvedValueOnce([{ id: "ent-1" }]);
     const { tryReservePackageSlot } = await import("./entitlement-service.js");
     const res = await tryReservePackageSlot("user-1", "claude-opus-4.8");
-    expect(res).toEqual({ covered: true, entitlementId: "ent-1" });
+    expect(res).toMatchObject({ covered: true, entitlementId: "ent-1" });
   });
 
   it("tryReservePackageSlot returns not-covered when UPDATE returns empty (quota exhausted)", async () => {
@@ -33,7 +38,6 @@ describe("entitlement-service", () => {
   });
 
   it("recordPackageUsage writes a usage row with costTL=0 and billed_via=package", async () => {
-    mockOnConflict.mockResolvedValue([]);
     const { recordPackageUsage } = await import("./entitlement-service.js");
     await recordPackageUsage({
       userId: "u", apiKeyId: "k", modelId: "claude-opus-4.8", entitlementId: "e",

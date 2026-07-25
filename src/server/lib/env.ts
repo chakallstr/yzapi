@@ -82,6 +82,27 @@ const schema = z.object({
   CODEFAST_RESELLER_ENABLED: z.coerce.boolean().default(false),
   CODEFAST_RESELLER_BASE_URL: z.string().url().default("https://reseller-api.codefast.app"),
   CODEFAST_RESELLER_API_KEY: z.string().optional(),
+  // CF cron job zamanlamaları. optional() BİLİNÇLİ: job'lar `env.X ?? "<default>"` yazar
+  // (cf-ledger-job.ts:10, cf-reconcile-job.ts:9, cf-served-refresh-job.ts:10). Zod .default()
+  // verilirse `??` hiç tetiklenmez; .optional() 2026-07-16 öncesi çalışan davranışı birebir korur
+  // (anahtar env'de yoksa undefined → job kendi default'una düşer).
+  CF_LEDGER_POLL_CRON: z.string().optional(),
+  CF_RECONCILE_CRON: z.string().optional(),
+  CF_SERVED_REFRESH_CRON: z.string().optional(),
+  CF_MIRROR_SYNC_ENABLED: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  CF_MIRROR_SYNC_CRON: z.string().default("*/30 * * * * *"),
+  CF_MIRROR_SYNC_DRY_RUN: z.enum(["true", "false"]).default("true").transform((v) => v === "true"),
+  CF_PROACTIVE_TOPUP_ENABLED: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  CODEX_SEAT_ONLY: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  SEAT_PRIMARY_FOR_PACKAGE_GPT: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  CF_FIRST_FOR_PACKAGE_GPT: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  CODEX_SPARK_ALTERNATION_ENABLED: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  CODEX_SPARK_56_ALTERNATION_ENABLED: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  CF_UNIFIED_COUNTER_ENABLED: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  NSFW_MODERATION_URL: z.string().url().default("https://api.openai.com/v1/moderations"),
+  NSFW_MODERATION_API_KEY: z.string().optional(),
+  NSFW_MODERATION_MODEL: z.string().default("omni-moderation-latest"),
+  NSFW_MODERATION_TIMEOUT_MS: z.coerce.number().default(2500),
 
   // Shopier payment (optional — returns 503 when unset)
   SHOPIER_API_KEY: z.string().optional(),

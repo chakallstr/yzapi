@@ -44,6 +44,7 @@ export type RuntimeApiConfig = {
   strictCanonicalModelIds: boolean;
   /** Token Saver: tool çıktılarını upstream'e gitmeden sıkıştır (default kapalı). */
   tokenSaverEnabled: boolean;
+  cfOverserveCapMultiplier?: number | null;
   updatedAt: string | null;
 };
 
@@ -93,6 +94,7 @@ export type ModelRuntimePolicySnapshot = {
   contextOverrideTokens: number | null;
   maxOutputTokens: number | null;
   allowStreaming: boolean | null;
+  defaultReasoningEffort?: string | null;
   updatedAt: string | null;
 };
 

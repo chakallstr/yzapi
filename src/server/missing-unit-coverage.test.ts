@@ -1203,11 +1203,11 @@ describe("GAP-12: ECONNRESET kasıtlı olarak retry edilmez (mid-flight çift g�
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// GAP-10 (jobs) – startAllJobs kaynak kodu 9 starter içeriyor
+// GAP-10 (jobs) – startAllJobs kaynak kodu tüm starter'ları içeriyor
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("GAP-10 (jobs): startAllJobs – tüm job starter'lar kayıtlı", () => {
-  it("jobs/index.ts tüm 9 starter'ı içeriyor", async () => {
+  it("jobs/index.ts tüm 14 starter'ı içeriyor", async () => {
     const { readFileSync } = await import("node:fs");
     const { fileURLToPath } = await import("node:url");
     const { dirname, join } = await import("node:path");
@@ -1223,10 +1223,40 @@ describe("GAP-10 (jobs): startAllJobs – tüm job starter'lar kayıtlı", () =>
       "startGozcuJob",
       "startGozcuDigestJob",
       "startPackageMaintenanceJob",
+      // 2026-07-16'da SESSİZCE düşen 5 job (bayat ağaçtan tam build). Kota sayacının
+      // self-healer'ı dahil ~14 saat ölü kaldı ve bu test onu YAKALAMADI — çünkü liste
+      // sabit 9'du. Aşağıdaki dinamik kontrol bu sınıf hatayı bir daha kaçırmaz.
+      "startCfLedgerJob",
+      "startCfReconcileJob",
+      "startCfServedRefreshJob",
+      "startCfMirrorSyncJob",
+      "startPackageSlotReconcileJob",
     ];
     for (const starter of starters) {
       expect(src).toContain(starter);
     }
+  });
+
+  it("jobs/ altındaki HER start*Job export'u index.ts'te çağrılıyor (kendi-kendini koruyan)", async () => {
+    const { readFileSync, readdirSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
+    const { dirname, join } = await import("node:path");
+    const __dir = dirname(fileURLToPath(import.meta.url));
+    const jobsDir = join(__dir, "jobs");
+    const indexSrc = readFileSync(join(jobsDir, "index.ts"), "utf8");
+
+    // jobs/*.ts (index + testler hariç) içindeki her `export function start<X>Job` bulunur.
+    const exported: string[] = [];
+    for (const f of readdirSync(jobsDir)) {
+      if (!f.endsWith(".ts") || f === "index.ts" || f.includes(".test.")) continue;
+      const m = readFileSync(join(jobsDir, f), "utf8").matchAll(/export\s+function\s+(start\w*Job)\s*\(/g);
+      for (const hit of m) exported.push(hit[1]);
+    }
+
+    expect(exported.length).toBeGreaterThanOrEqual(14); // sanity: dosyalar gerçekten tarandı
+    // Bir job dosyası var ama startAllJobs onu çağırmıyorsa = 2026-07-16 sınıfı sessiz düşüş.
+    const missing = exported.filter((s) => !new RegExp(`${s}\\s*\\(`).test(indexSrc));
+    expect(missing).toEqual([]);
   });
 });
 

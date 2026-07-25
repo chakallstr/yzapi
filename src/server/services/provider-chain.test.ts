@@ -14,7 +14,7 @@ vi.mock("../lib/logger.js", () => ({
 
 import { systemApiConfig, providerProfiles } from "../db/schema.js";
 import { encryptApiKey } from "./api-key-service.js";
-import { resolveProviderChainForModel, invalidateProviderConfigCache } from "./provider-config-service.js";
+import { resolveProfileById, resolveProviderChainForModel, invalidateProviderConfigCache } from "./provider-config-service.js";
 import { resetFakeDb, seedTable } from "./__fakes__/fake-db.js";
 
 function profile(over: Record<string, unknown>) {
@@ -108,5 +108,32 @@ describe("resolveProviderChainForModel", () => {
     const { primary, fallback } = await resolveProviderChainForModel("totally-unpinned-model");
     expect(primary.profileId).toBeNull();
     expect(fallback).toBeNull();
+  });
+});
+
+describe("resolveProfileById", () => {
+  it("returns the exact enabled profile context without model pin matching", async () => {
+    seedTable(providerProfiles, [
+      profile({ id: "vexly-api", supportedModelIds: [], baseUrl: "http://127.0.0.1:8328/api/v1", modelMap: { "claude-opus-4-6": "claude-opus-4-6" } }),
+      profile({ id: "vexly-cli", supportedModelIds: ["claude-opus-4-6"], baseUrl: "http://127.0.0.1:8328/cli/v1" }),
+    ]);
+
+    const ctx = await resolveProfileById("vexly-api");
+
+    expect(ctx?.profileId).toBe("vexly-api");
+    expect(ctx?.baseUrl).toBe("http://127.0.0.1:8328/api/v1");
+    expect(ctx?.apiKey).toBe("key");
+    expect(ctx?.modelMap).toMatchObject({ "claude-opus-4-6": "claude-opus-4-6" });
+  });
+
+  it("returns null for disabled, missing, or keyless profiles", async () => {
+    seedTable(providerProfiles, [
+      profile({ id: "disabled", enabled: false }),
+      profile({ id: "keyless", apiKeyCipher: null }),
+    ]);
+
+    await expect(resolveProfileById("disabled")).resolves.toBeNull();
+    await expect(resolveProfileById("missing")).resolves.toBeNull();
+    await expect(resolveProfileById("keyless")).resolves.toBeNull();
   });
 });

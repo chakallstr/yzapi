@@ -40,8 +40,8 @@ değiştirirsin.
    Çıkan `yzk_live_...` anahtarını **hemen kopyala ve güvenli bir yere kaydet**
    (anahtar yalnızca bir kez tam haliyle gösterilir).
 3. **Bakiye yükle:** "Bakiye yükle" bölümünden yöntem seç:
-   - **Havale/EFT (IBAN):** Tutarı seç, çıkan referans kodunu havale açıklamasına
-     yaz, gönder. **Ödemen admin onayından sonra bakiyene eklenir** (anlık değil).
+   - **Havale/EFT (IBAN):** Tutarı seç, havale/EFT açıklama kısmını **boş bırak**.
+     Referans kodunu ödeme sonrası WhatsApp/destek üzerinden bildir. **Ödemen admin onayından sonra bakiyene eklenir** (anlık değil).
    - **Kart / Kripto:** Aktifse otomatik eklenir.
 4. **Doğrula:** Bakiyenin yüklendiğini panelde gör; sonra `/v1/balance` ile de
    kontrol edebilirsin (Bölüm 2).

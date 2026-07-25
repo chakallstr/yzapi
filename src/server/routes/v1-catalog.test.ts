@@ -76,6 +76,15 @@ describe("public /v1 catalog contract", () => {
     });
   });
 
+  it("advertises Sonnet 4.6 as vision-capable in OpenAI-compatible model discovery", () => {
+    const response = buildV1ModelsResponse();
+    const sonnet = response.data.find((model) => model.id === "claude-sonnet-4.6");
+
+    expect(sonnet).toBeDefined();
+    expect(sonnet?.architecture.input_modalities).toEqual(expect.arrayContaining(["text", "image"]));
+    expect(sonnet?.architecture.output_modalities).toEqual(expect.arrayContaining(["text"]));
+  });
+
   it("builds a unique provider list without internal upstream details", () => {
     const response = buildV1ProvidersResponse(sampleEntries);
 

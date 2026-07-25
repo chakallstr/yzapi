@@ -86,8 +86,8 @@ router.get("/templates", async (_req: Request, res: Response) => {
         durationDays: t.duration_days, itemCount: t.item_count ?? null, itemsSummary: t.items_summary ?? null,
       })),
     });
-  } catch (e) {
-    throw new AppError(503, "CodeFast şablonlarına ulaşılamadı: " + (e as Error).message);
+  } catch {
+    throw new AppError(503, "CodeFast şablonlarına ulaşılamadı");
   }
 });
 
@@ -129,8 +129,8 @@ router.get("/catalog", async (_req: Request, res: Response) => {
         manual: c.requires_manual_review, resellable: c.is_resellable,
       })),
     });
-  } catch (e) {
-    throw new AppError(503, "CodeFast kataloğuna ulaşılamadı: " + (e as Error).message);
+  } catch {
+    throw new AppError(503, "CodeFast kataloğuna ulaşılamadı");
   }
 });
 

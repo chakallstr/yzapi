@@ -34,6 +34,7 @@ import {
   isValidProviderBaseUrl,
   resolveProviderChainForModel,
   resolveSupportedModelIds,
+  nativeResponsesCapable,
 } from "./provider-config-service.js";
 import { resetFakeDb, seedTable, getTableRows } from "./__fakes__/fake-db.js";
 
@@ -54,6 +55,48 @@ function baseRow(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   resetFakeDb();
   invalidateProviderConfigCache();
+});
+
+describe("nativeResponsesCapable", () => {
+  const ctx = (overrides: Parameters<typeof nativeResponsesCapable>[0]) => overrides;
+
+  it("treats Codex seat and CodeFast proxy profiles as native Responses providers", () => {
+    expect(nativeResponsesCapable(ctx({
+      profileId: "sub-codex",
+      baseUrl: "https://seat.example/v1",
+      apiKey: "sk-seat",
+      modelMap: {},
+      source: { baseUrl: "model_profile", apiKey: "model_profile" },
+    }))).toBe(true);
+
+    expect(nativeResponsesCapable(ctx({
+      profileId: "cf:ent_123",
+      baseUrl: "https://codefast.example/proxy/codex-api/v1",
+      apiKey: "cf_rc_live_test",
+      modelMap: {},
+      source: { baseUrl: "db", apiKey: "db" },
+    }))).toBe(true);
+  });
+
+  it("keeps generic chat-only providers on the translation path", () => {
+    expect(nativeResponsesCapable(ctx({
+      profileId: "closerouter",
+      baseUrl: "https://closerouter.example/v1",
+      apiKey: "sk-cr",
+      modelMap: {},
+      source: { baseUrl: "model_profile", apiKey: "model_profile" },
+    }))).toBe(false);
+  });
+
+  it("passes direct OpenAI base URLs through natively even without a profile id", () => {
+    expect(nativeResponsesCapable(ctx({
+      profileId: null,
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "sk-openai",
+      modelMap: {},
+      source: { baseUrl: "env", apiKey: "env" },
+    }))).toBe(true);
+  });
 });
 
 describe("provider-config-service — properties", () => {

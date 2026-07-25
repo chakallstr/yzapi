@@ -7,6 +7,11 @@ import { grantPackageEntitlement } from "./entitlement-service.js";
 import { computeCustomPrice, limitStepError, type BirimTipi } from "./custom-package-pricing.js";
 import { generateUniquePurchaseRef } from "./purchase-ref.js";
 
+export function cfSeatDecoupled(pkg: { cf_api_slug?: string | null; cfApiSlug?: string | null }, codexSeatOnly: boolean): boolean {
+  const slug = pkg.cf_api_slug ?? pkg.cfApiSlug ?? "";
+  return codexSeatOnly && slug === "codex-api";
+}
+
 /** Configurable paket için anlık fiyat hesabı (TL + USD). */
 export async function previewConfigurablePrice(
   packageId: string,

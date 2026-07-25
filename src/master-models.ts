@@ -147,6 +147,7 @@ function textModel(opts: {
   contextTokens?: number;
   maxOutputTokens?: number;
   aliases?: string[];
+  inputModalities?: ModelModality[];
   price?: number;
 }): MasterModel {
   const price = opts.price ?? familyPrice(opts.id);
@@ -161,7 +162,7 @@ function textModel(opts: {
     maxOutputTokens: opts.maxOutputTokens ?? 128000,
     description: null,
     aliases: opts.aliases,
-    inputModalities: ["text"],
+    inputModalities: opts.inputModalities ?? ["text"],
     outputModalities: ["text"],
     endpoints: TEXT_ENDPOINTS,
     endpointDetails: TEXT_ENDPOINT_DETAILS,
@@ -177,7 +178,7 @@ export const MASTER_MODELS: MasterModel[] = [
   textModel({ id: "claude-opus-4-6", name: "Claude Opus 4.6", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000, aliases: ["anthropic/claude-opus-4.6", "anthropic/claude-opus-4-6", "claude-opus-4.6"] }),
   textModel({ id: "claude-opus-4-5-20251101", name: "Claude Opus 4.5", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000 }),
   textModel({ id: "claude-opus-4-1-20250805", name: "Claude Opus 4.1", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000 }),
-  textModel({ id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000, aliases: ["anthropic/claude-sonnet-4.6", "anthropic/claude-sonnet-4-6", "claude-sonnet-4.6"] }),
+  textModel({ id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000, aliases: ["anthropic/claude-sonnet-4.6", "anthropic/claude-sonnet-4-6", "claude-sonnet-4.6"], inputModalities: ["text", "image"] }),
   textModel({ id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000 }),
   textModel({ id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: "Anthropic", providerSlug: "anthropic", context: "1M", contextTokens: 1000000 }),
   textModel({ id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", provider: "Anthropic", providerSlug: "anthropic", context: "200K", contextTokens: 200000, aliases: ["anthropic/claude-haiku-4.5", "anthropic/claude-haiku-4-5", "anthropic/claude-haiku-4-5-20251001"] }),

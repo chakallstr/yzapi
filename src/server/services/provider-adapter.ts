@@ -22,13 +22,15 @@ export interface ProviderAdapter {
   forwardChatStream(body: ChatRequest, res: Response, ctx: ProviderContext, attempt?: AttemptOptions): Promise<ChatUsage>;
   // Responses API streaming köprüsü: upstream'i chat olarak sürer, res'e Responses event'leri yazar.
   forwardResponsesStream(body: ChatRequest, res: Response, ctx: ProviderContext, meta: ResponsesStreamMeta, attempt?: AttemptOptions): Promise<ChatUsage>;
+  forwardResponsesStreamNative(body: Record<string, unknown>, res: Response, ctx: ProviderContext, meta: ResponsesStreamMeta, attempt?: AttemptOptions): Promise<ChatUsage>;
   forwardResponses(body: TextRequest, ctx: ProviderContext, attempt?: AttemptOptions): Promise<{ raw: unknown; usage: ChatUsage }>;
   forwardMessages(body: TextRequest, ctx: ProviderContext, attempt?: AttemptOptions, upstreamHeaders?: Record<string, string>): Promise<{ raw: unknown; usage: ChatUsage }>;
   forwardImage(
     endpoint: "generations" | "edits",
     body: Record<string, unknown>,
-    ctx: ProviderContext
-  ): Promise<{ raw: unknown; imageCount: number }>;
+    ctx: ProviderContext,
+    timeoutMs?: number,
+  ): Promise<{ raw: unknown; imageCount: number; cfRemaining?: number | null }>;
   submitVideo(body: Record<string, unknown>, ctx: ProviderContext): Promise<{ taskId: string }>;
   getVideoTask(taskId: string, ctx: ProviderContext): Promise<Record<string, unknown>>;
 }
@@ -48,6 +50,10 @@ export class CloseRouterAdapter implements ProviderAdapter {
     return forwardChatStreamAsResponses(body, res, ctx, meta, attempt);
   }
 
+  forwardResponsesStreamNative(body: Record<string, unknown>, res: Response, ctx: ProviderContext, meta: ResponsesStreamMeta, attempt?: AttemptOptions): Promise<ChatUsage> {
+    return forwardChatStreamAsResponses(body as ChatRequest, res, ctx, meta, attempt);
+  }
+
   forwardResponses(body: TextRequest, ctx: ProviderContext, attempt?: AttemptOptions): Promise<{ raw: unknown; usage: ChatUsage }> {
     return forwardTextEndpoint("responses", body, ctx, attempt);
   }
@@ -59,8 +65,9 @@ export class CloseRouterAdapter implements ProviderAdapter {
   forwardImage(
     endpoint: "generations" | "edits",
     body: Record<string, unknown>,
-    ctx: ProviderContext
-  ): Promise<{ raw: unknown; imageCount: number }> {
+    ctx: ProviderContext,
+    _timeoutMs?: number,
+  ): Promise<{ raw: unknown; imageCount: number; cfRemaining?: number | null }> {
     return forwardImage(endpoint, body, ctx);
   }
 

@@ -1,0 +1,26 @@
+[Unit]
+Description=YapayZekaLab Vexly loopback cloak router
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=turkapi
+Group=turkapi
+WorkingDirectory=/opt/turkapiprojesi
+Environment=NODE_ENV=production
+ExecStartPre=/usr/bin/test -s /opt/turkapiprojesi/dist/vexly-cloak-router.js
+ExecStart=/usr/bin/node /opt/turkapiprojesi/dist/vexly-cloak-router.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

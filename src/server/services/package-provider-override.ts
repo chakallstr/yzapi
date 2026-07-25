@@ -57,7 +57,7 @@ export interface EntitlementProviderSlot {
  * modeller CF'de YOK → bilerek haritada değil; CF paketinin allowed_models'ına da konmamalı
  * (seed disiplini). Eksik sanıp ekleme.
  */
-const CF_SLUG_MODEL_MAPS: Record<string, Record<string, string>> = {
+export const CF_SLUG_MODEL_MAPS: Record<string, Record<string, string>> = {
   "claude-api": {
     "claude-opus-4.8": "claude-opus-4.8",
     "claude-opus-4-8": "claude-opus-4.8",
@@ -127,6 +127,52 @@ export function entitlementOverrideChain(slot: EntitlementProviderSlot, base: st
     },
     fallback: null,
   };
+}
+
+/**
+ * GPT/Codex package traffic is seat-only. Exhausted or unavailable seats must
+ * surface their error; CodeFast must never be attached as an implicit fallback.
+ */
+export function seatPrimaryPackageChain(
+  seatChain: ProviderChain,
+  _cfChain: ProviderChain,
+): ProviderChain | null {
+  if (seatChain.primary.profileId !== "sub-codex") return null;
+  return { primary: seatChain.primary, fallback: null };
+}
+
+export function cfFirstPackageChain(_seatChain: ProviderChain, cfChain: ProviderChain): ProviderChain | null {
+  return cfChain;
+}
+
+export function applyCodexSparkAlternation(
+  chain: ProviderChain,
+  _model?: string,
+  _requestsToday?: number,
+  _body?: Record<string, unknown>,
+): ProviderChain {
+  return chain;
+}
+
+export function applyGpt56SparkAlternation(
+  chain: ProviderChain,
+  _model?: string,
+  _requestsToday?: number,
+  _body?: Record<string, unknown>,
+): ProviderChain {
+  return chain;
+}
+
+export function requiresCfKeyReady(cfApiSlugOrSlot: EntitlementProviderSlot | string | null | undefined, chain?: ProviderChain | null): boolean {
+  const slug = typeof cfApiSlugOrSlot === "string"
+    ? cfApiSlugOrSlot
+    : cfApiSlugOrSlot?.cfApiSlug;
+  const s = (slug ?? "").trim();
+  // codex-api paketleri koltuk (sub-codex) fallback'iyle servis edilebilir — CF müşteri
+  // key'i yoksa (provisioning fail/NULL) bile 409 atma; normal per-model routing koltuğa düşer.
+  // Non-codex CF paketleri (glm/composer/görsel) koltuk fallback'ine sahip DEĞİL → 409 korunur.
+  if (s === "codex-api") return false;
+  return Boolean(s) && !chain;
 }
 
 export interface ProviderOverrideInput {

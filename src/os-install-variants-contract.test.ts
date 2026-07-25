@@ -92,4 +92,15 @@ describe("OS install variants contract (Windows / macOS / Linux)", () => {
     // Source placeholder yine korunur (rejected-template-guard ile uyumlu).
     expect(dataSource).toContain("yzk_live_YOUR_KEY");
   });
+
+  it("puts Claude and Codex install shortcuts at the top of the docs hub", () => {
+    expect(docsSource).toContain("Claude kurulumu");
+    expect(docsSource).toContain("Codex kurulumu");
+    expect(docsSource).toContain("id === 'claude-desktop'");
+    expect(docsSource).toContain("id === 'codex-desktop'");
+  });
+
+  it("does not ask for another key on the docs hub when a user already has one", () => {
+    expect(docsSource).toContain("hasKey ? <ApiKeyBox apiKey={myKey} /> : <ApiKeysPanel");
+  });
 });

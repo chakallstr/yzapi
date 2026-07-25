@@ -44,6 +44,16 @@ import {
 import { setPackageProviderOverride } from "../services/package-provider-override.js";
 import { generateRedeemCodes, listRedeemCodes, setRedeemCodeEnabled, markRedeemCodeCopied } from "../services/redeem-code-service.js";
 import { listAllDeliveryOrders, markDeliveryDelivered, cancelDeliveryWithRefund } from "../services/account-delivery-service.js";
+// Admin entitlement yönetimi. 2026-07-14'te bu import + aşağıdaki 6 rota canlıdan düştü
+// (admin.ts, rotaları taşımayan bir ağaçtan rsync'lendi: 1874 → 1674 satır). Servis dosyası
+// sunucuda kaldı ama onu çağıran kimse olmadığı için ÖKSÜZ oldu; panelin UserPackagesPanel'i
+// de aynı anda düştüğü için "admin panelinde paket detayı yok" belirtisi doğdu. 2026-07-17'de
+// geri getirildi; imzalar canlının 09-07 tarihli servisine karşı birebir doğrulandı.
+import {
+  adminGrantEntitlement, adminUpdateEntitlement, adminCancelEntitlement,
+  adminRefundEntitlement, adminRenewEntitlement, adminDeleteEntitlement,
+  type RefundMode,
+} from "../services/admin-entitlement-service.js";
 import { getRikaResellerStatus } from "../services/rika-reseller-service.js";
 import {
   getProviderConfigAdminView,
@@ -1662,6 +1672,87 @@ router.post("/delivery-orders/:id/cancel", async (req, res, next) => {
   } catch (e) {
     next(e);
   }
+});
+
+// ── Admin: kullanıcı paket (entitlement) yönetimi (owner-only) ──────────────
+// 2026-07-17: 07-14'te düşen blok geri getirildi. Panelin UserPackagesPanel'i bu 6 ucu çağırır.
+// Para-kritik: hepsi owner-only + zorunlu audit notu; iade/charge yolları servise devreder.
+router.post("/users/:id/entitlements", async (req, res, next) => {
+  try {
+    if (req.adminRole !== "owner") return res.status(403).json({ error: "Owner admin required" });
+    const b = req.body as { packageId?: string; dailyLimit?: number; durationDays?: number; charge?: "gift" | "balance"; chargeTL?: number; note?: string; idempotencyKey?: string };
+    if (!b?.packageId) return res.status(400).json({ error: "packageId zorunlu" });
+    if (b.charge !== "gift" && b.charge !== "balance") return res.status(400).json({ error: "charge 'gift' veya 'balance' olmalı" });
+    if (!b.note?.trim()) return res.status(400).json({ error: "Audit notu zorunlu" });
+    const result = await adminGrantEntitlement({
+      userId: req.params.id, packageId: b.packageId, dailyLimit: b.dailyLimit, durationDays: b.durationDays,
+      charge: b.charge, chargeTL: b.chargeTL, adminId: req.user!.id, note: b.note, idempotencyKey: b.idempotencyKey,
+    });
+    await writeAudit("entitlement_grant", result.entitlementId, `${b.charge} grant pkg=${b.packageId} — ${b.note}`, req.user!.id);
+    res.status(201).json({ ok: true, ...result });
+  } catch (e) { next(e); }
+});
+
+router.patch("/entitlements/:entId", async (req, res, next) => {
+  try {
+    if (req.adminRole !== "owner") return res.status(403).json({ error: "Owner admin required" });
+    const b = req.body as { dailyLimit?: number; remaining?: number; expiresAt?: string; paused?: boolean; status?: "active" | "cancelled"; note?: string };
+    if (!b?.note?.trim()) return res.status(400).json({ error: "Audit notu zorunlu" });
+    // En az bir güncellenebilir alan gerekli (yoksa sessiz no-op + anlamsız audit kaydı).
+    if (Object.keys(b).filter((k) => k !== "note").length === 0) return res.status(400).json({ error: "En az bir alan güncellenmeli" });
+    await adminUpdateEntitlement(req.params.entId, b, req.user!.id, b.note);
+    await writeAudit("entitlement_update", req.params.entId, `${Object.keys(b).filter((k) => k !== "note").join(",")} güncellendi — ${b.note}`, req.user!.id);
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+router.post("/entitlements/:entId/cancel", async (req, res, next) => {
+  try {
+    if (req.adminRole !== "owner") return res.status(403).json({ error: "Owner admin required" });
+    const b = req.body as { refund?: RefundMode; amountTL?: number; note?: string };
+    const refund: RefundMode = b?.refund ?? "none";
+    if (!b?.note?.trim()) return res.status(400).json({ error: "Audit notu zorunlu" });
+    if (!["full", "partial", "none"].includes(refund)) return res.status(400).json({ error: "Geçersiz iade tipi (full|partial|none)" });
+    if (refund === "partial" && !(Number(b.amountTL) > 0)) return res.status(400).json({ error: "Kısmi iade için amountTL > 0 olmalı" });
+    const result = await adminCancelEntitlement(req.params.entId, refund, b.amountTL, req.user!.id, b.note);
+    await writeAudit("entitlement_cancel", req.params.entId, `iptal+${refund} iade ₺${result.refundedTL} — ${b.note}`, req.user!.id);
+    res.json({ ok: true, ...result });
+  } catch (e) { next(e); }
+});
+
+router.post("/entitlements/:entId/refund", async (req, res, next) => {
+  try {
+    if (req.adminRole !== "owner") return res.status(403).json({ error: "Owner admin required" });
+    const b = req.body as { refund?: "full" | "partial"; amountTL?: number; note?: string };
+    const refund = b?.refund ?? "partial";
+    if (!b?.note?.trim()) return res.status(400).json({ error: "Audit notu zorunlu" });
+    if (!["full", "partial"].includes(refund)) return res.status(400).json({ error: "Geçersiz iade tipi (full|partial)" });
+    if (refund === "partial" && !(Number(b.amountTL) > 0)) return res.status(400).json({ error: "Kısmi iade için amountTL > 0 olmalı" });
+    const result = await adminRefundEntitlement(req.params.entId, refund, b.amountTL, req.user!.id, b.note);
+    await writeAudit("entitlement_refund", req.params.entId, `${refund} iade ₺${result.refundedTL} — ${b.note}`, req.user!.id);
+    res.json({ ok: true, ...result });
+  } catch (e) { next(e); }
+});
+
+router.post("/entitlements/:entId/renew", async (req, res, next) => {
+  try {
+    if (req.adminRole !== "owner") return res.status(403).json({ error: "Owner admin required" });
+    const b = req.body as { charge?: "gift" | "balance"; chargeTL?: number; note?: string };
+    if (b?.charge !== "gift" && b?.charge !== "balance") return res.status(400).json({ error: "charge 'gift' veya 'balance' olmalı" });
+    if (!b.note?.trim()) return res.status(400).json({ error: "Audit notu zorunlu" });
+    const result = await adminRenewEntitlement(req.params.entId, b.charge, b.chargeTL, req.user!.id, b.note);
+    await writeAudit("entitlement_renew", req.params.entId, `${b.charge} yenile (₺${result.chargedTL}) — ${b.note}`, req.user!.id);
+    res.json({ ok: true, ...result });
+  } catch (e) { next(e); }
+});
+
+router.delete("/entitlements/:entId", async (req, res, next) => {
+  try {
+    if (req.adminRole !== "owner") return res.status(403).json({ error: "Owner admin required" });
+    await adminDeleteEntitlement(req.params.entId, req.user!.id);
+    await writeAudit("entitlement_delete", req.params.entId, "Entitlement silindi", req.user!.id);
+    res.json({ ok: true });
+  } catch (e) { next(e); }
 });
 
 // ── Rika Reseller API ─────────────────────────────────────────────────────────

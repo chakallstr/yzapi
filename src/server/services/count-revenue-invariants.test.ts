@@ -20,6 +20,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockDbSql = vi.fn();
 const mockOnConflict = vi.fn();
+const mockReturning = vi.fn();
 const mockInsertValues = vi.fn(() => ({ onConflictDoNothing: mockOnConflict }));
 
 vi.mock("../db/client.js", () => ({
@@ -40,13 +41,17 @@ async function importService() {
 // [INV-1] Exactly-once sayım
 // ═════════════════════════════════════════════════════════════════════════════
 describe("[INV-1] Exactly-once sayım — tryReservePackageSlot", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockOnConflict.mockReturnValue({ returning: mockReturning });
+    mockReturning.mockResolvedValue([]);
+  });
 
   it("başarılı rezervasyon: UPDATE RETURNING bir satır → covered=true, entitlementId dönülür", async () => {
     mockDbSql.mockResolvedValueOnce([{ id: "ent-abc" }]);
     const { tryReservePackageSlot } = await importService();
     const res = await tryReservePackageSlot("user-1", "claude-sonnet-4-6");
-    expect(res).toEqual({ covered: true, entitlementId: "ent-abc" });
+    expect(res).toMatchObject({ covered: true, entitlementId: "ent-abc" });
   });
 
   it("kota doluysa UPDATE RETURNING boş → covered=false (over-serve olmaz)", async () => {
@@ -83,7 +88,11 @@ describe("[INV-1] Exactly-once sayım — tryReservePackageSlot", () => {
 // [INV-2] Hata yolu geri-iadesi — releasePackageSlot
 // ═════════════════════════════════════════════════════════════════════════════
 describe("[INV-2] Hata yolu geri-iadesi — releasePackageSlot", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockOnConflict.mockReturnValue({ returning: mockReturning });
+    mockReturning.mockResolvedValue([]);
+  });
 
   it("releasePackageSlot: UPDATE DB çağrısı yapılır", async () => {
     mockDbSql.mockResolvedValueOnce([]);
@@ -109,7 +118,11 @@ describe("[INV-2] Hata yolu geri-iadesi — releasePackageSlot", () => {
 // [INV-3] Günlük sıfırlama atomikliği
 // ═════════════════════════════════════════════════════════════════════════════
 describe("[INV-3] Günlük sıfırlama atomikliği", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockOnConflict.mockReturnValue({ returning: mockReturning });
+    mockReturning.mockResolvedValue([]);
+  });
 
   it("yeni gün ilk isteği: SQL CASE WHEN last_reset_date < CURRENT_DATE THEN 1 mantığı checkPackageCoverage'da geçer", async () => {
     // SQL THEN 1 ELSE requests_today+1 — yeni gün sayaç 1'den başlar.
@@ -130,10 +143,13 @@ describe("[INV-3] Günlük sıfırlama atomikliği", () => {
 // [INV-4] Duplicate requestId idempotansı — recordPackageUsage
 // ═════════════════════════════════════════════════════════════════════════════
 describe("[INV-4] Duplicate requestId idempotansı — recordPackageUsage", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockOnConflict.mockReturnValue({ returning: mockReturning });
+    mockReturning.mockResolvedValue([]);
+  });
 
   it("aynı requestId iki kez gönderildiğinde onConflictDoNothing çağrılır", async () => {
-    mockOnConflict.mockResolvedValue([]);
     const { recordPackageUsage } = await importService();
     const opts = {
       userId: "u", apiKeyId: "k", modelId: "gpt-5", entitlementId: "e",
@@ -150,10 +166,13 @@ describe("[INV-4] Duplicate requestId idempotansı — recordPackageUsage", () =
 // [INV-5] Billed-via=package → costTL=0 (gelir sızmaz)
 // ═════════════════════════════════════════════════════════════════════════════
 describe("[INV-5] Paket isteği için costTL=0, billed_via=package", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockOnConflict.mockReturnValue({ returning: mockReturning });
+    mockReturning.mockResolvedValue([]);
+  });
 
   it("recordPackageUsage costTL='0' ve billedVia='package' ile yazılır", async () => {
-    mockOnConflict.mockResolvedValue([]);
     const { recordPackageUsage } = await importService();
     await recordPackageUsage({
       userId: "u", apiKeyId: "k", modelId: "claude-opus-4-8", entitlementId: "ent-1",
@@ -165,7 +184,6 @@ describe("[INV-5] Paket isteği için costTL=0, billed_via=package", () => {
   });
 
   it("hata durumunda (status=error) da costTL=0 olmalı — ücretsiz hata", async () => {
-    mockOnConflict.mockResolvedValue([]);
     const { recordPackageUsage } = await importService();
     await recordPackageUsage({
       userId: "u2", apiKeyId: "k2", modelId: "claude-opus-4-8", entitlementId: "ent-2",

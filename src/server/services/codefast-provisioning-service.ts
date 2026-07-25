@@ -80,14 +80,38 @@ export async function provisionCodefastEntitlement(args: {
     const order = await cfCreateOrder(orderReq, externalOrderId);
     let key = extractCustomerKey(order);
     const isManualProduct = order.manual_review_required || pkg.cfManual;
-    // AUTO ürün ama key yok (idempotent replay anomalisi — replay customer_api_key DÖNDÜRMEZ):
-    // order'dan kurtarmayı dene; kurtarılamazsa 'failed' (çağıran iade eder) — pending_manual'da
-    // SONSUZA dek takılı bırakma (müşteri öder, 409 alır, kurtuluş yok).
+    // CF artık auto-fulfillment yapıyor (Claude dahil): key POST'ta DÖNMÜYOR (async fulfillment).
+    // order.status "pending" → "fulfilled" olana kadar poll et, sonra GET customer_api_key.api_key gelir.
+    // Manuel ürün (pkg.cfManual=true) hariç — o hâlâ pending_manual'da admin bekler.
     if (!key && !isManualProduct) {
-      try {
-        const fresh = await cfGetOrder(order.order.id);
-        key = extractCustomerKey(fresh);
-      } catch { /* yut — aşağıda failed'e düşer */ }
+      const deadline = Date.now() + 120_000; // max 2 dk bekle
+      while (Date.now() < deadline) {
+        try {
+          const fresh = await cfGetOrder(order.order.id);
+          key = extractCustomerKey(fresh);
+          if (key) break;
+          // fulfilled ama key yok → kurtarılamaz
+          if (fresh.order?.status === "fulfilled" && !key) break;
+        } catch (e) {
+          // rate limit → retry_after_seconds kadar bekle
+          const msg = e instanceof CodefastError ? e.message : String((e as Error)?.message ?? e);
+          const m = /retry_after_seconds["']?\s*:\s*(\d+)/.exec(msg);
+          const is429 = e instanceof CodefastError && e.status === 429;
+          if (is429) {
+            const waitSec = m ? Number(m[1]) + 1 : 5;
+            await new Promise((r) => setTimeout(r, waitSec * 1000));
+            continue;
+          }
+        }
+        await new Promise((r) => setTimeout(r, 12_000)); // 12s poll aralığı
+      }
+      if (!key) {
+        // Son çare: bir kez daha GET dene, hâlâ yoksa failed (müşteri iade edilir).
+        try {
+          const fresh = await cfGetOrder(order.order.id);
+          key = extractCustomerKey(fresh);
+        } catch { /* yut */ }
+      }
       if (!key) {
         await dbSql`
           UPDATE user_package_entitlements
@@ -114,12 +138,12 @@ export async function provisionCodefastEntitlement(args: {
     `;
     return { cfStatus: status, cfOrderId: order.order.id };
   } catch (e) {
-    const msg = e instanceof CodefastError ? e.message : String(e);
+    const status = e instanceof CodefastError ? e.status : undefined;
     await dbSql`
       UPDATE user_package_entitlements SET cf_status = 'failed', updated_at = now()
       WHERE id = ${entitlementId}::uuid
     `.catch(() => {});
-    console.error("[codefast] provisioning failed", entitlementId, msg);
+    console.error("[codefast] provisioning failed", { entitlementId, status });
     return { cfStatus: "failed" };
   }
 }
@@ -147,7 +171,7 @@ export const CF_MAX_DURATION_DAYS = 30;
  * → müşterinin kullanmadığı isteğe para verilmez. Idempotent (key = batch indeksi, çift çekim yok),
  * ASLA throw etmez (fire-and-forget; isteği bloklamaz; concurrent loser UPDATE'i no-op).
  */
-export async function topUpCfIfNeeded(entitlementId: string): Promise<void> {
+export async function topUpCfIfNeeded(entitlementId: string, _poolRemainingOverride?: number | null): Promise<void> {
   try {
     const rows = await dbSql<any[]>`
       SELECT e.cf_customer_id, e.cf_status, e.cf_remaining, e.cf_units_ordered,
@@ -192,8 +216,13 @@ export async function topUpCfIfNeeded(entitlementId: string): Promise<void> {
           updated_at = now()
       WHERE id = ${entitlementId}::uuid AND cf_units_ordered = ${ordered}`;
   } catch (err) {
-    console.error("[codefast] top-up failed", entitlementId, (err as Error).message);
+    const status = err instanceof CodefastError ? err.status : undefined;
+    console.error("[codefast] top-up failed", { entitlementId, status });
   }
+}
+
+export async function topUpClaudeTokenOverride(entitlementId: string): Promise<void> {
+  await topUpCfIfNeeded(entitlementId);
 }
 
 /**

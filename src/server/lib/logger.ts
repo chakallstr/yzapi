@@ -29,6 +29,10 @@ export const redactPaths = [
   "provider_message_id",
   "signature",
   "sign",
+  "err.body",
+  "body.customer_api_key",
+  "body.api_key",
+  "body.authorization",
   "res",
   "hash",
 ];

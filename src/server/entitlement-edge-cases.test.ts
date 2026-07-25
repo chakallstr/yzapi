@@ -309,7 +309,7 @@ describe("zamanlama edge cases", () => {
       insert: vi.fn(() => ({
         values: vi.fn((row: any) => {
           capturedInserts.push(row);
-          return { onConflictDoNothing: vi.fn().mockResolvedValue(undefined) };
+          return { onConflictDoNothing: vi.fn(() => ({ returning: vi.fn().mockResolvedValue([]) })) };
         }),
       })),
     };
