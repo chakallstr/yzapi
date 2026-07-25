@@ -46,6 +46,66 @@ describe("responses araç sözleşmesi kablolaması (proxy.ts)", () => {
   });
 });
 
+// Dört-sınıf teşhis enstrümanı — spec görev 8.2 / 8.3 / 8.4
+// Bu köprüler koparsa sayaçlar sessizce 0 kalır ve canlıda hangi hata sınıfının aktif
+// olduğu ölçülemez (fix'in işe yaradığı iddia edilemez).
+describe("responses araç çağrısı telemetrisi kablolaması (proxy.ts)", () => {
+  it("sayaç ve sınıflandırma yardımcıları import edilir", () => {
+    expect(source).toMatch(/import\s*\{[^}]*countResponseToolCalls[^}]*\}\s*from\s*"\.\.\/services\/responses-translation\.js"/s);
+    expect(source).toMatch(/import\s*\{[^}]*createResponsesStreamStats[^}]*\}\s*from\s*"\.\.\/services\/responses-translation\.js"/s);
+    expect(source).toMatch(/import\s*\{[^}]*isSuspiciousToolOutcome[^}]*\}\s*from\s*"\.\.\/services\/responses-translation\.js"/s);
+  });
+
+  it("stream dalı translator sayaç toplayıcısını meta üzerinden taşır (item F)", () => {
+    expect(source).toContain("createResponsesStreamStats()");
+    expect(source).toMatch(/const responsesMeta = \{[^}]*stats: responsesToolStats[^}]*\}/);
+  });
+
+  it("iki dal da tek ortak sonuç logunu kullanır (stream + non-stream)", () => {
+    expect(source.match(/logResponsesToolOutcome\(/g)?.length ?? 0).toBeGreaterThanOrEqual(3); // tanım + 2 çağrı
+    expect(source).toContain("emittedToolItems");
+    expect(source).toContain("mappedToolCount");
+    expect(source).toContain("toolCallCount");
+  });
+
+  it("sonuç logu finishReason ve sınıflandırma reason alanını taşır (8.2/8.4)", () => {
+    // Bu alanlar olmadan canlı raporda halüsinasyon ile sahte başarı ayırt edilemez.
+    expect(source).toMatch(/const fields = \{[\s\S]*?finishReason: o\.finishReason[\s\S]*?reason: suspicious/);
+    expect(source).toContain("tools_dropped_and_no_tool_call");
+    expect(source).toContain("no_tool_call_despite_tools");
+  });
+
+  it("non-stream dalı upstream yanıtından tool_call sayar (8.2)", () => {
+    expect(source).toMatch(/toolCallCount: countResponseToolCalls\(raw, native === true\)/);
+  });
+
+  it("sonuç logu düşen araç tiplerini de taşır (tool-routing korelasyonu)", () => {
+    expect(source).toMatch(/droppedToolTypes: toolContract\.droppedToolTypes/);
+    expect(source).toMatch(/droppedToolTypes: native === true \? \[\] : toolContract\.droppedToolTypes/);
+  });
+
+  it("sahte başarı alarmı tek warn satırı olarak kalır", () => {
+    expect(source).toContain('"responses tool contract suspicious success"');
+    expect(source.match(/"responses tool contract suspicious success"/g)?.length).toBe(1);
+    expect(source).toContain("isSuspiciousToolOutcome(");
+  });
+
+  it("rapor script'inin okuduğu alanlar log sözleşmesinde var (görev 8.1 tüketici sözleşmesi)", () => {
+    // scripts/responses-tool-contract-report.mjs bu alan adlarına göre sınıflandırma yapar;
+    // adlar değişirse script sessizce 0 sayar ve canlı ölçüm yanlış olur.
+    expect(source).toMatch(/const fields = \{[\s\S]*?status: o\.status[\s\S]*?native: o\.native[\s\S]*?\}/);
+    expect(source).toMatch(/\{ requestId, stream: true, degraded, lossyToolTypes: translationLossyToolTypes\(/);
+    expect(source).toMatch(/\{ requestId, stream: false, degraded, lossyToolTypes: translationLossyToolTypes\(/);
+  });
+
+  it("stream dalında sayaçlar billing settle'dan SONRA loglanır (para yolu değişmez)", () => {
+    const streamLog = source.indexOf("emittedToolItems: responsesToolStats.emittedToolItems");
+    const settle = source.indexOf("status: streamStatus");
+    expect(settle).toBeGreaterThan(0);
+    expect(streamLog).toBeGreaterThan(settle);
+  });
+});
+
 describe("teşhis logu sızıntı güvenliği", () => {
   it("özet yalnız tip/sayı taşır — araç adı, argüman veya içerik taşımaz", () => {
     const summary = summarizeToolContract({
@@ -67,6 +127,7 @@ describe("teşhis logu sızıntı güvenliği", () => {
 
     expect(summary).toEqual({
       toolCount: 3,
+      mappedToolCount: 2,
       declaredToolTypes: ["custom", "function", "web_search"],
       mappedToolTypes: ["custom", "function"],
       droppedToolTypes: ["web_search"],
@@ -77,6 +138,7 @@ describe("teşhis logu sızıntı güvenliği", () => {
   it("araçsız istekte özet boş listelerle döner", () => {
     expect(summarizeToolContract({ input: "x" })).toEqual({
       toolCount: 0,
+      mappedToolCount: 0,
       declaredToolTypes: [],
       mappedToolTypes: [],
       droppedToolTypes: [],

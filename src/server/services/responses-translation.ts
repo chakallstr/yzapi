@@ -23,6 +23,30 @@ export interface ResponsesUsage {
 /** İstemcinin bir aracı hangi Responses tipiyle deklare ettiği. */
 export type ResponsesToolKind = "function" | "custom" | "local_shell";
 
+/**
+ * Stream yolu araç telemetrisi (SALT-GÖZLEM).
+ *
+ * NEDEN: sessiz arıza sayacı bugün yalnız non-stream dalında çalışıyor; Codex akış
+ * kullanır. Bu toplayıcı, translator'ın gördüğü upstream tool_call sayısını ve istemciye
+ * GERÇEKTEN yayılan araç öğesi sayısını route'a taşır (bkz. spec görev 8.3 / HANDOFF item F).
+ *
+ * Ayrım: `upstreamToolCalls > 0 && emittedToolItems === 0` → çeviri/emit hatası BİZDE;
+ * `emittedToolItems > 0` → gateway işini yaptı, sorun istemci tarafında (sandbox/cwd/izin).
+ *
+ * Yalnız SAYI tutar; araç adı/argüman/içerik TAŞIMAZ. Translator'ın ürettiği event dizisi
+ * bu alandan bağımsızdır (golden korpus kilidi).
+ */
+export interface ResponsesStreamStats {
+  /** upstream chat SSE'de görülen ayrı tool_call slotu sayısı */
+  upstreamToolCalls: number;
+  /** istemciye `response.output_item.added` ile yayılan araç öğesi sayısı */
+  emittedToolItems: number;
+}
+
+export function createResponsesStreamStats(): ResponsesStreamStats {
+  return { upstreamToolCalls: 0, emittedToolItems: 0 };
+}
+
 export interface ResponsesStreamMeta {
   id: string; // request id (resp_/msg_/fc_ id türetmek için)
   model: string; // canonical master model id (yanıtta gösterilecek)
@@ -34,6 +58,12 @@ export interface ResponsesStreamMeta {
    * tipi bugünkü ad-tabanlı heuristikle seçilir (geriye dönük uyumluluk).
    */
   toolKinds?: Record<string, ResponsesToolKind>;
+  /**
+   * OPSİYONEL salt-gözlem sayaç toplayıcısı (bkz. ResponsesStreamStats). Verilirse
+   * translator sayaçları artırır; verilmezse hiçbir şey değişmez. Üretilen event
+   * dizisi her iki durumda da BİT-BİT aynıdır.
+   */
+  stats?: ResponsesStreamStats;
 }
 
 interface ChatMessage {
@@ -313,6 +343,8 @@ export function countResponseToolCalls(raw: unknown, native: boolean): number {
 /** Teşhis logu için araç sözleşmesi özeti (sır/ad/argüman içermez — yalnız tip ve sayı). */
 export function summarizeToolContract(body: Json): {
   toolCount: number;
+  /** Upstream'e GERÇEKTEN gönderilen araç sayısı (düşenler sayılmaz) — bkz görev 8.2. */
+  mappedToolCount: number;
   declaredToolTypes: string[];
   mappedToolTypes: string[];
   droppedToolTypes: string[];
@@ -330,11 +362,33 @@ export function summarizeToolContract(body: Json): {
           : "other";
   return {
     toolCount: Array.isArray(body.tools) ? body.tools.length : 0,
+    mappedToolCount: conv.tools?.length ?? 0,
     declaredToolTypes: conv.declaredTypes,
     mappedToolTypes: conv.mappedTypes,
     droppedToolTypes: conv.droppedTypes,
     toolChoiceKind,
   };
+}
+
+/**
+ * "Sahte başarı" sınıflandırıcısı (bkz. spec görev 8.4).
+ *
+ * İstek `success` kaydedildi, upstream'e araç GİTTİ (veya araçlar çeviride DÜŞTÜ) ama hiç
+ * araç çağrısı dönmedi → istemci hiçbir şey yürütmez; müşteri "hiçbir şey yapmıyor" der
+ * ama `usage_records` bunu `success` gösterir. Bu yüklem o kombinasyonu görünür kılar.
+ * Başarısız/ücretsiz isteklerde araç çağrısı yokluğu BEKLENİR → şüpheli değildir.
+ *
+ * Saf yüklem: billing, DB ve yanıt gövdesi ETKİLENMEZ.
+ */
+export function isSuspiciousToolOutcome(o: {
+  status: string;
+  mappedToolCount: number;
+  toolCallCount: number;
+  droppedToolTypes: string[];
+}): boolean {
+  if (o.status !== "success") return false;
+  if (o.toolCallCount > 0) return false;
+  return o.mappedToolCount > 0 || o.droppedToolTypes.length > 0;
 }
 
 function convertToolChoice(tc: unknown): unknown {
@@ -603,6 +657,7 @@ export class ResponsesStreamTranslator {
   private readonly model: string;
   private readonly createdAt: number;
   private readonly toolKinds?: Record<string, ResponsesToolKind>;
+  private readonly stats?: ResponsesStreamStats;
   private textOpened = false;
   private textIndex = -1;
   private text = "";
@@ -615,6 +670,7 @@ export class ResponsesStreamTranslator {
     this.model = meta.model;
     this.createdAt = meta.createdAt;
     this.toolKinds = meta.toolKinds;
+    this.stats = meta.stats;
   }
 
   private ev(obj: Json): Json {
@@ -745,6 +801,8 @@ export class ResponsesStreamTranslator {
         if (!t) {
           t = { itemId: `fc_${this.responseIdSuffix()}_${idx}`, outputIndex: -1, callId: "", name: "", args: "", opened: false };
           this.tools.set(idx, t);
+          // Salt-gözlem: upstream'in AÇTIĞI araç çağrısı slotu (yayım henüz yapılmadı).
+          if (this.stats) this.stats.upstreamToolCalls++;
         }
         if (typeof tc.id === "string" && tc.id) t.callId = tc.id;
         const fn = tc.function as Json | undefined;
@@ -757,6 +815,8 @@ export class ResponsesStreamTranslator {
           if (!t.callId) t.callId = `call_${this.responseIdSuffix()}_${idx}`;
           t.outputIndex = this.nextOutputIndex++;
           t.opened = true;
+          // Salt-gözlem: araç öğesi GERÇEKTEN istemciye yayıldı (output_item.added).
+          if (this.stats) this.stats.emittedToolItems++;
           events.push(
             this.ev({
               type: "response.output_item.added",

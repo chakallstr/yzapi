@@ -48,7 +48,7 @@ import {
   type WebSearchMode,
 } from "../services/web-search-augment.js";
 import { chargeWebSearch } from "../services/web-search-billing-service.js";
-import { responsesRequestToChat, chatCompletionToResponses, deriveToolKinds, summarizeToolContract, countResponseToolCalls } from "../services/responses-translation.js";
+import { responsesRequestToChat, chatCompletionToResponses, deriveToolKinds, summarizeToolContract, countResponseToolCalls, createResponsesStreamStats, isSuspiciousToolOutcome } from "../services/responses-translation.js";
 import {
   getApiKeyPolicy,
   getModelRuntimePolicy,
@@ -1286,6 +1286,54 @@ router.get("/balance", async (req: Request, res: Response, next: NextFunction) =
 // "chat" olarak çözülür → "model does not support responses" 400'ü ortadan kalkar),
 // chat yanıtını (stream veya non-stream) Codex'in beklediği Responses formatına çevirir.
 // Para yolu (reserve/settle/resolveBilledPromptTokens) chat handler ile BİREBİR aynıdır.
+// ── Dört-sınıf teşhis enstrümanı (SALT-EK log; billing/DB/yanıt DEĞİŞMEZ) ─────
+// "API hiçbir tool çağrısı yapmıyor" belirtisi dört ayrı kök nedenden gelir; hangisinin
+// aktif olduğu ölçülmeden fix'in işe yaradığı iddia edilemez (bkz spec görev 8.2/8.3/8.4):
+//   • tool-routing   → droppedToolTypes boş değil (istek logu) / degraded=true
+//   • halüsinasyon   → mappedToolCount > 0 && toolCallCount === 0
+//   • emit hatası    → toolCallCount > 0 && emittedToolItems === 0  (BİZDE)
+//   • istemci tarafı → emittedToolItems > 0 ama müşteri değişiklik görmüyor (gateway dışı)
+// Loglanan: yalnız tip string'leri, sayılar, boolean'lar ve upstream finish_reason.
+// Loglanmayan: araç adı, argüman, prompt, API key, base_url, provider codename, PII.
+function logResponsesToolOutcome(o: {
+  requestId: string;
+  stream: boolean;
+  status: string;
+  native?: boolean;
+  toolCount: number;
+  mappedToolCount: number;
+  droppedToolTypes: string[];
+  toolCallCount: number;
+  emittedToolItems?: number;
+  finishReason?: string;
+}): void {
+  const suspicious = isSuspiciousToolOutcome({
+    status: o.status,
+    mappedToolCount: o.mappedToolCount,
+    toolCallCount: o.toolCallCount,
+    droppedToolTypes: o.droppedToolTypes,
+  });
+  const fields = {
+    requestId: o.requestId,
+    endpoint: "responses",
+    stream: o.stream,
+    status: o.status,
+    native: o.native,
+    toolCount: o.toolCount,
+    mappedToolCount: o.mappedToolCount,
+    droppedToolTypes: o.droppedToolTypes,
+    toolCallCount: o.toolCallCount,
+    emittedToolItems: o.emittedToolItems,
+    finishReason: o.finishReason,
+    reason: suspicious
+      ? (o.droppedToolTypes.length > 0 ? "tools_dropped_and_no_tool_call" : "no_tool_call_despite_tools")
+      : undefined,
+  };
+  // Sahte başarı: istek `success` faturalandı ama istemci yürütecek hiçbir çağrı almadı.
+  if (suspicious) logger.warn(fields, "responses tool contract suspicious success");
+  else logger.info(fields, "responses tool call outcome");
+}
+
 async function handleResponsesEndpoint(req: Request, res: Response, next: NextFunction): Promise<void> {
   const isStream = (req.body as { stream?: boolean }).stream === true;
   const userId = req.user!.id;
@@ -1320,10 +1368,14 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
     const responsesToolKinds = deriveToolKinds(rawResponsesBody.tools);
     // Teşhis (salt-ek): YALNIZ tip/sayı/boolean. Araç adı, argüman, prompt, key, base_url,
     // provider codename ve PII loglanmaz — bkz design.md §8.
+    const toolContract = summarizeToolContract(rawResponsesBody);
     logger.info(
-      { requestId, endpoint: "responses", stream: isStream, ...summarizeToolContract(rawResponsesBody) },
+      { requestId, endpoint: "responses", stream: isStream, ...toolContract },
       "responses tool contract",
     );
+    // Stream yolu araç sayacı (salt-gözlem): translator'ın gördüğü upstream tool_call ve
+    // istemciye yayılan araç öğesi sayısı. Event dizisi ETKİLENMEZ (golden korpus kilidi).
+    const responsesToolStats = createResponsesStreamStats();
 
     // customerId varsa messages'ın başına (veya mevcut system mesajına) enjekte et.
     if (customerId) {
@@ -1555,7 +1607,7 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
     chain = applyIdentityRelabel(chain, masterModel.id);
     const activeProviderAdapter = await getActiveProviderAdapter();
 
-    const responsesMeta = { id: requestId, model: masterModel!.id, createdAt, toolKinds: responsesToolKinds };
+    const responsesMeta = { id: requestId, model: masterModel!.id, createdAt, toolKinds: responsesToolKinds, stats: responsesToolStats };
     if (isStream) {
       res.setHeader("X-YZ-Request-Id", requestId);
       const { result: usage, servedBy: responsesStreamProfileId } = await forwardWithFailover(chain, { res }, async (ctx, attempt) => {
@@ -1617,6 +1669,20 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
         status: streamStatus,
         profileId: responsesStreamProfileId ?? undefined,
       });
+
+      // Stream dalı araç telemetrisi (HANDOFF item F): sayaç settle'dan SONRA, para yoluna
+      // dokunmadan yazılır. emittedToolItems === 0 iken toolCallCount > 0 → emit hatası BİZDE.
+      logResponsesToolOutcome({
+        requestId,
+        stream: true,
+        status: streamStatus,
+        toolCount: toolContract.toolCount,
+        mappedToolCount: toolContract.mappedToolCount,
+        droppedToolTypes: toolContract.droppedToolTypes,
+        toolCallCount: responsesToolStats.upstreamToolCalls,
+        emittedToolItems: responsesToolStats.emittedToolItems,
+        finishReason: usage.finishReason,
+      });
     } else {
       const { result: { raw, usage, native }, servedBy: responsesProfileId } = await forwardWithFailover(chain, {}, async (ctx, attempt) => {
         // Native passthrough (sub-codex / cf:*): RAW Responses body → upstream /responses,
@@ -1666,19 +1732,19 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
       // istek teknik olarak "success" olur ve faturalanır, ama istemci hiçbir şey
       // yürütemez (müşteri "hiçbir şey yapmıyor" der). Bu kombinasyonu görünür kılar;
       // faturalama/DB davranışı DEĞİŞMEZ. bkz spec görev 8.2/8.4.
-      const toolCallCount = countResponseToolCalls(raw, native === true);
-      const declaredToolCount = Array.isArray(rawResponsesBody.tools) ? rawResponsesBody.tools.length : 0;
-      if (declaredToolCount > 0 && toolCallCount === 0) {
-        logger.warn(
-          { requestId, endpoint: "responses", stream: false, native: native === true, declaredToolCount, toolCallCount, reason: "no_tool_call_despite_tools" },
-          "responses tool contract suspicious success",
-        );
-      } else {
-        logger.info(
-          { requestId, endpoint: "responses", stream: false, native: native === true, declaredToolCount, toolCallCount },
-          "responses tool call outcome",
-        );
-      }
+      // Native bacakta araçlar HAM gövdeyle gittiği için upstream'e giden araç sayısı
+      // deklare edilen sayıdır; çeviri yolunda yalnız eşlenenler gider (görev 8.2).
+      logResponsesToolOutcome({
+        requestId,
+        stream: false,
+        status: "success",
+        native: native === true,
+        toolCount: toolContract.toolCount,
+        mappedToolCount: native === true ? toolContract.toolCount : toolContract.mappedToolCount,
+        droppedToolTypes: native === true ? [] : toolContract.droppedToolTypes,
+        toolCallCount: countResponseToolCalls(raw, native === true),
+        finishReason: usage.finishReason,
+      });
 
       const { remainingUSD } = await getUserBalanceSnapshot(userId);
       setExtendedBillingHeaders(res, costTL, remainingTL, remainingUSD, requestId);

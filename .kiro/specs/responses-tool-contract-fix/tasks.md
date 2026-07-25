@@ -87,33 +87,33 @@ Dokunulan dosyalar: `src/server/services/responses-translation.ts`, `src/server/
   - Sonuçları kanıt olarak özetle; herhangi biri kırmızıysa DEVAM ETME
   - _Requirements: 3.10, 3.11, 3.12_
 
-- [~] 7. Commit ve deploy (commit YAPILDI; deploy BLOKE)
+- [-] 7. Commit ve deploy (commit YAPILDI; deploy BLOKE)
   - ÖN KOŞUL: lokal ağaç kirli (84 dosya, HEAD `b6f6197`) → `sync-deploy.sh` clean-tree guard'ı abort eder. Yalnız bu spec kapsamındaki dosyaları ayıklayıp commit et; ilgisiz 84 dosyayı bu commit'e KARIŞTIRMA
   - Deploy: `bash scripts/sync-deploy.sh --dry-run` sonra kullanıcı onayıyla gerçek deploy
   - Deploy sonrası doğrulama: `curl -s http://127.0.0.1:4568/health` (sunucuda), `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`
   - Canlı kanıt: yeni teşhis log satırlarının journal'da göründüğünü ve `droppedToolTypes` sıklığını raporla
   - _Requirements: 2.7, 3.10_
 
-- [ ] 8. Dört hata sınıfını canlıda birbirinden ayırt et (teşhis enstrümanı)
+- [x] 8. Dört hata sınıfını canlıda birbirinden ayırt et (teşhis enstrümanı)
   - Semptom: API hiçbir tool çağrısı yazmıyor/değiştirmiyor/silmiyor. Bu spec'in düzeltmesi yalnız **tool-routing** sınıfını kapsar; diğer üç sınıf (model halüsinasyonu, sandbox/environment mismatch, orkestratörün sahte başarı üretmesi) ayrı kök nedenlerdir ve aynı belirtiyi verir. Hangisinin aktif olduğunu ölçmeden fix'in işe yaradığı iddia EDİLEMEZ.
-- [ ] 8.1 Tool-routing sınıfı sayacı
+- [x] 8.1 Tool-routing sınıfı sayacı
   - Görev 5'teki `responses tool contract` logundan `droppedToolTypes` boş olmayan istek oranını ve `responses native degrade` logundan `degraded=true` oranını raporlayan tek seferlik bir analiz script'i yaz (`scripts/responses-tool-contract-report.mjs`): journalctl çıktısını stdin'den okur, JSON satırlarını ayrıştırır, sınıf başına sayı basar
   - Script sır/PII yazdırmaz; yalnız tip ve sayı toplar
   - _Requirements: 2.2, 2.7, 3.11_
-- [ ] 8.2 Model halüsinasyonu sınıfı sayacı (araç verildi ama model çağırmadı)
+- [x] 8.2 Model halüsinasyonu sınıfı sayacı (araç verildi ama model çağırmadı)
   - `handleResponsesEndpoint` yanıt tarafına salt-ek alan ekle: `toolCallCount` (upstream'den dönen tool_call sayısı) ve `mappedToolCount` (upstream'e gönderilen araç sayısı)
   - `mappedToolCount > 0 && toolCallCount === 0` kombinasyonu "araç verildi, model kullanmadı" sınıfını izole eder — halüsinasyon/prompt sorununu tool-routing'den ayırır
   - Mevcut `raw_usage_json.finishReason` alanıyla birlikte raporlanır (billing'e dokunmadan, yalnız log)
   - _Requirements: 2.7, 3.10, 3.11_
-- [ ] 8.3 Sandbox/environment mismatch sınıfı (çağrı istemciye ulaştı mı)
+- [x] 8.3 Sandbox/environment mismatch sınıfı (çağrı istemciye ulaştı mı)
   - Stream yolunda yayılan araç öğesi sayısını (`response.output_item.added` içinden `function_call`/`custom_tool_call`/`local_shell_call`) sayan salt-ek log alanı ekle: `emittedToolItems`
   - `toolCallCount > 0 && emittedToolItems === 0` → çeviri/emit hatası (bizde); `emittedToolItems > 0` ve müşteri hâlâ "dosya değişmedi" diyorsa → sorun istemci tarafında (sandbox/cwd/izin), gateway kapsamı dışında. Bu ayrımı raporla
   - _Requirements: 2.3, 2.7, 3.7_
-- [ ] 8.4 Sahte başarı sınıfını alarma bağla
+- [x] 8.4 Sahte başarı sınıfını alarma bağla
   - `status=success` + `mappedToolCount > 0` + `toolCallCount === 0` + `droppedToolTypes` boş değil kombinasyonunu tek bir uyarı satırı olarak logla (`logger.warn`, mesaj: `responses tool contract suspicious success`)
   - Bu kombinasyon bugün `usage_records`'ta `success` olarak görünüp sorunu gizliyor; uyarı satırı onu görünür kılar. DB şeması ve billing DEĞİŞMEZ
   - _Requirements: 2.7, 3.10, 3.11_
-- [ ] 8.5 Doğrulama
+- [x] 8.5 Doğrulama
   - `npm run lint` + `npm test` temiz; yeni log alanlarının çeviri çıktısını değiştirmediğini golden testiyle kanıtla (`npx vitest run src/server/services/responses-translation-golden.test.ts`)
   - Kablolama contract testine yeni alanlar için assertion ekle
   - _Requirements: 3.11, 3.12_
@@ -211,3 +211,18 @@ Kullanıcının tarif ettiği "hiçbir tool çağrısı yazmıyor/değiştirmiyo
 | Model halüsinasyonu (araç verildi, model çağırmadı/uydurdu) | HAYIR | `mappedToolCount > 0 && toolCallCount === 0` (görev 8.2) |
 | Sandbox/environment mismatch (çağrı istemciye ulaştı, istemci yürütemedi) | HAYIR — gateway dışı | `emittedToolItems > 0` ama müşteri tarafında değişiklik yok (görev 8.3) |
 | Orkestratörün sahte başarı üretmesi | HAYIR — ama görünür kılınır | `status=success` + araç var + çağrı yok (görev 8.4) |
+
+## Görev 8.1 / 8.5 Kanıtları (2026-07-25)
+
+| Adım | Kanıt |
+|------|-------|
+| 8.1 RED | `scripts/responses-tool-contract-report.mjs` geçici olarak kaldırıldı → `npx vitest run src/server/routes/responses-tool-contract-report.test.ts`: **10 fail / 1 pass** (ENOENT + `--json` çıkış kodu 1). Script yokken sınıflandırma iddiası doğrulanamıyor kanıtı. |
+| 8.1 GREEN | Script geri kondu → aynı komut **11/11 yeşil**. Dört sınıf sayacı, journal ön-ekli satır ayrıştırma, bozuk/boş satır dayanıklılığı, `--help`, boş girdi ve sır/PII yazmama testleri dahil. |
+| 8.5 lint | `npm run lint` (tsc --noEmit) temiz. |
+| 8.5 tam paket | `npm test` → **144 dosya / 1235 test yeşil** (öncesi 143/1220; +1 dosya script testi, +15 test). |
+| 8.5 golden | `npx vitest run src/server/services/responses-translation-golden.test.ts` → 3/3 yeşil (salt-okuma; `GOLDEN_WRITE` kullanılmadı, fixture değişmedi). |
+| 8.5 kablolama | `responses-tool-contract-wire.test.ts` → 17/17. Eksik olan tek köprü eklendi: rapor script'inin okuduğu log alanları (`status`, `native`, degrade satırındaki `degraded` + `lossyToolTypes`) artık assertion altında. |
+| 8.5 build/scan | `npm run build` başarılı · `npm run scan:public` → `{"scanned":3,"hits":[]}`. |
+| Canlı koşu (salt-okuma) | `ssh yzapi-vps 'journalctl -u turkapiprojesi --since "2 days ago" --no-pager -o cat' \| node scripts/responses-tool-contract-report.mjs` → 36 `/v1/responses` isteği (stream=35, non-stream=1), araç deklare eden 1 istek (`custom`+`function`), **droppedToolTypes 0/36**, degrade kararı 0. Sonuç kaydı 0 — çünkü `responses tool call outcome` / `suspicious success` / `native degrade` satırları canlıda HENÜZ YOK (grep: 0/0/0); 8.2–8.4 kodu deploy edilmedi (görev 7 bloke). Yani sınıf 2/3/4 canlıda ölçülemez durumda, sınıf 1 için kanıt: fix'ten sonra araç düşüşü gözlenmiyor. |
+
+Dokunulmayan alanlar: billing/K1, CF sayaçları, provider routing, DB şeması/migration, paket/lane/spark dalları, `responses-translation.ts`, `proxy.ts` (bu görevde hiç değişmedi), golden fixture. Commit/push/deploy/restart YAPILMADI.

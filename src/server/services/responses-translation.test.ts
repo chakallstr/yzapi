@@ -7,6 +7,9 @@ import {
   formatResponsesSse,
   usageFromTokens,
   countResponseToolCalls,
+  createResponsesStreamStats,
+  summarizeToolContract,
+  isSuspiciousToolOutcome,
 } from "./responses-translation.js";
 
 describe("normalizeRequestedModel", () => {
@@ -586,5 +589,118 @@ describe("countResponseToolCalls", () => {
     expect(countResponseToolCalls("metin", true)).toBe(0);
     expect(countResponseToolCalls({ output: "dizi-degil" }, true)).toBe(0);
     expect(countResponseToolCalls({ choices: [{}] }, false)).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stream telemetrisi (salt-gözlem) — spec görev 8.3 (HANDOFF item F)
+// Sayaç YALNIZ gözlem içindir: üretilen event dizisi bit-bit aynı kalır (golden kilidi).
+// Ayrım: upstreamToolCalls > 0 && emittedToolItems === 0 → bizde emit hatası.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("ResponsesStreamStats (stream araç telemetrisi)", () => {
+  const baseMeta = { id: "req9", model: "gpt-5.5", createdAt: 1000 };
+
+  it("upstream tool_call'larını ve yayılan araç öğelerini sayar", () => {
+    const stats = createResponsesStreamStats();
+    const t = new ResponsesStreamTranslator({ ...baseMeta, stats });
+    t.start();
+    t.pushChatChunk({ choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", function: { name: "shell", arguments: "{}" } }] } }] });
+    t.pushChatChunk({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: "" } }] } }] });
+    t.pushChatChunk({ choices: [{ delta: { tool_calls: [{ index: 1, id: "c2", function: { name: "apply_patch", arguments: "{}" } }] } }] });
+    t.finish(usageFromTokens(1, 1));
+
+    expect(stats.upstreamToolCalls).toBe(2);
+    expect(stats.emittedToolItems).toBe(2);
+  });
+
+  it("araç çağrısı olmayan akışta sayaçlar 0 kalır (sessiz arıza sinyali)", () => {
+    const stats = createResponsesStreamStats();
+    const t = new ResponsesStreamTranslator({ ...baseMeta, stats });
+    t.start();
+    t.pushChatChunk({ choices: [{ delta: { content: "merhaba" } }] });
+    t.finish(usageFromTokens(1, 1));
+
+    expect(stats.upstreamToolCalls).toBe(0);
+    expect(stats.emittedToolItems).toBe(0);
+  });
+
+  it("stats verilmediğinde event dizisi ve davranış değişmez (geriye dönük uyum)", () => {
+    const withStats = new ResponsesStreamTranslator({ ...baseMeta, stats: createResponsesStreamStats() });
+    const without = new ResponsesStreamTranslator({ ...baseMeta });
+    const run = (t: ResponsesStreamTranslator) => [
+      ...t.start(),
+      ...t.pushChatChunk({ choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", function: { name: "shell", arguments: "{}" } }] } }] }),
+      ...t.finish(usageFromTokens(1, 1)),
+    ];
+    expect(run(withStats)).toEqual(run(without));
+  });
+
+  it("stats yalnız sayı taşır — araç adı/argüman sızdırmaz", () => {
+    const stats = createResponsesStreamStats();
+    const t = new ResponsesStreamTranslator({ ...baseMeta, stats });
+    t.start();
+    t.pushChatChunk({ choices: [{ delta: { tool_calls: [{ index: 0, id: "gizli_call_id", function: { name: "gizli_arac", arguments: "{\"input\":\"gizli argüman\"}" } }] } }] });
+    t.finish(usageFromTokens(1, 1));
+
+    const serialized = JSON.stringify(stats);
+    expect(serialized).not.toContain("gizli_arac");
+    expect(serialized).not.toContain("gizli argüman");
+    expect(serialized).not.toContain("gizli_call_id");
+    expect(Object.values(stats).every((v) => typeof v === "number")).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// summarizeToolContract.mappedToolCount — spec görev 8.2
+// "araç verildi, model kullanmadı" sınıfını izole etmek için upstream'e KAÇ araç
+// gönderildiği gerekir (tip listesi değil, sayı).
+// ─────────────────────────────────────────────────────────────────────────────
+describe("summarizeToolContract mappedToolCount", () => {
+  it("upstream'e taşınan araç sayısını verir (düşenleri saymaz)", () => {
+    const s = summarizeToolContract({
+      tools: [
+        { type: "function", name: "a", parameters: { type: "object" } },
+        { type: "custom", name: "apply_patch" },
+        { type: "web_search" },
+      ],
+    });
+    expect(s.toolCount).toBe(3);
+    expect(s.mappedToolCount).toBe(2);
+    expect(s.droppedToolTypes).toEqual(["web_search"]);
+  });
+
+  it("tüm araçlar düşerse 0 döner", () => {
+    expect(summarizeToolContract({ tools: [{ type: "web_search" }] }).mappedToolCount).toBe(0);
+  });
+
+  it("araçsız istekte 0 döner", () => {
+    expect(summarizeToolContract({ input: "x" }).mappedToolCount).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// isSuspiciousToolOutcome — spec görev 8.4 (sahte başarı alarmı)
+// status=success + araç upstream'e gitti/düştü + hiç araç çağrısı yok → uyarı.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("isSuspiciousToolOutcome", () => {
+  it("araç gönderildi ama hiç çağrı dönmediyse şüphelidir", () => {
+    expect(isSuspiciousToolOutcome({ status: "success", mappedToolCount: 2, toolCallCount: 0, droppedToolTypes: [] })).toBe(true);
+  });
+
+  it("araçların hepsi düştüyse ve çağrı yoksa şüphelidir (tool-routing sınıfı)", () => {
+    expect(isSuspiciousToolOutcome({ status: "success", mappedToolCount: 0, toolCallCount: 0, droppedToolTypes: ["web_search"] })).toBe(true);
+  });
+
+  it("araç çağrısı döndüyse şüpheli değildir", () => {
+    expect(isSuspiciousToolOutcome({ status: "success", mappedToolCount: 2, toolCallCount: 1, droppedToolTypes: ["web_search"] })).toBe(false);
+  });
+
+  it("araçsız istek şüpheli değildir", () => {
+    expect(isSuspiciousToolOutcome({ status: "success", mappedToolCount: 0, toolCallCount: 0, droppedToolTypes: [] })).toBe(false);
+  });
+
+  it("başarısız/ücretsiz istek şüpheli değildir (çağrı yokluğu beklenir)", () => {
+    expect(isSuspiciousToolOutcome({ status: "error", mappedToolCount: 2, toolCallCount: 0, droppedToolTypes: [] })).toBe(false);
+    expect(isSuspiciousToolOutcome({ status: "stream_missing_usage", mappedToolCount: 2, toolCallCount: 0, droppedToolTypes: [] })).toBe(false);
   });
 });
