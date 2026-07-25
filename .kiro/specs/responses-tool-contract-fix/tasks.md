@@ -94,6 +94,30 @@ Dokunulan dosyalar: `src/server/services/responses-translation.ts`, `src/server/
   - Canlı kanıt: yeni teşhis log satırlarının journal'da göründüğünü ve `droppedToolTypes` sıklığını raporla
   - _Requirements: 2.7, 3.10_
 
+- [ ] 8. Dört hata sınıfını canlıda birbirinden ayırt et (teşhis enstrümanı)
+  - Semptom: API hiçbir tool çağrısı yazmıyor/değiştirmiyor/silmiyor. Bu spec'in düzeltmesi yalnız **tool-routing** sınıfını kapsar; diğer üç sınıf (model halüsinasyonu, sandbox/environment mismatch, orkestratörün sahte başarı üretmesi) ayrı kök nedenlerdir ve aynı belirtiyi verir. Hangisinin aktif olduğunu ölçmeden fix'in işe yaradığı iddia EDİLEMEZ.
+- [ ] 8.1 Tool-routing sınıfı sayacı
+  - Görev 5'teki `responses tool contract` logundan `droppedToolTypes` boş olmayan istek oranını ve `responses native degrade` logundan `degraded=true` oranını raporlayan tek seferlik bir analiz script'i yaz (`scripts/responses-tool-contract-report.mjs`): journalctl çıktısını stdin'den okur, JSON satırlarını ayrıştırır, sınıf başına sayı basar
+  - Script sır/PII yazdırmaz; yalnız tip ve sayı toplar
+  - _Requirements: 2.2, 2.7, 3.11_
+- [ ] 8.2 Model halüsinasyonu sınıfı sayacı (araç verildi ama model çağırmadı)
+  - `handleResponsesEndpoint` yanıt tarafına salt-ek alan ekle: `toolCallCount` (upstream'den dönen tool_call sayısı) ve `mappedToolCount` (upstream'e gönderilen araç sayısı)
+  - `mappedToolCount > 0 && toolCallCount === 0` kombinasyonu "araç verildi, model kullanmadı" sınıfını izole eder — halüsinasyon/prompt sorununu tool-routing'den ayırır
+  - Mevcut `raw_usage_json.finishReason` alanıyla birlikte raporlanır (billing'e dokunmadan, yalnız log)
+  - _Requirements: 2.7, 3.10, 3.11_
+- [ ] 8.3 Sandbox/environment mismatch sınıfı (çağrı istemciye ulaştı mı)
+  - Stream yolunda yayılan araç öğesi sayısını (`response.output_item.added` içinden `function_call`/`custom_tool_call`/`local_shell_call`) sayan salt-ek log alanı ekle: `emittedToolItems`
+  - `toolCallCount > 0 && emittedToolItems === 0` → çeviri/emit hatası (bizde); `emittedToolItems > 0` ve müşteri hâlâ "dosya değişmedi" diyorsa → sorun istemci tarafında (sandbox/cwd/izin), gateway kapsamı dışında. Bu ayrımı raporla
+  - _Requirements: 2.3, 2.7, 3.7_
+- [ ] 8.4 Sahte başarı sınıfını alarma bağla
+  - `status=success` + `mappedToolCount > 0` + `toolCallCount === 0` + `droppedToolTypes` boş değil kombinasyonunu tek bir uyarı satırı olarak logla (`logger.warn`, mesaj: `responses tool contract suspicious success`)
+  - Bu kombinasyon bugün `usage_records`'ta `success` olarak görünüp sorunu gizliyor; uyarı satırı onu görünür kılar. DB şeması ve billing DEĞİŞMEZ
+  - _Requirements: 2.7, 3.10, 3.11_
+- [ ] 8.5 Doğrulama
+  - `npm run lint` + `npm test` temiz; yeni log alanlarının çeviri çıktısını değiştirmediğini golden testiyle kanıtla (`npx vitest run src/server/services/responses-translation-golden.test.ts`)
+  - Kablolama contract testine yeni alanlar için assertion ekle
+  - _Requirements: 3.11, 3.12_
+
 ## Task Dependency Graph
 
 ```json
@@ -105,7 +129,9 @@ Dokunulan dosyalar: `src/server/services/responses-translation.ts`, `src/server/
     { "wave": 4, "tasks": ["3.2", "3.3", "3.4", "3.5", "4", "5"], "note": "Fix ve salt-ek log; 4 ve 5 paralel" },
     { "wave": 5, "tasks": ["3.6"], "note": "Golden + CE doğrulaması" },
     { "wave": 6, "tasks": ["6"], "note": "Tam doğrulama geçidi (lint/test/build/scan)" },
-    { "wave": 7, "tasks": ["7"], "note": "Commit + deploy — yalnız açık kullanıcı onayıyla" }
+    { "wave": 7, "tasks": ["8.1", "8.2", "8.3", "8.4"], "note": "Dört-sınıf teşhis enstrümanı (salt-ek)" },
+    { "wave": 8, "tasks": ["8.5"], "note": "Teşhis eklemelerinin doğrulaması" },
+    { "wave": 9, "tasks": ["7"], "note": "Commit + deploy — yalnız açık kullanıcı onayıyla" }
   ]
 }
 ```
@@ -162,3 +188,26 @@ Kanıt: canlı journal'da 48 saatte scheduled job listesi 8 job içeriyor ve bu 
 1. `jobs/index.ts`'i canlı hâliyle eşitleyip (4 CF job import'unu ayırıp) sonra deploy — CF jobları kapalı kalır, yalnız bu fix gider.
 2. 4 CF job'unun canlıda çalışması bilinçli bir karar ise, önce onlar ayrı ve gözetimli deploy edilir, sonra bu fix.
 3. Hedefli rsync (yalnız 3 dosya) + build + restart — sunucu-taraflı gate'i atlar, CLAUDE.md bunu tuzak olarak işaretliyor; önerilmez.
+
+## Deploy Ön Koşulları — Güncel Durum (2026-07-25, ikinci tur)
+
+| Kontrol | Sonuç |
+|---------|-------|
+| Çalışma ağacı temiz mi | EVET — ama bunu ben yapmadım: `a0e1dbb` ("wip: canlı ile eşitlenmiş bekleyen çalışma ağacını commit'le") benim dışımda oluştu ve 88 dosyayı commit'ledi. Fix commit'im `179c8fa` ondan ÖNCE ve ayrı |
+| Migration riski | YOK — lokal `0040`→`0046` ile canlı birebir aynı; `db:migrate` yeni migration uygulamaz |
+| `package.json` | Canlıyla byte-özdeş → `npm ci` davranışı değişmez |
+| Kirli dosya içerik riski | 65 kod dosyasının 62'si canlıyla byte-özdeş, 2'si yalnız test |
+| **AÇIK BLOCKER** | `src/server/jobs/index.ts` — lokal sürüm canlıda ÇALIŞMAYAN 4 CF cron job'unu başlatıyor (`startCfLedgerJob`, `startCfReconcileJob`, `startCfServedRefreshJob`, `startCfMirrorSyncJob`). Canlı journal'da 48 saatte 8 scheduled job var, bu 4'ü YOK (iz: 0 satır). Deploy bunları üretimde yeni başlatır → para/CF sayaçlarına dokunan iş; CLAUDE.md'deki ~675 TL over-order olayı bu sınıftan |
+
+Deploy, bu blocker bir karara bağlanmadan yapılmayacak. Seçenekler görev 7 notunda.
+
+## Kapsam Uyarısı — Dört Hata Sınıfı
+
+Kullanıcının tarif ettiği "hiçbir tool çağrısı yazmıyor/değiştirmiyor/silmiyor" belirtisi dört farklı kök nedenden gelebilir ve bu spec yalnız birini düzeltir:
+
+| Sınıf | Bu spec kapsıyor mu | Ayırt edici ölçüm |
+|-------|---------------------|-------------------|
+| Tool-routing (araç düşüyor / yanlış öğe tipi / tool_choice 400 / degrade kırpması) | EVET — görev 1-6 | `droppedToolTypes` boş değil, `degraded=true`, `custom` deklare + `function_call` yayımı |
+| Model halüsinasyonu (araç verildi, model çağırmadı/uydurdu) | HAYIR | `mappedToolCount > 0 && toolCallCount === 0` (görev 8.2) |
+| Sandbox/environment mismatch (çağrı istemciye ulaştı, istemci yürütemedi) | HAYIR — gateway dışı | `emittedToolItems > 0` ama müşteri tarafında değişiklik yok (görev 8.3) |
+| Orkestratörün sahte başarı üretmesi | HAYIR — ama görünür kılınır | `status=success` + araç var + çağrı yok (görev 8.4) |
