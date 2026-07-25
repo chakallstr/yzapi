@@ -80,6 +80,27 @@ const STRIP_BEFORE_UPSTREAM = new Set(["customerId"]);
 // Opus 4.7/4.8/Fable/Mythos bunları reddeder (upstream 400). rejectsSamplingParams=true ise silinir.
 const SAMPLING_PARAMS = ["temperature", "top_p", "top_k"] as const;
 
+// OpenAI `developer` rolünü (o1/o3/gpt-5 nesli için system'in yeni adı) upstream şeması
+// REDDEDER: 400 invalid_request "Invalid enum value. Expected 'system' | 'user' | 'assistant'
+// | 'tool', received 'developer'". Cline'ın OpenAI sağlayıcısı gpt-5.x seçildiğinde system
+// mesajını `developer` olarak yollar → müşteri ilk istekte 400 alır. /v1/responses yolunda
+// çeviri zaten yapılıyor (responses-translation.ts: developer → system); chat yolunda
+// eksikti. Burada normalize edilir: rol dışında hiçbir alan değişmez (content/name/tool_calls
+// aynen korunur), böylece davranış system mesajıyla birebir aynı olur.
+function normalizeDeveloperRole(body: Record<string, unknown>): void {
+  const messages = body.messages;
+  if (!Array.isArray(messages)) return;
+  let changed = false;
+  const mapped = messages.map((m) => {
+    if (m && typeof m === "object" && (m as Record<string, unknown>).role === "developer") {
+      changed = true;
+      return { ...(m as Record<string, unknown>), role: "system" };
+    }
+    return m;
+  });
+  if (changed) body.messages = mapped;
+}
+
 export function estimateTextTokens(value: unknown): number {
   if (value === null || value === undefined) return 0;
   const text = typeof value === "string" ? value : JSON.stringify(value);
@@ -227,6 +248,12 @@ export function buildRequestGuard(opts: BuildRequestGuardOptions): RequestGuardR
   for (const key of STRIP_BEFORE_UPSTREAM) delete guardedBody[key];
   if (opts.rejectsSamplingParams) {
     for (const key of SAMPLING_PARAMS) delete guardedBody[key];
+  }
+  // OpenAI-şekilli gövdelerde developer → system (bkz normalizeDeveloperRole notu).
+  // "messages" ucu Anthropic şeması → messages[] içinde system/developer zaten geçersiz,
+  // o yol system'i top-level `system` alanına taşıyor; oraya dokunmuyoruz.
+  if (opts.endpoint !== "messages") {
+    normalizeDeveloperRole(guardedBody);
   }
 
   // thinking.budget_tokens Anthropic API'de zorunludur (type:"enabled" olduğunda).

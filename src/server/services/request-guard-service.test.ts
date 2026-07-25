@@ -267,6 +267,35 @@ describe("request guard service", () => {
     expect(guard.guardedBody).not.toHaveProperty("top_k");
   });
 
+  it("rewrites the OpenAI `developer` role to `system` before forwarding", () => {
+    // Cline's OpenAI provider sends the system prompt as role:"developer" for gpt-5.x.
+    // Upstream schema only accepts system|user|assistant|tool → 400 invalid_request
+    // ("Invalid enum value ... received 'developer'"). The gateway normalizes it.
+    const guard = buildRequestGuard({
+      endpoint: "chat",
+      model,
+      body: {
+        model: "gpt-5.6-sol",
+        messages: [
+          { role: "developer", content: "Sen bir kod asistanısın", name: "dev" },
+          { role: "user", content: "selam" },
+        ],
+      },
+    });
+
+    expect(guard.guardedBody.messages).toEqual([
+      { role: "system", content: "Sen bir kod asistanısın", name: "dev" },
+      { role: "user", content: "selam" },
+    ]);
+  });
+
+  it("leaves messages untouched when no developer role is present", () => {
+    const messages = [{ role: "user", content: "selam" }];
+    const guard = buildRequestGuard({ endpoint: "chat", model, body: { model: "gpt-5.6-sol", messages } });
+
+    expect(guard.guardedBody.messages).toBe(messages);
+  });
+
   it("does NOT range-validate sampling params for models that reject them (they are stripped instead)", () => {
     // Even an out-of-range temperature must not 400 — it is simply dropped.
     expect(() => buildRequestGuard({
