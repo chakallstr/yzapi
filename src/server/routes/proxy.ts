@@ -27,7 +27,7 @@ import { resolveActiveCatalogModel } from "../services/added-model-service.js";
 import { getActiveProviderAdapter } from "../services/provider-adapter.js";
 import { resolveProviderForModel, resolveProviderChainForModel, nativeResponsesCapable } from "../services/provider-config-service.js";
 import type { ProviderContext, ProviderChain } from "../services/provider-config-service.js";
-import { resolveLanesForModel, acquireLane, laneToContext, recordLaneBackoff, clearLaneBackoff, enqueueRequest, drainQueue, isLaneAvailable, type LaneInfo } from "../services/lane-scheduler.js";
+import { resolveLanesForModel, acquireLane, laneToContext, recordLaneBackoff, releaseLane, backoffMsFromRetryAfter, enqueueRequest, drainQueue } from "../services/lane-scheduler.js";
 import { forwardWithFailover } from "../services/provider-failover.js";
 import { applyClaudeCloakRouteLock } from "../services/claude-cloak-route.js";
 import { packageOverrideChain, entitlementOverrideChain, seatPrimaryPackageChain, cfFirstPackageChain, applyCodexSparkAlternation, applyGpt56SparkAlternation, requiresCfKeyReady } from "../services/package-provider-override.js";
@@ -167,46 +167,37 @@ export function applyIdentityRelabel(chain: ProviderChain, canonicalModelId: str
 // İstemci claude-sonnet-4-6 ister → scheduler uygun ilk lane'e dispatch eder.
 // Opus/Haiku lane'ine düşerse bile applyIdentityRelabel "Claude Sonnet 4.6"
 // label'ını set eder (masterModel.id ile çalışır, lane model'i ile değil).
-async function resolveLaneAwareChain(canonicalModelId: string): Promise<ProviderChain> {
+// `laneProfileId` YALNIZ gerçek bir lane acquire edildiğinde dolar. Önceki sürüm
+// zincirin primary'sini koşulsuz lane sayıyordu; lane'i olmayan bir modelde (örn
+// kiro/vexly) 429 alındığında o profil lane backoff tablosuna yazılıyordu.
+async function resolveLaneAwareChain(canonicalModelId: string): Promise<{
+  chain: ProviderChain;
+  laneProfileId: string | null;
+}> {
   const lanes = await resolveLanesForModel(canonicalModelId);
   if (lanes.length === 0) {
     // Lane yok → mevcut davranış (geriye dönük uyumlu)
-    return resolveProviderChainForModel(canonicalModelId);
+    return { chain: await resolveProviderChainForModel(canonicalModelId), laneProfileId: null };
   }
   // Priority sırasıyla ilk uygun lane'i acquire et
   const lane = acquireLane(lanes);
   if (lane) {
     const ctx = laneToContext(lane);
-    return { primary: ctx, fallback: null };
+    return { chain: { primary: ctx, fallback: null }, laneProfileId: ctx.profileId ?? null };
   }
   // Tüm lane'ler dolu → queue'ya al, bir lane boşalınca dispatch
-  const ctx = await enqueueRequest(lanes, 30_000);
-  return { primary: ctx, fallback: null };
+  const ctx = await enqueueRequest(canonicalModelId, lanes, 30_000);
+  return { chain: { primary: ctx, fallback: null }, laneProfileId: ctx.profileId ?? null };
 }
 
-// 429/503 alındığında lane'i backoff'a al ve sıradaki lane'e geç.
-// Lane scheduler aktifse (lane profili varsa) çağrılır.
-async function retryWithNextLane(
-  canonicalModelId: string,
-  failedProfileId: string,
-  err: Error & { status?: number },
-): Promise<ProviderChain | null> {
-  const lanes = await resolveLanesForModel(canonicalModelId);
-  if (lanes.length === 0) return null;
-  // Başarısız lane'i backoff'a al
-  recordLaneBackoff(failedProfileId);
-  // Sıradaki uygun lane'i bul
-  const nextLane = acquireLane(lanes);
-  if (nextLane) {
-    return { primary: laneToContext(nextLane), fallback: null };
-  }
-  // Tüm lane'ler dolu → queue
-  try {
-    const ctx = await enqueueRequest(lanes, 30_000);
-    return { primary: ctx, fallback: null };
-  } catch {
-    return null;
-  }
+// Lane acquire edildi ama override zinciri onu attıysa RPM kotasını geri ver.
+// Aksi halde lane'e hiç istek gitmediği hâlde sayaç yanmış kalır (hayalet tüketim):
+// canlıda 36 aktif CF-override hakkı var → her Claude isteği bir Sonnet kotası yakıyordu.
+function releaseLaneIfDiscarded(laneProfileId: string | null, chain: ProviderChain): string | null {
+  if (!laneProfileId) return null;
+  if (chain.primary.profileId === laneProfileId) return laneProfileId;
+  releaseLane(laneProfileId);
+  return null;
 }
 
 function endpointEnabledFor(runtimeConfig: RuntimeApiConfig, endpoint: string): boolean {
@@ -725,8 +716,9 @@ async function handleTextJsonEndpoint(
     // Per-model upstream routing: the model decides which provider profile serves
     // it (Claude → wellflow, GPT/Gemini/o-series + opus-4.8 → popusk); falls back to
     // the active provider when the model is pinned to no enabled profile.
-    let chain = await resolveLaneAwareChain(masterModel.id);
-    laneProfileId = chain.primary.profileId;
+    const laneResolved = await resolveLaneAwareChain(masterModel.id);
+    let chain = laneResolved.chain;
+    laneProfileId = laneResolved.laneProfileId;
     // PAYG (paket DEĞİL) yolu: kullanıcıda claude_cf_entitlement_id işaretliyse ve model bir Claude
     // modeliyse, YALNIZ upstream zinciri CF reseller claude-api ucuna çevrilir (normal koltuk zinciri
     // fallback kalır). billedViaPackage=false → TL reserve/settle AYNEN çalışır. İşaret yoksa (pointer
@@ -784,6 +776,7 @@ async function handleTextJsonEndpoint(
       chain = applyGpt56SparkAlternation(chain, masterModel.id, pkgSlot.requestsToday ?? 0, providerBody as Record<string, unknown>);
     }
     chain = await applyClaudeCloakRouteLock({ endpoint, model: masterModel, chain });
+    laneProfileId = releaseLaneIfDiscarded(laneProfileId, chain);
     if (chain.primary.profileId === "rika") (providerBody as Record<string, unknown>).customerId = userId;
     chain = applyIdentityRelabel(chain, masterModel.id);
     const activeProviderAdapter = await getActiveProviderAdapter();
@@ -851,8 +844,10 @@ async function handleTextJsonEndpoint(
     // Lane scheduler: 429/503 → başarısız lane'i backoff'a al
     const errStatus = (err as Error & { status?: number }).status;
     if (errStatus === 429 || errStatus === 503) {
-      if (laneProfileId) recordLaneBackoff(laneProfileId);
-      if (masterModel) void drainQueue(await resolveLanesForModel(masterModel.id));
+      if (laneProfileId) {
+        recordLaneBackoff(laneProfileId, backoffMsFromRetryAfter((err as { retryAfter?: string | null }).retryAfter));
+      }
+      if (masterModel) void drainQueue(masterModel.id, await resolveLanesForModel(masterModel.id));
     }
     if (err instanceof InsufficientBalanceError || err instanceof RateLimitError || err instanceof ModelNotFoundError || err instanceof ModelDisabledError || err instanceof BadRequestError) {
       return next(err);
@@ -1068,8 +1063,9 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       user: userId,
     };
     // Per-model upstream routing (see handleTextJsonEndpoint): model → provider + failover.
-    let chain = await resolveLaneAwareChain(masterModel.id);
-    laneProfileId = chain.primary.profileId;
+    const laneResolved = await resolveLaneAwareChain(masterModel.id);
+    let chain = laneResolved.chain;
+    laneProfileId = laneResolved.laneProfileId;
     // PAYG Claude→CF override (bkz handleTextJsonEndpoint): pointer'lı kullanıcı + Claude modeli → CF reseller
     // primary, koltuk fallback. billedViaPackage=false → TL billing aynen. Pointer NULL = INERT (no-op).
     if (!billedViaPackage && isClaudeOverrideModel(masterModel.id)) {
@@ -1119,6 +1115,7 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
       chain = applyGpt56SparkAlternation(chain, masterModel.id, pkgSlot.requestsToday ?? 0, providerBody as Record<string, unknown>);
     }
     chain = await applyClaudeCloakRouteLock({ endpoint: "chat", model: masterModel, chain });
+    laneProfileId = releaseLaneIfDiscarded(laneProfileId, chain);
     if (chain.primary.profileId === "rika") (providerBody as Record<string, unknown>).customerId = userId;
     chain = applyIdentityRelabel(chain, masterModel.id);
     const activeProviderAdapter = await getActiveProviderAdapter();
@@ -1213,8 +1210,10 @@ router.post("/chat/completions", requireProxy, async (req: Request, res: Respons
     const e = err as Error & { status?: number; body?: unknown };
     // Lane scheduler: 429/503 → başarısız lane'i backoff'a al
     if (e.status === 429 || e.status === 503) {
-      if (laneProfileId) recordLaneBackoff(laneProfileId);
-      if (masterModel) void drainQueue(await resolveLanesForModel(masterModel.id));
+      if (laneProfileId) {
+        recordLaneBackoff(laneProfileId, backoffMsFromRetryAfter((err as { retryAfter?: string | null }).retryAfter));
+      }
+      if (masterModel) void drainQueue(masterModel.id, await resolveLanesForModel(masterModel.id));
     }
 
     if (err instanceof InsufficientBalanceError) {
@@ -1547,8 +1546,9 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
     // it's an internal routing hint that must NEVER be forwarded upstream. (No system-message
     // injection on the native path — native forwards verbatim, we just don't leak the id.)
     delete rawProviderBody.customerId;
-    let chain = await resolveLaneAwareChain(masterModel.id);
-    laneProfileId = chain.primary.profileId;
+    const laneResolved = await resolveLaneAwareChain(masterModel.id);
+    let chain = laneResolved.chain;
+    laneProfileId = laneResolved.laneProfileId;
     // PAYG Claude→CF override (bkz handleTextJsonEndpoint): pointer'lı kullanıcı + Claude modeli → CF reseller
     // primary, koltuk fallback. billedViaPackage=false → TL billing aynen. Pointer NULL = INERT (no-op).
     if (!billedViaPackage && isClaudeOverrideModel(masterModel.id)) {
@@ -1603,6 +1603,7 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
       chain = applyGpt56SparkAlternation(chain, masterModel.id, pkgSlot.requestsToday ?? 0, rawProviderBody);
     }
     chain = await applyClaudeCloakRouteLock({ endpoint: "responses", model: masterModel, chain });
+    laneProfileId = releaseLaneIfDiscarded(laneProfileId, chain);
     if (chain.primary.profileId === "rika") (providerBody as Record<string, unknown>).customerId = userId;
     chain = applyIdentityRelabel(chain, masterModel.id);
     const activeProviderAdapter = await getActiveProviderAdapter();
@@ -1756,8 +1757,10 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
     // Lane scheduler: 429/503 → başarısız lane'i backoff'a al
     const errStatus = (err as Error & { status?: number }).status;
     if (errStatus === 429 || errStatus === 503) {
-      if (laneProfileId) recordLaneBackoff(laneProfileId);
-      if (masterModel) void drainQueue(await resolveLanesForModel(masterModel.id));
+      if (laneProfileId) {
+        recordLaneBackoff(laneProfileId, backoffMsFromRetryAfter((err as { retryAfter?: string | null }).retryAfter));
+      }
+      if (masterModel) void drainQueue(masterModel.id, await resolveLanesForModel(masterModel.id));
     }
     if (err instanceof InsufficientBalanceError || err instanceof RateLimitError || err instanceof ModelNotFoundError || err instanceof ModelDisabledError || err instanceof BadRequestError) {
       return next(err);

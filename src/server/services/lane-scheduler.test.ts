@@ -8,6 +8,9 @@ import {
   recordLaneBackoff,
   clearLaneBackoff,
   enqueueRequest,
+  drainQueue,
+  releaseLane,
+  backoffMsFromRetryAfter,
   getLaneDispatchCount,
   getLaneBackoffUntil,
   getQueueLength,
@@ -229,7 +232,7 @@ describe("lane-scheduler — queue", () => {
     expect(acquireLane(lanes)).toBeNull();
 
     // Queue'a al — timeout kısa olsun
-    const promise = enqueueRequest(lanes, 100);
+    const promise = enqueueRequest("claude-sonnet-4-6", lanes, 100);
     expect(getQueueLength()).toBeGreaterThan(0);
 
     // Timeout sonrası reject
@@ -239,7 +242,7 @@ describe("lane-scheduler — queue", () => {
 
   it("queue timeout → temizlik", async () => {
     const lanes: LaneInfo[] = []; // hiç lane yok
-    const promise = enqueueRequest(lanes, 50);
+    const promise = enqueueRequest("claude-sonnet-4-6", lanes, 50);
     await expect(promise).rejects.toThrow("queue timeout");
     expect(getQueueLength()).toBe(0);
   });
@@ -270,5 +273,146 @@ describe("lane-scheduler — model matching", () => {
     expect(result).toHaveLength(2);
     expect(result[0].profile.id).toBe("sonnet-geo");
     expect(result[1].profile.id).toBe("opus-geo");
+  });
+});
+
+// ── releaseLane: hayalet RPM tüketimi ─────────────────────────────────────────
+// Lane zincir kurulurken acquire ediliyor, ardından CF/paket override zinciri onu
+// atabiliyor. Kota o zaman geri verilmezse lane'e hiç istek gitmediği hâlde sayaç
+// yanmış kalır → gerçek Sonnet kapasitesi sessizce erir.
+
+describe("lane-scheduler — releaseLane (hayalet tüketim)", () => {
+  it("acquire edilip kullanılmayan lane'in kotası geri verilir", () => {
+    const lanes = [makeLane({ id: "sonnet-geo", lanePriority: 1, rpmLimit: 2 })];
+
+    acquireLane(lanes);
+    expect(getLaneDispatchCount("sonnet-geo")).toBe(1);
+
+    releaseLane("sonnet-geo");
+    expect(getLaneDispatchCount("sonnet-geo")).toBe(0);
+  });
+
+  it("kota geri verilince dolu lane tekrar kullanılabilir olur", () => {
+    const lanes = [makeLane({ id: "sonnet-geo", lanePriority: 1, rpmLimit: 1 })];
+
+    expect(acquireLane(lanes)?.profile.id).toBe("sonnet-geo");
+    expect(acquireLane(lanes)).toBeNull(); // RPM dolu
+
+    releaseLane("sonnet-geo");
+    expect(acquireLane(lanes)?.profile.id).toBe("sonnet-geo");
+  });
+
+  it("hiç acquire edilmemiş lane'de releaseLane no-op (sayaç negatife düşmez)", () => {
+    releaseLane("hic-kullanilmadi");
+    expect(getLaneDispatchCount("hic-kullanilmadi")).toBe(0);
+  });
+
+  it("iki acquire + bir release → bir dispatch kalır", () => {
+    const lanes = [makeLane({ id: "sonnet-geo", lanePriority: 1, rpmLimit: 5 })];
+    acquireLane(lanes);
+    acquireLane(lanes);
+    releaseLane("sonnet-geo");
+    expect(getLaneDispatchCount("sonnet-geo")).toBe(1);
+  });
+});
+
+// ── Kuyruk modele bağlı + FIFO ────────────────────────────────────────────────
+
+describe("lane-scheduler — kuyruk modele bağlı", () => {
+  it("başka modelin drain'i bekleyen isteği ÇÖZMEZ", async () => {
+    const sonnetLanes = [makeLane({ id: "sonnet-geo", lanePriority: 1, rpmLimit: 1 })];
+    const opusLanes = [makeLane({ id: "opus-geo", lanePriority: 1, rpmLimit: 5 })];
+
+    acquireLane(sonnetLanes); // sonnet lane'i doldur
+    const pending = enqueueRequest("claude-sonnet-4-6", sonnetLanes, 300);
+    expect(getQueueLength()).toBe(1);
+
+    // Opus lane'i boş — ama bekleyen SONNET istiyor. Opus drain'i onu çözmemeli.
+    await drainQueue("claude-opus-4-6", opusLanes);
+    expect(getQueueLength()).toBe(1);
+
+    await expect(pending).rejects.toThrow("queue timeout");
+  });
+
+  it("kendi modelinin drain'i bekleyen isteği çözer ve doğru lane'i verir", async () => {
+    const lanes = [makeLane({ id: "sonnet-geo", lanePriority: 1, rpmLimit: 1 })];
+
+    acquireLane(lanes);
+    const pending = enqueueRequest("claude-sonnet-4-6", lanes, 1_000);
+    expect(getQueueLength()).toBe(1);
+
+    releaseLane("sonnet-geo"); // kota boşaldı
+    await drainQueue("claude-sonnet-4-6", lanes);
+
+    const ctx = await pending;
+    expect(ctx.profileId).toBe("sonnet-geo");
+    expect(getQueueLength()).toBe(0);
+  });
+
+  it("FIFO: en eski bekleyen ilk çözülür", async () => {
+    const lanes = [makeLane({ id: "sonnet-geo", lanePriority: 1, rpmLimit: 1 })];
+    acquireLane(lanes); // lane dolu
+
+    const order: string[] = [];
+    const first = enqueueRequest("claude-sonnet-4-6", lanes, 1_000).then(() => { order.push("first"); });
+    const second = enqueueRequest("claude-sonnet-4-6", lanes, 1_000).then(() => { order.push("second"); });
+    expect(getQueueLength()).toBe(2);
+
+    // Tek slot aç → yalnız BİRİ çözülmeli ve o "first" olmalı.
+    releaseLane("sonnet-geo");
+    await drainQueue("claude-sonnet-4-6", lanes);
+    await first;
+
+    expect(order).toEqual(["first"]);
+    expect(getQueueLength()).toBe(1);
+
+    // Kalanı da çöz ki asılı promise kalmasın.
+    releaseLane("sonnet-geo");
+    await drainQueue("claude-sonnet-4-6", lanes);
+    await second;
+    expect(order).toEqual(["first", "second"]);
+  });
+});
+
+// ── Retry-After farkında backoff ──────────────────────────────────────────────
+
+describe("lane-scheduler — backoffMsFromRetryAfter", () => {
+  it("saniye biçimini (delta-seconds) kullanır", () => {
+    expect(backoffMsFromRetryAfter("30")).toBe(30_000);
+    expect(backoffMsFromRetryAfter("0")).toBe(0);
+  });
+
+  it("HTTP-date biçimini kalan süreye çevirir", () => {
+    const now = Date.UTC(2026, 6, 25, 12, 0, 0);
+    const at = new Date(now + 20_000).toUTCString();
+    const ms = backoffMsFromRetryAfter(at, now);
+    // toUTCString saniyeye yuvarlar → 19–20sn arası kabul
+    expect(ms).toBeGreaterThan(18_000);
+    expect(ms).toBeLessThanOrEqual(20_000);
+  });
+
+  it("geçmiş tarih → sabit süreye düşer", () => {
+    const now = Date.UTC(2026, 6, 25, 12, 0, 0);
+    expect(backoffMsFromRetryAfter(new Date(now - 60_000).toUTCString(), now)).toBe(5_000);
+  });
+
+  it("başlık yok/geçersiz → sabit 5sn", () => {
+    expect(backoffMsFromRetryAfter(null)).toBe(5_000);
+    expect(backoffMsFromRetryAfter(undefined)).toBe(5_000);
+    expect(backoffMsFromRetryAfter("")).toBe(5_000);
+    expect(backoffMsFromRetryAfter("yakinda")).toBe(5_000);
+  });
+
+  it("uçuk değerler üst sınırla kırpılır (lane sonsuza kilitlenmesin)", () => {
+    expect(backoffMsFromRetryAfter("99999")).toBe(120_000);
+  });
+
+  it("recordLaneBackoff Retry-After süresini uygular", () => {
+    const lane = makeLane({ id: "sonnet-geo", lanePriority: 1 });
+    recordLaneBackoff("sonnet-geo", backoffMsFromRetryAfter("30"));
+
+    expect(isLaneAvailable(lane)).toBe(false);
+    expect(isLaneAvailable(lane, Date.now() + 29_000)).toBe(false);
+    expect(isLaneAvailable(lane, Date.now() + 31_000)).toBe(true);
   });
 });

@@ -622,16 +622,203 @@ function bedrockInvokeUrl(baseUrl: string, model: string): string {
   return `${u.origin}/model/${encodeURIComponent(model)}/invoke`;
 }
 
-function textFromBedrockAnthropic(json: Record<string, unknown>): string {
+// ── Bedrock Anthropic çeviri katmanı ────────────────────────────────────────
+//
+// buildBedrockAnthropicBody İKİ farklı gövde şeklini alır:
+//   1. OpenAI-şekilli  → /v1/chat/completions ve /v1/responses çevirisi
+//      (tools: [{type:"function", function:{name, parameters}}], assistant.tool_calls,
+//       role:"tool" mesajları, tool_choice: "auto"|"required"|{type:"function"})
+//   2. Anthropic-native → /v1/messages (tools: [{name, input_schema}], içerik blokları)
+//
+// Anthropic-native gövde Bedrock invoke'un beklediği şekildir → BİT-BİT korunur.
+// Yalnız OpenAI-şekilli alanlar çevrilir. Çeviri olmadan araç taşıyan her chat
+// isteği Bedrock'ta ValidationException alıyordu ve dönüşte tool_use blokları
+// sessizce düşüyordu (istemci boş tur görüyordu).
+
+/** Anthropic araç şeması mı? ({name, input_schema}) — /v1/messages gövdesi. */
+function isAnthropicToolSpec(t: Record<string, unknown>): boolean {
+  return typeof t.name === "string" && t.input_schema !== undefined;
+}
+
+/**
+ * İstek araçlarını Bedrock Anthropic şemasına çevirir.
+ * - Anthropic şeması → dokunulmaz
+ * - OpenAI {type:"function", function:{...}} → {name, description, input_schema}
+ * - Yerleşik tipler (web_search, image_generation, local_shell, custom ...) DÜŞER:
+ *   Bedrock Anthropic invoke gövdesi yalnız kullanıcı-tanımlı aracı kabul eder.
+ */
+export function bedrockToolsFromRequest(tools: unknown[]): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  for (const raw of tools) {
+    if (!raw || typeof raw !== "object") continue;
+    const t = raw as Record<string, unknown>;
+    if (isAnthropicToolSpec(t)) { out.push(t); continue; }
+    if (t.type !== "function") continue;
+    const fn = t.function;
+    if (!fn || typeof fn !== "object") continue;
+    const f = fn as Record<string, unknown>;
+    if (typeof f.name !== "string" || !f.name) continue;
+    out.push({
+      name: f.name,
+      ...(typeof f.description === "string" ? { description: f.description } : {}),
+      input_schema: f.parameters && typeof f.parameters === "object"
+        ? f.parameters
+        : { type: "object", properties: {} },
+    });
+  }
+  return out;
+}
+
+/** tool_choice'u Anthropic şekline çevirir. Karşılığı yoksa undefined (alan gönderilmez). */
+export function bedrockToolChoiceFromRequest(choice: unknown): Record<string, unknown> | undefined {
+  if (typeof choice === "string") {
+    if (choice === "auto") return { type: "auto" };
+    if (choice === "required" || choice === "any") return { type: "any" };
+    return undefined; // "none" → araç zorlanmaz
+  }
+  if (!choice || typeof choice !== "object") return undefined;
+  const c = choice as Record<string, unknown>;
+  if (c.type === "auto" || c.type === "any" || c.type === "tool") return c; // Anthropic-native
+  if (c.type === "none") return undefined;
+  if (c.type === "function" && c.function && typeof c.function === "object") {
+    const name = (c.function as Record<string, unknown>).name;
+    if (typeof name === "string" && name) return { type: "tool", name };
+  }
+  return undefined;
+}
+
+/** OpenAI tool mesajı içeriğini Anthropic tool_result content'ine (string) indirger. */
+function toolResultContent(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (content === undefined || content === null) return "";
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part && typeof part === "object") {
+          const p = part as Record<string, unknown>;
+          if (typeof p.text === "string") return p.text;
+        }
+        return "";
+      })
+      .join("");
+  }
+  return JSON.stringify(content);
+}
+
+function parseToolArguments(args: unknown): unknown {
+  if (args === undefined || args === null) return {};
+  if (typeof args !== "string") return args;
+  try { return JSON.parse(args); } catch { return { input: args }; }
+}
+
+/**
+ * Mesaj dizisini Anthropic şekline getirir. System mesajları `systemParts`'a taşınır.
+ * OpenAI-şekilli araç turları (assistant.tool_calls / role:"tool") içerik bloklarına
+ * çevrilir; diğer her mesajın `content`'i DEĞİŞTİRİLMEDEN geçer (Anthropic blokları korunur).
+ */
+function bedrockMessagesFromRequest(
+  rawMessages: unknown[],
+  systemParts: unknown[],
+): Array<{ role: string; content: unknown }> {
+  const out: Array<{ role: string; content: unknown }> = [];
+
+  // Anthropic tool_result blokları user mesajının içinde durur; art arda gelen
+  // tool çıktıları TEK user mesajında birleşir (ayrı mesajlar 400 üretir).
+  const pushToolResult = (block: Record<string, unknown>): void => {
+    const last = out[out.length - 1];
+    if (last && last.role === "user" && Array.isArray(last.content)) {
+      (last.content as unknown[]).push(block);
+      return;
+    }
+    out.push({ role: "user", content: [block] });
+  };
+
+  for (const message of rawMessages) {
+    if (!message || typeof message !== "object") continue;
+    const m = message as Record<string, unknown>;
+    const role = m.role;
+
+    if (role === "system" || role === "developer") {
+      if (m.content !== undefined) systemParts.push(m.content);
+      continue;
+    }
+
+    if (role === "tool" || role === "function") {
+      const id = typeof m.tool_call_id === "string"
+        ? m.tool_call_id
+        : typeof m.tool_use_id === "string" ? m.tool_use_id : "";
+      if (!id) continue; // eşleşecek tool_use yok → gönderilemez
+      pushToolResult({ type: "tool_result", tool_use_id: id, content: toolResultContent(m.content) });
+      continue;
+    }
+
+    if (role === "assistant" && Array.isArray(m.tool_calls) && m.tool_calls.length > 0) {
+      const blocks: unknown[] = [];
+      if (typeof m.content === "string" && m.content.trim()) {
+        blocks.push({ type: "text", text: m.content });
+      } else if (Array.isArray(m.content)) {
+        for (const blk of m.content) blocks.push(blk);
+      }
+      for (const call of m.tool_calls) {
+        if (!call || typeof call !== "object") continue;
+        const c = call as Record<string, unknown>;
+        const fn = c.function && typeof c.function === "object" ? c.function as Record<string, unknown> : null;
+        const name = fn && typeof fn.name === "string" ? fn.name : typeof c.name === "string" ? c.name : "";
+        if (!name) continue;
+        blocks.push({
+          type: "tool_use",
+          id: typeof c.id === "string" && c.id ? c.id : `call_${blocks.length}`,
+          name,
+          input: parseToolArguments(fn ? fn.arguments : c.input),
+        });
+      }
+      out.push({ role: "assistant", content: blocks });
+      continue;
+    }
+
+    out.push({ role: role === "assistant" ? "assistant" : "user", content: m.content ?? "" });
+  }
+
+  return out;
+}
+
+/** Bedrock Anthropic yanıtından metin + araç çağrılarını ayrıştırır. */
+function partsFromBedrockAnthropic(json: Record<string, unknown>): {
+  text: string;
+  toolCalls: Array<Record<string, unknown>>;
+} {
   const content = json.content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .map((block) => {
-      if (!block || typeof block !== "object") return "";
-      const b = block as Record<string, unknown>;
-      return typeof b.text === "string" ? b.text : "";
-    })
-    .join("");
+  if (!Array.isArray(content)) return { text: "", toolCalls: [] };
+  let text = "";
+  const toolCalls: Array<Record<string, unknown>> = [];
+  for (const block of content) {
+    if (!block || typeof block !== "object") continue;
+    const b = block as Record<string, unknown>;
+    if (b.type === "tool_use" || (b.name !== undefined && b.input !== undefined && b.type !== "text")) {
+      const name = typeof b.name === "string" ? b.name : "";
+      if (!name) continue;
+      toolCalls.push({
+        id: typeof b.id === "string" && b.id ? b.id : `call_${toolCalls.length}`,
+        type: "function",
+        function: { name, arguments: JSON.stringify(b.input ?? {}) },
+      });
+      continue;
+    }
+    if (typeof b.text === "string") text += b.text;
+  }
+  return { text, toolCalls };
+}
+
+/** Anthropic stop_reason → OpenAI finish_reason. */
+function bedrockFinishReason(json: Record<string, unknown>, hasToolCalls: boolean): string {
+  const raw = extractFinishReason(json) ?? "stop";
+  if (raw === "tool_use") return "tool_calls";
+  if (raw === "end_turn" || raw === "stop_sequence") return "stop";
+  if (raw === "max_tokens") return "length";
+  // stop_reason yoksa ama araç çağrısı varsa sözleşme gereği tool_calls olmalı.
+  if (hasToolCalls && raw === "stop") return "tool_calls";
+  return raw;
 }
 
 export function buildBedrockAnthropicBody(body: ChatRequest | TextRequest): Record<string, unknown> {
@@ -640,18 +827,7 @@ export function buildBedrockAnthropicBody(body: ChatRequest | TextRequest): Reco
   const systemParts: unknown[] = [];
   if (typeof b.system === "string" && b.system.trim()) systemParts.push(b.system);
 
-  const messages = rawMessages
-    .map((message) => {
-      if (!message || typeof message !== "object") return null;
-      const m = message as Record<string, unknown>;
-      const role = m.role === "assistant" ? "assistant" : m.role === "system" ? "system" : "user";
-      if (role === "system") {
-        if (m.content !== undefined) systemParts.push(m.content);
-        return null;
-      }
-      return { role, content: m.content ?? "" };
-    })
-    .filter(Boolean);
+  const messages = bedrockMessagesFromRequest(rawMessages, systemParts);
 
   const maxTokens = typeof b.max_tokens === "number"
     ? b.max_tokens
@@ -671,15 +847,27 @@ export function buildBedrockAnthropicBody(body: ChatRequest | TextRequest): Reco
   if (Array.isArray(b.stop)) out.stop_sequences = b.stop;
   else if (typeof b.stop === "string") out.stop_sequences = [b.stop];
   if (Array.isArray(b.stop_sequences)) out.stop_sequences = b.stop_sequences;
-  if (Array.isArray(b.tools)) out.tools = b.tools;
-  if (b.tool_choice && typeof b.tool_choice === "object") out.tool_choice = b.tool_choice;
+
+  // Araçlar: çevrilebilenler gönderilir. HİÇBİRİ çevrilemediyse tool_choice DA
+  // gönderilmez — "araç yok ama araç zorunlu" gövdesi Bedrock'ta 400'dür.
+  if (Array.isArray(b.tools) && b.tools.length > 0) {
+    const tools = bedrockToolsFromRequest(b.tools);
+    if (tools.length > 0) {
+      out.tools = tools;
+      const toolChoice = bedrockToolChoiceFromRequest(b.tool_choice);
+      if (toolChoice) out.tool_choice = toolChoice;
+    }
+  }
   return out;
 }
 
 export function bedrockAnthropicToChatCompletion(json: Record<string, unknown>, model: string): Record<string, unknown> {
-  const text = textFromBedrockAnthropic(json);
-  const finishReason = extractFinishReason(json) ?? "stop";
+  const { text, toolCalls } = partsFromBedrockAnthropic(json);
+  const finishReason = bedrockFinishReason(json, toolCalls.length > 0);
   const usage = normalizeProviderUsage(json.usage);
+  const message: Record<string, unknown> = toolCalls.length > 0
+    ? { role: "assistant", content: text.length > 0 ? text : null, tool_calls: toolCalls }
+    : { role: "assistant", content: text };
   return {
     id: typeof json.id === "string" ? json.id : `bedrock-${Date.now()}`,
     object: "chat.completion",
@@ -687,8 +875,8 @@ export function bedrockAnthropicToChatCompletion(json: Record<string, unknown>, 
     model,
     choices: [{
       index: 0,
-      message: { role: "assistant", content: text },
-      finish_reason: finishReason === "end_turn" ? "stop" : finishReason,
+      message,
+      finish_reason: finishReason,
     }],
     usage: {
       prompt_tokens: usage.promptTokens,
@@ -725,6 +913,15 @@ function firstChatFinishReason(raw: unknown): string {
   return typeof finishReason === "string" && finishReason.length > 0 ? finishReason : "stop";
 }
 
+/** Chat completion gövdesindeki araç çağrıları (Bedrock SSE köprüsü için). */
+function firstChatToolCalls(raw: unknown): Array<Record<string, unknown>> {
+  const message = firstChatChoice(raw).message;
+  if (!message || typeof message !== "object") return [];
+  const calls = (message as Record<string, unknown>).tool_calls;
+  if (!Array.isArray(calls)) return [];
+  return calls.filter((c): c is Record<string, unknown> => !!c && typeof c === "object");
+}
+
 function writeSseHeaders(res: Response): void {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -745,6 +942,7 @@ function writeBedrockChatCompletionAsSse(
   const model = typeof rawObj.model === "string" ? rawObj.model : body.model;
   const content = firstChatMessageContent(raw);
   const finishReason = firstChatFinishReason(raw);
+  const toolCalls = firstChatToolCalls(raw);
 
   writeSseHeaders(res);
   if (content.length > 0) {
@@ -754,6 +952,25 @@ function writeBedrockChatCompletionAsSse(
       created,
       model,
       choices: [{ index: 0, delta: { role: "assistant", content }, finish_reason: null }],
+    })}\n\n`);
+  }
+  // Araç çağrıları: OpenAI stream sözleşmesinde delta.tool_calls olarak akar.
+  // Bu chunk olmadan istemci (Cursor/opencode/Codex) araç turunu HİÇ görmez —
+  // yanıt boş görünür ama istek başarılı sayılıp faturalanır.
+  if (toolCalls.length > 0) {
+    res.write(`data: ${JSON.stringify({
+      id,
+      object: "chat.completion.chunk",
+      created,
+      model,
+      choices: [{
+        index: 0,
+        delta: {
+          role: "assistant",
+          tool_calls: toolCalls.map((call, index) => ({ index, ...call })),
+        },
+        finish_reason: null,
+      }],
     })}\n\n`);
   }
   res.write(`data: ${JSON.stringify({
@@ -858,23 +1075,33 @@ export async function forwardChat(
   );
   if (isBedrockRuntimeBase(baseUrl)) {
     const runtimeConfig = await getRuntimeApiConfig();
-    maybeCompressToolOutputs(providerBody, runtimeConfig);
-    const model = typeof providerBody.model === "string" ? providerBody.model : body.model;
+    // Identity relabel: Bedrock dalı bunu atlıyordu → Opus/Haiku lane'ine düşen bir
+    // Sonnet isteğinde model kendi gerçek kimliğini söylüyordu. Diğer tüm yollarla aynı.
+    const relabeledBody = applyIdentityRelabelToBody(providerBody, ctx.relabelResponseTo, "chat");
+    maybeCompressToolOutputs(relabeledBody, runtimeConfig);
+    const model = typeof relabeledBody.model === "string" ? relabeledBody.model : body.model;
     const res = await fetchWithRuntimeTimeout(bedrockInvokeUrl(baseUrl, model), {
       method: "POST",
       headers: { ...baseHeaders(ctx.apiKey), ...ctx.extraHeaders },
-      body: JSON.stringify(buildBedrockAnthropicBody(providerBody)),
+      body: JSON.stringify(buildBedrockAnthropicBody(relabeledBody)),
     }, attempt?.timeoutMs ?? runtimeConfig.defaultRequestTimeoutMs, attempt?.maxAttempts ?? 3);
     const responseMs = Date.now() - start;
     const json = await readProviderJson(res);
-    logger.info({ model, user: (providerBody as ChatRequest).user, providerHost: new URL(baseUrl).hostname, status: res.status, responseMs }, "bedrock request dispatched");
+    logger.info({ model, user: (relabeledBody as ChatRequest).user, providerHost: new URL(baseUrl).hostname, status: res.status, responseMs }, "bedrock request dispatched");
     if (!res.ok) {
-      const err = new Error(`AI provider ${res.status}`) as Error & { status: number; body: unknown };
+      const err = new Error(`AI provider ${res.status}`) as Error & {
+        status: number; body: unknown; retryAfter?: string | null;
+      };
       err.status = res.status;
       err.body = json;
+      // Lane scheduler backoff'u bu başlığı okur; yoksa sabit süreye düşer.
+      err.retryAfter = res.headers.get("retry-after");
       throw err;
     }
-    const raw = bedrockAnthropicToChatCompletion(json, body.model);
+    // body.model = müşterinin istediği katalog id'si → upstream inference-profile
+    // adı ("global.anthropic....") yanıta HİÇ yazılmaz.
+    const chatCompletion = bedrockAnthropicToChatCompletion(json, body.model);
+    const raw = filterIdentityLeaksInJson(chatCompletion, ctx.relabelResponseTo);
     const usage = normalizeProviderUsage(json.usage);
     if (json.usage !== undefined && json.usage !== null) usage.providerRaw = json.usage;
     return { raw, usage: { ...usage, cfRemaining: null, finishReason: extractFinishReason(json) } };
@@ -930,25 +1157,36 @@ export async function forwardTextEndpoint(
   );
   if (isBedrockRuntimeBase(baseUrl) && endpoint === "messages") {
     const runtimeConfig = await getRuntimeApiConfig();
-    maybeCompressToolOutputs(providerBody, runtimeConfig);
-    const model = typeof providerBody.model === "string" ? providerBody.model : body.model;
+    // Identity relabel + sızıntı filtresi: bu dal ikisini de atlıyordu. Yanıt HAM
+    // dönüyordu ve Anthropic gövdesindeki `model` alanı upstream inference-profile
+    // adını ("global.anthropic....") müşteriye gösteriyordu.
+    const relabeledBody = applyIdentityRelabelToBody(providerBody, ctx.relabelResponseTo, "messages");
+    maybeCompressToolOutputs(relabeledBody, runtimeConfig);
+    const model = typeof relabeledBody.model === "string" ? relabeledBody.model : body.model;
     const res = await fetchWithRuntimeTimeout(bedrockInvokeUrl(baseUrl, model), {
       method: "POST",
       headers: { ...baseHeaders(ctx.apiKey), ...ctx.extraHeaders },
-      body: JSON.stringify(buildBedrockAnthropicBody(providerBody)),
+      body: JSON.stringify(buildBedrockAnthropicBody(relabeledBody)),
     }, attempt?.timeoutMs ?? runtimeConfig.defaultRequestTimeoutMs, attempt?.maxAttempts ?? 3);
     const responseMs = Date.now() - start;
     const json = await readProviderJson(res);
     logger.debug({ model, endpoint, status: res.status, responseMs }, "bedrock text endpoint");
     if (!res.ok) {
-      const err = new Error(`AI provider ${res.status}`) as Error & { status: number; body: unknown };
+      const err = new Error(`AI provider ${res.status}`) as Error & {
+        status: number; body: unknown; retryAfter?: string | null;
+      };
       err.status = res.status;
       err.body = json;
+      // Lane scheduler backoff'u bu başlığı okur; yoksa sabit süreye düşer.
+      err.retryAfter = res.headers.get("retry-after");
       throw err;
     }
+    // Anthropic yanıt şekli korunur (tool_use blokları dahil); yalnız `model` alanı
+    // müşterinin istediği katalog id'sine çevrilir ve kimlik sızıntısı filtrelenir.
+    const masked = filterIdentityLeaksInJson({ ...json, model: body.model }, ctx.relabelResponseTo);
     const usage = normalizeProviderUsage(json.usage);
     if (json.usage !== undefined && json.usage !== null) usage.providerRaw = json.usage;
-    return { raw: json, usage: { ...usage, cfRemaining: null, finishReason: extractFinishReason(json) } };
+    return { raw: masked, usage: { ...usage, cfRemaining: null, finishReason: extractFinishReason(json) } };
   }
   const url = `${baseUrl}/${endpoint}`;
   const relabeledProviderBody = applyIdentityRelabelToBody(
@@ -1209,6 +1447,20 @@ export async function forwardChatStreamAsResponses(
     if (content.length > 0) {
       writeEvents(translator.pushChatChunk({
         choices: [{ delta: { role: "assistant", content } }],
+      }));
+    }
+    // Araç çağrıları: bu dal yalnız metni translator'a veriyordu → /v1/responses
+    // kullanan istemci (Codex/opencode) Sonnet 4.6'da araç turunu HİÇ görmüyordu.
+    // Translator delta.tool_calls'tan function_call öğelerini üretir.
+    const responsesToolCalls = firstChatToolCalls(raw);
+    if (responsesToolCalls.length > 0) {
+      writeEvents(translator.pushChatChunk({
+        choices: [{
+          delta: {
+            role: "assistant",
+            tool_calls: responsesToolCalls.map((call, index) => ({ index, ...call })),
+          },
+        }],
       }));
     }
     writeEvents(translator.finish(usageFromTokens(usage.promptTokens, usage.completionTokens)));

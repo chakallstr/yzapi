@@ -19,18 +19,25 @@ const laneDispatchTimes: Map<string, number[]> = new Map();
 // Backoff: lane → backoff bitiş timestamp'i (epoch ms)
 const laneBackoffUntil: Map<string, number> = new Map();
 
-// Queue: tüm lane'ler doluyken bekleyen istekler
+// Queue: tüm lane'ler doluyken bekleyen istekler.
+//
+// `modelId` ZORUNLU: kuyruk tek ve global olduğu için, model kimliği olmadan
+// drainQueue çağıran HANGİ model olursa olsun sıradaki bekleyeni kendi lane'iyle
+// çözüyordu — Sonnet bekleyen bir istek başka bir modelin upstream'ine gidebilirdi.
+// Bugün yalnız Sonnet lane grubu olduğu için gizliydi; ikinci grup eklendiği an
+// yanlış sağlayıcıya yönlenme demekti.
 interface QueuedRequest {
+  modelId: string;
   resolve: (ctx: ProviderContext) => void;
   reject: (err: Error) => void;
-  timeoutMs: number;
   enqueuedAt: number;
   timer: NodeJS.Timeout;
 }
 const requestQueue: QueuedRequest[] = [];
 
 const WINDOW_MS = 60_000; // 60 saniye sliding window (RPM = requests per minute)
-const DEFAULT_BACKOFF_MS = 5_000; // 429/503 sonrası 5sn backoff
+const DEFAULT_BACKOFF_MS = 5_000; // 429/503 sonrası 5sn backoff (Retry-After yoksa)
+const MAX_BACKOFF_MS = 120_000; // Retry-After ne derse desen üst sınır — lane sonsuza kilitlenmesin
 const QUEUE_POLL_INTERVAL_MS = 500; // queue boşalınca 500ms'de bir lane kontrol
 
 // ── Lane resolution ──────────────────────────────────────────────────────────
@@ -113,6 +120,41 @@ export function recordLaneBackoff(profileId: string, durationMs: number = DEFAUL
   laneBackoffUntil.set(profileId, Date.now() + durationMs);
 }
 
+// Upstream'in Retry-After başlığını saygı gösteren backoff. Başlık yok/geçersizse
+// sabit DEFAULT_BACKOFF_MS. Saniye (delta-seconds) ve HTTP-date biçimleri desteklenir.
+export function backoffMsFromRetryAfter(
+  retryAfter: string | null | undefined,
+  now: number = Date.now(),
+): number {
+  if (!retryAfter) return DEFAULT_BACKOFF_MS;
+  const trimmed = retryAfter.trim();
+  if (/^\d+$/.test(trimmed)) {
+    const seconds = Number(trimmed);
+    if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1000, MAX_BACKOFF_MS);
+  }
+  const asDate = Date.parse(trimmed);
+  if (Number.isFinite(asDate)) {
+    const delta = asDate - now;
+    if (delta > 0) return Math.min(delta, MAX_BACKOFF_MS);
+    return DEFAULT_BACKOFF_MS;
+  }
+  return DEFAULT_BACKOFF_MS;
+}
+
+// Acquire edilmiş ama KULLANILMAYAN lane'in RPM kotasını geri verir.
+//
+// resolveLaneAwareChain lane'i zincir kurulurken acquire ediyor; ardından CF/paket
+// override zinciri tamamen değiştirebiliyor. O durumda lane'e hiç istek gitmediği
+// hâlde sayaç yanmış kalıyordu (hayalet tüketim) — canlıda 36 aktif CF-override
+// hakkı olduğu için her Claude isteği bir Sonnet kotası yakıyordu.
+export function releaseLane(profileId: string): void {
+  const times = laneDispatchTimes.get(profileId);
+  if (!times || times.length === 0) return;
+  times.pop(); // en son eklenen dispatch kaydını geri al
+  if (times.length === 0) laneDispatchTimes.delete(profileId);
+  else laneDispatchTimes.set(profileId, times);
+}
+
 // Başarılı dispatch sonrası backoff'u temizle (lane sağlıklı).
 export function clearLaneBackoff(profileId: string): void {
   laneBackoffUntil.delete(profileId);
@@ -123,6 +165,7 @@ export function clearLaneBackoff(profileId: string): void {
 // Tüm lane'ler doluyken isteği queue'ya al. Bir lane boşalınca dispatch eder.
 // timeoutMs süresinde lane bulunamazsa reject eder.
 export function enqueueRequest(
+  modelId: string,
   lanes: LaneInfo[],
   timeoutMs: number = 30_000,
 ): Promise<ProviderContext> {
@@ -134,47 +177,45 @@ export function enqueueRequest(
     }, timeoutMs);
 
     requestQueue.push({
+      modelId,
       resolve,
       reject,
-      timeoutMs,
       enqueuedAt: Date.now(),
       timer,
     });
 
     // Hemen bir lane denemesi yap (belki bu sırada biri boşalmıştır)
-    void drainQueue(lanes);
+    void drainQueue(modelId, lanes);
   });
 }
 
 // Queue'daki istekleri uygun lane'lere dispatch et.
 // Her dispatch sonrası veya backoff süresi dolduğunda çağrılır.
-export async function drainQueue(lanes: LaneInfo[]): Promise<void> {
+export async function drainQueue(modelId: string, lanes: LaneInfo[]): Promise<void> {
   if (requestQueue.length === 0) return;
   const now = Date.now();
 
-  // Queue'daki her istek için uygun lane ara
-  for (let i = requestQueue.length - 1; i >= 0; i--) {
+  // FIFO: en ESKİ bekleyenden başla. Önceki sürüm diziyi sondan tarıyordu (LIFO),
+  // yani yoğunlukta ilk gelen istek süresiz açlığa düşebiliyordu.
+  // Yalnız AYNI modeli bekleyenler bu lane grubuyla çözülür.
+  for (let i = 0; i < requestQueue.length;) {
     const req = requestQueue[i];
+    if (req.modelId !== modelId) { i++; continue; }
     const lane = acquireLane(lanes, now);
-    if (lane) {
-      // Lane bulundu → dispatch et, queue'dan kaldır
-      requestQueue.splice(i, 1);
-      clearTimeout(req.timer);
-      req.resolve(laneToContext(lane));
-    } else {
-      // İlk uygun lane bulunamadı → gerisi de doludur, dur
-      break;
-    }
+    if (!lane) break; // ilk uygun lane yok → gerisi de dolu, dur
+    requestQueue.splice(i, 1);
+    clearTimeout(req.timer);
+    req.resolve(laneToContext(lane));
   }
 
-  // Hâlâ queue'da istek varsa ve bir lane backoff'ta → süre dolunca tekrar dene
-  if (requestQueue.length > 0) {
-    scheduleNextDrain(lanes);
+  // Hâlâ bu modeli bekleyen varsa ve bir lane backoff'ta → süre dolunca tekrar dene
+  if (requestQueue.some((r) => r.modelId === modelId)) {
+    scheduleNextDrain(modelId, lanes);
   }
 }
 
 // En yakın backoff bitişine kadar bekle, sonra drainQueue tekrar çağır.
-function scheduleNextDrain(lanes: LaneInfo[]): void {
+function scheduleNextDrain(modelId: string, lanes: LaneInfo[]): void {
   const now = Date.now();
   let earliestBackoff = Infinity;
   for (const lane of lanes) {
@@ -194,10 +235,10 @@ function scheduleNextDrain(lanes: LaneInfo[]): void {
       }
     }
     const waitMs = earliestRpmReset === Infinity ? QUEUE_POLL_INTERVAL_MS : Math.min(QUEUE_POLL_INTERVAL_MS, earliestRpmReset - now + 10);
-    setTimeout(() => void drainQueue(lanes), Math.max(10, waitMs));
+    setTimeout(() => void drainQueue(modelId, lanes), Math.max(10, waitMs)).unref?.();
   } else {
     const waitMs = earliestBackoff - now + 10;
-    setTimeout(() => void drainQueue(lanes), Math.max(10, waitMs));
+    setTimeout(() => void drainQueue(modelId, lanes), Math.max(10, waitMs)).unref?.();
   }
 }
 
