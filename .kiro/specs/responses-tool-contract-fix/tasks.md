@@ -295,3 +295,62 @@ Derlenmiyor / test kırmızısı / yarı bitmiş görünen provider kodu **bulun
 | Billing (salt-okuma, 24 saat) | **44 success / 7 error** (deploy öncesi referans 40/7 → +4 success, **yeni error 0**). Son 5 kayıt: 13:41:42–13:41:47 UTC, 4× `claude-sonnet-4-6` success (`error_code` boş) + 13:01 `claude-opus-5` success. Restart'tan sonraki ilk faturalandırılan istekler hatasız |
 
 Dokunulmayan alanlar: `git push` yok, `main`/`master` yok, canlı `.env` yok, nginx/üretim config yok, DB şeması/migration yazma yok, billing/CF sayaç mantığı yok, başka oturumun dosyaları (commit/stash/revert) yok, gpt-web ve yzlab yok. Rollback gerekmedi (`.deploy/predeploy-backups` kullanılmadı).
+
+## Görev 8 — Beşinci Tur: DÖRT SINIF CANLIDA ÖLÇÜLDÜ (2026-07-25, ölçüm boşluğu KAPANDI)
+
+Dördüncü turda kalan tek eksik şuydu: telemetri canlıda ayaktaydı ama `/v1/responses` trafiği gelmediği için dört sınıfın dağılımı hakkında iddia üretilemiyordu. Bu turda tetikleyici trafik **bilinçli olarak üretildi** ve dört sınıf birbirinden ayrıştı.
+
+### Yöntem
+
+1 saatlik test keyi üretildi (`scripts/gen-1hour-test-key.ts`, `key_id eeb87a8d…`, kendi test user'ı + 10 TL, `daily_limit_usd=5`). Geçici bir prob script'i (`.tmp-responses-live-probe.mjs`) `https://api.yapayzekalab.org/v1/responses` üzerine 5 senaryo gönderdi; her senaryo iki modelle koştu (`claude-sonnet-4-6` = bedrock bacağı, `claude-opus-5` = kiro bacağı). Ölçüm bitince key **revoke edildi** (`REVOKED: id=eeb87a8d…`, doğrulama: aynı keyle istek → **401**) ve prob dosyası silindi. Canlı kod/config/DB şeması değişmedi.
+
+### İstemci tarafı sonuç (10 istek, 10× HTTP 200)
+
+| Senaryo | `claude-sonnet-4-6` | `claude-opus-5` (kiro) |
+|---------|---------------------|------------------------|
+| C1 non-stream `function` | `function_call` ×1 | `function_call` ×1 |
+| **C2 non-stream `custom`** | **`custom_tool_call` ×1** | **`custom_tool_call` ×1** |
+| C3 stream `function` | `added`+`done` = `function_call` | `added`+`done` = `function_call` |
+| C4 non-stream yalnız-düşen (`web_search` + `tool_choice:"required"`) | HTTP **200**, araç öğesi 0 | HTTP **200**, araç öğesi 0 |
+| **C5 stream `custom`** | **`added`+`done` = `custom_tool_call`** | **`added`+`done` = `custom_tool_call`** |
+
+Üç bağımsız kanıt: (a) **CE2/CE1 canlıda doğrulandı** — `custom` araç artık upstream'e gidiyor ve dönüşte `custom_tool_call` olarak yayılıyor, `function_call`'a düşmüyor; (b) **CE4 canlıda doğrulandı** — yalnız-düşen araç + `tool_choice:"required"` artık 400 üretmiyor, `tool_choice` kapısı çalışıyor; (c) stream yolunda `output_item.added` **da** doğru tipte geldi (tasks.md'de "ad ilk delta'da gelmezse `function_call` kalır" diye kayıtlı bilinen sınırlama bu koşuda tetiklenmedi).
+
+### Dört sınıf raporu (`scripts/responses-tool-contract-report.mjs`, sonnet turu, 5 istek)
+
+```
+responses istegi        : 5  (stream=2  non-stream=3)
+arac deklare eden istek : 5  (100.0%)     sonuc kaydi : 5     ayristirilamayan satir : 0
+SINIF 1 tool-routing  : droppedToolTypes bos degil 1/5 (20.0%) · degrade karari 0 · lossyToolTypes (bos)
+SINIF 2 halusinasyon  : mappedToolCount>0 → 4 · bunlarda toolCallCount=0 → 0 (0.0%)
+SINIF 3 emit hatasi   : stream cagrili=2 olculen=2 emittedToolItems=0 → 0 (0.0%) · non-stream olculen=0 (beklenen)
+SINIF 4 sahte basari  : 1/5 (20.0%) · reason: tools_dropped_and_no_tool_call=1
+declaredToolTypes : custom=2  function=2  web_search=1
+droppedToolTypes  : web_search=1
+finishReason      : tool_calls=2  tool_use=2  end_turn=1
+```
+
+Yorum — dört sınıf artık **birbirinden ayrılabiliyor**, sayı uydurmaya gerek yok:
+
+- **Sınıf 1 (bu spec'in kapsamı): temiz.** Tek düşen tip `web_search` ve o gerçekten desteklenmeyen bir tip — `custom`/`function`/`local_shell` hiç düşmüyor. Degrade kararı 0 (rethrow kapısı hiç tetiklenmedi çünkü native 400 gelmedi).
+- **Sınıf 2: temiz.** Araç verilen 4 turda model 4/4 araç çağırdı. Yani "API tool çağırmıyor" semptomu bu koşuda halüsinasyondan gelmiyor.
+- **Sınıf 3: temiz.** Stream'de gelen her araç çağrısı istemciye yayıldı (`emittedToolItems=1`, ölçülen 2/2). Yani çeviri/emit hatası yok; müşteri "dosya değişmedi" derse sorun istemci tarafında (sandbox/cwd/izin) — gateway kapsamı dışı.
+- **Sınıf 4: uyarı çalışıyor.** C4 tam olarak eskiden gizlenen vakadır: araç deklare edildi, düştü, model araç çağırmadı, kayıt yine `success` faturalandı. Görev 8.4'ün `logger.warn` satırı bunu `reason=tools_dropped_and_no_tool_call` ile **görünür** kıldı. DB'de hâlâ `success` — beklenen; şema/billing değişmedi.
+
+### Log gizlilik doğrulaması (canlı satırlar üzerinde)
+
+Journal'daki 9 satır tek tek okundu. İçerik: `endpoint`, `stream`, `toolCount`, `mappedToolCount`, `declaredToolTypes`, `mappedToolTypes`, `droppedToolTypes`, `toolChoiceKind`, `status`, `native`, `toolCallCount`, `emittedToolItems`, `finishReason`, `reason`, `requestId`. **Araç adı yok** (`write_file` / `apply_patch` grep'i 0), prompt yok, API key yok, `base_url` yok, provider codename yok, PII yok. Native bacak bilgisi `native:false` boolean'ı olarak yazılmış — tasarım sözleşmesine uygun.
+
+### Billing (salt-okuma, 45 dakika penceresi)
+
+`claude-sonnet-4-6` → 9 success / 0 error · `claude-opus-5` → 6 success / 0 error. Tüm `error_code` boş. Prob trafiği hiçbir hata kaydı üretmedi; `tool_choice:"required"` + düşen araç kombinasyonu artık 400 yerine faturalandırılabilir 200 dönüyor.
+
+### Yan bulgu — kiro bacağı da araç sözleşmesini koruyor
+
+`claude-opus-5` (Kiro bridge → `claude-cloak-route.ts` KIRO OVERRIDE yolu) beş senaryonun beşinde `claude-sonnet-4-6` ile **aynı** araç öğesi tiplerini üretti. Yani görev 3.5'in `responsesToolItemKind()` birleştirmesi provider bacağından bağımsız çalışıyor. Bu, spec kapsamının dışında ama kiro cutover'ı için kayda değer kanıt.
+
+**Bu turda dokunulmayanlar:** kod (0 satır), `dist/`, deploy, `git commit`/`push`, `main`/`master`, canlı `.env`, DB şeması/migration, billing mantığı, CF sayaçları, golden fixture, başka oturumun dosyaları. Tek kalıcı DB etkisi: test user + revoke edilmiş key kaydı (script'in tasarlanmış davranışı).
+
+### Spec durumu
+
+Görev 1–8.5 tamam ve **canlı kanıtlı**. Spec'in açık maddesi kalmadı. Açık kalan tek şey spec dışıdır: `git push` yapılmadı (branch `fix/responses-tool-contract` lokalde), çünkü deploy edilen commit'ler zaten canlıda ve push kullanıcı onayı bekliyor.
