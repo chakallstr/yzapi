@@ -6,6 +6,7 @@ import {
   ResponsesStreamTranslator,
   formatResponsesSse,
   usageFromTokens,
+  countResponseToolCalls,
 } from "./responses-translation.js";
 
 describe("normalizeRequestedModel", () => {
@@ -543,5 +544,47 @@ describe("araç sözleşmesi (bug koşulu C(X))", () => {
     });
     expect((chat.tools as any[]).map((t) => t.function.name)).toEqual(["shell"]);
     expect(chat.tool_choice).toEqual({ type: "function", function: { name: "shell" } });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// countResponseToolCalls — sessiz arıza dedektörünün sayacı
+// Spec: .kiro/specs/responses-tool-contract-fix (görev 8.2 / 8.4)
+// "status=success ama hiç araç çağrısı yok" kombinasyonunu ölçülebilir kılar.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("countResponseToolCalls", () => {
+  it("native Responses yanıtındaki üç araç öğesi tipini de sayar", () => {
+    const raw = {
+      output: [
+        { type: "message", content: [] },
+        { type: "function_call", name: "shell" },
+        { type: "custom_tool_call", name: "apply_patch" },
+        { type: "local_shell_call", action: {} },
+        { type: "reasoning" },
+      ],
+    };
+    expect(countResponseToolCalls(raw, true)).toBe(3);
+  });
+
+  it("chat/completions yanıtındaki tool_calls'ları sayar", () => {
+    const raw = {
+      choices: [
+        { message: { role: "assistant", content: "", tool_calls: [{ id: "a" }, { id: "b" }] } },
+      ],
+    };
+    expect(countResponseToolCalls(raw, false)).toBe(2);
+  });
+
+  it("araç çağrısı olmayan yanıtlarda 0 döner (sessiz arıza sinyali)", () => {
+    expect(countResponseToolCalls({ output: [{ type: "message", content: [] }] }, true)).toBe(0);
+    expect(countResponseToolCalls({ choices: [{ message: { content: "merhaba" } }] }, false)).toBe(0);
+  });
+
+  it("bozuk/eksik gövdelerde asla patlamaz", () => {
+    expect(countResponseToolCalls(null, true)).toBe(0);
+    expect(countResponseToolCalls(undefined, false)).toBe(0);
+    expect(countResponseToolCalls("metin", true)).toBe(0);
+    expect(countResponseToolCalls({ output: "dizi-degil" }, true)).toBe(0);
+    expect(countResponseToolCalls({ choices: [{}] }, false)).toBe(0);
   });
 });

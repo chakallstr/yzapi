@@ -275,6 +275,41 @@ function convertToolsDetailed(tools: unknown): ToolConversion {
   };
 }
 
+/**
+ * Upstream'den dönen yanıtta KAÇ araç çağrısı olduğunu sayar (sır/içerik taşımaz).
+ *
+ * NEDEN: "status=success ama hiç araç çağrısı yok" kombinasyonu, araç deklare eden bir
+ * istemci için sessiz arıza demektir — upstream düz metin döndürmüştür, istemci hiçbir
+ * şey yürütmez ama istek başarılı sayılıp faturalanır. Bu sayaç o durumu ölçülebilir
+ * kılar (bkz. .kiro/specs/responses-tool-contract-fix görev 8.2/8.4).
+ *
+ * `native=true` → gövde HAM Responses yanıtıdır (output[] öğeleri sayılır).
+ * `native=false` → gövde chat/completions yanıtıdır (choices[].message.tool_calls sayılır).
+ */
+export function countResponseToolCalls(raw: unknown, native: boolean): number {
+  if (!raw || typeof raw !== "object") return 0;
+  const body = raw as Json;
+  if (native) {
+    const output = body.output;
+    if (!Array.isArray(output)) return 0;
+    let n = 0;
+    for (const item of output) {
+      if (!item || typeof item !== "object") continue;
+      const type = (item as Json).type;
+      if (type === "function_call" || type === "custom_tool_call" || type === "local_shell_call") n++;
+    }
+    return n;
+  }
+  const choices = body.choices;
+  if (!Array.isArray(choices)) return 0;
+  let n = 0;
+  for (const choice of choices) {
+    const calls = ((choice as Json | undefined)?.message as Json | undefined)?.tool_calls;
+    if (Array.isArray(calls)) n += calls.length;
+  }
+  return n;
+}
+
 /** Teşhis logu için araç sözleşmesi özeti (sır/ad/argüman içermez — yalnız tip ve sayı). */
 export function summarizeToolContract(body: Json): {
   toolCount: number;

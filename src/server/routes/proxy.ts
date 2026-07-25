@@ -48,7 +48,7 @@ import {
   type WebSearchMode,
 } from "../services/web-search-augment.js";
 import { chargeWebSearch } from "../services/web-search-billing-service.js";
-import { responsesRequestToChat, chatCompletionToResponses, deriveToolKinds, summarizeToolContract } from "../services/responses-translation.js";
+import { responsesRequestToChat, chatCompletionToResponses, deriveToolKinds, summarizeToolContract, countResponseToolCalls } from "../services/responses-translation.js";
 import {
   getApiKeyPolicy,
   getModelRuntimePolicy,
@@ -1660,6 +1660,25 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
         status: "success",
         profileId: responsesProfileId ?? undefined,
       });
+
+      // ── Sessiz arıza dedektörü (salt-ek teşhis) ────────────────────────────
+      // İstemci araç deklare ettiği hâlde upstream HİÇ araç çağrısı döndürmediyse
+      // istek teknik olarak "success" olur ve faturalanır, ama istemci hiçbir şey
+      // yürütemez (müşteri "hiçbir şey yapmıyor" der). Bu kombinasyonu görünür kılar;
+      // faturalama/DB davranışı DEĞİŞMEZ. bkz spec görev 8.2/8.4.
+      const toolCallCount = countResponseToolCalls(raw, native === true);
+      const declaredToolCount = Array.isArray(rawResponsesBody.tools) ? rawResponsesBody.tools.length : 0;
+      if (declaredToolCount > 0 && toolCallCount === 0) {
+        logger.warn(
+          { requestId, endpoint: "responses", stream: false, native: native === true, declaredToolCount, toolCallCount, reason: "no_tool_call_despite_tools" },
+          "responses tool contract suspicious success",
+        );
+      } else {
+        logger.info(
+          { requestId, endpoint: "responses", stream: false, native: native === true, declaredToolCount, toolCallCount },
+          "responses tool call outcome",
+        );
+      }
 
       const { remainingUSD } = await getUserBalanceSnapshot(userId);
       setExtendedBillingHeaders(res, costTL, remainingTL, remainingUSD, requestId);
