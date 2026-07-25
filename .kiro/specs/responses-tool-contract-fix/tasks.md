@@ -87,7 +87,7 @@ Dokunulan dosyalar: `src/server/services/responses-translation.ts`, `src/server/
   - Sonuçları kanıt olarak özetle; herhangi biri kırmızıysa DEVAM ETME
   - _Requirements: 3.10, 3.11, 3.12_
 
-- [-] 7. Commit ve deploy (commit YAPILDI; deploy BLOKE)
+- [ ] 7. Commit ve deploy (commit YAPILDI; deploy BLOKE)
   - ÖN KOŞUL: lokal ağaç kirli (84 dosya, HEAD `b6f6197`) → `sync-deploy.sh` clean-tree guard'ı abort eder. Yalnız bu spec kapsamındaki dosyaları ayıklayıp commit et; ilgisiz 84 dosyayı bu commit'e KARIŞTIRMA
   - Deploy: `bash scripts/sync-deploy.sh --dry-run` sonra kullanıcı onayıyla gerçek deploy
   - Deploy sonrası doğrulama: `curl -s http://127.0.0.1:4568/health` (sunucuda), `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`
