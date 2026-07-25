@@ -87,7 +87,7 @@ Dokunulan dosyalar: `src/server/services/responses-translation.ts`, `src/server/
   - Sonuçları kanıt olarak özetle; herhangi biri kırmızıysa DEVAM ETME
   - _Requirements: 3.10, 3.11, 3.12_
 
-- [ ] 7. Commit ve deploy (commit YAPILDI; deploy BLOKE)
+- [x] 7. Commit ve deploy (DEPLOY EDİLDİ — release `sync-20260725T133730Z-b676ea0`; canlı doğrulama dördüncü turda tamamlandı, aşağıya bkz.)
   - ÖN KOŞUL: lokal ağaç kirli (84 dosya, HEAD `b6f6197`) → `sync-deploy.sh` clean-tree guard'ı abort eder. Yalnız bu spec kapsamındaki dosyaları ayıklayıp commit et; ilgisiz 84 dosyayı bu commit'e KARIŞTIRMA
   - Deploy: `bash scripts/sync-deploy.sh --dry-run` sonra kullanıcı onayıyla gerçek deploy
   - Deploy sonrası doğrulama: `curl -s http://127.0.0.1:4568/health` (sunucuda), `SMOKE_BASE_URL=https://yapayzekalab.org npm run smoke:vps`
@@ -242,3 +242,56 @@ Kullanıcının tarif ettiği "hiçbir tool çağrısı yazmıyor/değiştirmiyo
 | Canlı koşu (salt-okuma) | `ssh yzapi-vps 'journalctl -u turkapiprojesi --since "2 days ago" --no-pager -o cat' \| node scripts/responses-tool-contract-report.mjs` → 36 `/v1/responses` isteği (stream=35, non-stream=1), araç deklare eden 1 istek (`custom`+`function`), **droppedToolTypes 0/36**, degrade kararı 0. Sonuç kaydı 0 — çünkü `responses tool call outcome` / `suspicious success` / `native degrade` satırları canlıda HENÜZ YOK (grep: 0/0/0); 8.2–8.4 kodu deploy edilmedi (görev 7 bloke). Yani sınıf 2/3/4 canlıda ölçülemez durumda, sınıf 1 için kanıt: fix'ten sonra araç düşüşü gözlenmiyor. |
 
 Dokunulmayan alanlar: billing/K1, CF sayaçları, provider routing, DB şeması/migration, paket/lane/spark dalları, `responses-translation.ts`, `proxy.ts` (bu görevde hiç değişmedi), golden fixture. Commit/push/deploy/restart YAPILMADI.
+
+## Görev 7 — Dördüncü Tur: DEPLOY EDİLDİ (başka oturum tarafından) + canlı doğrulama (2026-07-25)
+
+**Sonuç: Bu oturum deploy KOŞMADI — gerek kalmadı, çünkü görev 7 yükü zaten canlıda. Yapılan iş: ölçüm + salt-okuma canlı doğrulama.**
+
+### Ağaç durumu ölçümü (iki kez, ~95 sn arayla)
+
+| Ölçüm | 16:45 | 16:47 | 16:49 |
+|-------|-------|-------|-------|
+| `git status --porcelain` | `?? .kiro/specs/sonnet-46-unlimited-hardening/` | aynı | aynı |
+| `closerouter-service.ts` mtime / md5 | 16:28:05 / `2ce7a82b…` | değişmedi | değişmedi |
+| `lane-scheduler.ts`, `proxy.ts` | 16:16:10 | değişmedi | değişmedi |
+| `sonnet-46-unlimited-hardening/requirements.md` | 16:43:20 | **16:47:38 (değişti)** | — |
+| `…/tasks.md` | yok | **16:47:23 (yeni oluştu)** | — |
+
+Yorum: önceki turu bloke eden `closerouter-service.ts` / `lane-scheduler.ts` yazımı **bitmiş ve commit'lenmiş** (`234819a`, `3de6297` — başka oturum, aynı branch). Ama başka oturum **hâlâ aktif**: yeni bir spec (`sonnet-46-unlimited-hardening`) canlı canlı yazılıyor (3 dosya, ölçüm penceremde 2 kez değişti). Bu untracked dizin `sync-deploy.sh:29` clean-tree guard'ını (`git status --porcelain` boş olmalı) hâlâ tetikliyor → script bugün de abort ederdi. **Başka oturumun dosyalarına dokunulmadı** (commit/stash/silme/geri alma YOK).
+
+### Deploy neden koşulmadı: yük zaten canlıda
+
+| Kanıt | Değer |
+|-------|-------|
+| Canlı release (en üstte) | `sync-20260725T133730Z-b676ea0.json` — `local_commit: b676ea0`, `health: 200`, `migration: applied`, dist hash `c5690b23a5f2865e…` |
+| `b676ea0` içeriği | `90c2cde` (görev 8 telemetrisi) + `defb61e` (KIRO OVERRIDE) + `4f8b950` + başka oturumun `234819a` bedrock düzeltmesi → görev 7'nin deploy etmesi gereken her şey |
+| Servis | `active`, `ActiveEnterTimestamp = 2026-07-25 13:38:59 UTC` (deploy 13:39:03Z manifest'iyle tutarlı) |
+| Lokal ↔ canlı runtime md5 | `closerouter-service.ts`, `lane-scheduler.ts`, `proxy.ts`, `responses-translation.ts`, `claude-cloak-route.ts`, `jobs/index.ts`, `package.json` → **7/7 byte-özdeş** |
+| rsync `--dry-run` deltası (salt-okuma, manuel; script guard'a takıldığı için) | Yalnız mtime farkları (`<f..T....`) + **2 gerçek yenilik**: `scripts/verify-sonnet-tools-live.sh` (başka oturumun canlı doğrulama script'i, runtime dışı) ve `sonnet-46-unlimited-hardening/*.md` (başka oturumun yarı yazılmış spec'i). **Silinen dosya yok, yeni servis yok, `.env` yok** |
+
+Yani bugün deploy koşmanın tek etkisi, başka oturumun **yarı yazılmış spec dokümanlarını** canlıya taşımak olurdu. Runtime deltası sıfır. Deploy koşulmadı.
+
+### Başka oturumun HEAD'e giren provider kodu — çalışma zamanı riski ölçümü
+
+`234819a` (`proxy.ts` +85, `closerouter-service.ts` +328, `lane-scheduler.ts` +87, 2 test dosyası) **zaten canlıda** (13:37 deploy'uyla gitti). Yarı bitmişlik ölçümü:
+
+- `npm run lint` (tsc --noEmit) → **temiz**
+- `npm test` → **145 dosya / 1284 test yeşil** (önceki tur 144/1235; +1 dosya `bedrock-tool-contract.test.ts`, +49 test)
+- `npm run build` / `npm run scan:public` KOŞULMADI — bilinçli: lokal `dist/`'i başka oturum çalışırken ezmemek için. Canlı `dist` imzaları doğrudan sunucuda doğrulandı (aşağıda)
+
+Derlenmiyor / test kırmızısı / yarı bitmiş görünen provider kodu **bulunmadı**.
+
+### Canlı doğrulama (görev 7 şartı)
+
+| Kontrol | Sonuç |
+|---------|-------|
+| `systemctl is-active` | `active` |
+| `curl http://127.0.0.1:4568/health` | `{"status":"ok","checks":{"db":"ok","kurAge":"535s","aiProvider":"ok",…}}` |
+| Yeni release en üstte | `sync-20260725T133730Z-b676ea0.json` (evet) |
+| **CF job tablosu (restart 13:38:59 sonrası journal)** | `cf-ledger-job` **skipped** (CF key yok) · `cf-reconcile-job` **skipped** · `cf-mirror-sync` **disabled** (`CF_MIRROR_SYNC_ENABLED=false`) · `cf-served-refresh-job` **scheduled `*/15 * * * *`** → deploy ÖNCESİ (12:42 restart) tablosuyla **birebir aynı**. Rollback gerekmedi |
+| `dist/server.js` imzaları | `emittedToolItems` 4 · `mappedToolCount` 6 · `responses tool call outcome` 1 · `suspicious success` 1 · `responses tool contract` 2 · `dist/model_catalog_override.json` mevcut (288 KB, 13:38:57). `KIRO OVERRIDE` string'i dist'te 0 — beklenen: yorum satırı, bundle'da soyulur; kaynak `claude-cloak-route.ts` lokalle byte-özdeş |
+| `smoke:vps` | `SMOKE_BASE_URL=https://yapayzekalab.org` **başarısız** — kök alan `/health`'te 404 + HTML döndürüyor (API `api.` alt alanında; script beklentisi bayat). `https://api.yapayzekalab.org` ile: `/health ok db:ok`, `/status ok`, `/api/models`, unauth `401`, iki `json_404` → **tümü yeşil**. İki bayat sabit beklenti override edildi: `SMOKE_EXPECTED_MODEL_COUNT` 33→42, `SMOKE_EXPECTED_API_MODEL_COUNT` 33→62. Katalog dosyaları lokal↔canlı byte-özdeş ve deploy edilen commit'lerin hiçbiri katalog dosyasına dokunmadı → sayı farkı deploy kaynaklı DEĞİL, script varsayılanı bayat |
+| Teşhis raporu (`responses-tool-contract-report.mjs`, restart'tan beri) | 0 `/v1/responses` isteği · dört sınıfın hepsi `n/a` · 6 ayrıştırılamayan satır (skipped). **Yeni kod ayakta, tetikleyici trafik gelmedi** — sınıf dağılımı hakkında iddia üretilemez |
+| Billing (salt-okuma, 24 saat) | **44 success / 7 error** (deploy öncesi referans 40/7 → +4 success, **yeni error 0**). Son 5 kayıt: 13:41:42–13:41:47 UTC, 4× `claude-sonnet-4-6` success (`error_code` boş) + 13:01 `claude-opus-5` success. Restart'tan sonraki ilk faturalandırılan istekler hatasız |
+
+Dokunulmayan alanlar: `git push` yok, `main`/`master` yok, canlı `.env` yok, nginx/üretim config yok, DB şeması/migration yazma yok, billing/CF sayaç mantığı yok, başka oturumun dosyaları (commit/stash/revert) yok, gpt-web ve yzlab yok. Rollback gerekmedi (`.deploy/predeploy-backups` kullanılmadı).
