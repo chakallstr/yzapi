@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server/index.ts",
     "build": "rm -rf dist && vite build && esbuild src/server/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js && esbuild scripts/run-vexly-cloak-router.ts --bundle --platform=node --format=esm --outfile=dist/vexly-cloak-router.js",
-    "postbuild": "cp .htaccess dist/.htaccess 2>/dev/null || true",
+    "postbuild": "cp .htaccess dist/.htaccess 2>/dev/null || true; cp model_catalog_override.json dist/model_catalog_override.json 2>/dev/null || true",
     "start": "node dist/server.js",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
