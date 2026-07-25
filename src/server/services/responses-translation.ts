@@ -20,10 +20,20 @@ export interface ResponsesUsage {
   total_tokens: number;
 }
 
+/** İstemcinin bir aracı hangi Responses tipiyle deklare ettiği. */
+export type ResponsesToolKind = "function" | "custom" | "local_shell";
+
 export interface ResponsesStreamMeta {
   id: string; // request id (resp_/msg_/fc_ id türetmek için)
   model: string; // canonical master model id (yanıtta gösterilecek)
   createdAt: number; // unix saniye
+  /**
+   * araç adı → istemcinin DEKLARE ETTİĞİ tip. Dönüş çevirisi, upstream'den gelen
+   * tool_call'ı istemcinin beklediği öğe tipiyle (function_call / custom_tool_call /
+   * local_shell_call) yayabilmek için buna bakar. OPSİYONELDİR: verilmezse dönüş
+   * tipi bugünkü ad-tabanlı heuristikle seçilir (geriye dönük uyumluluk).
+   */
+  toolKinds?: Record<string, ResponsesToolKind>;
 }
 
 interface ChatMessage {
@@ -34,6 +44,56 @@ interface ChatMessage {
 }
 
 type Json = Record<string, unknown>;
+const LOCAL_SHELL_TOOL_NAME = "local_shell";
+
+const LOCAL_SHELL_CHAT_TOOL: Json = {
+  type: "function",
+  function: {
+    name: LOCAL_SHELL_TOOL_NAME,
+    description: "Execute a local shell command.",
+    parameters: {
+      type: "object",
+      properties: {
+        action: {
+          type: "object",
+          properties: {
+            type: { type: "string", const: "exec" },
+            command: { type: "array", items: { type: "string" } },
+            env: { type: "object", additionalProperties: { type: "string" } },
+            timeout_ms: { type: "number" },
+            user: { type: "string" },
+            working_directory: { type: "string" },
+          },
+          required: ["type", "command", "env"],
+          additionalProperties: false,
+        },
+      },
+      required: ["action"],
+      additionalProperties: false,
+    },
+  },
+};
+
+function readJsonObject(raw: unknown): Json | null {
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw as Json;
+  if (typeof raw !== "string") return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Json : null;
+  } catch {
+    return null;
+  }
+}
+
+function localShellArgumentsFromAction(action: unknown): string {
+  return JSON.stringify({ action: readJsonObject(action) ?? action ?? { type: "exec", command: [], env: {} } });
+}
+
+function localShellActionFromArguments(args: unknown): Json {
+  const parsed = readJsonObject(args);
+  const action = readJsonObject(parsed?.action);
+  return action ?? { type: "exec", command: [], env: {} };
+}
 
 // ── Model slug alias: Codex kendi slug'larını gönderir (gpt-5.x-codex / codex-mini) ──
 // Katalogda olmayanları en yakın gerçek modele yönlendir; aksi halde 404 olurdu.
@@ -93,14 +153,102 @@ function contentToChatContent(content: unknown): unknown {
   return parts;
 }
 
-// ── tools: Responses (flat) → chat (function sarmalı) ────────────────────────
-function convertTools(tools: unknown): unknown[] | undefined {
+// ── custom (freeform) araç ───────────────────────────────────────────────────
+// Responses `{type:"custom"}` aracı serbest-biçim metin alır (Codex'in apply_patch'i).
+// chat/completions'ta serbest-biçim araç yoktur → tek `input: string` parametreli bir
+// function sarmalına eşlenir. Dönüşte (toolKinds sayesinde) `custom_tool_call` olarak
+// geri çevrilir, böylece istemcinin sözleşmesi korunur. Eşleme kayıpsız DEĞİLDİR
+// (grammar/format kısıtı JSON string'e iner) ama aracı sessizce düşürmekten iyidir;
+// native bacak varken degrade YERİNE failover seçilmesinin sebebi de budur (bkz proxy.ts).
+const CUSTOM_TOOL_DEFAULT_DESCRIPTION =
+  "Freeform tool. Pass the entire payload as a single string in the `input` field.";
+
+function customChatTool(t: Json): Json {
+  return {
+    type: "function",
+    function: {
+      name: t.name,
+      description: typeof t.description === "string" && t.description.length > 0 ? t.description : CUSTOM_TOOL_DEFAULT_DESCRIPTION,
+      parameters: {
+        type: "object",
+        properties: { input: { type: "string" } },
+        required: ["input"],
+        additionalProperties: false,
+      },
+    },
+  };
+}
+
+/** custom araç çağrısının chat `arguments` string'inden Responses `input` string'ini çıkarır. */
+function customToolInputFromArguments(args: unknown): string {
+  if (typeof args !== "string") return args == null ? "" : JSON.stringify(args);
+  const parsed = readJsonObject(args);
+  const input = parsed?.input;
+  if (typeof input === "string") return input;
+  return args; // JSON değil veya input yok → ham string (kayıpsız fallback)
+}
+
+function toolNameOf(t: Json): string | undefined {
+  const direct = t.name;
+  if (typeof direct === "string" && direct.length > 0) return direct;
+  const nested = (t.function as Json | undefined)?.name;
+  return typeof nested === "string" && nested.length > 0 ? nested : undefined;
+}
+
+/**
+ * İstek gövdesindeki `tools` listesinden `araç adı → deklare edilen tip` haritası.
+ * Boş/geçersiz girdide `undefined` döner — böylece meta'ya alan hiç eklenmez ve
+ * mevcut çağrı yolları bit-bit aynı kalır.
+ */
+export function deriveToolKinds(tools: unknown): Record<string, ResponsesToolKind> | undefined {
   if (!Array.isArray(tools)) return undefined;
-  const out: Json[] = [];
+  const kinds: Record<string, ResponsesToolKind> = {};
   for (const raw of tools) {
     if (!raw || typeof raw !== "object") continue;
     const t = raw as Json;
-    if (t.type === "function") {
+    if (t.type === "local_shell") {
+      kinds[LOCAL_SHELL_TOOL_NAME] = "local_shell";
+      continue;
+    }
+    const name = toolNameOf(t);
+    if (!name) continue;
+    if (t.type === "custom") kinds[name] = "custom";
+    else if (t.type === "function") kinds[name] = "function";
+  }
+  return Object.keys(kinds).length > 0 ? kinds : undefined;
+}
+
+// ── tools: Responses (flat) → chat (function sarmalı) ────────────────────────
+export interface ToolConversion {
+  tools?: unknown[];
+  /** İstekte deklare edilen Responses araç tipleri (sırayla, tekrarsız). */
+  declaredTypes: string[];
+  /** Upstream'e taşınabilen tipler. */
+  mappedTypes: string[];
+  /** Taşınamayan (düşürülen) tipler — teşhis logu bunu raporlar, sessiz kayıp olmaz. */
+  droppedTypes: string[];
+}
+
+function convertToolsDetailed(tools: unknown): ToolConversion {
+  if (!Array.isArray(tools)) return { declaredTypes: [], mappedTypes: [], droppedTypes: [] };
+  const out: Json[] = [];
+  const declared: string[] = [];
+  const mapped: string[] = [];
+  const dropped: string[] = [];
+  const note = (list: string[], type: string) => {
+    if (!list.includes(type)) list.push(type);
+  };
+
+  for (const raw of tools) {
+    if (!raw || typeof raw !== "object") continue;
+    const t = raw as Json;
+    const type = typeof t.type === "string" ? t.type : "unknown";
+    note(declared, type);
+
+    if (t.type === "local_shell") {
+      out.push(LOCAL_SHELL_CHAT_TOOL);
+      note(mapped, type);
+    } else if (t.type === "function") {
       if (t.function && typeof t.function === "object") {
         out.push(t); // zaten chat-şekilli
       } else {
@@ -108,10 +256,50 @@ function convertTools(tools: unknown): unknown[] | undefined {
         if (t.strict !== undefined) fn.strict = t.strict;
         out.push({ type: "function", function: fn });
       }
+      note(mapped, type);
+    } else if (t.type === "custom" && toolNameOf(t)) {
+      out.push(customChatTool(t));
+      note(mapped, type);
+    } else {
+      // Eşlemesi olmayan Responses araçları (web_search, image_generation, adsız custom...)
+      // chat upstream'de anlaşılmaz → düşürülür AMA raporlanır.
+      note(dropped, type);
     }
-    // function-dışı Responses araçları (web_search vb.) chat upstream'de anlaşılmaz → atlanır
   }
-  return out.length > 0 ? out : undefined;
+
+  return {
+    tools: out.length > 0 ? out : undefined,
+    declaredTypes: declared,
+    mappedTypes: mapped,
+    droppedTypes: dropped,
+  };
+}
+
+/** Teşhis logu için araç sözleşmesi özeti (sır/ad/argüman içermez — yalnız tip ve sayı). */
+export function summarizeToolContract(body: Json): {
+  toolCount: number;
+  declaredToolTypes: string[];
+  mappedToolTypes: string[];
+  droppedToolTypes: string[];
+  toolChoiceKind: "none" | "string" | "function" | "other";
+} {
+  const conv = convertToolsDetailed(body.tools);
+  const tc = body.tool_choice;
+  const toolChoiceKind =
+    tc == null
+      ? "none"
+      : typeof tc === "string"
+        ? "string"
+        : typeof tc === "object" && (tc as Json).type === "function"
+          ? "function"
+          : "other";
+  return {
+    toolCount: Array.isArray(body.tools) ? body.tools.length : 0,
+    declaredToolTypes: conv.declaredTypes,
+    mappedToolTypes: conv.mappedTypes,
+    droppedToolTypes: conv.droppedTypes,
+    toolChoiceKind,
+  };
 }
 
 function convertToolChoice(tc: unknown): unknown {
@@ -162,8 +350,32 @@ export function responsesRequestToChat(body: Json): Json {
         continue;
       }
 
+      if (type === "local_shell_call") {
+        pendingToolCalls.push({
+          id: (item.call_id as string) ?? (item.id as string) ?? "",
+          type: "function",
+          function: { name: LOCAL_SHELL_TOOL_NAME, arguments: localShellArgumentsFromAction(item.action) },
+        });
+        continue;
+      }
+
+      // custom_tool_call (freeform araç geçmişi): chat'te function tool_call olarak taşınır;
+      // serbest metin `input` alanına sarılır (gidiş eşlemesinin aynası).
+      if (type === "custom_tool_call") {
+        const rawInput = item.input;
+        pendingToolCalls.push({
+          id: (item.call_id as string) ?? (item.id as string) ?? "",
+          type: "function",
+          function: {
+            name: item.name ?? "",
+            arguments: JSON.stringify({ input: typeof rawInput === "string" ? rawInput : JSON.stringify(rawInput ?? "") }),
+          },
+        });
+        continue;
+      }
+
       // function_call_output: önce bekleyen tool_call'ları (assistant) flush et, sonra tool mesajı
-      if (type === "function_call_output") {
+      if (type === "function_call_output" || type === "local_shell_call_output" || type === "custom_tool_call_output") {
         flushToolCalls();
         const output = item.output;
         messages.push({
@@ -175,6 +387,13 @@ export function responsesRequestToChat(body: Json): Json {
       }
 
       if (type === "reasoning") continue; // chat karşılığı yok → atla
+
+      // Rolü OLMAYAN, `message` OLMAYAN ve içeriği OLMAYAN öğe (örn web_search_call,
+      // image_generation_call, gelecekteki bilinmeyen tipler): aşağıdaki generic dal bunu
+      // {role:"user", content:""} boş mesajına çevirip geçmişi bozuyordu (bazı upstream'ler
+      // boş content'e 400 verir). Üç koşul birlikte arandığı için rol taşıyan / type:"message"
+      // olan / içerik taşıyan hiçbir öğe bu daldan etkilenmez (preservation).
+      if (item.role === undefined && typeof type === "string" && type !== "message" && item.content == null) continue;
 
       // message (veya type'sız ama role'lu) öğe
       flushToolCalls();
@@ -196,10 +415,14 @@ export function responsesRequestToChat(body: Json): Json {
   if (body.stream === true) chat.stream = true;
   if (typeof body.parallel_tool_calls === "boolean") chat.parallel_tool_calls = body.parallel_tool_calls;
 
-  const tools = convertTools(body.tools);
-  if (tools) chat.tools = tools;
+  const conversion = convertToolsDetailed(body.tools);
+  if (conversion.tools) chat.tools = conversion.tools;
   const toolChoice = convertToolChoice(body.tool_choice);
-  if (toolChoice !== undefined) chat.tool_choice = toolChoice;
+  // İstemci araç GÖNDERDİ ama hiçbiri çeviriden sağ çıkmadıysa tool_choice'u İLETME:
+  // `tools` yok + `tool_choice` var = upstream 400. Araç hiç gönderilmediyse (tools yok/boş)
+  // bugünkü davranış korunur — tool_choice neyse iletilir.
+  const allToolsDropped = Array.isArray(body.tools) && body.tools.length > 0 && !conversion.tools;
+  if (toolChoice !== undefined && !allToolsDropped) chat.tool_choice = toolChoice;
 
   // reasoning.effort → reasoning_effort (sağlayıcı destekliyorsa kullanır, yoksa yok sayar)
   const reasoning = body.reasoning as Json | undefined;
@@ -235,6 +458,15 @@ export function usageFromTokens(promptTokens: number, completionTokens: number):
   };
 }
 
+// ── dönüş: tool_call → Responses öğe tipi ────────────────────────────────────
+// Önce istemcinin DEKLARE ETTİĞİ tip (meta.toolKinds), yoksa bugünkü ad-tabanlı
+// heuristik. toolKinds verilmediğinde sonuç bugünküyle BİREBİR aynıdır.
+function responsesToolItemKind(name: string, toolKinds?: Record<string, ResponsesToolKind>): ResponsesToolKind {
+  const declared = toolKinds?.[name];
+  if (declared) return declared;
+  return name === LOCAL_SHELL_TOOL_NAME ? "local_shell" : "function";
+}
+
 // ── non-stream: chat completion → Responses response objesi ─────────────────
 export function chatCompletionToResponses(chatJson: unknown, meta: ResponsesStreamMeta): Json {
   const chat = (chatJson ?? {}) as Json;
@@ -257,13 +489,38 @@ export function chatCompletionToResponses(chatJson: unknown, meta: ResponsesStre
   if (Array.isArray(toolCalls)) {
     toolCalls.forEach((tc, i) => {
       const fn = (tc.function ?? {}) as Json;
+      const callId = (tc.id as string) ?? `call_${meta.id}_${i}`;
+      const name = String(fn.name ?? "");
+      const args = typeof fn.arguments === "string" ? fn.arguments : JSON.stringify(fn.arguments ?? "");
+      const kind = responsesToolItemKind(name, meta.toolKinds);
+      if (kind === "local_shell") {
+        output.push({
+          id: `fc_${meta.id}_${i}`,
+          type: "local_shell_call",
+          status: "completed",
+          call_id: callId,
+          action: localShellActionFromArguments(args),
+        });
+        return;
+      }
+      if (kind === "custom") {
+        output.push({
+          id: `fc_${meta.id}_${i}`,
+          type: "custom_tool_call",
+          status: "completed",
+          call_id: callId,
+          name,
+          input: customToolInputFromArguments(args),
+        });
+        return;
+      }
       output.push({
         id: `fc_${meta.id}_${i}`,
         type: "function_call",
         status: "completed",
-        call_id: (tc.id as string) ?? `call_${meta.id}_${i}`,
-        name: fn.name ?? "",
-        arguments: typeof fn.arguments === "string" ? fn.arguments : JSON.stringify(fn.arguments ?? ""),
+        call_id: callId,
+        name,
+        arguments: args,
       });
     });
   }
@@ -310,6 +567,7 @@ export class ResponsesStreamTranslator {
   private readonly msgItemId: string;
   private readonly model: string;
   private readonly createdAt: number;
+  private readonly toolKinds?: Record<string, ResponsesToolKind>;
   private textOpened = false;
   private textIndex = -1;
   private text = "";
@@ -321,6 +579,7 @@ export class ResponsesStreamTranslator {
     this.msgItemId = `msg_${meta.id}`;
     this.model = meta.model;
     this.createdAt = meta.createdAt;
+    this.toolKinds = meta.toolKinds;
   }
 
   private ev(obj: Json): Json {
@@ -356,16 +615,40 @@ export class ResponsesStreamTranslator {
     }
     for (const t of this.tools.values()) {
       if (!t.opened) continue;
-      items[t.outputIndex] = {
-        id: t.itemId,
-        type: "function_call",
-        status: "completed",
-        call_id: t.callId,
-        name: t.name,
-        arguments: t.args,
-      };
+      items[t.outputIndex] = this.toolOutputItem(t, "completed");
     }
     return items.filter((x): x is Json => x != null);
+  }
+
+  private toolOutputItem(t: ToolState, status: "in_progress" | "completed"): Json {
+    const kind = responsesToolItemKind(t.name, this.toolKinds);
+    if (kind === "local_shell") {
+      return {
+        id: t.itemId,
+        type: "local_shell_call",
+        status,
+        call_id: t.callId,
+        action: localShellActionFromArguments(t.args),
+      };
+    }
+    if (kind === "custom") {
+      return {
+        id: t.itemId,
+        type: "custom_tool_call",
+        status,
+        call_id: t.callId,
+        name: t.name,
+        input: status === "completed" ? customToolInputFromArguments(t.args) : "",
+      };
+    }
+    return {
+      id: t.itemId,
+      type: "function_call",
+      status,
+      call_id: t.callId,
+      name: t.name,
+      arguments: status === "completed" ? t.args : "",
+    };
   }
 
   // İlk event'ler: response.created + response.in_progress
@@ -443,7 +726,7 @@ export class ResponsesStreamTranslator {
             this.ev({
               type: "response.output_item.added",
               output_index: t.outputIndex,
-              item: { id: t.itemId, type: "function_call", status: "in_progress", call_id: t.callId, name: t.name, arguments: "" },
+              item: this.toolOutputItem(t, "in_progress"),
             }),
           );
         }
@@ -523,7 +806,7 @@ export class ResponsesStreamTranslator {
         this.ev({
           type: "response.output_item.done",
           output_index: t.outputIndex,
-          item: { id: t.itemId, type: "function_call", status: "completed", call_id: t.callId, name: t.name, arguments: t.args },
+          item: this.toolOutputItem(t, "completed"),
         }),
       );
     }

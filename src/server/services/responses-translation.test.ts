@@ -91,6 +91,66 @@ describe("responsesRequestToChat", () => {
     ]);
   });
 
+  it("preserves OpenAI local_shell as a chat function tool for translated Codex requests", () => {
+    const chat = responsesRequestToChat({
+      model: "gpt-5.5",
+      input: "x",
+      tools: [{ type: "local_shell" }],
+    });
+
+    expect(chat.tools).toEqual([
+      expect.objectContaining({
+        type: "function",
+        function: expect.objectContaining({ name: "local_shell" }),
+      }),
+    ]);
+  });
+
+  it("maps local_shell call history back to chat tool messages", () => {
+    const chat = responsesRequestToChat({
+      model: "gpt-5.5",
+      input: [
+        { type: "message", role: "user", content: "branch kontrol et" },
+        {
+          type: "local_shell_call",
+          call_id: "call_shell_1",
+          action: {
+            type: "exec",
+            command: ["git", "branch", "--show-current"],
+            env: {},
+            working_directory: "/Users/ufuk/yzapi",
+          },
+        },
+        { type: "local_shell_call_output", call_id: "call_shell_1", output: "feat/v1-usage-endpoint" },
+      ],
+      tools: [{ type: "local_shell" }],
+    });
+
+    const msgs = chat.messages as any[];
+    expect(msgs[1]).toEqual({
+      role: "assistant",
+      content: null,
+      tool_calls: [
+        {
+          id: "call_shell_1",
+          type: "function",
+          function: {
+            name: "local_shell",
+            arguments: JSON.stringify({
+              action: {
+                type: "exec",
+                command: ["git", "branch", "--show-current"],
+                env: {},
+                working_directory: "/Users/ufuk/yzapi",
+              },
+            }),
+          },
+        },
+      ],
+    });
+    expect(msgs[2]).toEqual({ role: "tool", tool_call_id: "call_shell_1", content: "feat/v1-usage-endpoint" });
+  });
+
   it("converts object tool_choice to chat shape and maps reasoning.effort", () => {
     const chat = responsesRequestToChat({
       model: "gpt-5.5",
@@ -149,6 +209,34 @@ describe("chatCompletionToResponses (non-stream)", () => {
       call_id: "call_9",
       name: "shell",
       arguments: "{}",
+    });
+  });
+
+  it("maps local_shell tool calls to Responses local_shell_call items", () => {
+    const args = JSON.stringify({
+      action: {
+        type: "exec",
+        command: ["git", "branch", "--show-current"],
+        env: {},
+        working_directory: "/Users/ufuk/yzapi",
+      },
+    });
+    const resp = chatCompletionToResponses(
+      { choices: [{ message: { role: "assistant", content: "", tool_calls: [{ id: "call_local_1", type: "function", function: { name: "local_shell", arguments: args } }] } }] },
+      meta,
+    );
+
+    expect((resp.output as any[])[0]).toEqual({
+      id: "fc_req1_0",
+      type: "local_shell_call",
+      status: "completed",
+      call_id: "call_local_1",
+      action: {
+        type: "exec",
+        command: ["git", "branch", "--show-current"],
+        env: {},
+        working_directory: "/Users/ufuk/yzapi",
+      },
     });
   });
 });
@@ -232,6 +320,19 @@ describe("ResponsesStreamTranslator", () => {
     expect(fnDone.item.call_id).toBe("call_req1_0");
   });
 
+  it("translates streamed local_shell tool calls to local_shell_call items", () => {
+    const t = new ResponsesStreamTranslator(meta);
+    t.start();
+    const args = JSON.stringify({ action: { type: "exec", command: ["git", "branch", "--show-current"], env: {}, working_directory: "/Users/ufuk/yzapi" } });
+    const open = t.pushChatChunk({ choices: [{ delta: { tool_calls: [{ index: 0, id: "call_local_1", type: "function", function: { name: "local_shell", arguments: args } }] } }] });
+
+    expect((open[0].item as any).type).toBe("local_shell_call");
+    const done = t.finish(usageFromTokens(1, 1));
+    const completedOut = (done[2] as any).response.output[0];
+    expect(completedOut.type).toBe("local_shell_call");
+    expect(completedOut.action.command).toEqual(["git", "branch", "--show-current"]);
+  });
+
   it("finish is idempotent", () => {
     const t = new ResponsesStreamTranslator(meta);
     t.start();
@@ -244,5 +345,203 @@ describe("formatResponsesSse", () => {
   it("emits event: and data: lines with trailing blank line", () => {
     const s = formatResponsesSse({ type: "response.completed", sequence_number: 7 });
     expect(s).toBe('event: response.completed\ndata: {"type":"response.completed","sequence_number":7}\n\n');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Araç sözleşmesi regresyon testleri — bug koşulu C(X)
+// Spec: .kiro/specs/responses-tool-contract-fix/ (bugfix.md CE1-CE4)
+// Bu blok fix'ten ÖNCE kırmızıdır; bug koşulunu yakalar.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("araç sözleşmesi (bug koşulu C(X))", () => {
+  const meta = { id: "req1", model: "gpt-5.5", createdAt: 1000 };
+
+  // CE1: custom araç sessizce düşmemeli
+  it("CE1: type:'custom' aracı chat aracı olarak taşır (sessizce düşürmez)", () => {
+    const chat = responsesRequestToChat({
+      model: "gpt-5.5",
+      input: "x",
+      tools: [{ type: "custom", name: "apply_patch", description: "Freeform patch" }],
+    });
+
+    const tools = chat.tools as any[] | undefined;
+    expect(tools).toBeDefined();
+    expect(tools).toHaveLength(1);
+    expect(tools![0].type).toBe("function");
+    expect(tools![0].function.name).toBe("apply_patch");
+    expect(tools![0].function.description).toBe("Freeform patch");
+    // Freeform içerik tek string argümanla taşınır
+    expect(tools![0].function.parameters.properties.input.type).toBe("string");
+    expect(tools![0].function.parameters.required).toEqual(["input"]);
+  });
+
+  it("CE1b: custom + function araçları birlikte taşınır", () => {
+    const chat = responsesRequestToChat({
+      model: "gpt-5.5",
+      input: "x",
+      tools: [
+        { type: "function", name: "shell", description: "run", parameters: { type: "object" } },
+        { type: "custom", name: "apply_patch" },
+      ],
+    });
+    const names = (chat.tools as any[]).map((t) => t.function.name);
+    expect(names).toEqual(["shell", "apply_patch"]);
+  });
+
+  // CE2: dönüş yolu deklare edilen tipi korumalı (non-stream)
+  it("CE2: custom deklare edilen araç için non-stream çıktı custom_tool_call üretir", () => {
+    const resp = chatCompletionToResponses(
+      {
+        choices: [
+          {
+            message: {
+              role: "assistant",
+              content: "",
+              tool_calls: [
+                { id: "call_c1", type: "function", function: { name: "apply_patch", arguments: '{"input":"*** Begin Patch"}' } },
+              ],
+            },
+          },
+        ],
+      },
+      { ...meta, toolKinds: { apply_patch: "custom" } } as any,
+    );
+
+    expect((resp.output as any[])[0]).toEqual({
+      id: "fc_req1_0",
+      type: "custom_tool_call",
+      status: "completed",
+      call_id: "call_c1",
+      name: "apply_patch",
+      input: "*** Begin Patch",
+    });
+  });
+
+  it("CE2b: custom çağrısının argümanı JSON değilse ham string input olarak taşınır", () => {
+    const resp = chatCompletionToResponses(
+      {
+        choices: [
+          {
+            message: {
+              role: "assistant",
+              content: "",
+              tool_calls: [{ id: "call_c2", type: "function", function: { name: "apply_patch", arguments: "düz metin yama" } }],
+            },
+          },
+        ],
+      },
+      { ...meta, toolKinds: { apply_patch: "custom" } } as any,
+    );
+
+    const item = (resp.output as any[])[0];
+    expect(item.type).toBe("custom_tool_call");
+    expect(item.input).toBe("düz metin yama");
+  });
+
+  // CE2c: dönüş yolu deklare edilen tipi korumalı (stream)
+  it("CE2c: custom deklare edilen araç için stream çıktısı custom_tool_call üretir", () => {
+    const t = new ResponsesStreamTranslator({ ...meta, toolKinds: { apply_patch: "custom" } } as any);
+    t.start();
+    const open = t.pushChatChunk({
+      choices: [{ delta: { tool_calls: [{ index: 0, id: "call_c3", type: "function", function: { name: "apply_patch", arguments: '{"input":"p' } }] } }],
+    });
+    expect((open[0].item as any).type).toBe("custom_tool_call");
+
+    t.pushChatChunk({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: 'atch"}' } }] } }] });
+    const done = t.finish(usageFromTokens(2, 1));
+    const itemDone = (done.find((e) => e.type === "response.output_item.done") as any).item;
+    expect(itemDone.type).toBe("custom_tool_call");
+    expect(itemDone.input).toBe("patch");
+    const completedOut = (done[done.length - 1] as any).response.output[0];
+    expect(completedOut.type).toBe("custom_tool_call");
+  });
+
+  it("CE2d: toolKinds verilmediğinde dönüş tipi bugünkü davranışta kalır", () => {
+    const resp = chatCompletionToResponses(
+      {
+        choices: [
+          {
+            message: {
+              role: "assistant",
+              content: "",
+              tool_calls: [{ id: "call_x", type: "function", function: { name: "apply_patch", arguments: "{}" } }],
+            },
+          },
+        ],
+      },
+      meta,
+    );
+    expect((resp.output as any[])[0].type).toBe("function_call");
+  });
+
+  // CE3: custom araç geçmişi boş user mesajına dönüşmemeli
+  it("CE3: custom_tool_call / custom_tool_call_output geçmişini tool mesajlarına eşler", () => {
+    const chat = responsesRequestToChat({
+      model: "gpt-5.5",
+      input: [
+        { type: "message", role: "user", content: "yamayı uygula" },
+        { type: "custom_tool_call", call_id: "call_c9", name: "apply_patch", input: "*** Begin Patch" },
+        { type: "custom_tool_call_output", call_id: "call_c9", output: "uygulandı" },
+      ],
+      tools: [{ type: "custom", name: "apply_patch" }],
+    });
+
+    const msgs = chat.messages as any[];
+    expect(msgs[0]).toEqual({ role: "user", content: "yamayı uygula" });
+    expect(msgs[1]).toEqual({
+      role: "assistant",
+      content: null,
+      tool_calls: [
+        {
+          id: "call_c9",
+          type: "function",
+          function: { name: "apply_patch", arguments: JSON.stringify({ input: "*** Begin Patch" }) },
+        },
+      ],
+    });
+    expect(msgs[2]).toEqual({ role: "tool", tool_call_id: "call_c9", content: "uygulandı" });
+    // Hiçbir öğe boş içerikli user mesajına dönüşmemeli
+    expect(msgs.filter((m) => m.role === "user" && m.content === "")).toHaveLength(0);
+  });
+
+  it("CE3b: bilinmeyen tipli, rolsüz ve içeriksiz öğe boş user mesajı üretmez", () => {
+    const chat = responsesRequestToChat({
+      model: "gpt-5.5",
+      input: [
+        { type: "web_search_call", id: "ws_1", status: "completed" },
+        { type: "message", role: "user", content: "devam" },
+      ],
+    });
+    const msgs = chat.messages as any[];
+    expect(msgs).toEqual([{ role: "user", content: "devam" }]);
+  });
+
+  // CE4: araçlar tamamen düştüyse tool_choice gönderilmemeli
+  it("CE4: tüm araçlar düştüğünde tool_choice gövdeye eklenmez", () => {
+    const chat = responsesRequestToChat({
+      model: "gpt-5.5",
+      input: "x",
+      tools: [{ type: "web_search" }],
+      tool_choice: "required",
+    });
+    expect(chat.tools).toBeUndefined();
+    expect(chat.tool_choice).toBeUndefined();
+  });
+
+  it("CE4b: araç hiç gönderilmediyse tool_choice bugünkü gibi iletilir (preservation)", () => {
+    const chat = responsesRequestToChat({ model: "gpt-5.5", input: "x", tool_choice: "required" });
+    expect(chat.tools).toBeUndefined();
+    expect(chat.tool_choice).toBe("required");
+  });
+
+  it("CE4c: en az bir araç sağ kaldığında tool_choice iletilir (preservation)", () => {
+    const chat = responsesRequestToChat({
+      model: "gpt-5.5",
+      input: "x",
+      tools: [{ type: "web_search" }, { type: "function", name: "shell", parameters: { type: "object" } }],
+      tool_choice: { type: "function", name: "shell" },
+    });
+    expect((chat.tools as any[]).map((t) => t.function.name)).toEqual(["shell"]);
+    expect(chat.tool_choice).toEqual({ type: "function", function: { name: "shell" } });
   });
 });
