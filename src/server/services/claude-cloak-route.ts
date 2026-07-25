@@ -92,6 +92,12 @@ export async function applyClaudeCloakRouteLock(options: RouteLockOptions): Prom
 
   if (!isClaudeModel(model)) return chain;
 
+  // KIRO OVERRIDE: resolver kiro profilini sectiyse (enabled + key var) kiroyu
+  // kullan - kiro-bridge tum Claude hattini servis eder. Vexly lock fallback kalir.
+  if ((chain.primary?.profileId === "kiro" || chain.primary?.profileId === "cf-claude") && chain.primary.apiKey) {
+    return chain;
+  }
+
   const profileId = vexlyProfileIdForEndpoint(endpoint);
   const resolveProfileById = options.resolveProfileById ?? defaultResolveProfileById;
   const profile = await resolveProfileById(profileId);
