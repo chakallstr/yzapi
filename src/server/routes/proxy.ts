@@ -1417,7 +1417,7 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
     masterModel = enforcement.masterModel;
     // gpt-5.6 tier prep: model_runtime_policies.default_reasoning_effort set'liyse ve client
     // reasoning belirtmemişse enjekte et. Policy NULL (bugün her model) → no-op.
-    applyDefaultReasoningEffort(preparedResponsesBody, enforcement.runtimePolicy);
+    applyDefaultReasoningEffort(rawResponsesBody, enforcement.runtimePolicy);
     runtimeConfig = enforcement.runtimeConfig;
     if (runtimeConfig.maintenanceModeForApi) {
       throw new AppError(503, runtimeConfig.maintenanceMessage);
@@ -1555,7 +1555,7 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
     // (guardrails are faz0-inert/off today); if they're ever enabled to MUTATE bodies, mirror
     // that here for the native path (follow-up).
     const rawProviderBody: Record<string, unknown> = {
-      ...preparedResponsesBody,
+      ...rawResponsesBody,
       model: providerBody.model,
       max_output_tokens: guard.reservedCompletionTokens,
     };
