@@ -10,6 +10,8 @@ import {
   createResponsesStreamStats,
   summarizeToolContract,
   isSuspiciousToolOutcome,
+  liftAdditionalTools,
+  deriveToolKinds,
 } from "./responses-translation.js";
 
 describe("normalizeRequestedModel", () => {
@@ -169,6 +171,145 @@ describe("responsesRequestToChat", () => {
   it("aliases codex model slugs", () => {
     const chat = responsesRequestToChat({ model: "gpt-5.3-codex", input: "x" });
     expect(chat.model).toBe("gpt-5.4");
+  });
+});
+
+describe("input.additional_tools tool lifting", () => {
+  const execTool = {
+    type: "function",
+    name: "exec",
+    description: "Run a command",
+    parameters: {
+      type: "object",
+      properties: { cmd: { type: "string" } },
+      required: ["cmd"],
+    },
+  };
+  const waitTool = {
+    type: "function",
+    name: "wait",
+    description: "Wait for a running cell",
+    parameters: {
+      type: "object",
+      properties: { cell_id: { type: "string" } },
+      required: ["cell_id"],
+    },
+  };
+  const applyPatchTool = {
+    type: "custom",
+    name: "apply_patch",
+    description: "Apply a patch",
+  };
+
+  it("returns the original object when additional_tools is absent", () => {
+    const body = { model: "gpt-5.6-sol", input: "pwd", tools: [execTool] };
+    expect(liftAdditionalTools(body)).toBe(body);
+  });
+
+  it("lifts all additional_tools items, preserves order, and removes control items from input", () => {
+    const body = {
+      model: "gpt-5.6-sol",
+      input: [
+        { type: "additional_tools", role: "developer", tools: [execTool, waitTool] },
+        { type: "message", role: "user", content: "çalıştır" },
+        { type: "additional_tools", role: "developer", tools: [applyPatchTool] },
+      ],
+    };
+
+    const prepared = liftAdditionalTools(body) as any;
+
+    expect(prepared).not.toBe(body);
+    expect(prepared.tools.map((tool: any) => tool.name)).toEqual(["exec", "wait", "apply_patch"]);
+    expect(prepared.input).toEqual([{ type: "message", role: "user", content: "çalıştır" }]);
+    expect(body).not.toHaveProperty("tools");
+    expect((body.input as any[])).toHaveLength(3);
+  });
+
+  it("keeps top-level tools authoritative when names collide", () => {
+    const topLevelExec = { ...execTool, description: "authoritative" };
+    const body = {
+      model: "gpt-5.6-sol",
+      tools: [topLevelExec],
+      input: [
+        {
+          type: "additional_tools",
+          role: "developer",
+          tools: [{ ...execTool, description: "must-not-win" }, waitTool],
+        },
+      ],
+    };
+
+    const prepared = liftAdditionalTools(body) as any;
+
+    expect(prepared.tools.map((tool: any) => tool.name)).toEqual(["exec", "wait"]);
+    expect(prepared.tools[0].description).toBe("authoritative");
+  });
+
+  it("removes namespace children that collide with authoritative top-level tools", () => {
+    const body = {
+      model: "gpt-5.6-sol",
+      tools: [{ ...execTool, description: "authoritative" }],
+      input: [
+        {
+          type: "additional_tools",
+          role: "developer",
+          tools: [
+            { type: "namespace", name: "runtime", tools: [{ ...execTool, description: "duplicate" }, waitTool] },
+          ],
+        },
+      ],
+    };
+
+    const prepared = liftAdditionalTools(body) as any;
+    const chat = responsesRequestToChat(body);
+
+    expect(prepared.tools[1].tools.map((tool: any) => tool.name)).toEqual(["wait"]);
+    expect((chat.tools as any[]).map((tool) => tool.function.name)).toEqual(["exec", "wait"]);
+  });
+
+  it("makes exec, wait, and apply_patch visible to translated Responses requests without an empty system message", () => {
+    const chat = responsesRequestToChat({
+      model: "gpt-5.6-sol",
+      input: [
+        { type: "additional_tools", role: "developer", tools: [execTool, waitTool, applyPatchTool] },
+        { type: "message", role: "user", content: [{ type: "input_text", text: "pwd çalıştır" }] },
+      ],
+      tool_choice: "auto",
+    });
+
+    expect((chat.tools as any[]).map((tool) => tool.function.name)).toEqual(["exec", "wait", "apply_patch"]);
+    expect((chat.messages as any[])).toEqual([{ role: "user", content: "pwd çalıştır" }]);
+    expect(chat.tool_choice).toBe("auto");
+  });
+
+  it("preserves a namespace container for native forwarding and flattens its children only for chat translation", () => {
+    const namespace = {
+      type: "namespace",
+      name: "runtime",
+      description: "Runtime tools",
+      tools: [execTool, waitTool],
+    };
+    const body = {
+      model: "gpt-5.6-sol",
+      input: [
+        { type: "additional_tools", role: "developer", tools: [namespace] },
+        { type: "message", role: "user", content: "çalıştır" },
+      ],
+    };
+
+    const prepared = liftAdditionalTools(body) as any;
+    const chat = responsesRequestToChat(body);
+
+    expect(prepared.tools).toEqual([namespace]);
+    expect((chat.tools as any[]).map((tool) => tool.function.name)).toEqual(["exec", "wait"]);
+    expect(JSON.stringify(chat.tools)).not.toContain("execexec");
+    expect(JSON.stringify(chat.tools)).not.toContain("waitwait");
+  });
+
+  it("derives nested namespace tool kinds so custom calls return with the client-declared shape", () => {
+    expect(deriveToolKinds([
+      { type: "namespace", name: "editing", tools: [applyPatchTool, execTool] },
+    ])).toEqual({ apply_patch: "custom", exec: "function" });
   });
 });
 

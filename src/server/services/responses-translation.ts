@@ -226,6 +226,78 @@ function toolNameOf(t: Json): string | undefined {
 }
 
 /**
+ * Codex Desktop/CLI bazı sürümlerde araç şemalarını üst düzey `tools` yerine
+ * `input[]` içinde `{ type: "additional_tools", tools: [...] }` kontrol öğesiyle
+ * gönderir. Bu saf şekil düzeltici gerçek şemaları üst düzeye yükseltir ve kontrol
+ * öğesini konuşma geçmişinden çıkarır; aksi hâlde öğe boş bir developer/system
+ * mesajına dönüşür ve model hiçbir aracı göremez.
+ *
+ * Üst düzey `tools` otoriterdir: aynı adlı ek araç onu ezemez. Bug koşulu yoksa
+ * aynı nesne örneği döner; böylece mevcut isteklerin davranışı bit-bit korunur.
+ */
+export function liftAdditionalTools(body: Json): Json {
+  if (!Array.isArray(body.input)) return body;
+
+  let found = false;
+  const lifted: unknown[] = [];
+  const remainingInput: unknown[] = [];
+
+  for (const raw of body.input) {
+    if (raw && typeof raw === "object" && (raw as Json).type === "additional_tools") {
+      found = true;
+      const tools = (raw as Json).tools;
+      if (Array.isArray(tools)) lifted.push(...tools);
+      continue;
+    }
+    remainingInput.push(raw);
+  }
+
+  if (!found) return body;
+
+  const existing = Array.isArray(body.tools) ? body.tools : [];
+  const merged = [...existing];
+  const authoritativeNames = new Set<string>();
+  const collectNames = (items: unknown[]) => {
+    for (const raw of items) {
+      if (!raw || typeof raw !== "object") continue;
+      const tool = raw as Json;
+      const name = toolNameOf(tool);
+      if (name) authoritativeNames.add(name);
+      if (tool.type === "namespace" && Array.isArray(tool.tools)) collectNames(tool.tools);
+    }
+  };
+  collectNames(existing);
+
+  const prepareLiftedTool = (raw: unknown): unknown | undefined => {
+    if (!raw || typeof raw !== "object") return raw;
+    const tool = raw as Json;
+    const name = toolNameOf(tool);
+    if (name && authoritativeNames.has(name)) return undefined;
+
+    if (tool.type === "namespace" && Array.isArray(tool.tools)) {
+      const children = tool.tools
+        .map((child) => prepareLiftedTool(child))
+        .filter((child): child is unknown => child !== undefined);
+      if (children.length === 0) return undefined;
+      if (name) authoritativeNames.add(name);
+      return children.length === tool.tools.length ? tool : { ...tool, tools: children };
+    }
+
+    if (name) authoritativeNames.add(name);
+    return raw;
+  };
+
+  for (const raw of lifted) {
+    const preparedTool = prepareLiftedTool(raw);
+    if (preparedTool !== undefined) merged.push(preparedTool);
+  }
+
+  const prepared: Json = { ...body, input: remainingInput };
+  if (merged.length > 0 || Array.isArray(body.tools)) prepared.tools = merged;
+  return prepared;
+}
+
+/**
  * İstek gövdesindeki `tools` listesinden `araç adı → deklare edilen tip` haritası.
  * Boş/geçersiz girdide `undefined` döner — böylece meta'ya alan hiç eklenmez ve
  * mevcut çağrı yolları bit-bit aynı kalır.
@@ -233,18 +305,25 @@ function toolNameOf(t: Json): string | undefined {
 export function deriveToolKinds(tools: unknown): Record<string, ResponsesToolKind> | undefined {
   if (!Array.isArray(tools)) return undefined;
   const kinds: Record<string, ResponsesToolKind> = {};
-  for (const raw of tools) {
-    if (!raw || typeof raw !== "object") continue;
-    const t = raw as Json;
-    if (t.type === "local_shell") {
-      kinds[LOCAL_SHELL_TOOL_NAME] = "local_shell";
-      continue;
+  const visit = (items: unknown[]) => {
+    for (const raw of items) {
+      if (!raw || typeof raw !== "object") continue;
+      const t = raw as Json;
+      if (t.type === "namespace" && Array.isArray(t.tools)) {
+        visit(t.tools);
+        continue;
+      }
+      if (t.type === "local_shell") {
+        kinds[LOCAL_SHELL_TOOL_NAME] = "local_shell";
+        continue;
+      }
+      const name = toolNameOf(t);
+      if (!name) continue;
+      if (t.type === "custom") kinds[name] = "custom";
+      else if (t.type === "function") kinds[name] = "function";
     }
-    const name = toolNameOf(t);
-    if (!name) continue;
-    if (t.type === "custom") kinds[name] = "custom";
-    else if (t.type === "function") kinds[name] = "function";
-  }
+  };
+  visit(tools);
   return Object.keys(kinds).length > 0 ? kinds : undefined;
 }
 
@@ -269,33 +348,40 @@ function convertToolsDetailed(tools: unknown): ToolConversion {
     if (!list.includes(type)) list.push(type);
   };
 
-  for (const raw of tools) {
-    if (!raw || typeof raw !== "object") continue;
-    const t = raw as Json;
-    const type = typeof t.type === "string" ? t.type : "unknown";
-    note(declared, type);
+  const visit = (items: unknown[]) => {
+    for (const raw of items) {
+      if (!raw || typeof raw !== "object") continue;
+      const t = raw as Json;
+      const type = typeof t.type === "string" ? t.type : "unknown";
+      note(declared, type);
 
-    if (t.type === "local_shell") {
-      out.push(LOCAL_SHELL_CHAT_TOOL);
-      note(mapped, type);
-    } else if (t.type === "function") {
-      if (t.function && typeof t.function === "object") {
-        out.push(t); // zaten chat-şekilli
+      if (t.type === "namespace" && Array.isArray(t.tools)) {
+        const before = out.length;
+        visit(t.tools);
+        note(out.length > before ? mapped : dropped, type);
+      } else if (t.type === "local_shell") {
+        out.push(LOCAL_SHELL_CHAT_TOOL);
+        note(mapped, type);
+      } else if (t.type === "function") {
+        if (t.function && typeof t.function === "object") {
+          out.push(t); // zaten chat-şekilli
+        } else {
+          const fn: Json = { name: t.name, description: t.description, parameters: t.parameters };
+          if (t.strict !== undefined) fn.strict = t.strict;
+          out.push({ type: "function", function: fn });
+        }
+        note(mapped, type);
+      } else if (t.type === "custom" && toolNameOf(t)) {
+        out.push(customChatTool(t));
+        note(mapped, type);
       } else {
-        const fn: Json = { name: t.name, description: t.description, parameters: t.parameters };
-        if (t.strict !== undefined) fn.strict = t.strict;
-        out.push({ type: "function", function: fn });
+        // Eşlemesi olmayan Responses araçları (web_search, image_generation, adsız custom...)
+        // chat upstream'de anlaşılmaz → düşürülür AMA raporlanır.
+        note(dropped, type);
       }
-      note(mapped, type);
-    } else if (t.type === "custom" && toolNameOf(t)) {
-      out.push(customChatTool(t));
-      note(mapped, type);
-    } else {
-      // Eşlemesi olmayan Responses araçları (web_search, image_generation, adsız custom...)
-      // chat upstream'de anlaşılmaz → düşürülür AMA raporlanır.
-      note(dropped, type);
     }
-  }
+  };
+  visit(tools);
 
   return {
     tools: out.length > 0 ? out : undefined,
@@ -350,8 +436,9 @@ export function summarizeToolContract(body: Json): {
   droppedToolTypes: string[];
   toolChoiceKind: "none" | "string" | "function" | "other";
 } {
-  const conv = convertToolsDetailed(body.tools);
-  const tc = body.tool_choice;
+  const prepared = liftAdditionalTools(body);
+  const conv = convertToolsDetailed(prepared.tools);
+  const tc = prepared.tool_choice;
   const toolChoiceKind =
     tc == null
       ? "none"
@@ -361,7 +448,7 @@ export function summarizeToolContract(body: Json): {
           ? "function"
           : "other";
   return {
-    toolCount: Array.isArray(body.tools) ? body.tools.length : 0,
+    toolCount: Array.isArray(prepared.tools) ? prepared.tools.length : 0,
     mappedToolCount: conv.tools?.length ?? 0,
     declaredToolTypes: conv.declaredTypes,
     mappedToolTypes: conv.mappedTypes,
@@ -406,6 +493,7 @@ function convertToolChoice(tc: unknown): unknown {
 
 // ── Responses request → chat/completions request ────────────────────────────
 export function responsesRequestToChat(body: Json): Json {
+  const prepared = liftAdditionalTools(body);
   const messages: ChatMessage[] = [];
   let pendingToolCalls: Json[] = [];
 
@@ -416,12 +504,12 @@ export function responsesRequestToChat(body: Json): Json {
     }
   };
 
-  const instructions = body.instructions;
+  const instructions = prepared.instructions;
   if (typeof instructions === "string" && instructions.length > 0) {
     messages.push({ role: "system", content: instructions });
   }
 
-  const input = body.input;
+  const input = prepared.input;
   if (typeof input === "string") {
     messages.push({ role: "user", content: input });
   } else if (Array.isArray(input)) {
@@ -494,27 +582,27 @@ export function responsesRequestToChat(body: Json): Json {
   flushToolCalls();
 
   const chat: Json = {
-    model: normalizeRequestedModel(body.model),
+    model: normalizeRequestedModel(prepared.model),
     messages,
   };
 
-  if (typeof body.max_output_tokens === "number") chat.max_tokens = body.max_output_tokens;
-  if (typeof body.temperature === "number") chat.temperature = body.temperature;
-  if (typeof body.top_p === "number") chat.top_p = body.top_p;
-  if (body.stream === true) chat.stream = true;
-  if (typeof body.parallel_tool_calls === "boolean") chat.parallel_tool_calls = body.parallel_tool_calls;
+  if (typeof prepared.max_output_tokens === "number") chat.max_tokens = prepared.max_output_tokens;
+  if (typeof prepared.temperature === "number") chat.temperature = prepared.temperature;
+  if (typeof prepared.top_p === "number") chat.top_p = prepared.top_p;
+  if (prepared.stream === true) chat.stream = true;
+  if (typeof prepared.parallel_tool_calls === "boolean") chat.parallel_tool_calls = prepared.parallel_tool_calls;
 
-  const conversion = convertToolsDetailed(body.tools);
+  const conversion = convertToolsDetailed(prepared.tools);
   if (conversion.tools) chat.tools = conversion.tools;
-  const toolChoice = convertToolChoice(body.tool_choice);
+  const toolChoice = convertToolChoice(prepared.tool_choice);
   // İstemci araç GÖNDERDİ ama hiçbiri çeviriden sağ çıkmadıysa tool_choice'u İLETME:
   // `tools` yok + `tool_choice` var = upstream 400. Araç hiç gönderilmediyse (tools yok/boş)
   // bugünkü davranış korunur — tool_choice neyse iletilir.
-  const allToolsDropped = Array.isArray(body.tools) && body.tools.length > 0 && !conversion.tools;
+  const allToolsDropped = Array.isArray(prepared.tools) && prepared.tools.length > 0 && !conversion.tools;
   if (toolChoice !== undefined && !allToolsDropped) chat.tool_choice = toolChoice;
 
   // reasoning.effort → reasoning_effort (sağlayıcı destekliyorsa kullanır, yoksa yok sayar)
-  const reasoning = body.reasoning as Json | undefined;
+  const reasoning = prepared.reasoning as Json | undefined;
   if (reasoning && typeof reasoning.effort === "string") chat.reasoning_effort = reasoning.effort;
 
   return chat;

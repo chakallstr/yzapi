@@ -48,7 +48,7 @@ import {
   type WebSearchMode,
 } from "../services/web-search-augment.js";
 import { chargeWebSearch } from "../services/web-search-billing-service.js";
-import { responsesRequestToChat, chatCompletionToResponses, deriveToolKinds, summarizeToolContract, countResponseToolCalls, createResponsesStreamStats, isSuspiciousToolOutcome } from "../services/responses-translation.js";
+import { responsesRequestToChat, chatCompletionToResponses, deriveToolKinds, summarizeToolContract, countResponseToolCalls, createResponsesStreamStats, isSuspiciousToolOutcome, liftAdditionalTools } from "../services/responses-translation.js";
 import {
   getApiKeyPolicy,
   getModelRuntimePolicy,
@@ -1357,19 +1357,36 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
   try {
     // 1) Responses isteğini chat/completions şemasına çevir (model slug alias dahil).
     const rawResponsesBody = req.body as Record<string, unknown>;
+    const preparedResponsesBody = liftAdditionalTools(rawResponsesBody);
     const customerId = typeof rawResponsesBody.customerId === "string" && rawResponsesBody.customerId.trim()
       ? rawResponsesBody.customerId.trim()
       : null;
-    const chatBody = responsesRequestToChat(rawResponsesBody);
+    const chatBody = responsesRequestToChat(preparedResponsesBody);
     // Araç sözleşmesi köprüsü: istemcinin DEKLARE ETTİĞİ tipler (ad → tip) dönüş çevirisine
     // taşınır ki upstream'den gelen tool_call istemcinin beklediği öğe tipiyle yayılsın
     // (custom → custom_tool_call). Araç yoksa undefined → dönüş davranışı bugünkü gibi.
-    const responsesToolKinds = deriveToolKinds(rawResponsesBody.tools);
+    const responsesToolKinds = deriveToolKinds(preparedResponsesBody.tools);
     // Teşhis (salt-ek): YALNIZ tip/sayı/boolean. Araç adı, argüman, prompt, key, base_url,
     // provider codename ve PII loglanmaz — bkz design.md §8.
-    const toolContract = summarizeToolContract(rawResponsesBody);
+    const toolContract = summarizeToolContract(preparedResponsesBody);
+    const hasTopLevelTools = Array.isArray(rawResponsesBody.tools) && rawResponsesBody.tools.length > 0;
+    const hasAdditionalTools = Array.isArray(rawResponsesBody.input) && rawResponsesBody.input.some(
+      (item) => item && typeof item === "object" && (item as Record<string, unknown>).type === "additional_tools",
+    );
     logger.info(
-      { requestId, endpoint: "responses", stream: isStream, ...toolContract },
+      {
+        requestId,
+        endpoint: "responses",
+        stream: isStream,
+        toolSource: hasTopLevelTools && hasAdditionalTools
+          ? "tools+additional_tools"
+          : hasAdditionalTools
+            ? "additional_tools"
+            : hasTopLevelTools
+              ? "tools"
+              : "none",
+        ...toolContract,
+      },
       "responses tool contract",
     );
     // Stream yolu araç sayacı (salt-gözlem): translator'ın gördüğü upstream tool_call ve
@@ -1400,7 +1417,7 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
     masterModel = enforcement.masterModel;
     // gpt-5.6 tier prep: model_runtime_policies.default_reasoning_effort set'liyse ve client
     // reasoning belirtmemişse enjekte et. Policy NULL (bugün her model) → no-op.
-    applyDefaultReasoningEffort(req.body as Record<string, unknown>, enforcement.runtimePolicy);
+    applyDefaultReasoningEffort(preparedResponsesBody, enforcement.runtimePolicy);
     runtimeConfig = enforcement.runtimeConfig;
     if (runtimeConfig.maintenanceModeForApi) {
       throw new AppError(503, runtimeConfig.maintenanceMessage);
@@ -1538,7 +1555,7 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
     // (guardrails are faz0-inert/off today); if they're ever enabled to MUTATE bodies, mirror
     // that here for the native path (follow-up).
     const rawProviderBody: Record<string, unknown> = {
-      ...rawResponsesBody,
+      ...preparedResponsesBody,
       model: providerBody.model,
       max_output_tokens: guard.reservedCompletionTokens,
     };
@@ -1628,9 +1645,9 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
             // Rethrow → forwardWithFailover sub-codex GENİŞ taksonomisiyle (her non-2xx eligible,
             // provider-failover.ts) isteği GERÇEK koltuk bacağına (orijinal gövde, tam yetenek)
             // düşürür = gelecekteki HER bilinmeyen spark kısıtı için güvenlik ağı.
-            const degraded = shouldDegradeNativeResponsesForContext(ctx, err, res, rawResponsesBody);
+            const degraded = shouldDegradeNativeResponsesForContext(ctx, err, res, preparedResponsesBody);
             logger.info(
-              { requestId, stream: true, degraded, lossyToolTypes: translationLossyToolTypes(rawResponsesBody) },
+              { requestId, stream: true, degraded, lossyToolTypes: translationLossyToolTypes(preparedResponsesBody) },
               "responses native degrade",
             );
             if (degraded) {
@@ -1694,9 +1711,9 @@ async function handleResponsesEndpoint(req: Request, res: Response, next: NextFu
             return { raw: r.raw, usage: r.usage, native: true };
           } catch (err) {
             // Native /responses unsupported (pre-commit 4xx/404) → translation on the SAME ctx.
-            const degraded = isNativeResponsesDegradable(err, res, rawResponsesBody);
+            const degraded = isNativeResponsesDegradable(err, res, preparedResponsesBody);
             logger.info(
-              { requestId, stream: false, degraded, lossyToolTypes: translationLossyToolTypes(rawResponsesBody) },
+              { requestId, stream: false, degraded, lossyToolTypes: translationLossyToolTypes(preparedResponsesBody) },
               "responses native degrade",
             );
             if (degraded) {

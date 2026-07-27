@@ -23,8 +23,10 @@ describe("responses araç sözleşmesi kablolaması (proxy.ts)", () => {
     expect(source).toMatch(/import\s*\{[^}]*summarizeToolContract[^}]*\}\s*from\s*"\.\.\/services\/responses-translation\.js"/s);
   });
 
-  it("toolKinds ham istek gövdesinden türetilir", () => {
-    expect(source).toContain("deriveToolKinds(rawResponsesBody.tools)");
+  it("additional_tools önce hazırlanır; toolKinds hazırlanmış gövdeden türetilir", () => {
+    expect(source).toContain("const preparedResponsesBody = liftAdditionalTools(rawResponsesBody)");
+    expect(source).toContain("deriveToolKinds(preparedResponsesBody.tools)");
+    expect(source).toContain("summarizeToolContract(preparedResponsesBody)");
   });
 
   it("stream dönüş çevirisi toolKinds taşır (responsesMeta)", () => {
@@ -35,9 +37,11 @@ describe("responses araç sözleşmesi kablolaması (proxy.ts)", () => {
     expect(source).toMatch(/chatCompletionToResponses\(raw, \{[^}]*toolKinds: responsesToolKinds[^}]*\}\)/);
   });
 
-  it("native-degrade kapısı iki çağrı noktasında da ham gövdeyle beslenir", () => {
-    expect(source).toContain("shouldDegradeNativeResponsesForContext(ctx, err, res, rawResponsesBody)");
-    expect(source).toContain("isNativeResponsesDegradable(err, res, rawResponsesBody)");
+  it("native forwarding ve degrade kapısı hazırlanmış gövdeyle beslenir", () => {
+    expect(source).toMatch(/const rawProviderBody[^=]*=\s*\{\s*\.\.\.preparedResponsesBody/s);
+    expect(source).toContain("shouldDegradeNativeResponsesForContext(ctx, err, res, preparedResponsesBody)");
+    expect(source).toContain("isNativeResponsesDegradable(err, res, preparedResponsesBody)");
+    expect(source).toContain("translationLossyToolTypes(preparedResponsesBody)");
   });
 
   it("teşhis logu iki noktada da yazılır", () => {
